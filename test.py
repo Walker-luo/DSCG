@@ -122,10 +122,11 @@ class JsonActionExecutor(agent_pipeline.BasePipelineElement):
             # 将新生成的助手消息加入列表
             updated_messages = [*messages, assistant_msg]
 
-            print("="*100)
-            print("成功提取 ActionSequenceModel，将 Assistant 消息返回给框架")
-            print(updated_messages)
-            print("="*100)
+            # print("="*100)
+            # print("成功提取 ActionSequenceModel，将 Assistant 消息返回给框架")
+            # print(updated_messages)
+            # print("="*100)
+            # x = input()
 
             # --- 修改核心点：直接返回，不再调用 ToolsExecutor ---
             # 这样消息列表的最后一条就是带有 tool_calls 的 assistant_msg
@@ -161,10 +162,16 @@ def make_qwen_json_pipeline(model_id: str):
     # 创建我们的自定义执行器
     json_executor = JsonActionExecutor(llm)
 
+    tools_loop = agent_pipeline.ToolsExecutionLoop([
+        agent_pipeline.ToolsExecutor(), 
+        llm
+    ])
+
     pipeline = agent_pipeline.AgentPipeline([
         agent_pipeline.SystemMessage(load_system_message(None)), 
         agent_pipeline.InitQuery(),
-        json_executor  # 这里直接处理了 生成JSON + 解析 + 执行工具
+        json_executor,  # 这里直接处理了 生成JSON + 解析
+        tools_loop
     ])
     
     pipeline.name = f"{llm.name}-json-mode"
