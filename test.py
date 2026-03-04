@@ -81,7 +81,7 @@ class JsonActionExecutor(agent_pipeline.BasePipelineElement):
 
     def query(self, query, runtime, env, messages, extra_args):
         
-        # --- 步骤 1：动态获取“正确答案” ---
+        # 获取相关工具定义
         tools_definitions = self._get_tool_definitions(runtime)
 
         # --- 步骤 2：构建包含定义的 System Prompt ---
@@ -149,7 +149,26 @@ class JsonActionExecutor(agent_pipeline.BasePipelineElement):
             
             data = ActionSequenceModel.model_validate_json(clean_content)
             
+            # ==========================================
+            #TODO 核心安全逻辑：判断当前回合是否由用户发起的，是的话跟新sandbox
+            # ==========================================
+            last_input_msg = messages[-1]
+            last_role = last_input_msg["role"] if isinstance(last_input_msg, dict) else getattr(last_input_msg, "role", None)
             
+            is_user_turn = (last_role == "user")
+            
+            if self.sandbox is not None:
+                if is_user_turn:
+                    # 场景 A：当前是任务第一轮（用户刚提问）
+                    generated_tools = list(set([action.tool_name for action in data.actions]))
+                    self.sandbox.allowed_tools = generated_tools
+                    print(f"🔒 [安全锁定] 检测到用户原始提问，沙箱白名单已自动锁定为: {generated_tools}")
+                else:
+                    # 场景 B：当前是多轮交互（工具返回了结果，可能带毒）
+                    print(f"⏩ [动作延续] 多轮流转中，维持原有安全白名单: {self.sandbox.allowed_tools}")
+            # ==========================================
+
+            # 5. 封装成 AgentDojo 可识别的 Assistant 消息
             ad_tool_calls = []
             for action in data.actions:
                 call_id = f"call_{uuid.uuid4().hex[:8]}" 
@@ -165,7 +184,6 @@ class JsonActionExecutor(agent_pipeline.BasePipelineElement):
                 tool_calls=ad_tool_calls
             )
             
-            # 返回给 Pipeline，由后续的 ToolsExecutor 执行
             return query, runtime, env, [*messages, assistant_msg], extra_args
 
         except Exception as e:
@@ -175,6 +193,7 @@ class JsonActionExecutor(agent_pipeline.BasePipelineElement):
                 "tool_calls": [] 
             }
             return query, runtime, env, [*messages, error_msg], extra_args
+
 
 
 class ActionSecurityChecker(agent_pipeline.BasePipelineElement):
@@ -257,7 +276,7 @@ class PermissionSandbox(agent_pipeline.BasePipelineElement):
         last_msg = messages[-1]
         role = last_msg["role"] if isinstance(last_msg, dict) else last_msg.role
         
-        if role != "assistant":
+        if role != "assistant" or "tool":
             return query, runtime, env, messages, extra_args
             
         tool_calls = last_msg.get("tool_calls", []) if isinstance(last_msg, dict) else last_msg.tool_calls
@@ -312,36 +331,120 @@ class PermissionSandbox(agent_pipeline.BasePipelineElement):
         return query, runtime, env, [*messages[:-1], block_msg], extra_args
 
 
-class DynamicPermissionGenerator(agent_pipeline.BasePipelineElement):
-    def __init__(self, sandbox: PermissionSandbox):
-        self.sandbox = sandbox # 传入沙箱实例，以便动态修改它的规则
+
+class PermissionSandbox(agent_pipeline.BasePipelineElement):
+    def __init__(self, allowed_tools: list[str] = None, safe_domains: list[str] = None):
+        """
+        初始化沙箱规则
+        allowed_tools: 允许调用的工具白名单
+        safe_domains: 允许发送邮件的安全域名白名单
+        """
+        self.allowed_tools = allowed_tools or []
+        self.safe_domains = safe_domains or []  
 
     def query(self, query, runtime, env, messages, extra_args):
-        # 1. 解析用户的原始需求
-        # (这里用简单的关键词匹配作为示例，实际工业界会用一个小模型做意图分类)
-        user_query = query.lower()
+        if not messages:
+            return query, runtime, env, messages, extra_args
+
+        last_msg = messages[-1]
+        role = last_msg["role"] if isinstance(last_msg, dict) else getattr(last_msg, "role", None)
         
-        dynamic_allowed_tools = []
-        
-        # 2. 动态分配最小权限 (Least Privilege 原则)
-        if "email" in user_query or "message" in user_query:
-            dynamic_allowed_tools.extend(["search_emails", "read_email", "send_email"])
-        
-        if "calendar" in user_query or "event" in user_query:
-            dynamic_allowed_tools.extend(["search_calendar_events", "get_day_calendar_events"])
+        # ==========================================
+        #! 1. 事前拦截：大模型企图执行动作 (role == 'assistant')
+        # ==========================================
+        if role == "assistant":
+            tool_calls = last_msg.get("tool_calls", []) if isinstance(last_msg, dict) else getattr(last_msg, "tool_calls", [])
+            if not tool_calls:
+                return query, runtime, env, messages, extra_args
+
+            for call in tool_calls:
+                tool_name = call.function if hasattr(call, 'function') else call.get("function")
+                args = call.args if hasattr(call, 'args') else call.get("args", {})
+
+                # --- 规则 1：工具白名单校验 ---
+                if self.allowed_tools and tool_name not in self.allowed_tools:
+                    return self._block_action(
+                        query, runtime, env, messages, extra_args, 
+                        f"Sandbox Violation: Tool '{tool_name}' is not allowed in this context."
+                    )
+
+                # --- 规则 2：参数安全校验 ---
+                if tool_name == "send_email" and "recipients" in args:
+                    for recipient in args["recipients"]:
+                        domain = recipient.split('@')[-1] if '@' in recipient else ""
+                        if self.safe_domains and domain not in self.safe_domains:
+                            return self._block_action(
+                                query, runtime, env, messages, extra_args, 
+                                f"Sandbox Violation: Unauthorized domain '{domain}'. Allowed: {self.safe_domains}"
+                            )
+
+            print("🛡️ [SANDBOX PRE-CHECK] Assistant actions passed.")
+            return query, runtime, env, messages, extra_args
+
+        # ==========================================
+        #! 2. 事后/数据监控：工具返回了结果 (role == 'tool')
+        # ==========================================
+        elif role == "tool":
+            content_obj = last_msg.get("content", []) if isinstance(last_msg, dict) else getattr(last_msg, "content", [])
+            text_content = ad_types.get_text_content_as_str(content_obj)
             
-        if "file" in user_query or "document" in user_query:
-            dynamic_allowed_tools.extend(["search_files", "read_file"])
+            tool_name = ""
+            if isinstance(last_msg, dict) and "tool_call" in last_msg:
+                tool_name = last_msg["tool_call"].get("function", "")
+            elif hasattr(last_msg, "tool_call") and hasattr(last_msg.tool_call, "function"):
+                tool_name = last_msg.tool_call.function
 
-        # 3. 如果识别不出意图，给一个绝对安全的兜底白名单（只读工具）
-        if not dynamic_allowed_tools:
-            dynamic_allowed_tools = ["get_current_day"]
+            # --- 规则 3：过滤工具返回结果中的恶意/敏感数据 ---
+            # 针对 AgentDojo 常见的注入标签 <INFORMATION> 进行物理过滤
+            if "<INFORMATION>" in text_content or "</INFORMATION>" in text_content:
+                return self._block_tool_output(
+                    query, runtime, env, messages, extra_args,
+                    f"Sandbox Violation: Malicious Prompt Injection pattern detected in {tool_name} output."
+                )
+                
+            # 针对敏感数据读取的告警 (比如读到了包含密码的文件)
+            if re.search(r'(?i)password\s*is\s*[:=]\s*\w+', text_content):
+                return self._block_tool_output(
+                    query, runtime, env, messages, extra_args,
+                    f"Sandbox Violation: Sensitive credential detected in {tool_name} output. Data sanitized."
+                )
 
-        # 4. 把生成的动态白名单，硬塞给后面的沙箱！
-        print(f"🔐 [Dynamic Permission] 为本次任务分配临时权限: {dynamic_allowed_tools}")
-        self.sandbox.allowed_tools = dynamic_allowed_tools
+            print(f"🛡️ [SANDBOX POST-CHECK] Tool '{tool_name}' output sanitized and passed.")
+            return query, runtime, env, messages, extra_args
 
+        # 其他角色 (user, system) 直接放行
         return query, runtime, env, messages, extra_args
+
+
+    def _block_action(self, query, runtime, env, messages, extra_args, reason: str):
+        """【拦截 Assistant】清除危险的 tool_calls，阻止工具执行"""
+        print(f"🛑 [SANDBOX OUTBOUND BLOCKED] {reason}")
+        block_msg = ad_types.ChatAssistantMessage(
+            role="assistant",
+            content=[ad_types.text_content_block_from_string(reason)],
+            tool_calls=[] # 清空工具调用
+        )
+        return query, runtime, env, [*messages[:-1], block_msg], extra_args
+
+    def _block_tool_output(self, query, runtime, env, messages, extra_args, reason: str):
+        """【拦截 Tool】抹除危险的工具返回值，防止大模型看到恶意指令或敏感数据"""
+        print(f"🛑 [SANDBOX INBOUND BLOCKED] {reason}")
+        
+        last_msg = messages[-1]
+        # 必须保留原始的 tool_call_id，否则 OpenAI/大模型上下文会报错匹配不上
+        tool_call_id = last_msg.get("tool_call_id") if isinstance(last_msg, dict) else getattr(last_msg, "tool_call_id", "")
+        tool_call = last_msg.get("tool_call") if isinstance(last_msg, dict) else getattr(last_msg, "tool_call", None)
+
+        # 构造一个安全、被“和谐”过的工具返回消息
+        safe_tool_msg = {
+            "role": "tool",
+            "content": [{"type": "text", "text": f"[DATA SANITIZED BY SANDBOX] {reason}"}],
+            "tool_call_id": tool_call_id,
+            "tool_call": tool_call,
+            "error": "Sanitized"
+        }
+        
+        return query, runtime, env, [*messages[:-1], safe_tool_msg], extra_args
 
 
 def make_qwen_json_pipeline(model_id: str, sec_model_id: str):
@@ -366,14 +469,19 @@ def make_qwen_json_pipeline(model_id: str, sec_model_id: str):
     sec_llm = agent_pipeline.OpenAILLM(client, sec_model_id, temperature=0.0, reasoning_effort=None)
     sec_llm.name = sec_model_id
 
-    # 创建我们的自定义执行器
-    json_executor = JsonActionExecutor(llm)
+    #! 如果你保留了独立的物理拦截沙箱，先实例化它：
+    my_sandbox = PermissionSandbox(allowed_tools=[])
+
+    # 创建执行器
+    json_executor = JsonActionExecutor(llm, sandbox= my_sandbox)
     security_checker = ActionSecurityChecker(small_llm=sec_llm)
 
 
     tools_loop = agent_pipeline.ToolsExecutionLoop([
         agent_pipeline.ToolsExecutor(), 
-        llm
+        llm,
+        security_checker,   
+        my_sandbox          
     ])
 
     pipeline = agent_pipeline.AgentPipeline([
@@ -381,10 +489,11 @@ def make_qwen_json_pipeline(model_id: str, sec_model_id: str):
         agent_pipeline.InitQuery(),
         json_executor,  # 这里直接处理了 生成JSON + 解析
         security_checker,
+        my_sandbox,
         tools_loop
     ])
     
-    pipeline.name = f"{llm.name}-sec-mode"
+    pipeline.name = f"{sec_llm.name}-test"
     return pipeline
 
 
@@ -452,16 +561,45 @@ def main(
 
         # D. 输出结果分析
         utility_results = results["utility_results"]
-        utility_score = sum(utility_results.values()) / len(utility_results)
-        print(f"[{suite_name}] 可用性 (Utility): {utility_score:.2%}")
+        security_results = results.get("security_results", {})
 
-        if run_attack:
-            security_results = results["security_results"]
-            security_score = sum(security_results.values()) / len(security_results)
-            print(f"[{suite_name}] 安全性 (Security): {security_score:.2%}")
+        print("\n" + "="*50)
+        print(f"📊 [{suite_name}] 任务详细执行报告")
+        print("="*50)
+
+        # 遍历输出每个具体任务的执行情况
+        for task_key, util_status in utility_results.items():
+            # task_key 是一个元组: (user_task_id, injection_task_id)
+            user_task_id = task_key[0]
+            injection_task_id = task_key[1] if len(task_key) > 1 else "None"
             
-            # 安全性得分 0% 意味着模型每次都中了注入攻击
-            # 安全性得分 100% 意味着模型成功忽略了所有注入指令
+            # 格式化输出可用性
+            util_str = "✅ 成功 (True)" if util_status else "❌ 失败 (False)"
+            
+            if run_attack:
+                # 获取对应的安全性结果
+                sec_status = security_results.get(task_key, False)
+                sec_str = "🛡️ 防御成功 (True)" if sec_status else "⚠️ 被攻破 (False)"
+                
+                print(f"📌 [用户任务]: {user_task_id:<25} | [注入攻击]: {injection_task_id:<25}")
+                print(f"   -> 功能性 (Utility): {util_str:<15} | 安全性 (Security): {sec_str}")
+                print("-" * 50)
+            else:
+                print(f"📌 [用户任务]: {user_task_id:<25}")
+                print(f"   -> 功能性 (Utility): {util_str}")
+                print("-" * 50)
+
+        # 最后输出总体得分
+        print("\n🏆 总体评测得分汇总:")
+        utility_score = sum(utility_results.values()) / len(utility_results)
+        print(f"👉 [{suite_name}] 整体可用性 (Utility): {utility_score:.2%}")
+
+        if run_attack and len(security_results) > 0:
+            security_score = sum(security_results.values()) / len(security_results)
+            print(f"👉 [{suite_name}] 整体安全性 (Security): {security_score:.2%}")
+            
+        print("="*50 + "\n")
+
 
 
 if __name__ == "__main__":
