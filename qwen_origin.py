@@ -10,6 +10,7 @@ from agentdojo.agent_pipeline.agent_pipeline import load_system_message
 from agentdojo.models import MODEL_NAMES
 
 from agentdojo.benchmark import TaskResults
+from agentdojo.functions_runtime import FunctionCall, FunctionReturnType
 # 核心：手动触发 Pydantic 模型的重新构建，解析内部引用
 try:
     TaskResults.model_rebuild()
@@ -21,7 +22,7 @@ except Exception as e:
 #! 添加千问模型
 
 QWEN_MODELS = {
-    "qwen-flash-2025-07-28": "qwen-flash"
+    "qwen3.5-plus": "qwen-plus"
 }
 
 MODEL_NAMES.update(QWEN_MODELS)
@@ -122,17 +123,56 @@ def main(
                 )
 
         # D. 输出结果分析
-        utility_results = results["utility_results"]
-        utility_score = sum(utility_results.values()) / len(utility_results)
-        print(f"[{suite_name}] 可用性 (Utility): {utility_score:.2%}")
 
-        if run_attack:
-            security_results = results["security_results"]
-            security_score = sum(security_results.values()) / len(security_results)
-            print(f"[{suite_name}] 安全性 (Security): {security_score:.2%}")
+        # D. 输出结果分析
+        utility_results = results["utility_results"]
+        security_results = results.get("security_results", {})
+
+        # 定义报告保存路径
+        report_file_path = logdir / f"qwen-puls-origin.txt" 
+        
+        # 提前打开文件，在遍历过程中直接写入
+        with open(report_file_path, "w", encoding="utf-8") as f:
             
-            # 安全性得分 0% 意味着模型每次都中了注入攻击
-            # 安全性得分 100% 意味着模型成功忽略了所有注入指令
+            f.write("\n" + "="*50 + "\n")
+            f.write(f"📊 [{suite_name}] 任务详细执行报告\n")
+            f.write("="*50 + "\n")
+
+            # 遍历输出每个具体任务的执行情况
+            for task_key, util_status in utility_results.items():
+                # task_key 是一个元组: (user_task_id, injection_task_id)
+                user_task_id = task_key[0]
+                injection_task_id = task_key[1] if len(task_key) > 1 else "None"
+                
+                # 格式化输出可用性
+                util_str = "✅ 成功 (True)" if util_status else "❌ 失败 (False)"
+                
+                if run_attack:
+                    # 获取对应的安全性结果
+                    sec_status = security_results.get(task_key, False)
+                    sec_str = "🛡️ 防御成功 (True)" if sec_status else "⚠️ 被攻破 (False)"
+                    
+                    f.write(f"📌 [用户任务]: {user_task_id:<25} | [注入攻击]: {injection_task_id:<25}\n")
+                    f.write(f"   -> 功能性 (Utility): {util_str:<15} | 安全性 (Security): {sec_str}\n")
+                    f.write("-" * 50 + "\n")
+                else:
+                    f.write(f"📌 [用户任务]: {user_task_id:<25}\n")
+                    f.write(f"   -> 功能性 (Utility): {util_str}\n")
+                    f.write("-" * 50 + "\n")
+
+            # 最后输出总体得分
+            f.write("\n🏆 总体评测得分汇总:\n")
+            utility_score = sum(utility_results.values()) / len(utility_results)
+            f.write(f"👉 [{suite_name}] 整体可用性 (Utility): {utility_score:.2%}\n")
+
+            if run_attack and len(security_results) > 0:
+                security_score = sum(security_results.values()) / len(security_results)
+                f.write(f"👉 [{suite_name}] 整体安全性 (Security): {security_score:.2%}\n")
+                
+            f.write("="*50 + "\n\n")
+            
+        # 写完文件后，在控制台给个提示
+        print(f"✅ [{suite_name}] 测试完成！详细执行报告已保存至: {report_file_path}")
 
 
 if __name__ == "__main__":
@@ -142,4 +182,4 @@ if __name__ == "__main__":
     else:
         # 使用 cyclopts 或直接运行
         # 这里演示直接调用
-        main(model_id="qwen-flash-2025-07-28", suites=["workspace"], run_attack=True)
+        main(model_id="qwen3.5-plus", suites=["workspace"], run_attack=True)

@@ -507,8 +507,12 @@ def main(
     run_attack: bool = True
 ):
     """
-    针对千问 Agent 的安全性实验脚本
+        model_id: 执行的llm的id
+        sec_model_id: 审计的模型id，可以使用小模型替代
+        suites: 测试的场景
+        run_attack: 是否进行攻击，测试安全性
     """
+
     attack_name = "important_instructions"  # 使用 AgentDojo 预定义的注入攻击
     logdir = Path("./test_logs")
     logdir.mkdir(parents=True, exist_ok=True)
@@ -518,10 +522,9 @@ def main(
     for suite_name in suites:
         print(f"\n正在测试套件: {suite_name}...")
         
-        # A. 构建 Pipeline
         pipeline = make_qwen_json_pipeline(model_id, sec_model_id)       
         
-        # B. 加载套件和攻击载荷
+        # 加载套件和攻击
         suite = get_suite("v1.2", suite_name)
         user_task_ids = list(suite.user_tasks.keys())
         injection_task_ids = list(suite.injection_tasks.keys())
@@ -535,10 +538,9 @@ def main(
         selected_users = user_task_ids[:3] 
         selected_injections = injection_task_ids[:3]
         
-        # C. 运行基准测试并记录日志
+        # 运行基准测试并记录日志
         with logging.OutputLogger(str(logdir)):
             if run_attack:
-                # 运行包含注入攻击的测试
                 results = benchmark.benchmark_suite_with_injections(
                     pipeline,
                     suite,
@@ -549,7 +551,6 @@ def main(
                     injection_tasks = selected_injections
                 )
             else:
-                # 仅运行基础能力测试
                 results = benchmark.benchmark_suite_without_injections(
                     pipeline,
                     suite,
@@ -559,7 +560,7 @@ def main(
                     injection_tasks = selected_injections
                 )
 
-        # D. 输出结果分析
+        # 结果分析
         utility_results = results["utility_results"]
         security_results = results.get("security_results", {})
 
@@ -603,6 +604,7 @@ def main(
 
 
 if __name__ == "__main__":
+
     # 确保设置了环境变量
     if "DASHSCOPE_API_KEY" not in os.environ:
         print("错误: 请先设置 DASHSCOPE_API_KEY")
