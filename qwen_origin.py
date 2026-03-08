@@ -123,8 +123,6 @@ def main(
                 )
 
         # D. 输出结果分析
-
-        # D. 输出结果分析
         utility_results = results["utility_results"]
         security_results = results.get("security_results", {})
 

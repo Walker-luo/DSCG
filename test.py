@@ -35,57 +35,57 @@ class ActionModel(BaseModel):
 class ActionSequenceModel(BaseModel):
     actions: List[ActionModel]
 
-
 class JsonActionExecutor(agent_pipeline.BasePipelineElement):
     def __init__(self, llm: agent_pipeline.OpenAILLM, sandbox: None):
         self.llm = llm
-        self.sandbox = sandbox
+        self.sandbox = sandbox #! 权限沙箱
 
     def _get_tool_definitions(self, runtime: functions_runtime.FunctionsRuntime) -> str:
+        '''
+            获取测试环境的全部工具参数
+        '''
 
-            tools_desc = []
-            for name, func in runtime.functions.items():
-                # 1. 在 AgentDojo 中，文档通常在 .description 里
-                doc = getattr(func, "description", getattr(func, "doc", "No description."))
+        tools_desc = []
+        for name, func in runtime.functions.items():
+            # 1. 在 AgentDojo 中，文档通常在 .description 里
+            doc = getattr(func, "description", getattr(func, "doc", "No description."))
+            
+            # 2. 解析 Pydantic Schema 获取参数
+            params_str = "()"
+            pydantic_model = getattr(func, "parameters", None)
+            
+            if pydantic_model and hasattr(pydantic_model, "model_json_schema"):
+                schema = pydantic_model.model_json_schema()
+                properties = schema.get("properties", {})
+                required_fields = schema.get("required", [])
                 
-                # 2. 解析 Pydantic Schema 获取参数
-                params_str = "()"
-                pydantic_model = getattr(func, "parameters", None)
+                param_list = []
+                for p_name, p_info in properties.items():
+                    p_type = p_info.get("type", "any")
+                    # 处理列表类型 (如 list[str])
+                    if "items" in p_info:
+                        p_type = f"list[{p_info['items'].get('type', 'any')}]"
+                        
+                    req_str = "required" if p_name in required_fields else "optional"
+                    param_list.append(f"{p_name}: {p_type} ({req_str})")
                 
-                if pydantic_model and hasattr(pydantic_model, "model_json_schema"):
-                    schema = pydantic_model.model_json_schema()
-                    properties = schema.get("properties", {})
-                    required_fields = schema.get("required", [])
-                    
-                    param_list = []
-                    for p_name, p_info in properties.items():
-                        p_type = p_info.get("type", "any")
-                        # 处理列表类型 (如 list[str])
-                        if "items" in p_info:
-                            p_type = f"list[{p_info['items'].get('type', 'any')}]"
-                            
-                        req_str = "required" if p_name in required_fields else "optional"
-                        param_list.append(f"{p_name}: {p_type} ({req_str})")
-                    
-                    params_str = f"({', '.join(param_list)})"
+                params_str = f"({', '.join(param_list)})"
 
-                tools_desc.append(f"Tool: {name}{params_str}\nDescription: {doc}")
+            tools_desc.append(f"Tool: {name}{params_str}\nDescription: {doc}")
+            # print("="*100)
+            # print("tools_desc++++++++")
+            # print(tools_desc)
+            # print("="*100)
 
-                # print("="*100)
-                # print("tools_desc++++++++")
-                # print(tools_desc)
-                # print("="*100)
-                
-            return "\n\n".join(tools_desc)
+        return "\n\n".join(tools_desc)
     
 
     def query(self, query, runtime, env, messages, extra_args):
         
-        # 获取相关工具定义
+        # TODO 优化一下，获取全部工具参数会消耗较多tokens
         tools_definitions = self._get_tool_definitions(runtime)
 
-        # --- 步骤 2：构建包含定义的 System Prompt ---
-        # 强制模型阅读定义，并使用定义中的参数名
+        # 构建包含定义的 System Prompt:强制模型阅读定义，并使用定义中的参数名
         json_instruction = (
             f"\n\n### AVAILABLE TOOLS (API REFERENCE) ###\n"
             f"{tools_definitions}\n" 
@@ -100,7 +100,6 @@ class JsonActionExecutor(agent_pipeline.BasePipelineElement):
             "3. Do not output anything other than the JSON."
         )
         
-
         # 更新 System Message -> 调用 LLM -> 解析 JSON
         new_messages = list(messages)
         
@@ -119,8 +118,7 @@ class JsonActionExecutor(agent_pipeline.BasePipelineElement):
                                         "role": "system", 
                                         "content": [{
                                             "type": "text", 
-                                            "text": updated_text, 
-                                            "content": updated_text  # <--- 务必加上这个！
+                                            "content": updated_text 
                                         }]}
             else:
                 new_messages[0] = ad_types.ChatSystemMessage(
@@ -128,13 +126,21 @@ class JsonActionExecutor(agent_pipeline.BasePipelineElement):
                     content=[ad_types.text_content_block_from_string(updated_text)]
                 )
 
-        # 调用 LLM
-        dummy_runtime = functions_runtime.FunctionsRuntime()
-        _, _, _, [*_, response_msg], _ = self.llm.query(query, dummy_runtime, env, new_messages, extra_args)
+        #! 调用 LLM
+        # dummy_runtime = functions_runtime.FunctionsRuntime()
+
+
+        
+        # TODO 优化动作流的生成步骤
+        #! 传入模型的new_messages：system prompt+ user prompt
+        # _, _, _, [*_, response_msg], _ = self.llm.query(query, dummy_runtime, env, new_messages, extra_args)
+        _, _, _, [*_, response_msg], _ = self.llm.query(query, runtime, env, messages, extra_args)
         # print("+"*100)
         # print("respose")
         # print(response_msg)
         # print("+"*100)
+        print(response_msg)
+        x = input()
 
         content = ad_types.get_text_content_as_str(
             response_msg['content'] if isinstance(response_msg, dict) else response_msg.content
@@ -142,16 +148,13 @@ class JsonActionExecutor(agent_pipeline.BasePipelineElement):
 
 
         try:
-            # 鲁棒解析
+            #! 解析模型输出的动作流为  ActionSequenceModel，便于后续的审计操作
             json_match = re.search(r'(\{.*\}|\[.*\])', content, re.DOTALL)
             clean_content = json_match.group(1) if json_match else content
             clean_content = clean_content.replace("```json", "").replace("```", "").strip()
-            
             data = ActionSequenceModel.model_validate_json(clean_content)
             
-            # ==========================================
-            #TODO 核心安全逻辑：判断当前回合是否由用户发起的，是的话跟新sandbox
-            # ==========================================
+            #! 判断当前回合是否由用户发起的，是的话更新sandbox
             last_input_msg = messages[-1]
             last_role = last_input_msg["role"] if isinstance(last_input_msg, dict) else getattr(last_input_msg, "role", None)
             
@@ -159,16 +162,15 @@ class JsonActionExecutor(agent_pipeline.BasePipelineElement):
             
             if self.sandbox is not None:
                 if is_user_turn:
-                    # 场景 A：当前是任务第一轮（用户刚提问）
                     generated_tools = list(set([action.tool_name for action in data.actions]))
                     self.sandbox.allowed_tools = generated_tools
-                    print(f"🔒 [安全锁定] 检测到用户原始提问，沙箱白名单已自动锁定为: {generated_tools}")
+                    print(f"🔒 检测到用户原始请求，沙箱白名单已自动锁定为: {generated_tools}")
                 else:
-                    # 场景 B：当前是多轮交互（工具返回了结果，可能带毒）
-                    print(f"⏩ [动作延续] 多轮流转中，维持原有安全白名单: {self.sandbox.allowed_tools}")
-            # ==========================================
+                    # 当前是多轮交互（工具返回了结果可能带毒）
+                    print(f"⏩ [动作延续] 维持原有安全白名单: {self.sandbox.allowed_tools}")
 
-            # 5. 封装成 AgentDojo 可识别的 Assistant 消息
+
+            # 封装成 AgentDojo 可识别的 Assistant 消息
             ad_tool_calls = []
             for action in data.actions:
                 call_id = f"call_{uuid.uuid4().hex[:8]}" 
@@ -183,18 +185,19 @@ class JsonActionExecutor(agent_pipeline.BasePipelineElement):
                 content=[ad_types.text_content_block_from_string(f"Thinking: {data.actions[0].thought}")],
                 tool_calls=ad_tool_calls
             )
-            
-            return query, runtime, env, [*messages, assistant_msg], extra_args
 
+            return query, runtime, env, [*messages, assistant_msg], extra_args
+            
+        #! 解析动作流失败
         except Exception as e:
+
             error_msg = {
                 "role": "assistant",
-                "content": [{"type": "text", "text": f"Error parsing JSON: {str(e)}"}],
+                "content": [{"type": "text", "content": f"Error parsing JSON: {str(e)}"}],
                 "tool_calls": [] 
             }
+            print("🚨 解析动作流失败")
             return query, runtime, env, [*messages, error_msg], extra_args
-
-
 
 class ActionSecurityChecker(agent_pipeline.BasePipelineElement):
     def __init__(self, small_llm: agent_pipeline.OpenAILLM): # 传入你的监控小模型
