@@ -466,7 +466,6 @@ def main(
         # 写完文件后，在控制台给个提示
         print(f"✅ [{suite_name}] 测试完成！详细执行报告已保存至: {report_file_path}")
 
-
 if __name__ == "__main__":
 
     # 确保设置了环境变量

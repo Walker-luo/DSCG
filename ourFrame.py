@@ -16,7 +16,8 @@ from agentdojo.benchmark import TaskResults
 import uuid
 import re
 
-# 核心：手动触发 Pydantic 模型的重新构建，解析内部引用
+
+# 手动触发 Pydantic 模型的重新构建，解析内部引用
 try:
     TaskResults.model_rebuild()
 except Exception as e:
@@ -32,6 +33,9 @@ class ActionModel(BaseModel):
 
 class ActionSequenceModel(BaseModel):
     actions: List[ActionModel]
+
+
+
 
 
 class JsonActionExecutor(agent_pipeline.BasePipelineElement):
@@ -454,7 +458,7 @@ def main(
                 if run_attack:
                     # 获取对应的安全性结果
                     sec_status = security_results.get(task_key, False)
-                    sec_str = "🛡️ 防御成功 (True)" if sec_status else "⚠️ 被攻破 (False)"
+                    sec_str = "🛡️ 防御成功 (True)" if not sec_status else "⚠️ 被攻破 (False)"
                     
                     f.write(f"📌 [用户任务]: {user_task_id:<25} | [注入攻击]: {injection_task_id:<25}\n")
                     f.write(f"   -> 功能性 (Utility): {util_str:<15} | 安全性 (Security): {sec_str}\n")
