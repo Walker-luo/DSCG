@@ -6,6 +6,9 @@ import json
 import csv
 from pathlib import Path
 
+#统计token
+from tools import TokenTrackerClient
+
 from agentdojo import agent_pipeline, functions_runtime, logging, benchmark, attacks
 from agentdojo.task_suite import get_suite
 from agentdojo.agent_pipeline.agent_pipeline import load_system_message
@@ -18,10 +21,6 @@ try:
     TaskResults.model_rebuild()
 except Exception as e:
     print(f"提醒：TaskResults 重构过程中出现小插曲（可能已处理）: {e}")
-
-
-
-
 
 
 
@@ -41,10 +40,12 @@ def make_qwen_original_pipeline(model_id: str, ad_defense = None):
         model_id: model_id
     }
 
+    tracked_client = TokenTrackerClient(client)
+
     MODEL_NAMES.update(QWEN_MODELS)
     
     #! 非openai模型  reasoning_effort=None 查看README
-    llm = agent_pipeline.OpenAILLM(client, model_id, temperature=0.0, reasoning_effort= None)
+    llm = agent_pipeline.OpenAILLM(tracked_client, model_id, temperature=0.0, reasoning_effort= None)
     llm.name = model_id
 
 
@@ -72,7 +73,7 @@ def make_qwen_original_pipeline(model_id: str, ad_defense = None):
     
     # 给 pipeline 命名，方便日志记录
     pipeline.name = f"{llm.name}_{ad_defense}" if ad_defense else llm.name
-    return pipeline
+    return pipeline, tracked_client
 
 
 def main(
@@ -95,7 +96,7 @@ def main(
         print(f"\n正在测试套件: {suite_name}...")
         
         # A. 构建 Pipeline
-        pipeline = make_qwen_original_pipeline(model_id, ad_defense=defense)       
+        pipeline, tracked_client = make_qwen_original_pipeline(model_id, ad_defense=defense)       
 
 
         
@@ -110,9 +111,9 @@ def main(
 
         attack = attacks.load_attack(attack_name, suite, pipeline)
 
-        selected_users = user_task_ids[:3] 
+        selected_users = user_task_ids[:2] 
         # selected_injections = injection_task_ids[:6]
-        selected_injections = injection_task_ids[:3]
+        selected_injections = injection_task_ids[:2]
         
         # C. 运行基准测试并记录日志
         with logging.OutputLogger(str(logdir)):
@@ -135,7 +136,6 @@ def main(
                     logdir,
                     force_rerun=True,
                     user_tasks = selected_users,
-                    injection_tasks = selected_injections
                 )
 
 
@@ -180,6 +180,15 @@ def main(
         security_score = sum(security_results.values()) / len(security_results) if run_attack and security_results else 0
         defense_score = 1.0 - security_score if run_attack else 1.0
 
+        prompt_tokens = tracked_client.total_prompt_tokens 
+        completion_tokens = tracked_client.total_completion_tokens
+        total_tokens = tracked_client.get_total_tokens()
+
+        # ...
+        # 💡 修改 3：在你的 summary_data 中加入 Token 统计节点
+
+
+
         summary_data = {
             "suite_name": suite_name,
             "pipeline_name": pipeline.name,
@@ -192,7 +201,12 @@ def main(
                 "total_tasks": len(utility_results),
                 "utility_passed": sum(utility_results.values()),
                 "attacked_tasks": len(security_results)
-            }
+            },
+            "overhead": {
+                "prompt_tokens": prompt_tokens,
+                "completion_tokens": completion_tokens,
+                "total_tokens": total_tokens
+            },
         }
 
         # 4. 写入文件 (TXT, CSV, JSON)
@@ -220,6 +234,10 @@ def main(
             if run_attack:
                 f.write(f"👉 [{suite_name}] 攻击成功率 (ASR): {security_score:.2%}\n")
                 f.write(f"👉 [{suite_name}] 整体安全性 (Defense Rate): {defense_score:.2%}\n")
+            f.write("\n💰 系统开销评估 (Overhead):\n")
+            f.write(f"👉 任务 Input Tokens: {prompt_tokens:.1f}\n")
+            f.write(f"👉 任务 Output Tokens: {completion_tokens:.1f}\n")
+            f.write(f"👉 任务总计 Tokens: {total_tokens:.1f}\n")
             f.write("="*50 + "\n\n")
 
         # 4.2 保存用于画图和数据分析的 CSV 详细表格

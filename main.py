@@ -11,7 +11,7 @@ from qwen_origin import make_qwen_original_pipeline
 
 def main(
     model_id: str = "qwen-flash-2025-07-28",
-    sec_model_id: str = "qwen3.5-flash",
+    sec_model_id: str = None,
     # suites: list[str] = ["workspace", "banking"],
     suites: list[str] = ["workspace"],
     run_attack: bool = True,
@@ -30,7 +30,7 @@ def main(
 
 
     attack_name = "important_instructions"  # 使用 AgentDojo 预定义的注入攻击
-    logdir = Path("./logs")
+    logdir = Path("./test_logs")
     logdir.mkdir(parents=True, exist_ok=True)
 
     print(f"开始实验 - 模型: {model_id}, 审计模型：{sec_model_id}, 攻击: {attack_name if run_attack else '无'}, 防御: {defense if defense else '无'}")
@@ -39,10 +39,10 @@ def main(
         print(f"\n正在测试套件: {suite_name}...")
         
         if origin:
-            pipeline = make_qwen_original_pipeline(model_id, ad_defense=defense) if defense else make_qwen_original_pipeline(model_id)
+            pipeline, main_tracker = make_qwen_original_pipeline(model_id, ad_defense=defense) if defense else make_qwen_original_pipeline(model_id)
 
         else:
-            pipeline = make_qwen_newFrame_pipeline(model_id, sec_model_id)       
+            pipeline, main_tracker, sec_tracker = make_qwen_newFrame_pipeline(model_id, sec_model_id)       
         
         # 加载套件和攻击
         suite = get_suite("v1.2", suite_name)
@@ -55,8 +55,9 @@ def main(
 
         attack = attacks.load_attack(attack_name, suite, pipeline)
 
-        # selected_users = user_task_ids[:3] 
-        selected_injections = injection_task_ids[:6]
+        # selected_injections = injection_task_ids[:6]
+        selected_users = user_task_ids[:2] 
+        selected_injections = injection_task_ids[:2]
         
         # 运行基准测试并记录日志
         with logging.OutputLogger(str(logdir)):
@@ -67,7 +68,7 @@ def main(
                     attack,
                     logdir,
                     force_rerun=False,
-                    # user_tasks = selected_users,
+                    user_tasks = selected_users,
                     injection_tasks = selected_injections,
                     verbose= True
                 )
@@ -77,7 +78,7 @@ def main(
                     suite,
                     logdir,
                     force_rerun=False,
-                    # user_tasks = selected_users,
+                    user_tasks = selected_users,
                     injection_tasks = selected_injections
                 )
 
@@ -122,6 +123,15 @@ def main(
         security_score = sum(security_results.values()) / len(security_results) if run_attack and security_results else 0
         defense_score = 1.0 - security_score if run_attack else 1.0
 
+
+        prompt_tokens = main_tracker.total_prompt_tokens 
+        completion_tokens = main_tracker.total_completion_tokens
+        total_tokens = main_tracker.get_total_tokens()
+        if sec_model_id:
+            sec_prompt_tokens = sec_tracker.total_prompt_tokens 
+            sec_completion_tokens = sec_tracker.total_completion_tokens
+            sec_total_tokens = sec_tracker.get_total_tokens() 
+
         summary_data = {
             "suite_name": suite_name,
             "pipeline_name": pipeline.name,
@@ -134,14 +144,26 @@ def main(
                 "total_tasks": len(utility_results),
                 "utility_passed": sum(utility_results.values()),
                 "attacked_tasks": len(security_results)
-            }
+            },
+            "overhead": {
+                "prompt_tokens": prompt_tokens,
+                "completion_tokens": completion_tokens,
+                "total_tokens": total_tokens
+            },
         }
+
+        if sec_model_id:
+            summary_data["sec_overhead"] = {
+                "prompt_tokens": sec_prompt_tokens,
+                "completion_tokens": sec_completion_tokens,
+                "total_tokens": sec_total_tokens
+            }
 
         # 4. 写入文件 (TXT, CSV, JSON)
         # 4.1 保存供人类阅读的 TXT 报告
         with open(report_file_path, "w", encoding="utf-8") as f:
             f.write("\n" + "="*50 + "\n")
-            f.write(f"Pipeline: {pipeline.name} | Model: {model_id}\n")
+            f.write(f"Pipeline: {pipeline.name} | Model: {model_id}, Sec Model:{sec_model_id}\n")
             f.write(f"📊 [{suite_name}] 任务详细执行报告\n")
             f.write("="*50 + "\n")
 
@@ -162,6 +184,18 @@ def main(
             if run_attack:
                 f.write(f"👉 [{suite_name}] 攻击成功率 (ASR): {security_score:.2%}\n")
                 f.write(f"👉 [{suite_name}] 整体安全性 (Defense Rate): {defense_score:.2%}\n")
+
+
+            f.write("\n💰 系统开销评估 (Overhead):\n")
+            f.write(f"👉 任务 Input Tokens: {prompt_tokens:.1f}\n")
+            f.write(f"👉 任务 Output Tokens: {completion_tokens:.1f}\n")
+            f.write(f"👉 任务总计 Tokens: {total_tokens:.1f}\n")
+            if sec_model_id:            
+                f.write("\n💰 安全模型开销评估 (Overhead):\n")
+                f.write(f"👉 Sec Input Tokens: {sec_prompt_tokens:.1f}\n")
+                f.write(f"👉 Sec Output Tokens: {sec_completion_tokens:.1f}\n")
+                f.write(f"👉 Sec Tokens: {sec_total_tokens:.1f}\n")
+
             f.write("="*50 + "\n\n")
 
         # 4.2 保存用于画图和数据分析的 CSV 详细表格
@@ -193,7 +227,10 @@ if __name__ == "__main__":
     else:
         # 使用 cyclopts 或直接运行
         # 这里演示直接调用
+        # main(model_id="qwen3-max", sec_model_id = "qwen3.5-plus", suites=["workspace"], run_attack=True,
+        # origin= True,
+        # defense="spotlighting_with_delimiting")
         main(model_id="qwen3-max", sec_model_id = "qwen3.5-plus", suites=["workspace"], run_attack=True,
-        origin= True,
-        defense="spotlighting_with_delimiting")
+        origin= False,
+        defense = None)
 

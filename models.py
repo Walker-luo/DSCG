@@ -1,6 +1,7 @@
 import os
 from pathlib import Path
 import openai
+import re
 
 from pydantic import BaseModel, Field
 from typing import List, Dict, Any
@@ -9,12 +10,12 @@ from agentdojo import agent_pipeline, functions_runtime,logging, benchmark, atta
 from agentdojo.task_suite import get_suite
 from agentdojo.agent_pipeline.agent_pipeline import load_system_message
 from agentdojo.models import MODEL_NAMES
-
 from agentdojo.functions_runtime import FunctionCall, FunctionReturnType
 from agentdojo.benchmark import TaskResults
 
-import uuid
-import re
+#! 统计token消耗
+from tools import TokenTrackerClient
+
 
 
 # 手动触发 Pydantic 模型的重新构建，解析内部引用
@@ -494,12 +495,14 @@ class ActionSecurityChecker(agent_pipeline.BasePipelineElement):
 
 
 def make_qwen_newFrame_pipeline(model_id: str, sec_model_id: str):
+
     client = openai.OpenAI(
         api_key=os.getenv("DASHSCOPE_API_KEY"),
         base_url="https://dashscope.aliyuncs.com/compatible-mode/v1",
     )
 
-
+    main_tracker = TokenTrackerClient(client)
+    sec_tracker = TokenTrackerClient(client)
 
     QWEN_MODELS = {
         model_id : model_id,
@@ -508,11 +511,11 @@ def make_qwen_newFrame_pipeline(model_id: str, sec_model_id: str):
 
     MODEL_NAMES.update(QWEN_MODELS)
     
-    llm = agent_pipeline.OpenAILLM(client, model_id, temperature=0.0, reasoning_effort=None)
+    llm = agent_pipeline.OpenAILLM(main_tracker, model_id, temperature=0.0, reasoning_effort=None)
     llm.name = model_id
     
 
-    sec_llm = agent_pipeline.OpenAILLM(client, sec_model_id, temperature=0.0, reasoning_effort=None)
+    sec_llm = agent_pipeline.OpenAILLM(sec_tracker, sec_model_id, temperature=0.0, reasoning_effort=None)
     sec_llm.name = sec_model_id
 
     action_tracker = ActionHistoryTracker()
@@ -541,6 +544,6 @@ def make_qwen_newFrame_pipeline(model_id: str, sec_model_id: str):
     ])
     
     pipeline.name = f"{llm.name}-newFrame"
-    return pipeline
+    return pipeline, main_tracker, sec_tracker
 
 
