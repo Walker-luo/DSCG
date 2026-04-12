@@ -30,7 +30,7 @@ def main(
 
 
     attack_name = "important_instructions"  # 使用 AgentDojo 预定义的注入攻击
-    logdir = Path("./test_logs")
+    logdir = Path("./result_logs")
     logdir.mkdir(parents=True, exist_ok=True)
 
     print(f"开始实验 - 模型: {model_id}, 审计模型：{sec_model_id}, 攻击: {attack_name if run_attack else '无'}, 防御: {defense if defense else '无'}")
@@ -55,9 +55,14 @@ def main(
 
         attack = attacks.load_attack(attack_name, suite, pipeline)
 
-        # selected_injections = injection_task_ids[:6]
-        selected_users = user_task_ids[:2] 
-        selected_injections = injection_task_ids[:2]
+        if suite_name == "workspace":
+            selected_injections = injection_task_ids[:6]
+        else:
+            selected_injections = injection_task_ids[:5]
+        
+        selected_users = user_task_ids[:35] if len(user_task_ids) >= 35 else user_task_ids
+        # selected_users = user_task_ids[:1] 
+        # selected_injections = injection_task_ids[:1]
         
         # 运行基准测试并记录日志
         with logging.OutputLogger(str(logdir)):
@@ -91,9 +96,14 @@ def main(
         output_dir.mkdir(parents=True, exist_ok=True)
         
         # 定义各类文件保存路径
-        report_file_path = output_dir / f"{suite_name}_report.txt"
-        csv_file_path = output_dir / f"{suite_name}_detailed_results.csv"
-        summary_file_path = output_dir / f"{suite_name}_summary.json"
+        # report_file_path = output_dir / f"{suite_name}_report.txt"
+        # csv_file_path = output_dir / f"{suite_name}_detailed_results.csv"
+        # summary_file_path = output_dir / f"{suite_name}_summary.json"
+        report_file_path = output_dir / suite_name / "report.txt"
+        csv_file_path = output_dir / suite_name / "detailed_results.csv"
+        summary_file_path = output_dir / suite_name /"summary.json"
+
+        #
 
         # ==========================================
         # 2. 构造结构化数据列表 (用于画图)
@@ -227,10 +237,18 @@ if __name__ == "__main__":
     else:
         # 使用 cyclopts 或直接运行
         # 这里演示直接调用
+        #! origin
+        main(model_id="qwen3-max", sec_model_id = None, suites=["workspace", "travel", "banking", "slack"], run_attack=True,
+        origin= True,
+        defense=None)
+
+        #! defense
         # main(model_id="qwen3-max", sec_model_id = "qwen3.5-plus", suites=["workspace"], run_attack=True,
         # origin= True,
         # defense="spotlighting_with_delimiting")
-        main(model_id="qwen3-max", sec_model_id = "qwen3.5-plus", suites=["workspace"], run_attack=True,
-        origin= False,
-        defense = None)
+
+        #! ourFrame
+        # main(model_id="qwen3-max", sec_model_id = "qwen3.5-plus", suites=["travel","banking","slack"], run_attack=True,
+        # origin= False,
+        # defense = None)
 

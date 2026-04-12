@@ -92,8 +92,8 @@ class OurFrameExecutor(agent_pipeline.BasePipelineElement):
         """动态遍历环境内所有工具并分配权限"""
         all_tools = list(runtime.functions.keys())  #! 动态获取当前环境里的所有工具
         allowed = set(first_turn_tools) 
-        print("="*100)
-        print(f"添加的工具：{allowed}")
+        # print("="*100)
+        # print(f"添加的工具：{allowed}")
         prompt_lower = user_prompt.lower()
 
         for tool in all_tools:
@@ -230,15 +230,15 @@ class PermissionSandbox(agent_pipeline.BasePipelineElement):
         
         #TODO 这个部分需要？
         #! 事后/数据监控：工具返回了结果 (role == 'tool')
-        elif role == "tool":
-            content_obj = last_msg.get("content", []) if isinstance(last_msg, dict) else getattr(last_msg, "content", [])
-            text_content = ad_types.get_text_content_as_str(content_obj)
+        # elif role == "tool":
+        #     content_obj = last_msg.get("content", []) if isinstance(last_msg, dict) else getattr(last_msg, "content", [])
+        #     text_content = ad_types.get_text_content_as_str(content_obj)
             
-            tool_name = ""
-            if isinstance(last_msg, dict) and "tool_call" in last_msg:
-                tool_name = last_msg["tool_call"].get("function", "")
-            elif hasattr(last_msg, "tool_call") and hasattr(last_msg.tool_call, "function"):
-                tool_name = last_msg.tool_call.function
+        #     tool_name = ""
+        #     if isinstance(last_msg, dict) and "tool_call" in last_msg:
+        #         tool_name = last_msg["tool_call"].get("function", "")
+        #     elif hasattr(last_msg, "tool_call") and hasattr(last_msg.tool_call, "function"):
+        #         tool_name = last_msg.tool_call.function
 
             #TODO 过滤工具返回结果中的恶意/敏感数据 ---
             #TODO 针对 AgentDojo 常见的注入标签 <INFORMATION> 进行物理过滤
@@ -249,13 +249,13 @@ class PermissionSandbox(agent_pipeline.BasePipelineElement):
             #     )
                 
             # 针对敏感数据读取的告警 (比如读到了包含密码的文件)
-            if re.search(r'(?i)password\s*is\s*[:=]\s*\w+', text_content):
-                return self._block_tool_output(
-                    query, runtime, env, messages, extra_args,
-                    f"Sandbox Violation: Sensitive credential detected in {tool_name} output. Data sanitized."
-                )
+            # if re.search(r'(?i)password\s*is\s*[:=]\s*\w+', text_content):
+            #     return self._block_tool_output(
+            #         query, runtime, env, messages, extra_args,
+            #         f"Sandbox Violation: Sensitive credential detected in {tool_name} output. Data sanitized."
+            #     )
 
-            return query, runtime, env, messages, extra_args
+            # return query, runtime, env, messages, extra_args
 
         # 其他角色 (user, system) 直接放行
         return query, runtime, env, messages, extra_args
@@ -418,15 +418,32 @@ class ActionSecurityChecker(agent_pipeline.BasePipelineElement):
             
             # 构造 actions_str：序列化全局历史为 JSON
             if action_history and hasattr(action_history, "actions") and action_history.actions:
-                actions_str = action_history.model_dump_json(indent=2)
+                # actions_str = action_history.model_dump_json(indent=2)
+                history_str = action_history.model_dump_json(indent=2)
             else:
                 # 兜底：如果没有全局历史，只看当前动作
-                actions_to_check = []
-                for call in tool_calls:
-                    func_name = getattr(call, "function", None) or (call.get("function") if isinstance(call, dict) else str(call))
-                    args = getattr(call, "args", None) or (call.get("args") if isinstance(call, dict) else "")
-                    actions_to_check.append(f"Tool: {func_name}, Args: {args}")
-                actions_str = "\n".join(actions_to_check)
+                history_str = "No action history available."
+
+            actions_to_check = []
+            for call in tool_calls:
+                func_name = getattr(call, "function", None) or (call.get("function") if isinstance(call, dict) else str(call))
+                args = getattr(call, "args", None) or (call.get("args") if isinstance(call, dict) else "")
+                actions_to_check.append(f"Tool: {func_name}, Args: {args}")
+            actions_str = "\n".join(actions_to_check)
+            current_action_str = "\n".join(actions_to_check)
+
+                
+            actions_str = (
+                "[Action History]\n"
+                f"{history_str}\n\n"
+                "[Current Pending Action]\n"
+                f"{current_action_str}"
+            )
+
+            # print("+"*100)
+            # print("审计动作序列：")
+            # print(actions_str)
+            # print("+"*100)
 
             #! 终极 ATP 审计 Prompt：专注“逻辑滥用”和“组合攻击”
             # security_prompt = (
@@ -460,8 +477,8 @@ class ActionSecurityChecker(agent_pipeline.BasePipelineElement):
             ).strip().upper()
 
             if "UNSAFE" in check_result:
-                print("+"*100)
-                print(f"🚨 [BEHAVIORAL ALERT] LLM 审计判定为组合攻击 / 逻辑滥用！轨迹:\n{actions_str}")
+                # print("+"*100)
+                # print(f"🚨 [BEHAVIORAL ALERT] LLM 审计判定为组合攻击 / 逻辑滥用！轨迹:\n{actions_str}")
                 
                 # 1. 提取当前企图执行的违规工具名称
                 blocked_tool_names = []
