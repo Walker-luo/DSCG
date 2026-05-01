@@ -24,13 +24,13 @@ def main(
         suites: 测试的场景
         run_attack: 是否进行攻击，测试安全性，默认true
         origin: 是否只使用原始模型
-        defense: agentdojo自带的防御机制包括："tool_filter", "transformers_pi_detector", "spotlighting_with_delimiting"等
+        defense: agentdojo自带的防御机制包括："tool_filter", "transformers_pi_detector", "spotlighting_with_delimiting", ""等
     """
 
 
 
     attack_name = "important_instructions"  # 使用 AgentDojo 预定义的注入攻击
-    logdir = Path("./result_logs")
+    logdir = Path("./result_logs/ablation_study")
     logdir.mkdir(parents=True, exist_ok=True)
 
     print(f"开始实验 - 模型: {model_id}, 审计模型：{sec_model_id}, 攻击: {attack_name if run_attack else '无'}, 防御: {defense if defense else '无'}")
@@ -238,17 +238,17 @@ if __name__ == "__main__":
         # 使用 cyclopts 或直接运行
         # 这里演示直接调用
         #! origin
-        main(model_id="qwen3-max", sec_model_id = None, suites=["workspace", "travel", "banking", "slack"], run_attack=True,
-        origin= True,
-        defense=None)
+        # main(model_id="qwen3-max", sec_model_id = None, suites=["workspace"], run_attack=True,
+        # origin= True,
+        # defense=None)
 
         #! defense
-        # main(model_id="qwen3-max", sec_model_id = "qwen3.5-plus", suites=["workspace"], run_attack=True,
+        # main(model_id="qwen3-max", sec_model_id = None, suites=["workspace","travel", "banking", "slack"], run_attack=True,
         # origin= True,
-        # defense="spotlighting_with_delimiting")
+        # defense="repeat_user_prompt")
 
         #! ourFrame
-        # main(model_id="qwen3-max", sec_model_id = "qwen3.5-plus", suites=["travel","banking","slack"], run_attack=True,
-        # origin= False,
-        # defense = None)
+        main(model_id="qwen3-max", sec_model_id = "qwen3.5-plus", suites=["slack"], run_attack=True,
+        origin= False,
+        defense = None)
 
