@@ -16,7 +16,9 @@ def main(
     suites: list[str] = ["workspace"],
     run_attack: bool = True,
     origin = False,
-    defense: str = None
+    defense: str = None,
+    use_sandbox: bool = True, 
+    use_security_checker: bool = True
 ):
     """
         model_id: 执行的llm的id
@@ -42,7 +44,7 @@ def main(
             pipeline, main_tracker = make_qwen_original_pipeline(model_id, ad_defense=defense) if defense else make_qwen_original_pipeline(model_id)
 
         else:
-            pipeline, main_tracker, sec_tracker = make_qwen_newFrame_pipeline(model_id, sec_model_id)       
+            pipeline, main_tracker, sec_tracker = make_qwen_newFrame_pipeline(model_id, sec_model_id, use_sandbox=use_sandbox, use_security_checker=use_security_checker)       
         
         # 加载套件和攻击
         suite = get_suite("v1.2", suite_name)
@@ -248,7 +250,8 @@ if __name__ == "__main__":
         # defense="repeat_user_prompt")
 
         #! ourFrame
-        main(model_id="qwen3-max", sec_model_id = "qwen3.5-plus", suites=["slack"], run_attack=True,
+        main(model_id="qwen3-max", sec_model_id = "qwen3.5-plus", suites=["workspace"], run_attack=True,
         origin= False,
-        defense = None)
+        defense = None,
+        use_security_checker=False)
 

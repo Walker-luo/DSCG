@@ -27,7 +27,6 @@ except Exception as e:
 
 
 
-
 # 定义动作流结构
 class ActionModel(BaseModel):
     tool_name: str = Field(description="工具名称")
@@ -563,14 +562,18 @@ class ActionSecurityChecker(agent_pipeline.BasePipelineElement):
         return query, runtime, env, messages, extra_args
 
 
-
-
-
-def make_qwen_newFrame_pipeline(model_id: str, 
-                                sec_model_id: str,
-                                use_sandbox: bool = True, 
-                                use_security_checker: bool = True):
-
+def make_qwen_newFrame_pipeline(
+    model_id: str, 
+    sec_model_id: str, 
+    use_sandbox: bool = True, 
+    use_security_checker: bool = True
+):
+    """
+    构建 Qwen NewFrame 评测流水线，支持消融实验。
+    
+    :param use_sandbox: 是否启用 PermissionSandbox (物理漏斗)
+    :param use_security_checker: 是否启用 ActionSecurityChecker + ActionHistoryTracker (语义漏斗)
+    """
     client = openai.OpenAI(
         api_key=os.getenv("DASHSCOPE_API_KEY"),
         base_url="https://dashscope.aliyuncs.com/compatible-mode/v1",
@@ -583,34 +586,45 @@ def make_qwen_newFrame_pipeline(model_id: str,
         model_id : model_id,
         sec_model_id: sec_model_id
     }
-
-    MODEL_NAMES.update(QWEN_MODELS)
+    # MODEL_NAMES.update(QWEN_MODELS) # 假设 MODEL_NAMES 在外部定义
     
+    # 1. 初始化主 LLM
     llm = agent_pipeline.OpenAILLM(main_tracker, model_id, temperature=0.0, reasoning_effort=None)
     llm.name = model_id
+
+    # 2. 动态实例化组件
+    my_sandbox = None
+    if use_sandbox:
+        my_sandbox = PermissionSandbox(allowed_tools=[], model=llm)
+
+    # new_executor 需要处理 sandbox=None 的情况（你的代码中 _authorize_tools_dynamically 应该有判空逻辑）
+    new_executor = OurFrameExecutor(llm, sandbox=my_sandbox)
+
+    security_checker = None
+    action_tracker = None
+    if use_security_checker:
+        sec_llm = agent_pipeline.OpenAILLM(sec_tracker, sec_model_id, temperature=0.0, reasoning_effort=None)
+        sec_llm.name = sec_model_id
+        action_tracker = ActionHistoryTracker()
+        security_checker = ActionSecurityChecker(small_llm=sec_llm, llm=llm)
+
+    # 3. 动态构建 ToolsExecutionLoop 列表
+    # 注意：流水线的执行顺序非常重要
+    loop_components = []
     
+    if use_sandbox:
+        loop_components.append(my_sandbox)          # 最前置的物理阻断
+        
+    if use_security_checker:
+        loop_components.append(security_checker)    # 唤醒式意图审计
+        loop_components.append(action_tracker)      # 记录账本
+        
+    loop_components.append(agent_pipeline.ToolsExecutor()) # 真实的工具执行
+    loop_components.append(new_executor)                   # 结果返回给大模型
 
-    sec_llm = agent_pipeline.OpenAILLM(sec_tracker, sec_model_id, temperature=0.0, reasoning_effort=None)
-    sec_llm.name = sec_model_id
+    tools_loop = agent_pipeline.ToolsExecutionLoop(loop_components)
 
-    action_tracker = ActionHistoryTracker()
-    #! 如果你保留了独立的物理拦截沙箱，先实例化它：
-    my_sandbox = PermissionSandbox(allowed_tools=[], model = llm)
-
-    # 创建执行器
-    new_executor = OurFrameExecutor(llm, sandbox= my_sandbox)
-    security_checker = ActionSecurityChecker(small_llm=sec_llm, llm=llm)
-
-
-
-    tools_loop = agent_pipeline.ToolsExecutionLoop([
-        my_sandbox,          
-        security_checker,   
-        action_tracker,
-        agent_pipeline.ToolsExecutor(), 
-        new_executor,
-    ])
-
+    # 4. 构建主 Pipeline
     pipeline = agent_pipeline.AgentPipeline([
         agent_pipeline.SystemMessage(load_system_message(None)), 
         agent_pipeline.InitQuery(),
@@ -618,7 +632,17 @@ def make_qwen_newFrame_pipeline(model_id: str,
         tools_loop
     ])
     
-    pipeline.name = f"{llm.name}-newFrame"
+    # 5. 动态命名 Pipeline，方便看实验日志
+    ablation_suffix = ""
+    if not use_sandbox and not use_security_checker:
+        ablation_suffix = "-Baseline" # 两者都没开，等同于无防御基线
+    elif not use_sandbox:
+        ablation_suffix = "-NoSandbox"
+    elif not use_security_checker:
+        ablation_suffix = "-NoChecker"
+    else:
+        ablation_suffix = "-OursFull" # 完整双层漏斗
+        
+    pipeline.name = f"{llm.name}-newFrame{ablation_suffix}"
+    
     return pipeline, main_tracker, sec_tracker
-
-
