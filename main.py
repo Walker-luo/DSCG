@@ -164,7 +164,7 @@ def main(
             },
         }
 
-        if sec_model_id:
+        if sec_model_id and use_security_checker:
             summary_data["sec_overhead"] = {
                 "prompt_tokens": sec_prompt_tokens,
                 "completion_tokens": sec_completion_tokens,
@@ -253,5 +253,5 @@ if __name__ == "__main__":
         main(model_id="qwen3-max", sec_model_id = "qwen3.5-plus", suites=["workspace"], run_attack=True,
         origin= False,
         defense = None,
-        use_security_checker=False)
+        use_sandbox=False)
 

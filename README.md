@@ -21,4 +21,58 @@
 - 安全性：12%
 
 
+### Ablation Study
+
+- myFrame
+🏆 总体评测得分汇总:
+👉 [workspace] 整体可用性 (Utility): 67.14%
+👉 [workspace] 攻击成功率 (ASR): 0.00%
+👉 [workspace] 整体安全性 (Defense Rate): 100.00%
+
+💰 系统开销评估 (Overhead):
+👉 任务 Input Tokens: 4992944.0
+👉 任务 Output Tokens: 117728.0
+👉 任务总计 Tokens: 5110672.0
+
+💰 安全模型开销评估 (Overhead):
+👉 Sec Input Tokens: 2169648.0
+👉 Sec Output Tokens: 189894.0
+👉 Sec Tokens: 2359542.0
+
+
+
+- No SandBox
+
+🏆 总体评测得分汇总:
+👉 [workspace] 整体可用性 (Utility): 68.10%
+👉 [workspace] 攻击成功率 (ASR): 0.48%
+👉 [workspace] 整体安全性 (Defense Rate): 99.52%
+
+💰 系统开销评估 (Overhead):
+👉 任务 Input Tokens: 5083574.0
+👉 任务 Output Tokens: 108086.0
+👉 任务总计 Tokens: 5191660.0
+
+💰 安全模型开销评估 (Overhead):
+👉 Sec Input Tokens: 3118935.0
+👉 Sec Output Tokens: 147879.0
+👉 Sec Tokens: 3266814.0
+
+
+- NO SecurityChecker (and HistoryTracker)
+
+🏆 总体评测得分汇总:
+👉 [workspace] 整体可用性 (Utility): 67.14%
+👉 [workspace] 攻击成功率 (ASR): 5.24%
+👉 [workspace] 整体安全性 (Defense Rate): 94.76%
+
+💰 系统开销评估 (Overhead):
+👉 任务 Input Tokens: 5179706.0
+👉 任务 Output Tokens: 106469.0
+👉 任务总计 Tokens: 5286175.0
+
+💰 安全模型开销评估 (Overhead):
+👉 Sec Input Tokens: 0.0
+👉 Sec Output Tokens: 0.0
+👉 Sec Tokens: 0.0
 

@@ -459,10 +459,10 @@ class ActionSecurityChecker(agent_pipeline.BasePipelineElement):
                 f"{current_action_str}"
             )
 
-            # print("+"*100)
-            # print("审计动作序列：")
-            # print(actions_str)
-            # print("+"*100)
+            print("+"*100)
+            print("审计动作序列：")
+            print(actions_str)
+            print("+"*100)
 
             #! 终极 ATP 审计 Prompt：专注“逻辑滥用”和“组合攻击”
             # security_prompt = (
@@ -586,7 +586,7 @@ def make_qwen_newFrame_pipeline(
         model_id : model_id,
         sec_model_id: sec_model_id
     }
-    # MODEL_NAMES.update(QWEN_MODELS) # 假设 MODEL_NAMES 在外部定义
+    MODEL_NAMES.update(QWEN_MODELS) # 假设 MODEL_NAMES 在外部定义
     
     # 1. 初始化主 LLM
     llm = agent_pipeline.OpenAILLM(main_tracker, model_id, temperature=0.0, reasoning_effort=None)

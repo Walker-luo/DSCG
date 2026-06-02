@@ -15,12 +15,8 @@ plt.rcParams['axes.unicode_minus'] = False  # 正常显示负号
 # =====================================================
 
 # ================= 2. 数据准备 (已重排顺序) =================
-# 顺序调整为：Workspace, Travel, Banking, Slack
 scenarios = ['Workspace', 'Travel', 'Banking', 'Slack']
 models = ['Qwen3-Max', 'Repeat Prompt', 'Spotlighting', 'CaMeL', 'DSCG']
-
-# 数据格式内部顺序： [TSR(可用性), ASR(攻击成功率), Task_Token, Audit_Token]
-# 数据已按新场景顺序 [Workspace, Travel, Banking, Slack] 严格重新映射
 
 data_vanilla = [
     [44.76, 37.62, 4989381.0, 0], # Workspace
@@ -43,12 +39,11 @@ data_spotlight = [
     [35.24, 81.90, 1539853.0, 0]  # Slack
 ]
 
-# CaMeL 仅测试前两个场景，Banking 和 Slack 使用 np.nan 留白
 data_camel = [
     [60.48, 0.00, 12734600.0, 0], # Workspace
-    [3.60, 0.00, 14082900, 0],  # Travel (【注意: 请将这里替换为您的真实Travel数据!】)
-    [np.nan, np.nan, np.nan, 0],  # Banking (不测试，留空)
-    [np.nan, np.nan, np.nan, 0]   # Slack (不测试，留空)
+    [3.60, 0.00, 14082900, 0],    # Travel (存在异常的数据)
+    [np.nan, np.nan, np.nan, 0],  # Banking
+    [np.nan, np.nan, np.nan, 0]   # Slack
 ]
 
 data_dscg = [
@@ -60,22 +55,19 @@ data_dscg = [
 
 all_data = [data_vanilla, data_repeat, data_spotlight, data_camel, data_dscg]
 
-# 高级学术配色方案 (突出 DSCG)
 colors = ['#A9B8C6', '#D4B483', '#C18C81', '#7EB09B', '#C44E52']
 
 # ================= 3. 核心绘图函数 =================
 def draw_bar_chart(metric_idx, title, ylabel, filename, is_token=False):
     fig, ax = plt.subplots(figsize=(14, 6.5), dpi=300)
     x = np.arange(len(scenarios))
-    width = 0.16  # 控制柱子宽度
+    width = 0.16  
     
-    # 计算偏移量 (5个柱子)
     offsets = [-2*width, -width, 0, width, 2*width]
     
     rects_list = []
     for i, model_data in enumerate(all_data):
         if is_token:
-            # 算力开销: Task + Audit，转换为 Million (M)
             y_values = [(scene[2] + scene[3]) / 1_000_000 if not np.isnan(scene[2]) else np.nan for scene in model_data]
         else:
             y_values = [scene[metric_idx] for scene in model_data]
@@ -84,58 +76,67 @@ def draw_bar_chart(metric_idx, title, ylabel, filename, is_token=False):
                        color=colors[i], edgecolor='black', linewidth=0.8, alpha=0.95)
         rects_list.append(rects)
 
-    # 样式美化
-    ax.set_ylabel(ylabel, fontsize=13, fontweight='bold')
+    # 🔼 修改 1：Y 轴标签字体增大 (13 -> 18)
+    ax.set_ylabel(ylabel, fontsize=18, fontweight='bold')
     ax.set_xticks(x)
-    ax.set_xticklabels(scenarios, fontsize=13, fontweight='bold')
+    # 🔼 修改 2：X 轴场景名称字体增大 (13 -> 18)
+    ax.set_xticklabels(scenarios, fontsize=18, fontweight='bold')
     
-    # 隐藏右侧和顶部边框
+    # 🔼 修改 3：新增配置，专门将 Y 轴上的刻度数字也调大 (默认约10 -> 15)
+    ax.tick_params(axis='y', labelsize=15)
+    
     ax.spines['top'].set_visible(False)
     ax.spines['right'].set_visible(False)
     
-    # 添加网格线
     ax.grid(axis='y', linestyle='--', alpha=0.4)
     ax.set_axisbelow(True)
 
-    # 动态调整 Y 轴上限
     max_val = 0
     for rects in rects_list:
         for rect in rects:
             if not np.isnan(rect.get_height()) and rect.get_height() > max_val:
                 max_val = rect.get_height()
                 
-    # 1. 标题 pad 调大给图例留空
-    ax.set_title(title, fontsize=16, fontweight='bold', pad=40) 
-    
-    # 2. 图例放至正上方，水平排开
-    ax.legend(fontsize=11.5, loc='lower center', bbox_to_anchor=(0.5, 1.02), ncol=5, frameon=False)
-    
-    # 3. Y 轴留出 15% 空间给数字标签
+    # 🔼 修改 4：主标题字体增大 (16 -> 24)，同时增加 pad 避免和图例挤在一起
+    ax.set_title(title, fontsize=24, fontweight='bold', pad=50) 
+    # 🔼 修改 5：图例字体增大 (11.5 -> 15)，稍微上移一点 (1.02 -> 1.05)
+    ax.legend(fontsize=15, loc='lower center', bbox_to_anchor=(0.5, 1.05), ncol=5, frameon=False)
     ax.set_ylim(0, max_val * 1.15)
     
-    # 数值标签函数
-    for rects in rects_list:
-        for rect in rects:
+    # 【核心修改区：添加异常星号标注】
+    for i, rects in enumerate(rects_list):
+        for j, rect in enumerate(rects):
             height = rect.get_height()
-            # 如果是 NaN 或者 (开销图中的 0.0)，则跳过不写数字
             if np.isnan(height) or (height == 0.0 and is_token):
                 continue  
             
             label_text = f'{height:.1f}M' if is_token else f'{height:.1f}%'
-            # 如果是 ASR/TSR 的 0.0%，正常显示
             if height == 0.0 and not is_token:
                 label_text = '0.0%'
                 
+            if i == 3 and j == 1:
+                label_text += '*'
+                
+            font_color = '#d32f2f' if '*' in label_text else 'black'
+                
+            # 🔼 修改 6：柱子上方的数值字体增大 (10 -> 13)
             ax.annotate(label_text,
                         xy=(rect.get_x() + rect.get_width() / 2, height),
-                        xytext=(0, 4),  # 垂直偏移
+                        xytext=(0, 4),  
                         textcoords="offset points",
-                        ha='center', va='bottom', fontsize=10, fontweight='bold', rotation=0)
+                        ha='center', va='bottom', fontsize=13, 
+                        fontweight='bold', color=font_color, rotation=0)
+
+    # 【核心修改区：添加底部脚注】
+    # 🔼 修改 7：脚注字体增大 (11 -> 14)，并将其下移 (-0.12 -> -0.16) 以免和变大后的 X 轴标签重叠
+    ax.text(0, -0.16, "* 注：CaMeL 框架在 Travel 场景中因通信死锁仅完成 11/20 评测任务，此为非全量测试异常数据。", 
+            transform=ax.transAxes, fontsize=14, color='#666666', style='italic')
 
     plt.tight_layout()
     plt.savefig(filename, dpi=300, bbox_inches='tight')
     plt.close()
     print(f"✅ 图表已生成: {filename}")
+
 
 # ================= 4. 执行生成 =================
 draw_bar_chart(metric_idx=0, 
@@ -155,3 +156,4 @@ draw_bar_chart(metric_idx=2,
                ylabel='Token 消耗总量 (Millions)', 
                filename='./img/Token_comparison.png', 
                is_token=True)
+
