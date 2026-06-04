@@ -3,3 +3,6 @@ test_logs/
 photo/
 result_logs/
 img/
+dashboard_results/
+__pycache__/
+*.pyc
