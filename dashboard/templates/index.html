@@ -1,0 +1,468 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NewFrame - 间接提示词注入防御可视化平台</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
+  <link href="/static/css/style.css" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+</head>
+<body>
+  <!-- ====== 顶部导航栏 ====== -->
+  <nav class="navbar navbar-expand-lg">
+    <div class="container-fluid">
+      <a class="navbar-brand" href="#">
+        <i class="bi bi-shield-check"></i>
+        <span>NewFrame</span>
+        <small class="text-muted ms-2">间接提示词注入防御可视化平台</small>
+      </a>
+      <div class="ms-auto d-flex align-items-center gap-3">
+        <button class="btn btn-sm btn-outline-info" data-bs-toggle="modal" data-bs-target="#architecture-modal">
+          <i class="bi bi-diagram-3"></i> 防御架构
+        </button>
+        <span id="status-indicator" class="badge bg-secondary">
+          <i class="bi bi-circle-fill me-1" style="font-size: 8px;"></i>就绪
+        </span>
+        <button class="btn btn-sm btn-outline-light" onclick="location.reload()">
+          <i class="bi bi-arrow-clockwise"></i> 刷新
+        </button>
+      </div>
+    </div>
+  </nav>
+
+  <div class="container-fluid p-0">
+    <div class="row g-0">
+      <!-- ====== 左侧配置面板 ====== -->
+      <div class="col-lg-3 col-xl-2 sidebar">
+        <div class="sidebar-header">
+          <h5><i class="bi bi-sliders"></i> 测试配置</h5>
+        </div>
+
+        <div class="sidebar-body">
+          <!-- 测试名称 -->
+          <div class="mb-3">
+            <label class="form-label">测试名称</label>
+            <input type="text" id="run-label" class="form-control form-control-sm"
+                   placeholder="输入测试标签（可选）">
+          </div>
+
+          <!-- 框架类型 -->
+          <div class="mb-3">
+            <label class="form-label">框架类型</label>
+            <select id="pipeline-type" class="form-select form-select-sm">
+              <option value="newframe">NewFrame (本框架)</option>
+              <option value="origin">原始模型 (Baseline)</option>
+            </select>
+          </div>
+
+          <!-- 主模型 -->
+          <div class="mb-3">
+            <label class="form-label">主模型 <span class="text-danger">*</span></label>
+            <select id="model-id" class="form-select form-select-sm">
+              <option value="" selected>Local/Env 配置</option>
+              <option value="qwen3-max" data-provider="dashscope" data-base-url="https://dashscope.aliyuncs.com/compatible-mode/v1">Qwen3-Max</option>
+              <option value="qwen-flash-2025-07-28" data-provider="dashscope" data-base-url="https://dashscope.aliyuncs.com/compatible-mode/v1">Qwen-Flash</option>
+              <option value="qwen-plus" data-provider="dashscope" data-base-url="https://dashscope.aliyuncs.com/compatible-mode/v1">Qwen-Plus</option>
+              <option value="qwen-turbo" data-provider="dashscope" data-base-url="https://dashscope.aliyuncs.com/compatible-mode/v1">Qwen-Turbo</option>
+              <option value="deepseek-flash" data-provider="deepseek" data-base-url="https://api.deepseek.com">DeepSeek Flash</option>
+              <option value="deepseek-v4-pro" data-provider="deepseek" data-base-url="https://api.deepseek.com">DeepSeek V4 Pro</option>
+            </select>
+          </div>
+
+          <!-- 审计模型 (仅 NewFrame) -->
+          <div class="mb-3" id="sec-model-group">
+            <label class="form-label">审计模型 (安全校验器)</label>
+            <select id="sec-model-id" class="form-select form-select-sm">
+              <option value="" selected>Local/Env 配置</option>
+              <option value="qwen3.5-plus" data-provider="dashscope" data-base-url="https://dashscope.aliyuncs.com/compatible-mode/v1">Qwen3.5-Plus</option>
+              <option value="qwen-flash-2025-07-28" data-provider="dashscope" data-base-url="https://dashscope.aliyuncs.com/compatible-mode/v1">Qwen-Flash</option>
+              <option value="qwen-turbo" data-provider="dashscope" data-base-url="https://dashscope.aliyuncs.com/compatible-mode/v1">Qwen-Turbo (轻量)</option>
+              <option value="qwen-plus" data-provider="dashscope" data-base-url="https://dashscope.aliyuncs.com/compatible-mode/v1">Qwen-Plus</option>
+              <option value="deepseek-flash" data-provider="deepseek" data-base-url="https://api.deepseek.com">DeepSeek Flash</option>
+              <option value="deepseek-v4-pro" data-provider="deepseek" data-base-url="https://api.deepseek.com">DeepSeek V4 Pro</option>
+            </select>
+          </div>
+
+          <!-- 测试场景 -->
+          <div class="mb-3">
+            <label class="form-label">测试场景 <span class="text-danger">*</span></label>
+            <div class="suite-checkboxes">
+              <div class="form-check form-check-inline">
+                <input class="form-check-input suite-cb" type="checkbox" id="suite-workspace"
+                       value="workspace" checked>
+                <label class="form-check-label" for="suite-workspace">Workspace</label>
+              </div>
+              <div class="form-check form-check-inline">
+                <input class="form-check-input suite-cb" type="checkbox" id="suite-travel"
+                       value="travel">
+                <label class="form-check-label" for="suite-travel">Travel</label>
+              </div>
+              <div class="form-check form-check-inline">
+                <input class="form-check-input suite-cb" type="checkbox" id="suite-banking"
+                       value="banking">
+                <label class="form-check-label" for="suite-banking">Banking</label>
+              </div>
+              <div class="form-check form-check-inline">
+                <input class="form-check-input suite-cb" type="checkbox" id="suite-slack"
+                       value="slack">
+                <label class="form-check-label" for="suite-slack">Slack</label>
+              </div>
+            </div>
+          </div>
+
+          <!-- 攻击设置 -->
+          <div class="mb-3">
+            <label class="form-label">攻击模式</label>
+            <select id="run-attack" class="form-select form-select-sm">
+              <option value="true" selected>执行注入攻击 (安全性测试)</option>
+              <option value="false">仅功能测试 (无攻击)</option>
+            </select>
+          </div>
+
+          <div class="mb-3" id="attack-type-group">
+            <label class="form-label">攻击类型</label>
+            <select id="attack-name" class="form-select form-select-sm">
+              <option value="important_instructions" selected>重要指令注入</option>
+              <option value="manual_system_prompt_extraction">系统提示词提取</option>
+              <option value="data_leakage">数据泄露</option>
+              <option value="injection_delimiters">分隔符注入</option>
+              <option value="ignore_previous">忽略前文指令</option>
+              <option value="malicious_sandbox">恶意沙箱</option>
+            </select>
+          </div>
+
+          <!-- AgentDojo 防御 (仅原始模型) -->
+          <div class="mb-3" id="defense-group" style="display:none;">
+            <label class="form-label">AgentDojo 防御机制</label>
+            <select id="defense" class="form-select form-select-sm">
+              <option value="" selected>无防御 (Baseline)</option>
+              <option value="tool_filter">工具过滤器</option>
+              <option value="transformers_pi_detector">注入检测器</option>
+              <option value="spotlighting_with_delimiting">定界高亮</option>
+              <option value="repeat_user_prompt">重复用户提示</option>
+            </select>
+          </div>
+
+          <!-- NewFrame 消融实验选项 -->
+          <div class="mb-3" id="ablation-group">
+            <label class="form-label">消融实验</label>
+            <div class="form-check form-switch">
+              <input class="form-check-input" type="checkbox" id="use-sandbox" checked>
+              <label class="form-check-label" for="use-sandbox">
+                <i class="bi bi-funnel"></i> 权限沙箱 (物理漏斗)
+              </label>
+            </div>
+            <div class="form-check form-switch">
+              <input class="form-check-input" type="checkbox" id="use-security-checker" checked>
+              <label class="form-check-label" for="use-security-checker">
+                <i class="bi bi-shield-exclamation"></i> 安全校验器 (语义漏斗)
+              </label>
+            </div>
+          </div>
+
+          <!-- 任务数量限制 -->
+          <div class="row mb-3">
+            <div class="col-6">
+              <label class="form-label">最大用户任务数</label>
+              <input type="number" id="max-user-tasks" class="form-control form-control-sm"
+                     value="0" min="0" placeholder="0=全部">
+            </div>
+            <div class="col-6">
+              <label class="form-label">最大注入任务数</label>
+              <input type="number" id="max-injection-tasks" class="form-control form-control-sm"
+                     value="0" min="0" placeholder="0=全部">
+            </div>
+          </div>
+
+          <!-- 运行按钮 -->
+          <button id="btn-run" class="btn btn-run w-100 mb-2">
+            <i class="bi bi-play-fill"></i> 开始测试
+          </button>
+          <button id="btn-stop" class="btn btn-outline-danger w-100 mb-3" style="display:none;">
+            <i class="bi bi-stop-fill"></i> 停止测试
+          </button>
+
+          <!-- 快捷对比 -->
+          <div class="quick-compare">
+            <label class="form-label mb-2">
+              <i class="bi bi-lightning-charge-fill"></i> 快捷对比模板
+            </label>
+            <button class="btn btn-sm btn-outline-info w-100 mb-1"
+                    onclick="quickCompare('baseline_vs_newframe')">
+              Baseline vs NewFrame 对比
+            </button>
+            <button class="btn btn-sm btn-outline-info w-100 mb-1"
+                    onclick="quickCompare('ablation_study')">
+              消融实验对比
+            </button>
+            <button class="btn btn-sm btn-outline-info w-100"
+                    onclick="quickCompare('defense_comparison')">
+              防御机制对比
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ====== 右侧主内容区 ====== -->
+      <div class="col-lg-9 col-xl-10 main-content">
+        <!-- 标签页导航 -->
+        <ul class="nav nav-tabs" id="main-tabs" role="tablist">
+          <li class="nav-item" role="presentation">
+            <button class="nav-link active" id="tab-live" data-bs-toggle="tab"
+                    data-bs-target="#panel-live" type="button" role="tab">
+              <i class="bi bi-terminal"></i> 实时日志
+            </button>
+          </li>
+          <li class="nav-item" role="presentation">
+            <button class="nav-link" id="tab-overview" data-bs-toggle="tab"
+                    data-bs-target="#panel-overview" type="button" role="tab">
+              <i class="bi bi-speedometer2"></i> 概览仪表盘
+            </button>
+          </li>
+          <li class="nav-item" role="presentation">
+            <button class="nav-link" id="tab-charts" data-bs-toggle="tab"
+                    data-bs-target="#panel-charts" type="button" role="tab">
+              <i class="bi bi-bar-chart"></i> 可视化图表
+            </button>
+          </li>
+          <li class="nav-item" role="presentation">
+            <button class="nav-link" id="tab-detail" data-bs-toggle="tab"
+                    data-bs-target="#panel-detail" type="button" role="tab">
+              <i class="bi bi-table"></i> 详细结果
+            </button>
+          </li>
+          <li class="nav-item" role="presentation">
+            <button class="nav-link" id="tab-compare" data-bs-toggle="tab"
+                    data-bs-target="#panel-compare" type="button" role="tab">
+              <i class="bi bi-git-compare"></i> 对比分析
+            </button>
+          </li>
+          <li class="nav-item" role="presentation">
+            <button class="nav-link" id="tab-report" data-bs-toggle="tab"
+                    data-bs-target="#panel-report" type="button" role="tab">
+              <i class="bi bi-file-earmark-text"></i> 测试报告
+            </button>
+          </li>
+          <li class="nav-item ms-auto" role="presentation">
+            <div class="nav-link text-muted" id="current-run-badge" style="display:none;">
+              当前运行: <strong id="current-run-id">-</strong>
+            </div>
+          </li>
+        </ul>
+
+        <!-- 标签页内容 -->
+        <div class="tab-content" id="main-tab-content">
+          <!-- 实时日志 -->
+          <div class="tab-pane fade show active" id="panel-live" role="tabpanel">
+            <div class="log-toolbar">
+              <div class="btn-group btn-group-sm">
+                <button class="btn btn-outline-secondary" onclick="clearLogs()">
+                  <i class="bi bi-eraser"></i> 清空
+                </button>
+                <button class="btn btn-outline-secondary" onclick="scrollLogsToBottom()">
+                  <i class="bi bi-arrow-down"></i> 底部
+                </button>
+                <button class="btn btn-outline-secondary" id="btn-auto-scroll" onclick="toggleAutoScroll()">
+                  <i class="bi bi-check-circle"></i> 自动滚动
+                </button>
+              </div>
+              <div class="form-check form-switch ms-2 d-inline-block">
+                <input class="form-check-input" type="checkbox" id="filter-errors">
+                <label class="form-check-label small" for="filter-errors">仅错误</label>
+              </div>
+            </div>
+            <div class="log-viewer" id="log-viewer">
+              <div class="log-placeholder">
+                <i class="bi bi-info-circle"></i>
+                <p>点击 <strong>"开始测试"</strong> 启动安全评估，实时日志将在此处显示。</p>
+                <p class="text-muted small">日志包含 Pipeline 构建、任务执行、安全审计等详细信息。</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- 概览仪表盘 -->
+          <div class="tab-pane fade" id="panel-overview" role="tabpanel">
+            <div class="p-3" id="overview-content">
+              <div class="placeholder-message">
+                <i class="bi bi-clipboard-data" style="font-size: 48px;"></i>
+                <p>完成测试后将在此显示概览仪表盘</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- 可视化图表 -->
+          <div class="tab-pane fade" id="panel-charts" role="tabpanel">
+            <div class="p-3">
+              <div class="chart-selector mb-3">
+                <label class="me-2">选择结果数据源:</label>
+                <select id="chart-data-source" class="form-select form-select-sm d-inline-block w-auto">
+                  <option value="">-- 选择运行 --</option>
+                </select>
+                <button class="btn btn-sm btn-outline-primary ms-2" onclick="refreshCharts()">
+                  <i class="bi bi-arrow-repeat"></i> 刷新
+                </button>
+              </div>
+              <div class="row" id="charts-container">
+                <div class="col-12 placeholder-message">
+                  <i class="bi bi-bar-chart-line" style="font-size: 48px;"></i>
+                  <p>完成测试并选择数据源后将显示交互式图表</p>
+                </div>
+              </div>
+              <div class="row mt-3" id="charts-row-2"></div>
+            </div>
+          </div>
+
+          <!-- 详细结果 -->
+          <div class="tab-pane fade" id="panel-detail" role="tabpanel">
+            <div class="p-3">
+              <div class="mb-3">
+                <label class="me-2">选择运行:</label>
+                <select id="detail-data-source" class="form-select form-select-sm d-inline-block w-auto">
+                  <option value="">-- 选择运行 --</option>
+                </select>
+                <label class="ms-3 me-2">场景:</label>
+                <select id="detail-suite-filter" class="form-select form-select-sm d-inline-block w-auto">
+                  <option value="all">全部</option>
+                </select>
+                <button class="btn btn-sm btn-outline-primary ms-2" onclick="refreshDetailTable()">
+                  <i class="bi bi-arrow-repeat"></i> 刷新
+                </button>
+              </div>
+              <div class="table-responsive" id="detail-table-container">
+                <div class="placeholder-message">
+                  <i class="bi bi-table" style="font-size: 48px;"></i>
+                  <p>完成测试后将在此显示详细的任务执行结果</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 对比分析 -->
+          <div class="tab-pane fade" id="panel-compare" role="tabpanel">
+            <div class="p-3">
+              <div class="mb-3">
+                <label class="form-label">选择要对比的运行:</label>
+                <div id="compare-run-checkboxes" class="mb-2"></div>
+                <button class="btn btn-sm btn-primary" onclick="runComparison()">
+                  <i class="bi bi-git-compare"></i> 执行对比
+                </button>
+              </div>
+              <div id="compare-results">
+                <div class="placeholder-message">
+                  <i class="bi bi-git-compare" style="font-size: 48px;"></i>
+                  <p>选择 2 个或更多运行结果进行对比分析</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 测试报告 -->
+          <div class="tab-pane fade" id="panel-report" role="tabpanel">
+            <div class="p-3">
+              <div class="mb-3">
+                <label class="me-2">选择运行:</label>
+                <select id="report-data-source" class="form-select form-select-sm d-inline-block w-auto">
+                  <option value="">-- 选择运行 --</option>
+                </select>
+                <button class="btn btn-sm btn-outline-primary ms-2" onclick="loadReport()">
+                  <i class="bi bi-download"></i> 生成报告
+                </button>
+                <a id="btn-download-report" class="btn btn-sm btn-success ms-2" style="display:none;"
+                   href="#" download>
+                  <i class="bi bi-download"></i> 下载 TXT 报告
+                </a>
+              </div>
+              <div id="report-content">
+                <div class="placeholder-message">
+                  <i class="bi bi-file-earmark-text" style="font-size: 48px;"></i>
+                  <p>选择运行结果并点击"生成报告"以查看</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ====== 防御架构示意图 Modal ====== -->
+  <div class="modal fade" id="architecture-modal" tabindex="-1">
+    <div class="modal-dialog modal-xl">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title"><i class="bi bi-diagram-3"></i> NewFrame 双层漏斗防御架构</h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body text-center">
+          <div class="architecture-diagram">
+            <div class="arch-flow">
+              <div class="arch-box arch-input">
+                <strong>用户请求</strong>
+                <small>User Prompt</small>
+              </div>
+              <div class="arch-arrow">→</div>
+              <div class="arch-box arch-sandbox">
+                <strong>🛡️ 权限沙箱</strong>
+                <small>物理漏斗: 动态白名单</small>
+                <small>工具级过滤</small>
+              </div>
+              <div class="arch-arrow">→</div>
+              <div class="arch-box arch-checker">
+                <strong>🔍 安全校验器</strong>
+                <small>语义漏斗: 意图对齐审计</small>
+                <small>组合攻击检测</small>
+              </div>
+              <div class="arch-arrow">→</div>
+              <div class="arch-box arch-exec">
+                <strong>⚙️ 工具执行</strong>
+                <small>ToolsExecutor</small>
+              </div>
+              <div class="arch-arrow">→</div>
+              <div class="arch-box arch-output">
+                <strong>✅ 安全响应</strong>
+                <small>返回到 LLM / 用户</small>
+              </div>
+            </div>
+            <div class="arch-details mt-3">
+              <div class="row">
+                <div class="col-md-4">
+                  <h6>第一层 - 物理漏斗</h6>
+                  <ul class="small text-start">
+                    <li>读写分离: 自动放行读操作</li>
+                    <li>意图解析: LLM 推理所需工具</li>
+                    <li>动态白名单: 仅允许必要工具</li>
+                    <li>违规拦截: 伪造报错触发纠错</li>
+                  </ul>
+                </div>
+                <div class="col-md-4">
+                  <h6>第二层 - 语义漏斗</h6>
+                  <ul class="small text-start">
+                    <li>写操作预检: 跳过纯读操作</li>
+                    <li>全局动作流审计</li>
+                    <li>意图对齐判定</li>
+                    <li>逻辑滥用 / 数据泄露检测</li>
+                  </ul>
+                </div>
+                <div class="col-md-4">
+                  <h6>安全保障</h6>
+                  <ul class="small text-start">
+                    <li>事前拦截 → 事中审计 → 事后监控</li>
+                    <li>组合攻击防御</li>
+                    <li>Token 开销可控</li>
+                    <li>消融实验支持</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="/static/js/app.js"></script>
+</body>
+</html>

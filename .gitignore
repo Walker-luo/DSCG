@@ -1,8 +1,7 @@
-logs/
-test_logs/
-photo/
-result_logs/
-img/
-dashboard_results/
+/results/
 __pycache__/
 *.pyc
+.DS_Store
+.env
+config/models.local.toml
+config/*.local.toml
