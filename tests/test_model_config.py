@@ -6,6 +6,7 @@ from dscg.model_config import (
     DEEPSEEK_MODEL_IDS,
     PROVIDER_PRESETS,
     load_model_settings,
+    reasoning_effort_for_config,
     resolve_model_config,
 )
 
@@ -147,6 +148,20 @@ api_key = "local-key"
         self.assertEqual(DEEPSEEK_MODEL_IDS, ("deepseek-flash", "deepseek-v4-pro"))
         self.assertEqual(preset.base_url, "https://api.deepseek.com")
         self.assertEqual(preset.api_key_env, "DEEPSEEK_API_KEY")
+
+    def test_deepseek_thinking_is_disabled_for_agentdojo_compatibility(self):
+        config = resolve_model_config(
+            local_settings={
+                "main": {
+                    "provider": "deepseek",
+                    "model_id": "deepseek-flash",
+                    "api_key": "test-key",
+                }
+            },
+            env={},
+        )
+
+        self.assertEqual(reasoning_effort_for_config(config), "none")
 
 
 if __name__ == "__main__":

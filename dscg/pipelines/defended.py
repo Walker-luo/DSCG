@@ -18,6 +18,7 @@ from dscg.token_tracking import TokenTrackerClient
 from dscg.model_config import (
     ModelConfig,
     create_openai_client,
+    reasoning_effort_for_config,
     resolve_model_config,
 )
 
@@ -127,16 +128,20 @@ class OurFrameExecutor(agent_pipeline.BasePipelineElement):
 
         # 4. 调用大模型进行解析 (这里假设你有一个可用的轻量客户端)
         try:
-            response = self.llm.client.chat.completions.create(
-                model=self.llm.name, # 或者专门配置一个 qwen-turbo 降低成本
-                messages=[{"role": "user", "content": prompt}],
-                response_format={"type": "json_object"} # 强制 JSON 输出
-            )
+            request_kwargs = {
+                "model": self.llm.name,  # 或者专门配置一个 qwen-turbo 降低成本
+                "messages": [{"role": "user", "content": prompt}],
+                "response_format": {"type": "json_object"},  # 强制 JSON 输出
+            }
+            reasoning_effort = getattr(self.llm, "reasoning_effort", None)
+            if reasoning_effort is not None:
+                request_kwargs["reasoning_effort"] = reasoning_effort
+            response = self.llm.client.chat.completions.create(**request_kwargs)
             # 解析返回的 JSON 列表
             result_json = json.loads(response.choices[0].message.content)
 
-            print("意图解析成功，相关写工具如下：")
-            print(result_json)
+            # print("意图解析成功，相关写工具如下：")
+            # print(result_json)
             
             # 将解析出的工具加入白名单
             for t in result_json:
@@ -463,10 +468,10 @@ class ActionSecurityChecker(agent_pipeline.BasePipelineElement):
                 f"{current_action_str}"
             )
 
-            print("+"*100)
-            print("审计动作序列：")
-            print(actions_str)
-            print("+"*100)
+            # print("+"*100)
+            # print("审计动作序列：")
+            # print(actions_str)
+            # print("+"*100)
 
             #! 终极 ATP 审计 Prompt：专注“逻辑滥用”和“组合攻击”
             # security_prompt = (
@@ -611,7 +616,10 @@ def make_qwen_newFrame_pipeline(
     
     # 1. 初始化主 LLM
     llm = agent_pipeline.OpenAILLM(
-        main_tracker, main_config.model_id, temperature=0.0, reasoning_effort=None
+        main_tracker,
+        main_config.model_id,
+        temperature=0.0,
+        reasoning_effort=reasoning_effort_for_config(main_config),
     )
     llm.name = main_config.model_id
 
@@ -642,7 +650,10 @@ def make_qwen_newFrame_pipeline(
         sec_tracker = TokenTrackerClient(sec_client)
         MODEL_NAMES.update({sec_config.model_id: sec_config.model_id})
         sec_llm = agent_pipeline.OpenAILLM(
-            sec_tracker, sec_config.model_id, temperature=0.0, reasoning_effort=None
+            sec_tracker,
+            sec_config.model_id,
+            temperature=0.0,
+            reasoning_effort=reasoning_effort_for_config(sec_config),
         )
         sec_llm.name = sec_config.model_id
         action_tracker = ActionHistoryTracker()

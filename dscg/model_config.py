@@ -34,7 +34,7 @@ ROLE_CONFIG_SECTIONS = {
     "DSCG_MAIN": ("main",),
     "DSCG_SEC": ("security", "sec", "audit"),
 }
-DEFAULT_MAIN_MODEL_ID = "qwen-flash-2025-07-28"
+DEFAULT_MAIN_MODEL_ID = "deepseek-flash"
 DEEPSEEK_MODEL_IDS = ("deepseek-flash", "deepseek-v4-pro")
 
 
@@ -65,6 +65,20 @@ class ModelConfig:
             "base_url": self.base_url,
             "api_key_env": self.api_key_env,
         }
+
+
+def reasoning_effort_for_config(config: ModelConfig) -> str | None:
+    """Return a safe reasoning setting for the configured provider.
+
+    AgentDojo 0.1.35 does not preserve DeepSeek's ``reasoning_content``
+    field when it serialises assistant tool-call messages. DeepSeek thinking
+    mode therefore fails on the next tool turn with a 400 error. Disable
+    thinking until the message adapter explicitly round-trips that field.
+    """
+
+    if config.provider == "deepseek":
+        return "none"
+    return None
 
 
 PROVIDER_PRESETS: dict[str, ProviderPreset] = {

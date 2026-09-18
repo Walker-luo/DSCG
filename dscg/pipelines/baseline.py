@@ -10,6 +10,7 @@ from dscg.paths import RESULTS_DIR
 from dscg.model_config import (
     ModelConfig,
     create_openai_client,
+    reasoning_effort_for_config,
     resolve_model_config,
 )
 from dscg.token_tracking import TokenTrackerClient
@@ -61,9 +62,12 @@ def make_openai_compatible_pipeline(
 
     MODEL_NAMES.update({config.model_id: config.model_id})
     
-    #! 非openai模型  reasoning_effort=None 查看README
+    # Provider-specific reasoning compatibility is resolved centrally.
     llm = agent_pipeline.OpenAILLM(
-        tracked_client, config.model_id, temperature=0.0, reasoning_effort=None
+        tracked_client,
+        config.model_id,
+        temperature=0.0,
+        reasoning_effort=reasoning_effort_for_config(config),
     )
     llm.name = config.model_id
 

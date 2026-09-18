@@ -206,6 +206,60 @@
 
 ---
 
+## 六、结合 DSCG TODO 的 2026 顶会优先阅读清单
+
+> 本节按与 DSCG 当前主线的相关性排序：P0 完整仲裁 → P1 Task Contract → P2 provenance/source-to-sink → P4 评测 → P5 论文 framing。会议状态按 2026-09-18 已公开的官方会议页、论文页或 OpenReview 页面核对。
+
+### 1. ACE: A Security Architecture for LLM-Integrated App Systems
+- **会议**：NDSS 2026
+- **论文页**：[NDSS official page](https://www.ndss-symposium.org/ndss-paper/ace-a-security-architecture-for-llm-integrated-app-systems/)
+- **核心方法**：将规划拆成 trusted abstract plan 和 concrete plan，再用静态信息流检查、数据屏障和 capability barrier 约束执行；同时覆盖规划完整性、执行完整性、可用性和隐私风险。
+- **为什么优先读**：这是最接近 DSCG “确定性策略层 + 动态能力图 + source-to-sink 约束”主线的系统安全架构，可作为 P0.2、P0.3、P1.2、P1.3 和 P2.2 的主要设计参照。
+- **对 DSCG 的直接启发**：把当前 `PermissionSandbox` 升级为“可信抽象计划 → 参数化具体动作 → 唯一 Reference Monitor”三段式执行链；把 `Capability Graph` 的节点约束落到可检查的结构化计划上。
+
+### 2. Security--Fidelity Tradeoffs: The Hidden Cost of Prompt Injection Defense
+- **会议**：ICML 2026
+- **论文页**：[arXiv:2606.30783](https://arxiv.org/abs/2606.30783)
+- **核心方法**：提出 SecFid 基准，区分“执行注入”“把注入当作数据处理”和“直接忽略注入”，专门测量安全防御造成的内容保真度损失。
+- **为什么优先读**：DSCG 当前重点记录 ASR 和 Utility，但 P4.2 还要求区分 benign utility、utility under attack、误拒绝和开销。SecFid 提供了比“拦截率越高越好”更严谨的评价视角。
+- **对 DSCG 的直接启发**：新增 `fidelity_rate`、`false_refusal_rate`、`source-preserving utility` 和按风险等级加权的效用指标；把“安全裁剪”与“静默丢弃合法数据”分开统计。
+
+### 3. Agent Security Needs Redefinition through a Holistic Framework
+- **会议**：ICML 2026 Position Paper
+- **论文页**：[arXiv:2607.22024](https://arxiv.org/abs/2607.22024)
+- **核心观点**：将 Agent 安全从“动作内容是否有害”重新定义为上下文安全，提出 Source Authorization、Task Alignment、Action Alignment 和 Data Isolation 四个持续检查属性，并把 IPI 视为 Source Authorization 违规。
+- **为什么优先读**：它几乎直接对应 TODO 的 P2 provenance、P2.2 source-to-sink、P3 delegation envelope 和 P5.1 研究问题；但它是立场/框架论文，不应替代实证防御论文。
+- **对 DSCG 的直接启发**：将 `ActionHistoryTracker` 从动作日志升级为带来源、授权主体、任务契约和数据流的安全账本；论文中明确区分“谁发出的指令”和“指令内容是什么”。
+
+### 4. Attention is All You Need to Defend Against Indirect Prompt Injection Attacks in LLMs (RENNERVATE)
+- **会议**：NDSS 2026
+- **论文页**：[NDSS official page](https://www.ndss-symposium.org/ndss-paper/attention-is-all-you-need-to-defend-against-indirect-prompt-injection-attacks-in-llms/)
+- **核心方法**：利用 attention features 做 token-level IPI 检测和精确 sanitization，并通过两步 attentive pooling 聚合 response token 与 attention head 特征。
+- **为什么优先读**：它适合作为 DSCG 的内容检测基线，对应 P2.1/P2.3 和 P4.4 的“无 LLM Security Checker / 无内容检测”消融；同时提醒我们不要把检测器当成唯一安全根。
+- **对 DSCG 的直接启发**：在 provenance 策略之前加入可插拔的 token/span 风险告警器，但最终 allow/deny 仍由确定性 Reference Monitor 决定。
+
+### 5. ChatInject: Abusing Chat Templates for Prompt Injection in LLM Agents
+- **会议**：ICLR 2026
+- **论文页**：[OpenReview paper](https://openreview.net/pdf?id=WVhgFSKniL)
+- **核心方法**：把恶意载荷格式化成类似原生 chat template 的角色化、多轮对话结构，并利用模拟历史和上下文说服绕过传统纯文本防御。
+- **为什么优先读**：它直接覆盖 TODO P4.3 的结构化注入、多轮攻击、审计器注入和“工具输出拼接 payload”，也是检验“只看文本分类器”是否失效的强攻击基线。
+- **对 DSCG 的直接启发**：增加 role-confusion、伪造 assistant/system turn、跨工具多轮拼接和模板变体测试；验证策略层是否只信任真实消息来源，而不是消息表面的 role 字段。
+
+### 6. RedTeamCUA: Realistic Adversarial Testing of Computer-Use Agents in Hybrid Web-OS Environments
+- **会议**：ICLR 2026 Oral
+- **项目与论文**：[official project page](https://osu-nlp-group.github.io/RedTeamCUA/) · [arXiv:2505.21936](https://arxiv.org/abs/2505.21936)
+- **核心方法**：构建结合 Web 复刻环境和 OS 沙箱的混合测试平台，支持自动化注入、场景化攻击配置以及跨 Web/OS 的真实任务链。
+- **为什么优先读**：它对应 TODO P4.2 和 P4.3 的“完整多领域、多阶段、自适应攻击”要求，能帮助 DSCG 从 AgentDojo 小子集扩展到更接近生产环境的长链路测试。
+- **对 DSCG 的直接启发**：补充跨资源、跨应用、跨会话的攻击轨迹；记录 P50/P95 延迟、确认次数、恢复次数和 source-to-sink 违规，而不只记录最终 ASR。
+
+### 建议阅读顺序
+
+1. **ACE**：先建立可信规划、能力屏障和完整仲裁的系统框架。
+2. **Security--Fidelity Tradeoffs**：补齐安全性、保真度和误拒绝的评价方法。
+3. **Agent Security Needs Redefinition**：重新定义 DSCG 的威胁模型和论文研究问题。
+4. **ChatInject + RedTeamCUA**：扩展自适应攻击与真实环境评测。
+5. **RENNERVATE**：作为内容检测器和 sanitization 基线加入消融。
+
 ## 分类统计
 
 | 分类 | 数量 | 涉及会议 |

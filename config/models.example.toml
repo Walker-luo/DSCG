@@ -6,7 +6,7 @@ provider = "deepseek"
 model_id = "deepseek-flash"
 base_url = "https://api.deepseek.com"
 api_key_env = "DEEPSEEK_API_KEY"
-# api_key = ""  # Optional local-only secret; prefer api_key_env for shared machines.
+# api_key = "sk-b8a564e77a0849c0a9b5d473e72325a3"  # Optional local-only secret; prefer api_key_env for shared machines.
 
 [security]
 provider = "dashscope"

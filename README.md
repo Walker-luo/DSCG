@@ -39,11 +39,20 @@ conda activate ipi
 cp config/models.example.toml config/models.local.toml
 ```
 
+如果 `ipi` 环境已经存在，请改用 `conda env update -n ipi -f environment.yml`，确保 Python 3.10 和 TOML 解析依赖 `tomli` 已安装。
+
 项目使用 Python 3.10、AgentDojo 0.1.35 和 OpenAI-compatible Chat Completions 接口。所有命令应在项目根目录执行。
 
 ## 模型配置
 
-模型接入统一由 [`dscg/model_config.py`](./dscg/model_config.py) 管理。Qwen、DeepSeek 等模型都通过 OpenAI-compatible API 调用；每个模型只需要提供模型 ID、API Key 和（必要时）Base URL。API Key 可以通过环境变量、函数参数或本地 `config/models.local.toml` 传入，但不要写入代码或提交到 Git。
+模型接入统一由 [`dscg/model_config.py`](./dscg/model_config.py) 管理。Qwen、DeepSeek 等模型都通过 OpenAI-compatible API 调用；每个模型只需要提供模型 ID、API Key 和（必要时）Base URL。API Key 可以通过环境变量、函数参数或本地 [`config/models.local.toml`](./config/models.local.toml) 传入，但不要写入代码或提交到 Git。
+
+配置相关源码位置：
+
+- 配置解析与 Provider 默认值：[`dscg/model_config.py`](./dscg/model_config.py)
+- 不含密钥的配置模板：[`config/models.example.toml`](./config/models.example.toml)
+- 本机实际配置：[`config/models.local.toml`](./config/models.local.toml)
+- 防御流水线的主模型与安全模型初始化：[`dscg/pipelines/defended.py`](./dscg/pipelines/defended.py)
 
 配置优先级为：函数显式参数 > `DSCG_MAIN_*` / `DSCG_SEC_*` 环境变量 > `config/models.local.toml` > Provider 默认值。
 
@@ -93,7 +102,7 @@ export MY_PROVIDER_API_KEY="your-api-key"
 
 ### 本地 TOML 配置
 
-如果不想每次手动 export，可以复制示例文件并填写本机配置：
+如果不想每次手动 export，可以复制 [`config/models.example.toml`](./config/models.example.toml) 为 [`config/models.local.toml`](./config/models.local.toml)，再填写本机配置：
 
 ```bash
 cp config/models.example.toml config/models.local.toml
@@ -115,6 +124,30 @@ base_url = "https://dashscope.aliyuncs.com/compatible-mode/v1"
 api_key_env = "DASHSCOPE_API_KEY"
 ```
 
+如果主模型和安全模型都使用 DeepSeek `deepseek-flash`，将 `[security]` 改为：
+
+```toml
+[main]
+provider = "deepseek"
+model_id = "deepseek-flash"
+base_url = "https://api.deepseek.com"
+api_key_env = "DEEPSEEK_API_KEY"
+
+[security]
+provider = "deepseek"
+model_id = "deepseek-flash"
+base_url = "https://api.deepseek.com"
+api_key_env = "DEEPSEEK_API_KEY"
+```
+
+然后设置一次环境变量：
+
+```bash
+export DEEPSEEK_API_KEY="your-deepseek-key"
+```
+
+`api_key_env` 只是环境变量名，两个角色可以共用同一个 Key；不要在两个配置段重复保存真实 `api_key`。如果省略整个 `[security]`，安全模型会在运行时复用 `[main]` 的模型配置。
+
 如果想把配置文件放到其他位置，可以设置：
 
 ```bash
@@ -123,7 +156,13 @@ export DSCG_MODEL_CONFIG="/absolute/path/to/models.local.toml"
 
 DeepSeek 内置配置使用当前 API 文档中的模型 ID `deepseek-flash` 和 `deepseek-v4-pro`，Base URL 为 `https://api.deepseek.com`。模型可用性可能随账号和地区变化；正式实验前请以 DeepSeek 控制台或 `GET /models` 返回为准。
 
+### DeepSeek thinking 兼容性
+
+DeepSeek 的 thinking 模式会在助手消息中返回 `reasoning_content`；带工具调用的下一轮请求必须完整回传该字段。当前项目使用 AgentDojo 0.1.35，而其 OpenAI 适配层不会保留这个字段，因此 [`dscg/model_config.py`](./dscg/model_config.py) 会对 DeepSeek 自动设置 `reasoning_effort="none"`，以使用非 thinking 模式完成稳定评测。若要重新开启 thinking，需要先在 AgentDojo 适配层中实现 `reasoning_content` 的完整 round-trip，再移除该兼容设置。
+
 ### Python 调用
+
+下面的调用示例对应源码 [`dscg/pipelines/defended.py`](./dscg/pipelines/defended.py) 中的 `make_defended_pipeline`。
 
 主模型和审计模型可以使用同一 Provider：
 
@@ -162,7 +201,7 @@ pipeline, main_tracker, sec_tracker = make_defended_pipeline(
 )
 ```
 
-原始基线同样支持这些参数：
+原始基线同样支持这些参数，对应源码为 [`dscg/pipelines/baseline.py`](./dscg/pipelines/baseline.py)：
 
 ```python
 from dscg.pipelines.baseline import make_openai_compatible_pipeline
@@ -177,11 +216,32 @@ pipeline, tracker = make_openai_compatible_pipeline(
 
 ## 运行评测
 
-运行当前 DSCG 主实验：
+主评测入口是 [`experiments/run_benchmark.py`](./experiments/run_benchmark.py)。在项目根目录执行 `python -m experiments.run_benchmark` 时，脚本会把 `DSCG_MAIN_MODEL_ID`、`DSCG_SEC_MODEL_ID` 等环境变量传给防御流水线；如果这些变量没有设置，模型 ID 会从 [`config/models.local.toml`](./config/models.local.toml) 的 `[main]` 和 `[security]` 中读取。
+
+例如，使用 DeepSeek `deepseek-flash` 同时作为主模型和安全模型，可以只配置 `config/models.local.toml`：
+
+```toml
+[main]
+provider = "deepseek"
+model_id = "deepseek-flash"
+base_url = "https://api.deepseek.com"
+api_key_env = "DEEPSEEK_API_KEY"
+
+[security]
+provider = "deepseek"
+model_id = "deepseek-flash"
+base_url = "https://api.deepseek.com"
+api_key_env = "DEEPSEEK_API_KEY"
+```
+
+再设置 Key 并运行：
 
 ```bash
+export DEEPSEEK_API_KEY="your-deepseek-key"
 python -m experiments.run_benchmark
 ```
+
+也可以不写 `[security]`，此时安全模型会复用 `[main]` 配置。若希望用环境变量覆盖 TOML，则设置 `DSCG_MAIN_MODEL_ID`、`DSCG_MAIN_PROVIDER`、`DSCG_SEC_MODEL_ID` 和 `DSCG_SEC_PROVIDER`；API Key 仍需通过对应的环境变量提供。
 
 运行保留的局部任务实验：
 
@@ -189,13 +249,53 @@ python -m experiments.run_benchmark
 python -m experiments.run_partial_benchmark
 ```
 
+### `run_benchmark` 与 `run_partial_benchmark` 的区别
+
+这两个入口都使用 AgentDojo 的 `important_instructions` 注入攻击，也都会输出 Utility、ASR、Defense Rate 和 token 开销；区别在于场景范围、任务取样、默认防御开关和结果目录。当前代码的实际行为如下：
+
+| 入口 | 默认套件与任务取样 | 默认防御配置 | 结果目录 | 适用场景 |
+|---|---|---|---|---|
+| `python -m experiments.run_benchmark` | `workspace`、`travel`、`banking`、`slack` 四个套件；每个套件使用全部用户任务和全部注入任务 | `use_sandbox=True`、`use_security_checker=True`，运行完整 DSCG 防御 | `results/benchmarks/ablation_study/` | 正式全量评测、跨场景对比和论文主结果 |
+| `python -m experiments.run_partial_benchmark` | 同样覆盖四个套件；每个套件只取前 3 个用户任务和前 2 个注入任务 | 使用防御流水线默认配置，即 Sandbox 和 Security Checker 均开启 | `results/partial_benchmark/` | 提交前回归、模型切换和低成本排查 |
+
+因此，`run_partial_benchmark` 是四个场景上的固定小批量回归，而不是完整评测。全量入口的任务组合数等于四个套件中各自的“用户任务数 × 注入任务数”之和，运行时间、Token 消耗和 API 费用会明显高于局部入口。两个脚本当前都设置了 `force_rerun=False`，重复运行时可能复用已有结果；更换模型、Provider、攻击配置或防御开关后，应清理对应结果目录，或在代码中显式改为强制重跑。
+
+运行全量评测：
+
+```bash
+python -m experiments.run_benchmark
+```
+
+运行小批量回归：
+
+```bash
+python -m experiments.run_partial_benchmark
+```
+
+如果需要从 Python 中覆盖套件或任务范围，也可以直接调用入口函数。完整防御配置示例：
+
+```python
+from experiments.run_benchmark import main
+
+main(
+    model_id="deepseek-flash",
+    sec_model_id="deepseek-flash",
+    suites=["workspace"],
+    run_attack=True,
+    use_sandbox=True,
+    use_security_checker=True,
+)
+```
+
+正式论文实验应固定套件、用户任务、注入任务、随机种子和防御开关，并记录实际任务数量；不要直接把上述两个入口的默认子集结果称为完整 AgentDojo 基准结果。
+
 直接运行原始基线模块：
 
 ```bash
 python -m dscg.pipelines.baseline
 ```
 
-评测输出统一写入 `results/`。主入口当前默认运行 Workspace 的 `important_instructions` 攻击；正式实验前应根据 [TODO.md](./TODO.md) 扩展领域、攻击类型和随机种子。
+评测输出统一写入 `results/`。主入口默认运行四个 AgentDojo 套件的 `important_instructions` 攻击；正式论文实验前仍应固定模型、Provider、攻击类型、任务列表、随机种子和防御开关，并保留每个套件的独立报告。
 
 ## Web 面板
 

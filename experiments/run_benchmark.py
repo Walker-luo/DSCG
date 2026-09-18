@@ -15,8 +15,7 @@ from dscg.pipelines.defended import make_defended_pipeline
 def main(
     model_id: str | None = None,
     sec_model_id: str | None = None,
-    # suites: list[str] = ["workspace", "banking"],
-    suites: list[str] = ["workspace"],
+    suites: list[str] = ["workspace", "travel", "banking", "slack"],
     run_attack: bool = True,
     origin = False,
     defense: str = None,
@@ -45,7 +44,7 @@ def main(
 
 
     attack_name = "important_instructions"  # 使用 AgentDojo 预定义的注入攻击
-    logdir = BENCHMARK_RESULTS_DIR / "ablation_study"
+    logdir = BENCHMARK_RESULTS_DIR
     logdir.mkdir(parents=True, exist_ok=True)
 
     print(f"开始实验 - 模型: {model_id or '本地/环境配置'}, 审计模型：{sec_model_id or '自动解析'}, 攻击: {attack_name if run_attack else '无'}, 防御: {defense if defense else '无'}")
@@ -99,14 +98,20 @@ def main(
 
         attack = attacks.load_attack(attack_name, suite, pipeline)
 
-        if suite_name == "workspace":
-            selected_injections = injection_task_ids[:6]
-        else:
-            selected_injections = injection_task_ids[:5]
-        
-        selected_users = user_task_ids[:35] if len(user_task_ids) >= 35 else user_task_ids
-        # selected_users = user_task_ids[:1] 
-        # selected_injections = injection_task_ids[:1]
+        # Full benchmark: evaluate every user task against every injection task.
+        selected_users = user_task_ids
+        selected_injections = injection_task_ids
+
+        planned_task_count = (
+            len(selected_users) * len(selected_injections)
+            if run_attack
+            else len(selected_users)
+        )
+        print(
+            f"本次评测任务数量 - User Tasks: {len(selected_users)}/{len(user_task_ids)}, "
+            f"Injection Tasks: {len(selected_injections)}/{len(injection_task_ids)}, "
+            f"预计任务组合: {planned_task_count}"
+        )
         
         # 运行基准测试并记录日志
         with logging.OutputLogger(str(logdir)):
@@ -134,6 +139,7 @@ def main(
         # 结果分析
         utility_results = results["utility_results"]
         security_results = results.get("security_results", {})
+        print(f"实际完成评测任务数量: {len(utility_results)}")
 
         # 1. 确保目录存在 (避免 FileNotFoundError)
         output_dir = logdir / pipeline.name
@@ -198,7 +204,11 @@ def main(
             "task_counts": {
                 "total_tasks": len(utility_results),
                 "utility_passed": sum(utility_results.values()),
-                "attacked_tasks": len(security_results)
+                "attacked_tasks": len(security_results),
+                "selected_user_tasks": len(selected_users),
+                "selected_injection_tasks": len(selected_injections),
+                "available_user_tasks": len(user_task_ids),
+                "available_injection_tasks": len(injection_task_ids),
             },
             "overhead": {
                 "prompt_tokens": prompt_tokens,
@@ -235,6 +245,9 @@ def main(
                 f.write("-" * 50 + "\n")
 
             f.write("\n🏆 总体评测得分汇总:\n")
+            f.write(f"👉 实际评测任务数量: {len(utility_results)}\n")
+            f.write(f"👉 User Tasks: {len(selected_users)}/{len(user_task_ids)}\n")
+            f.write(f"👉 Injection Tasks: {len(selected_injections)}/{len(injection_task_ids)}\n")
             f.write(f"👉 [{suite_name}] 整体可用性 (Utility): {utility_score:.2%}\n")
             if run_attack:
                 f.write(f"👉 [{suite_name}] 攻击成功率 (ASR): {security_score:.2%}\n")
@@ -281,11 +294,12 @@ if __name__ == "__main__":
             sec_model_id=os.getenv("DSCG_SEC_MODEL_ID"),
             provider=os.getenv("DSCG_MAIN_PROVIDER"),
             sec_provider=os.getenv("DSCG_SEC_PROVIDER"),
-            suites=["workspace"],
+            suites=["workspace", "travel", "banking", "slack"],
             run_attack=True,
             origin=False,
             defense=None,
-            use_sandbox=False,
+            use_sandbox=True,
+            use_security_checker=True,
         )
     except ModelConfigurationError as exc:
         print(f"模型配置错误: {exc}")
