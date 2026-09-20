@@ -14,7 +14,7 @@
 - `PermissionSandbox`：在工具执行前检查工具名，并裁剪未授权动作。
 - `ActionHistoryTracker`：保存历史工具名和参数。
 - `ActionSecurityChecker`：在出现写操作时，结合原始请求和动作历史进行 LLM 审计。
-- Mock Error / Retry：拦截违规动作后让主模型重新生成答案或动作。
+- 阻断与恢复：当前全阻断直接停止；Mock Error / Retry 仅作为待 P0.3 统一仲裁循环中的恢复设计。
 
 当前版本适合作为实验原型，但还不能把 LLM 审计、动作历史或工具名白名单描述成严格的安全边界。下一阶段的原则是：
 
@@ -103,15 +103,26 @@ ActionProposal(action_id, tool, canonical_args, provenance, contract_version)
 
 ### P0.1 白名单必须 fail-closed
 
-- [ ] 修复 `PermissionSandbox` 中空列表代表全放行的问题。
-- [ ] 明确区分：
+- [x] 修复 `PermissionSandbox` 中空列表代表全放行的问题。
+- [x] 明确区分：
   - `None`：策略尚未初始化，拒绝所有有副作用的动作；
   - `[]`：策略已初始化但未授权任何动作；
   - 非空列表：仅允许列表内动作。
-- [ ] 意图解析超时、JSON 错误、模型拒答、工具不存在时，一律进入安全失败状态。
-- [ ] 增加单元测试：空白名单、解析异常、未知工具均不能触发真实工具执行。
-- [ ] 为策略状态增加显式枚举（`uninitialized`、`initialized_empty`、`allowlist`、`error`），避免用空列表承载多种语义。
-- [ ] 测试工具调用批次中“一个未知/越权动作 + 一个合法动作”的行为，明确采用整批拒绝或逐动作裁剪，并在论文中固定该策略。
+- [x] 意图解析超时、JSON 错误、模型拒答、工具不存在时，一律进入安全失败状态。
+- [x] 增加单元测试：空白名单、解析异常、未知工具均不能触发真实工具执行。
+- [x] 为策略状态增加显式枚举（`uninitialized`、`initialized_empty`、`allowlist`、`error`），避免用空列表承载多种语义。
+- [x] 测试工具调用批次中“一个未知/越权动作 + 一个合法动作”的行为；当前采用逐动作裁剪，保留已授权动作并阻断未知/越权动作。
+
+#### P0.1 实现记录（2026-09-19）
+
+- `PermissionSandbox` 现在以不可变 `frozenset` 保存策略，读取白名单时返回副本；策略更新失败会先撤销旧权限，再进入 `error` 状态。
+- 只有 `allowlist` 状态且工具同时存在于 `runtime.functions` 时才允许执行。`uninitialized`、`initialized_empty`、`error` 和未知工具均 fail-closed。
+- 意图解析强制校验 JSON 结构、工具名、拒答和 `finish_reason`，并向 OpenAI-compatible 请求传入 30 秒单次请求超时。解析异常不会回退到旧白名单；SDK 级重试的总墙钟时间仍需在 P0.3 统一预算中处理。
+- 主执行器在每个新用户回合开始时清空旧策略；安全检查器产生的替换动作在进入 `ToolsExecutor` 前再次经过同一沙箱。
+- 全部动作被阻断时当前回合直接停止，不在沙箱内部调用主模型重试；混合批次采用逐动作裁剪，仅保留已授权动作。统一恢复事件循环仍属于 P0.3。
+- 离线回归覆盖真实 `FunctionsRuntime`/`ToolsExecutor`、解析失败矩阵、批次裁剪、文本回合撤权和流水线顺序：`tests/test_permission_sandbox.py`、`tests/test_sandbox_execution.py`。
+
+本改动只完成 P0.1 的工具级 fail-closed 基线，并不等价于完成 P0：首轮候选动作仍可能参与白名单编译（P0.2），工具风险仍暂依赖前缀（P0.5），动作票据、统一恢复循环和完整事件账本尚未实现（P0.3）。
 
 ### P0.2 移除“先生成、后授权”
 

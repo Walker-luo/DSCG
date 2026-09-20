@@ -214,6 +214,36 @@ pipeline, tracker = make_openai_compatible_pipeline(
 
 如果省略 `sec_model_id`，安全审计模型会复用主模型的模型配置；启用安全校验器时仍建议显式指定一个独立的审计模型，便于进行异构模型消融实验。
 
+## 防御改进记录
+
+每次改进按编号简要记录“改进前 → 改进后”，并说明验证结果与剩余限制。
+
+### P0.1：白名单 fail-closed
+
+| 改进项 | 改进前 | 改进后 |
+| --- | --- | --- |
+| 空白名单 | `None` 和 `[]` 混用，空列表会跳过权限检查 | 区分未初始化、已初始化为空、有效白名单和错误状态；仅有效白名单可放行 |
+| 授权异常 | 解析失败后仍可能保留首轮候选工具权限 | 超时、拒答、非法响应或策略更新失败时撤销权限，默认拒绝 |
+| 未知工具 | 沙箱未显式核对工具是否注册 | 即使在白名单中，未注册的工具也被阻断 |
+| 阻断后的新动作 | 沙箱内部重试或 Checker 纠错生成的动作可能跳过白名单检查 | 移除沙箱内部重试，Checker 替换动作在执行前再次检查 |
+
+验证：21 项离线测试、Python 编译检查和 `git diff --check` 通过，未运行真实模型评测。混合批次仍采用逐动作裁剪；更保守的阻断可能影响任务效用，需后续评测量化。
+
+当前 `PermissionSandbox`（实现见 [`dscg/pipelines/defended.py`](./dscg/pipelines/defended.py)）采用显式策略状态：
+
+- `uninitialized`（`None`）：尚未完成授权，拒绝所有工具调用；
+- `initialized_empty`（`[]`）：授权已完成但没有允许的工具，拒绝所有工具调用；
+- `allowlist`：只允许白名单中、且确实注册在当前 `FunctionsRuntime` 的工具；
+- `error`：意图解析、策略更新或模型响应异常后的安全失败状态，拒绝所有工具调用。
+
+未知工具、单次请求超时、拒答、非法 JSON、非完整响应和策略更新错误都不会回退到旧权限。一个批次中如果同时出现合法和越权动作，当前实现逐动作裁剪并保留合法动作；如果全部动作被阻断，则停止当前批次，不在沙箱内部自动重试。安全检查器生成的替换动作在真实工具执行前还会再次经过沙箱。SDK 重试导致的总墙钟时间上限尚未统一纳入预算。
+
+这些保证是工具级的研究基线，不是完整安全证明：P0.2–P0.5 的授权与执行改造、P1 的参数级授权和 P2 的 provenance 约束仍待完成，详见 [`TODO.md`](./TODO.md)。离线验证不需要 API Key，可在项目根目录运行：
+
+```bash
+conda run -n ipi python -m unittest discover -s tests -v
+```
+
 ## 运行评测
 
 主评测入口是 [`experiments/run_benchmark.py`](./experiments/run_benchmark.py)。在项目根目录执行 `python -m experiments.run_benchmark` 时，脚本会把 `DSCG_MAIN_MODEL_ID`、`DSCG_SEC_MODEL_ID` 等环境变量传给防御流水线；如果这些变量没有设置，模型 ID 会从 [`config/models.local.toml`](./config/models.local.toml) 的 `[main]` 和 `[security]` 中读取。
@@ -304,6 +334,8 @@ python -m dashboard.app
 ```
 
 默认地址为 `http://127.0.0.1:8888`，可通过 `PORT=5000 python -m dashboard.app` 覆盖端口。面板结果保存到 `results/dashboard/`。
+
+面板左侧的“自定义 API 连接”是本次运行级别的临时配置。可以直接填写主模型的 API Key 和 Base URL；安全审计模型可以单独填写覆盖值，留空时在同一 Provider 或未指定独立安全模型的情况下复用主连接。留空则继续使用环境变量或 `config/models.local.toml`。API Key 仅传给当前后台运行线程，不写入日志、运行结果或报告；在非本机部署时请使用 HTTPS，并避免通过不受信任的公网面板提交密钥。
 
 ## 生成图表
 

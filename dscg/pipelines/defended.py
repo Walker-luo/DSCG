@@ -2,6 +2,7 @@ import os
 from pathlib import Path
 import json
 import re
+from enum import Enum
 
 from pydantic import BaseModel, Field
 from typing import List, Dict, Any
@@ -39,6 +40,20 @@ class ActionModel(BaseModel):
 
 class ActionSequenceModel(BaseModel):
     actions: List[ActionModel] = Field(default_factory=list)
+
+
+class SandboxPolicyState(str, Enum):
+    """The lifecycle state of a sandbox allowlist.
+
+    ``None`` and ``[]`` intentionally have different meanings.  Keeping the
+    state explicit prevents a truthiness check from turning an empty policy
+    into an implicit allow-all policy.
+    """
+
+    UNINITIALIZED = "uninitialized"
+    INITIALIZED_EMPTY = "initialized_empty"
+    ALLOWLIST = "allowlist"
+    ERROR = "error"
 
 
 # 全局动作追踪器，记录当前user prompt下的所有执行动作直到下一个user prompt
@@ -96,6 +111,8 @@ class OurFrameExecutor(agent_pipeline.BasePipelineElement):
     def _authorize_tools_dynamically(self, user_prompt: str, runtime, first_turn_tools: list[str]) -> list[str]:
         all_tools = list(runtime.functions.keys())
         allowed = set(first_turn_tools)
+        if allowed - set(all_tools):
+            raise ValueError("unknown first-turn tool")
         
         # 1. 物理放行所有无害的读操作
         write_tools = {}
@@ -123,40 +140,69 @@ class OurFrameExecutor(agent_pipeline.BasePipelineElement):
         Based on the implicit or explicit semantics of the user's task, which tools MIGHT be required? 
         Consider synonyms, metaphors, and logical deductions (e.g., "paying a fee" requires "send_money").
         
-        Output ONLY a valid JSON list of tool names. Example: ["send_money", "update_calendar"]
+        Output ONLY a JSON object with this exact shape:
+        {{"tools": ["send_money", "update_calendar"]}}
         """
 
         # 4. 调用大模型进行解析 (这里假设你有一个可用的轻量客户端)
-        try:
-            request_kwargs = {
-                "model": self.llm.name,  # 或者专门配置一个 qwen-turbo 降低成本
-                "messages": [{"role": "user", "content": prompt}],
-                "response_format": {"type": "json_object"},  # 强制 JSON 输出
-            }
-            reasoning_effort = getattr(self.llm, "reasoning_effort", None)
-            if reasoning_effort is not None:
-                request_kwargs["reasoning_effort"] = reasoning_effort
-            response = self.llm.client.chat.completions.create(**request_kwargs)
-            # 解析返回的 JSON 列表
-            result_json = json.loads(response.choices[0].message.content)
+        request_kwargs = {
+            "model": self.llm.name,  # 或者专门配置一个 qwen-turbo 降低成本
+            "messages": [{"role": "user", "content": prompt}],
+            "response_format": {"type": "json_object"},  # 强制 JSON 输出
+            "timeout": 30.0,
+        }
+        reasoning_effort = getattr(self.llm, "reasoning_effort", None)
+        if reasoning_effort is not None:
+            request_kwargs["reasoning_effort"] = reasoning_effort
+        response = self.llm.client.chat.completions.create(**request_kwargs)
+        # 解析并严格验证返回值。解析失败必须由调用方转换为 ERROR
+        # 状态，不能悄悄退回一个可能被误解释的空列表。
+        choice = response.choices[0]
+        if getattr(choice.message, "refusal", None):
+            raise ValueError("intent parser refused the request")
+        if choice.finish_reason != "stop":
+            raise ValueError("intent parser response is incomplete")
+        result_json = json.loads(choice.message.content)
 
-            # print("意图解析成功，相关写工具如下：")
-            # print(result_json)
-            
-            # 将解析出的工具加入白名单
-            for t in result_json:
-                if t in write_tools:
-                    allowed.add(t)
-        except Exception as e:
-            print(f"意图解析失败，白名单初始化失败，回退到安全模式: {e}")
-            # 如果解析失败，为了安全，可以默认不开放任何写权限，或者回退到你之前的正则匹配
-            pass
-            
+        if isinstance(result_json, dict):
+            parsed_tools = result_json.get("tools")
+            if set(result_json) != {"tools"}:
+                raise ValueError("intent parser returned unexpected JSON fields")
+        elif isinstance(result_json, list):
+            # 兼容旧 provider 的数组响应；新请求仍要求 object。
+            parsed_tools = result_json
+        else:
+            raise ValueError("intent parser response must be a JSON object")
+
+        if not isinstance(parsed_tools, list) or not all(
+            isinstance(tool, str) and tool for tool in parsed_tools
+        ):
+            raise ValueError("intent parser 'tools' must be a list of tool names")
+
+        unknown_tools = set(parsed_tools) - set(all_tools)
+        if unknown_tools:
+            raise ValueError(
+                "intent parser returned unknown tools: "
+                + ", ".join(sorted(unknown_tools))
+            )
+
+        # 将解析出的工具加入白名单。只允许 runtime 中已注册的写工具。
+        for tool in parsed_tools:
+            if tool in write_tools:
+                allowed.add(tool)
+
         return list(allowed)
 
 
 
     def query(self, query, runtime, env, messages, extra_args):
+
+        # 新任务必须先撤销旧策略，即使主模型只返回文本或请求失败。
+        if self.sandbox is not None and messages:
+            last_input = messages[-1]
+            role = last_input.get("role") if isinstance(last_input, dict) else getattr(last_input, "role", None)
+            if role == "user":
+                self.sandbox.allowed_tools = None
 
         _, _, _, [*_, response_msg], _ = self.llm.query(query, runtime, env, messages, extra_args)
 
@@ -189,8 +235,13 @@ class OurFrameExecutor(agent_pipeline.BasePipelineElement):
                     user_text = query
 
                 # 传入 runtime 进行全局动态扫描
-                dynamic_whitelist = self._authorize_tools_dynamically(user_text, runtime, generated_tools)
-                self.sandbox.allowed_tools = dynamic_whitelist
+                try:
+                    dynamic_whitelist = self._authorize_tools_dynamically(
+                        user_text, runtime, generated_tools
+                    )
+                    self.sandbox.set_allowlist(dynamic_whitelist)
+                except Exception as exc:
+                    self.sandbox.mark_error(exc)
 
                 # print(f"🔓 [零先验沙箱] 动态扫描环境，赋予权限: {dynamic_whitelist}")
             else:
@@ -206,8 +257,54 @@ class PermissionSandbox(agent_pipeline.BasePipelineElement):
         初始化沙箱规则
         allowed_tools: 允许调用的工具白名单
         """
-        self.allowed_tools = allowed_tools or []
+        self._allowed_tools: frozenset[str] = frozenset()
+        self._policy_state = SandboxPolicyState.UNINITIALIZED
+        if allowed_tools is not None:
+            self.set_allowlist(allowed_tools)
         self.llm = model
+
+    @property
+    def policy_state(self) -> SandboxPolicyState:
+        return self._policy_state
+
+    @property
+    def allowed_tools(self) -> list[str]:
+        """Return a copy so callers cannot mutate policy without a state update."""
+        return sorted(self._allowed_tools)
+
+    @allowed_tools.setter
+    def allowed_tools(self, tools: list[str] | None):
+        # Keep assignment compatibility for existing integrations while
+        # preserving the None/[] distinction.
+        if tools is None:
+            self._allowed_tools = frozenset()
+            self._policy_state = SandboxPolicyState.UNINITIALIZED
+        else:
+            self.set_allowlist(tools)
+
+    def set_allowlist(self, tools: list[str]) -> None:
+        if tools is None:
+            self.allowed_tools = None
+            return
+        if not isinstance(tools, (list, tuple, set, frozenset)):
+            self.mark_error()
+            raise TypeError("sandbox allowlist must be a sequence of tool names")
+        if not all(isinstance(tool, str) and tool for tool in tools):
+            self.mark_error()
+            raise ValueError("sandbox allowlist contains an invalid tool name")
+        self._allowed_tools = frozenset(tools)
+        self._policy_state = (
+            SandboxPolicyState.ALLOWLIST
+            if self._allowed_tools
+            else SandboxPolicyState.INITIALIZED_EMPTY
+        )
+
+    def mark_error(self, error: Exception | None = None) -> None:
+        """Revoke permissions and enter fail-closed state until the next user turn."""
+        self._allowed_tools = frozenset()
+        self._policy_state = SandboxPolicyState.ERROR
+        if error is not None:
+            print(f"意图解析失败，沙箱进入安全失败状态: {type(error).__name__}")
 
     def query(self, query, runtime, env, messages, extra_args):
         if not messages:
@@ -234,8 +331,21 @@ class PermissionSandbox(agent_pipeline.BasePipelineElement):
                 is_safe = True
                 block_reason = ""
 
-                # 规则 1：工具白名单校验
-                if self.allowed_tools and tool_name not in self.allowed_tools:
+                # 规则 1：工具必须已经在 runtime 注册。未知工具永远拒绝，
+                # 即使攻击者设法把它写进了 allowlist。
+                if tool_name not in runtime.functions:
+                    is_safe = False
+                    block_reason = f"Unknown tool '{tool_name}'"
+
+                # 规则 2：显式策略状态校验。只有 ALLOWLIST 状态才会
+                # 逐项放行；其余状态全部 fail-closed。
+                elif self.policy_state != SandboxPolicyState.ALLOWLIST:
+                    is_safe = False
+                    block_reason = (
+                        f"Sandbox policy is {self.policy_state.value}; "
+                        f"tool '{tool_name}' is denied"
+                    )
+                elif tool_name not in self._allowed_tools:
                     is_safe = False
                     block_reason = f"Tool '{tool_name}' is not allowed"
 
@@ -301,68 +411,23 @@ class PermissionSandbox(agent_pipeline.BasePipelineElement):
             last_msg.get("content", []) if isinstance(last_msg, dict) else getattr(last_msg, "content", [])
         )
 
-        # 判决 A：全部违规 -> 伪造工具报错，触发 LLM 纠错 (All-or-Nothing Block & Retry)
+        # 全部违规时终止当前批次。内部重试会把未经校验的新动作交给
+        # 下游 ToolsExecutor；统一恢复事件循环在 P0.3 中实现。
         if not safe_calls:
             reason_str = f"Sandbox Violation: All attempted actions blocked. Reasons: {'; '.join(blocked_info)}"
-            print(f"🛑 [SANDBOX FULL BLOCK] {reason_str} -> 伪造工具报错触发纠错...")
-            
-            if hasattr(self, 'llm') and self.llm:
-                # 1. 构造原生的字典格式 Tool 消息
-                mock_tool_messages = []
-                for call in tool_calls:
-                    call_id = call.id if hasattr(call, 'id') else call.get("id")
-                    func_obj = getattr(call, "function", None) or call.get("function", {})
-                    func_name = getattr(func_obj, "name", None) or (func_obj.get("name") if isinstance(func_obj, dict) else str(func_obj))
-                    
-                    error_text = (
-                        f"Execution Failed: Blocked by Security Sandbox. Reason: {reason_str}. "
-                        "Do NOT retry this action. Please respond to the user directly based on safe information."
-                    )
-                    
-                    mock_tool_messages.append({
-                        "role": "tool",
-                        "content": [{"type": "text", "content": error_text}],
-                        "tool_call_id": call_id,
-                        "name": func_name,
-                        "error": None,
-                        "tool_call":call
-                    })
-                
-                # 2. 带着这些“报错结果”，调用大模型重新思考
-                # 注意：此时传给 llm 的上下文是 [*messages, *mock_tool_messages]
-                _, _, _, new_messages_list, _ = self.llm.query(
-                    query, runtime, env, [*messages, *mock_tool_messages], extra_args
-                )
-                
-                # 获取大模型“认错”后的最新回复
-                new_assistant_msg = new_messages_list[-1]
-                
-                # 3. 修复大模型可能输出 null tool_calls 的底层 Bug
-                if isinstance(new_assistant_msg, dict):
-                    if new_assistant_msg.get("tool_calls") is None:
-                        new_assistant_msg["tool_calls"] = []
-                else:
-                    if getattr(new_assistant_msg, "tool_calls", None) is None:
-                        new_assistant_msg.tool_calls = []
-                    
-                # 4. 🚨 完美拼接并交还给框架控制权
-                # 顺序：原本的对话(含越权动作) -> 沙箱的伪装报错 -> 大模型的纠错回复
-                return query, runtime, env, [*messages, *mock_tool_messages, new_assistant_msg], extra_args
-                
-            else:
-                # Fallback: 如果没传 llm 实例，走老路子结束任务
-                block_msg = ad_types.ChatAssistantMessage(
-                    role="assistant",
-                    content=[ad_types.text_content_block_from_string(reason_str)],
-                    tool_calls=[] 
-                )
-                return query, runtime, env, [*messages[:-1], block_msg], extra_args
+            print(f"🛑 [SANDBOX FULL BLOCK] {reason_str}")
+            block_msg = ad_types.ChatAssistantMessage(
+                role="assistant",
+                content=[ad_types.text_content_block_from_string(reason_str)],
+                tool_calls=[]
+            )
+            return query, runtime, env, [*messages[:-1], block_msg], extra_args
                 
        # 部分违规，部分合法 -> 动态修剪 (Selective Pruning)
         print(f"✂️ [SANDBOX PRUNING] 裁剪违规动作: {blocked_info}，保留合法动作。")
         
         # 悄悄注入系统警告，充当大模型的“记忆”，防止它死循环重试
-        warning_text = f"\n\n[System Sandbox Notice: Attempted actions blocked: {'; '.join(blocked_info)}. Only safe tools were executed.]"
+        warning_text = f"\n\n[System Sandbox Notice: Attempted actions blocked: {'; '.join(blocked_info)}. Only allowlisted tools remain pending.]"
         new_content = original_content + warning_text
 
         # 重构一条干净的 Assistant 消息，只包含安全的 tool_calls
@@ -626,7 +691,7 @@ def make_qwen_newFrame_pipeline(
     # 2. 动态实例化组件
     my_sandbox = None
     if use_sandbox:
-        my_sandbox = PermissionSandbox(allowed_tools=[], model=llm)
+        my_sandbox = PermissionSandbox(model=llm)
 
     # new_executor 需要处理 sandbox=None 的情况（你的代码中 _authorize_tools_dynamically 应该有判空逻辑）
     new_executor = OurFrameExecutor(llm, sandbox=my_sandbox)
@@ -670,6 +735,9 @@ def make_qwen_newFrame_pipeline(
         loop_components.append(security_checker)    # 唤醒式意图审计
         loop_components.append(action_tracker)      # 记录账本
         
+    if use_sandbox and use_security_checker:
+        # Checker 的恢复动作也必须满足当前白名单；P0.3 将统一恢复循环。
+        loop_components.append(my_sandbox)
     loop_components.append(agent_pipeline.ToolsExecutor()) # 真实的工具执行
     loop_components.append(new_executor)                   # 结果返回给大模型
 

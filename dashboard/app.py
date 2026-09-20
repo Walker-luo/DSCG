@@ -36,8 +36,24 @@ app.secret_key = "newframe_dashboard_2024"
 runs_store: dict[str, dict] = {}
 # 每个运行 ID 对应一个消息队列（用于 SSE 推送）
 run_queues: dict[str, queue.Queue] = {}
+# Raw credentials are kept only while a run is executing so log redaction can
+# catch provider/client exceptions that echo request data.
+run_secrets: dict[str, tuple[str, ...]] = {}
 # 全局锁
 _store_lock = threading.Lock()
+
+
+def _redact_run_config(config: dict | None) -> dict:
+    """Return a serialisable run config without exposing client credentials.
+
+    The dashboard accepts credentials for a single background run, but result
+    files, run listings and log messages must never contain the raw values.
+    """
+    safe_config = dict(config or {})
+    for key in ("api_key", "sec_api_key"):
+        if key in safe_config:
+            safe_config[key] = "[provided]" if safe_config[key] else None
+    return safe_config
 
 DASHBOARD_RESULTS_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -106,10 +122,16 @@ AVAILABLE_DEFENSES = [
 def push_log(run_id: str, level: str, message: str):
     """向指定 run 的消息队列推送一条日志"""
     if run_id in run_queues:
+        safe_message = str(message)
+        with _store_lock:
+            secrets = run_secrets.get(run_id, ())
+        for secret in secrets:
+            if secret:
+                safe_message = safe_message.replace(secret, "[REDACTED]")
         run_queues[run_id].put({
             "type": "log",
             "level": level,
-            "message": message,
+            "message": safe_message,
             "timestamp": datetime.now().isoformat()
         })
 
@@ -159,16 +181,27 @@ def run_test_thread(run_id: str, config: dict):
     在后台线程中执行安全测试。
     这是对 experiments.run_benchmark 中评测逻辑的 Web 封装。
     """
+    with _store_lock:
+        run_secrets[run_id] = tuple(
+            value for key in ("api_key", "sec_api_key")
+            if (value := config.get(key))
+        )
     try:
         push_log(run_id, "info", f"🚀 开始测试运行 [{run_id}]")
-        push_log(run_id, "info", f"配置: {json.dumps(config, ensure_ascii=False)}")
+        push_log(
+            run_id,
+            "info",
+            f"配置: {json.dumps(_redact_run_config(config), ensure_ascii=False)}",
+        )
 
         model_id = config.get("model_id")
         sec_model_id = config.get("sec_model_id")
         provider = config.get("provider")
         base_url = config.get("base_url")
+        api_key = config.get("api_key") or None
         sec_provider = config.get("sec_provider")
         sec_base_url = config.get("sec_base_url")
+        sec_api_key = config.get("sec_api_key") or None
         suites = config["suites"]
         run_attack = config.get("run_attack", True)
         is_origin = config.get("origin", False)
@@ -205,19 +238,29 @@ def run_test_thread(run_id: str, config: dict):
                     pipeline, main_tracker = make_openai_compatible_pipeline(
                         model_id,
                         ad_defense=defense,
+                        api_key=api_key,
                         provider=provider,
                         base_url=base_url,
                     )
                     sec_tracker = None
                 else:
+                    # An omitted security override may reuse the explicitly
+                    # supplied main credentials when both roles use the same
+                    # provider (or when no separate security model is chosen).
+                    same_connection = (
+                        not sec_model_id
+                        or (sec_provider and sec_provider == provider)
+                    )
                     pipeline, main_tracker, sec_tracker = make_defended_pipeline(
                         model_id, sec_model_id,
                         use_sandbox=use_sandbox,
                         use_security_checker=use_security_checker,
+                        api_key=api_key,
                         provider=provider,
                         base_url=base_url,
+                        sec_api_key=sec_api_key if sec_api_key else (api_key if same_connection else None),
                         sec_provider=sec_provider,
-                        sec_base_url=sec_base_url,
+                        sec_base_url=sec_base_url if sec_base_url else (base_url if same_connection else None),
                     )
 
                 main_model_config = getattr(pipeline, "dscg_model_config", {})
@@ -375,7 +418,7 @@ def run_test_thread(run_id: str, config: dict):
         # ---- 汇总所有套件结果 ----
         overall = {
             "run_id": run_id,
-            "config": config,
+            "config": _redact_run_config(config),
             "completed_at": datetime.now().isoformat(),
             "num_suites": len(all_summaries),
             "suites": all_summaries,
@@ -404,6 +447,8 @@ def run_test_thread(run_id: str, config: dict):
         def _cleanup():
             time.sleep(10)
             run_queues.pop(run_id, None)
+            with _store_lock:
+                run_secrets.pop(run_id, None)
         threading.Thread(target=_cleanup, daemon=True).start()
 
 
@@ -469,7 +514,7 @@ def list_runs():
                             data = json.load(f)
                         runs.append({
                             "run_id": d.name,
-                            "config": data.get("config", {}),
+                            "config": _redact_run_config(data.get("config", {})),
                             "completed_at": data.get("completed_at", ""),
                             "num_suites": data.get("num_suites", 0),
                             "aggregate_metrics": data.get("aggregate_metrics", {}),
@@ -491,6 +536,8 @@ def get_run(run_id: str):
         if result_file.exists():
             with open(result_file, "r") as f:
                 run = json.load(f)
+            if isinstance(run, dict):
+                run["config"] = _redact_run_config(run.get("config", {}))
 
     if not run:
         return jsonify({"error": "Run not found"}), 404
@@ -521,7 +568,9 @@ def get_suite_result(run_id: str, suite_name: str):
 @app.route("/api/run", methods=["POST"])
 def start_run():
     """启动一个新的测试运行"""
-    config = request.get_json()
+    config = request.get_json(silent=True) or {}
+    if not isinstance(config, dict):
+        return jsonify({"error": "Invalid JSON configuration"}), 400
 
     run_id = datetime.now().strftime("%Y%m%d_%H%M%S") + "_" + uuid.uuid4().hex[:6]
     run_queues[run_id] = queue.Queue()
@@ -529,7 +578,7 @@ def start_run():
     with _store_lock:
         runs_store[run_id] = {
             "run_id": run_id,
-            "config": config,
+            "config": _redact_run_config(config),
             "status": "running",
             "started_at": datetime.now().isoformat(),
         }
@@ -684,7 +733,7 @@ def download_report(run_id: str):
     lines.append(f"  测试套件: {', '.join(config.get('suites', []))}")
     lines.append(f"  执行攻击: {config.get('run_attack', True)}")
     lines.append(f"  攻击类型: {config.get('attack_name', 'N/A')}")
-    lines.append(f"  框架类型: {'原始模型' if config.get('origin') else 'NewFrame'}")
+    lines.append(f"  框架类型: {'原始模型' if config.get('origin') else 'DSCG'}")
     if config.get("defense"):
         lines.append(f"  AgentDojo 防御: {config.get('defense')}")
     if not config.get("origin"):
@@ -713,7 +762,7 @@ def download_report(run_id: str):
         lines.append("")
 
     lines.append("=" * 60)
-    lines.append("  报告由 NewFrame Web Dashboard 自动生成")
+    lines.append("  报告由 DSCG Web Dashboard 自动生成")
     lines.append("=" * 60)
 
     report_text = "\n".join(lines)
@@ -767,7 +816,7 @@ if __name__ == "__main__":
 
     # ---- 打印启动信息 ----
     print("=" * 60)
-    print("  🔐 NewFrame - 间接提示词注入防御可视化平台")
+    print("  🔐 DSCG - Agent 安全评测台")
     print("=" * 60)
 
     if is_docker:

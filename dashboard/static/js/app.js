@@ -1,5 +1,5 @@
 /**
- * NewFrame Dashboard - 前端应用逻辑
+ * DSCG Dashboard - 前端应用逻辑
  * 实时日志 / 图表渲染 / 对比分析 / 报告生成
  */
 
@@ -14,6 +14,7 @@ const state = {
   comparisonCharts: {},
   eventSource: null,
   isRunning: false,
+  dashboardConfig: null,
 };
 
 // DOM 引用缓存
@@ -28,6 +29,7 @@ document.addEventListener("DOMContentLoaded", () => {
   loadDashboardConfig();
   loadAllRuns();
   refreshDataSources();
+  updateRunPreview();
 
   // 定时刷新运行列表
   setInterval(loadAllRuns, 10000);
@@ -42,14 +44,17 @@ function initConfigListeners() {
   $("#pipeline-type").addEventListener("change", (e) => {
     const isOrigin = e.target.value === "origin";
     $("#sec-model-group").style.display = isOrigin ? "none" : "block";
+    $("#sec-connection-group").style.display = isOrigin ? "none" : "block";
     $("#defense-group").style.display = isOrigin ? "block" : "none";
     $("#ablation-group").style.display = isOrigin ? "none" : "block";
+    updateRunPreview();
   });
 
   // 攻击模式切换
   $("#run-attack").addEventListener("change", (e) => {
     const isAttack = e.target.value === "true";
     $("#attack-type-group").style.display = isAttack ? "block" : "none";
+    updateRunPreview();
   });
 
   // 启动测试
@@ -58,6 +63,18 @@ function initConfigListeners() {
 
   // 日志过滤
   $("#filter-errors").addEventListener("change", toggleLogFilter);
+
+  [
+    "#model-id", "#sec-model-id", "#defense", "#use-sandbox",
+    "#use-security-checker", "#max-user-tasks", "#max-injection-tasks",
+    "#api-key", "#base-url", "#sec-api-key", "#sec-base-url",
+  ].forEach((selector) => {
+    const element = $(selector);
+    if (!element) return;
+    element.addEventListener("change", updateRunPreview);
+    element.addEventListener("input", updateRunPreview);
+  });
+  $$(".suite-cb").forEach((checkbox) => checkbox.addEventListener("change", updateRunPreview));
 }
 
 function getSelectedConfig() {
@@ -68,15 +85,21 @@ function getSelectedConfig() {
   const isOrigin = pipelineType === "origin";
   const mainOption = $("#model-id").selectedOptions[0];
   const secOption = $("#sec-model-id").selectedOptions[0];
+  const customApiKey = $("#api-key").value.trim();
+  const customBaseUrl = $("#base-url").value.trim();
+  const customSecApiKey = $("#sec-api-key").value.trim();
+  const customSecBaseUrl = $("#sec-base-url").value.trim();
 
   return {
     label: $("#run-label").value || null,
     model_id: $("#model-id").value || null,
     provider: mainOption?.dataset.provider || null,
-    base_url: mainOption?.dataset.baseUrl || null,
+    api_key: customApiKey || null,
+    base_url: customBaseUrl || null,
     sec_model_id: isOrigin ? null : ($("#sec-model-id").value || null),
     sec_provider: isOrigin ? null : (secOption?.dataset.provider || null),
-    sec_base_url: isOrigin ? null : (secOption?.dataset.baseUrl || null),
+    sec_api_key: isOrigin ? null : (customSecApiKey || null),
+    sec_base_url: isOrigin ? null : (customSecBaseUrl || null),
     suites: suites,
     run_attack: $("#run-attack").value === "true",
     origin: isOrigin,
@@ -89,15 +112,74 @@ function getSelectedConfig() {
   };
 }
 
+function toggleSecretVisibility(inputId, button) {
+  const input = $("#" + inputId);
+  if (!input) return;
+  const shouldShow = input.type === "password";
+  input.type = shouldShow ? "text" : "password";
+  button.innerHTML = `<i class="bi bi-eye${shouldShow ? '-slash' : ''}"></i>`;
+  button.setAttribute(
+    "aria-label",
+    `${shouldShow ? "隐藏" : "显示"} ${inputId === "api-key" ? "主模型" : "安全模型"} API Key`,
+  );
+}
+
 async function loadDashboardConfig() {
   try {
     const resp = await fetch("/api/config");
     const config = await resp.json();
+    state.dashboardConfig = config;
     populateModelSelect("model-id", config.models || []);
     populateModelSelect("sec-model-id", config.sec_models || []);
+    (config.suites || []).forEach((suite) => {
+      const count = document.querySelector(`[data-suite-count="${suite.id}"]`);
+      if (count) count.textContent = `${suite.user_tasks} × ${suite.injection_tasks}`;
+    });
+    updateRunPreview();
   } catch (err) {
     console.error("加载模型配置失败:", err);
   }
+}
+
+function updateRunPreview() {
+  const selectedSuites = Array.from($$(".suite-cb:checked")).map((item) => item.value);
+  const allSuites = state.dashboardConfig?.suites || [
+    { id: "workspace", user_tasks: 40, injection_tasks: 14 },
+    { id: "travel", user_tasks: 20, injection_tasks: 7 },
+    { id: "banking", user_tasks: 16, injection_tasks: 9 },
+    { id: "slack", user_tasks: 21, injection_tasks: 5 },
+  ];
+  const maxUsers = Math.max(0, Number.parseInt($("#max-user-tasks")?.value, 10) || 0);
+  const maxInjections = Math.max(0, Number.parseInt($("#max-injection-tasks")?.value, 10) || 0);
+  const withAttack = $("#run-attack")?.value === "true";
+
+  const estimatedTasks = allSuites
+    .filter((suite) => selectedSuites.includes(suite.id))
+    .reduce((sum, suite) => {
+      const users = maxUsers > 0 ? Math.min(maxUsers, suite.user_tasks) : suite.user_tasks;
+      const injections = maxInjections > 0
+        ? Math.min(maxInjections, suite.injection_tasks)
+        : suite.injection_tasks;
+      return sum + (withAttack ? users * injections : users);
+    }, 0);
+
+  const isOrigin = $("#pipeline-type")?.value === "origin";
+  let defenseLabel = "Baseline";
+  if (isOrigin) {
+    defenseLabel = $("#defense")?.selectedOptions[0]?.textContent || "Baseline";
+  } else if ($("#use-sandbox")?.checked && $("#use-security-checker")?.checked) {
+    defenseLabel = "完整防御";
+  } else if ($("#use-sandbox")?.checked) {
+    defenseLabel = "仅沙箱";
+  } else if ($("#use-security-checker")?.checked) {
+    defenseLabel = "仅审计";
+  } else {
+    defenseLabel = "无防御";
+  }
+
+  if ($("#preview-suites")) $("#preview-suites").textContent = `${selectedSuites.length} / ${allSuites.length}`;
+  if ($("#preview-tasks")) $("#preview-tasks").textContent = estimatedTasks.toLocaleString("zh-CN");
+  if ($("#preview-defense")) $("#preview-defense").textContent = defenseLabel;
 }
 
 function populateModelSelect(selectorId, models) {
@@ -142,6 +224,8 @@ async function startRun() {
   $("#btn-run").disabled = true;
   $("#btn-run").innerHTML = '<i class="bi bi-hourglass-split"></i> 启动中...';
   updateStatus("running", "运行中");
+  $("#btn-stop").style.display = "inline-flex";
+  if ($("#live-context")) $("#live-context").textContent = "正在建立连接";
 
   try {
     const resp = await fetch("/api/run", {
@@ -157,6 +241,7 @@ async function startRun() {
     $("#current-run-id").textContent = data.run_id.slice(0, 16) + "...";
     $("#btn-run").innerHTML = '<i class="bi bi-play-fill"></i> 测试运行中...';
     updateStatus("running", "运行中: " + data.run_id.slice(0, 12));
+    if ($("#live-context")) $("#live-context").textContent = `${config.suites.length} 个场景 · ${data.run_id.slice(0, 12)}`;
 
     // 切换到日志面板
     const logTab = new bootstrap.Tab($("#tab-live"));
@@ -172,6 +257,7 @@ async function startRun() {
     state.isRunning = false;
     $("#btn-run").disabled = false;
     $("#btn-run").innerHTML = '<i class="bi bi-play-fill"></i> 开始测试';
+    $("#btn-stop").style.display = "none";
     updateStatus("idle", "就绪");
   }
 }
@@ -185,8 +271,9 @@ function stopRun() {
   $("#btn-run").disabled = false;
   $("#btn-run").innerHTML = '<i class="bi bi-play-fill"></i> 开始测试';
   $("#btn-stop").style.display = "none";
-  updateStatus("idle", "已停止");
-  pushLogEntry("warning", "⚠️ 测试已被用户手动停止");
+  updateStatus("idle", "日志已断开");
+  if ($("#live-context")) $("#live-context").textContent = "实时连接已断开";
+  pushLogEntry("warning", "实时日志连接已断开；后台评测任务可能仍在运行。此操作不会终止服务端线程。");
 }
 
 // =============================================
@@ -325,17 +412,8 @@ function updateProgress(progress) {
 
 function updateStatus(status, text) {
   const indicator = $("#status-indicator");
-  indicator.className = "badge";
-  if (status === "running") {
-    indicator.classList.add("bg-warning", "running");
-    indicator.innerHTML = `<i class="bi bi-circle-fill me-1" style="font-size:8px;"></i>${text}`;
-  } else if (status === "completed") {
-    indicator.classList.add("bg-success", "completed");
-    indicator.innerHTML = `<i class="bi bi-check-circle-fill me-1"></i>${text}`;
-  } else {
-    indicator.classList.add("bg-secondary");
-    indicator.innerHTML = `<i class="bi bi-circle-fill me-1" style="font-size:8px;"></i>${text}`;
-  }
+  indicator.className = `run-status ${status}`;
+  indicator.innerHTML = `<span class="status-dot"></span><span>${text}</span>`;
 }
 
 // =============================================
@@ -345,7 +423,9 @@ function onRunComplete(msg) {
   state.isRunning = false;
   $("#btn-run").disabled = false;
   $("#btn-run").innerHTML = '<i class="bi bi-play-fill"></i> 开始测试';
+  $("#btn-stop").style.display = "none";
   updateStatus("completed", "已完成");
+  if ($("#live-context")) $("#live-context").textContent = "运行已完成";
 
   if (msg.summary && msg.summary.error) {
     pushLogEntry("error", `测试异常结束: ${msg.summary.error}`);
@@ -385,7 +465,11 @@ async function loadAllRuns() {
   try {
     const resp = await fetch("/api/runs");
     const runs = await resp.json();
-    state.allRuns = runs;
+    state.allRuns = runs.sort((left, right) => {
+      const rightTime = Date.parse(right.completed_at || "") || 0;
+      const leftTime = Date.parse(left.completed_at || "") || 0;
+      return rightTime - leftTime;
+    });
     refreshDataSources();
   } catch (err) {
     console.error("加载运行列表失败:", err);
@@ -413,9 +497,8 @@ function updateRunSelector(selectorId) {
     const ts = r.completed_at ? new Date(r.completed_at).toLocaleString("zh-CN") : "";
     sel.innerHTML += `<option value="${r.run_id}">${label} (${ts})</option>`;
   });
-  if (currentVal && state.allRuns.find(r => r.run_id === currentVal)) {
-    sel.value = currentVal;
-  }
+  const preferred = currentVal || state.currentRunId || state.allRuns[0]?.run_id;
+  if (preferred && state.allRuns.some(r => r.run_id === preferred)) sel.value = preferred;
 }
 
 function updateCompareCheckboxes() {
@@ -452,9 +535,9 @@ async function loadOverview(runId) {
 
     const container = $("#overview-content");
     container.innerHTML = `
-      <div class="d-flex justify-content-between align-items-center mb-3">
-        <h5 class="mb-0">📊 测试概览</h5>
-        <span class="text-muted small">Run ID: ${runId}</span>
+      <div class="d-flex justify-content-between align-items-center gap-3 mb-3">
+        <div><span class="section-kicker">Run summary</span><h5 class="mb-0">测试概览</h5></div>
+        <code class="text-muted small">${runId}</code>
       </div>
       <div class="overview-cards">
         <div class="metric-card tsr">
@@ -479,7 +562,7 @@ async function loadOverview(runId) {
         </div>
       </div>
 
-      <h6 class="mt-3 mb-2">📋 各场景详情</h6>
+      <h6 class="mt-3 mb-2">各场景详情</h6>
       <div class="table-responsive">
         <table class="table table-dark table-hover">
           <thead>
@@ -531,11 +614,10 @@ async function refreshCharts() {
   try {
     const resp = await fetch(`/api/runs/${runId}`);
     const run = await resp.json();
-    renderSuiteCharts(run);
-
-    // 切换到图表面板
+    // 先显示面板，再创建 Chart.js 实例，避免隐藏容器导致首次宽度计算为 0。
     const chartsTab = new bootstrap.Tab($("#tab-charts"));
     chartsTab.show();
+    requestAnimationFrame(() => renderSuiteCharts(run));
   } catch (err) {
     console.error("加载图表数据失败:", err);
   }
@@ -557,13 +639,13 @@ function renderSuiteCharts(run) {
   let chartsHtml = `
     <div class="col-lg-6">
       <div class="chart-container">
-        <h6>📊 各场景可用性 & 防御率对比</h6>
+        <h6>各场景可用性与防御率</h6>
         <canvas id="chart-tsr-defense"></canvas>
       </div>
     </div>
     <div class="col-lg-6">
       <div class="chart-container">
-        <h6>🎯 各场景攻击成功率 (ASR)</h6>
+        <h6>各场景攻击成功率 (ASR)</h6>
         <canvas id="chart-asr"></canvas>
       </div>
     </div>
@@ -574,13 +656,13 @@ function renderSuiteCharts(run) {
   let tokenHtml = `
     <div class="col-lg-6">
       <div class="chart-container">
-        <h6>💰 各场景 Token 消耗分析</h6>
+        <h6>各场景 Token 消耗</h6>
         <canvas id="chart-tokens"></canvas>
       </div>
     </div>
     <div class="col-lg-6">
       <div class="chart-container">
-        <h6>📈 任务完成统计</h6>
+        <h6>任务完成统计</h6>
         <canvas id="chart-tasks"></canvas>
       </div>
     </div>
@@ -596,48 +678,58 @@ function renderSuiteCharts(run) {
   const totalTasks = suites.map(s => s.task_counts.total_tasks);
   const passedTasks = suites.map(s => s.task_counts.utility_passed);
 
-  // TSR + Defense 双柱图
+  // 可用性与防御率：用折线强调跨场景趋势，避免双柱挤在一起。
   state.charts.tsrDefense = new Chart($("#chart-tsr-defense"), {
-    type: "bar",
+    type: "line",
     data: {
       labels: labels,
       datasets: [
         {
           label: "可用性 TSR (%)",
           data: tsrData,
-          backgroundColor: "rgba(59, 130, 246, 0.7)",
-          borderColor: "#3b82f6",
-          borderWidth: 1,
-          borderRadius: 6,
+          borderColor: "#75a7ee",
+          backgroundColor: "rgba(117, 167, 238, 0.10)",
+          borderWidth: 2,
+          pointRadius: 3,
+          pointHoverRadius: 5,
+          pointBackgroundColor: "#75a7ee",
+          tension: 0.32,
         },
         {
           label: "防御成功率 (%)",
           data: defenseData,
-          backgroundColor: "rgba(16, 185, 129, 0.7)",
-          borderColor: "#10b981",
-          borderWidth: 1,
-          borderRadius: 6,
+          borderColor: "#48c6a4",
+          backgroundColor: "rgba(72, 198, 164, 0.08)",
+          borderWidth: 2,
+          pointRadius: 3,
+          pointHoverRadius: 5,
+          pointBackgroundColor: "#48c6a4",
+          tension: 0.32,
         },
       ],
     },
-    options: getBarOptions("%"),
+    options: getMetricOptions("%"),
   });
 
-  // ASR 柱状图
+  // ASR：用带填充的趋势线突出高风险场景。
   state.charts.asr = new Chart($("#chart-asr"), {
-    type: "bar",
+    type: "line",
     data: {
       labels: labels,
       datasets: [{
         label: "攻击成功率 ASR (%)",
         data: asrData,
-        backgroundColor: asrData.map(v => v > 30 ? "rgba(239, 68, 68, 0.7)" : "rgba(245, 158, 11, 0.7)"),
-        borderColor: asrData.map(v => v > 30 ? "#ef4444" : "#f59e0b"),
-        borderWidth: 1,
-        borderRadius: 6,
+        backgroundColor: "rgba(237, 116, 116, 0.12)",
+        borderColor: "#ed7474",
+        borderWidth: 2,
+        pointRadius: 3,
+        pointHoverRadius: 5,
+        pointBackgroundColor: asrData.map(v => v > 30 ? "#ed7474" : "#e9b35f"),
+        tension: 0.32,
+        fill: true,
       }],
     },
-    options: getBarOptions("%"),
+    options: getMetricOptions("%"),
   });
 
   // Token 消耗堆叠图
@@ -649,32 +741,24 @@ function renderSuiteCharts(run) {
         {
           label: "Prompt Tokens (K)",
           data: promptTokens.map(v => v / 1000),
-          backgroundColor: "rgba(139, 92, 246, 0.7)",
-          borderColor: "#8b5cf6",
+          backgroundColor: "rgba(176, 147, 229, 0.68)",
+          borderColor: "#b093e5",
           borderWidth: 1,
-          borderRadius: 6,
+          borderRadius: 4,
+          maxBarThickness: 24,
         },
         {
           label: "Completion Tokens (K)",
           data: completionTokens.map(v => v / 1000),
-          backgroundColor: "rgba(236, 72, 153, 0.7)",
-          borderColor: "#ec4899",
+          backgroundColor: "rgba(117, 167, 238, 0.68)",
+          borderColor: "#75a7ee",
           borderWidth: 1,
-          borderRadius: 6,
+          borderRadius: 4,
+          maxBarThickness: 24,
         },
       ],
     },
-    options: {
-      ...getBarOptions("Tokens (K)"),
-      scales: {
-        x: getXScale(),
-        y: {
-          stacked: true,
-          ticks: { color: "#8fa3b8" },
-          grid: { color: "rgba(42, 64, 85, 0.3)" },
-        },
-      },
-    },
+    options: getBarOptions("Tokens (K)", { stacked: true }),
   });
 
   // 任务统计
@@ -686,18 +770,20 @@ function renderSuiteCharts(run) {
         {
           label: "总任务数",
           data: totalTasks,
-          backgroundColor: "rgba(100, 116, 139, 0.5)",
-          borderColor: "#64748b",
+          backgroundColor: "rgba(116, 129, 125, 0.35)",
+          borderColor: "#74817d",
           borderWidth: 1,
-          borderRadius: 6,
+          borderRadius: 4,
+          maxBarThickness: 22,
         },
         {
           label: "通过任务数",
           data: passedTasks,
-          backgroundColor: "rgba(34, 197, 94, 0.7)",
-          borderColor: "#22c55e",
+          backgroundColor: "rgba(72, 198, 164, 0.72)",
+          borderColor: "#48c6a4",
           borderWidth: 1,
-          borderRadius: 6,
+          borderRadius: 4,
+          maxBarThickness: 22,
         },
       ],
     },
@@ -705,26 +791,55 @@ function renderSuiteCharts(run) {
   });
 }
 
-function getBarOptions(yLabel) {
+function getBarOptions(yLabel, { stacked = false, max = undefined } = {}) {
   return {
     responsive: true,
-    maintainAspectRatio: true,
+    maintainAspectRatio: false,
+    interaction: { mode: "index", intersect: false },
     plugins: {
       legend: {
-        labels: { color: "#8fa3b8", font: { size: 12 } },
+        position: "bottom",
+        labels: { color: "#a7b1ae", boxWidth: 10, boxHeight: 10, padding: 14, font: { size: 10 } },
       },
+      tooltip: { padding: 10, displayColors: true },
+    },
+    datasets: {
+      bar: { categoryPercentage: 0.58, barPercentage: 0.45, maxBarThickness: 26 },
+    },
+    scales: {
+      x: { ...getXScale(), stacked },
+      y: {
+        beginAtZero: true,
+        stacked,
+        suggestedMax: max,
+        ticks: { color: "#a7b1ae", maxTicksLimit: 6 },
+        grid: { color: "rgba(70, 80, 77, 0.32)" },
+        title: {
+          display: true,
+          text: yLabel,
+          color: "#74817d",
+          font: { size: 10 },
+        },
+      },
+    },
+  };
+}
+
+function getMetricOptions(yLabel) {
+  return {
+    ...getBarOptions(yLabel, { max: 100 }),
+    elements: {
+      line: { tension: 0.32 },
+      point: { borderWidth: 2 },
     },
     scales: {
       x: getXScale(),
       y: {
         beginAtZero: true,
-        ticks: { color: "#8fa3b8" },
-        grid: { color: "rgba(42, 64, 85, 0.3)" },
-        title: {
-          display: true,
-          text: yLabel,
-          color: "#8fa3b8",
-        },
+        max: 100,
+        ticks: { color: "#a7b1ae", maxTicksLimit: 6, callback: value => `${value}%` },
+        grid: { color: "rgba(70, 80, 77, 0.32)" },
+        title: { display: true, text: yLabel, color: "#74817d", font: { size: 10 } },
       },
     },
   };
@@ -732,7 +847,7 @@ function getBarOptions(yLabel) {
 
 function getXScale() {
   return {
-    ticks: { color: "#e0e6ec", font: { size: 12, weight: "bold" } },
+    ticks: { color: "#a7b1ae", font: { size: 10, weight: "600" }, maxRotation: 0 },
     grid: { display: false },
   };
 }
@@ -793,9 +908,9 @@ async function refreshDetailTable() {
               <td>${r.suite_name}</td>
               <td><code>${r.user_task_id}</code></td>
               <td><code>${r.injection_task_id}</code></td>
-              <td>${r.utility_success ? '✅ 成功' : '❌ 失败'}</td>
-              <td>${r.attack_success === null ? 'N/A' : (r.attack_success ? '⚠️ 被攻破' : '🛡️ 安全')}</td>
-              <td>${r.defense_success === null ? 'N/A' : (r.defense_success ? '✅ 成功' : '❌ 失败')}</td>
+              <td><span class="result-badge ${r.utility_success ? 'pass' : 'fail'}">${r.utility_success ? '成功' : '失败'}</span></td>
+              <td>${r.attack_success === null ? '<span class="result-badge neutral">N/A</span>' : (r.attack_success ? '<span class="result-badge fail">被攻破</span>' : '<span class="result-badge pass">安全</span>')}</td>
+              <td>${r.defense_success === null ? '<span class="result-badge neutral">N/A</span>' : (r.defense_success ? '<span class="result-badge pass">成功</span>' : '<span class="result-badge fail">失败</span>')}</td>
             </tr>
           `).join("")}
         </tbody>
@@ -845,7 +960,7 @@ function renderComparison(data) {
   const container = $("#compare-results");
 
   let html = `
-    <h5 class="mb-3">📊 多配置对比分析</h5>
+    <div class="mb-3"><span class="section-kicker">Comparison</span><h5 class="mb-0">多配置对比分析</h5></div>
     <div class="row">
       <div class="col-lg-4">
         <div class="chart-container">
@@ -1022,8 +1137,8 @@ async function loadReport() {
 
     const container = $("#report-content");
     container.innerHTML = `
-      <div class="chart-container">
-        <h4>📄 安全测试报告</h4>
+      <div class="report-sheet">
+        <div class="mb-3"><span class="section-kicker">Experiment report</span><h4>安全测试报告</h4></div>
         <hr style="border-color: var(--border-color);">
 
         <h6>测试配置</h6>
@@ -1035,7 +1150,7 @@ async function loadReport() {
           <tr><td class="text-muted">测试套件</td><td>${(config.suites || []).join(", ")}</td></tr>
           <tr><td class="text-muted">攻击模式</td><td>${config.run_attack ? "启用" : "禁用"}</td></tr>
           <tr><td class="text-muted">攻击类型</td><td>${config.attack_name || "N/A"}</td></tr>
-          <tr><td class="text-muted">框架</td><td>${config.origin ? "原始模型" : "NewFrame"}</td></tr>
+          <tr><td class="text-muted">框架</td><td>${config.origin ? "原始模型" : "DSCG"}</td></tr>
           ${config.defense ? `<tr><td class="text-muted">AgentDojo 防御</td><td>${config.defense}</td></tr>` : ""}
           ${!config.origin ? `
             <tr><td class="text-muted">沙箱</td><td>${config.use_sandbox !== false ? "启用" : "禁用"}</td></tr>
