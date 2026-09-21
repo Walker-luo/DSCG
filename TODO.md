@@ -12,9 +12,9 @@
 
 - `OurFrameExecutor`：先调用独立的 `ToolAuthorizationCompiler`，根据当前可信用户消息与固定系统策略编译工具级授权，再生成候选动作；候选动作不能扩大权限。
 - `PermissionSandbox`：在工具执行前检查工具名，并裁剪未授权动作。
-- `ActionHistoryTracker`：保存历史工具名和参数。
+- `ActionLedger`：在执行层维护 append-only 动作账本，记录候选、批准、执行、失败和阻断状态。
 - `ActionSecurityChecker`：在出现写操作时，结合原始请求和动作历史进行 LLM 审计。
-- 阻断与恢复：当前全阻断直接停止；Mock Error / Retry 仅作为待 P0.3 统一仲裁循环中的恢复设计。
+- 阻断与恢复：由统一 Reference Monitor 生成一次性执行票据；阻断结果作为工具错误反馈，后续重规划重新经过 Checker、Monitor 和票据执行器。
 
 当前版本适合作为实验原型，但还不能把 LLM 审计、动作历史或工具名白名单描述成严格的安全边界。下一阶段的原则是：
 
@@ -59,10 +59,10 @@
 | 当前组件 | 当前风险/限制 | 目标职责 | 首个可验收改动 |
 | --- | --- | --- | --- |
 | `OurFrameExecutor` | P0.2 已分离授权编译与候选生成；授权语义仍依赖 LLM，读写属性仍依赖名称前缀 | 只负责生成候选计划和请求 Contract 编译，不授予权限 | 已完成：首次候选生成前安装工具级 Contract；后续补充参数级约束 |
-| `PermissionSandbox` | P0.1 已修复空策略放行并移除内部重试；目前仍只检查工具名，缺少执行票据 | 唯一的确定性 Reference Monitor | 引入 `ActionProposal -> PolicyDecision` 接口；所有异常返回 deny |
+| `PermissionSandbox` | P0.1 已修复空策略放行；目前提供工具级判定 | 确定性工具级策略组件，由 Monitor 签发票据 | 参数/来源约束留待 P1/P2 |
 | `ActionSecurityChecker` | 自由文本 `SAFE/UNSAFE`；依赖当前动作文本和启发式写操作判断 | 对策略层提供结构化的语义风险信号 | 输出 schema 化 decision/reason code；超时和解析失败为 abstain/deny |
-| `ActionHistoryTracker` | 只保存工具名和参数，缺少 action 状态与数据来源 | 由执行层维护的 append-only security ledger | 为每个动作和工具输出分配 ID，记录完整生命周期和 provenance |
-| `ToolsExecutor` 调用链 | 正常、重试、裁剪和并发路径可能不一致 | 只能接受已批准的执行票据 | 未持有有效 `allow` decision 的调用无法到达真实工具 |
+| `ActionLedger` | 旧 Tracker 只保存工具名和参数，缺少 action 状态 | 由执行层维护的 append-only security ledger | 为每个动作分配 ID，记录完整生命周期和 reason code |
+| `ToolsExecutor` 调用链 | 正常、重试、裁剪和并发路径可能不一致 | 只能接受已批准的一次性执行票据 | 缺票据或重放票据无法到达真实工具 |
 
 建议先定义少量稳定的内部对象，再逐步替换旧逻辑：
 
@@ -99,7 +99,7 @@ ActionProposal(action_id, tool, canonical_args, provenance, contract_version)
 
 这些问题会直接影响现有实验结论，应在扩展功能前完成。
 
-**实现顺序**：P0.1 → P0.2 → P0.5 → P0.3 → P0.4。先消除放行漏洞和候选动作自授权，再替换工具风险分类、统一执行入口，最后引入模型审计信号。每一步都保留一个可运行的 baseline，方便定位效用下降来自哪一层。
+**实现顺序**：P0.1 → P0.2 → P0.3 → P0.5 → P0.4。先消除放行漏洞和候选动作自授权，再统一执行入口和动作账本，随后替换工具风险分类，最后引入结构化模型审计信号。每一步都保留一个可运行的 baseline，方便定位效用下降来自哪一层。
 
 ### P0.1 白名单必须 fail-closed
 
@@ -118,8 +118,8 @@ ActionProposal(action_id, tool, canonical_args, provenance, contract_version)
 - `PermissionSandbox` 现在以不可变 `frozenset` 保存策略，读取白名单时返回副本；策略更新失败会先撤销旧权限，再进入 `error` 状态。
 - 只有 `allowlist` 状态且工具同时存在于 `runtime.functions` 时才允许执行。`uninitialized`、`initialized_empty`、`error` 和未知工具均 fail-closed。
 - 意图解析强制校验 JSON 结构、工具名、拒答和 `finish_reason`，并向 OpenAI-compatible 请求传入 30 秒单次请求超时。解析异常不会回退到旧白名单；SDK 级重试的总墙钟时间仍需在 P0.3 统一预算中处理。
-- 主执行器在每个新用户回合开始时清空旧策略；安全检查器产生的替换动作在进入 `ToolsExecutor` 前再次经过同一沙箱。
-- 全部动作被阻断时当前回合直接停止，不在沙箱内部调用主模型重试；混合批次采用逐动作裁剪，仅保留已授权动作。统一恢复事件循环仍属于 P0.3。
+- 主执行器在每个新用户回合开始时清空旧策略；安全检查器的阻断信号和后续重规划动作统一经过 Reference Monitor 与票据执行器。
+- P0.1 时的混合批次裁剪已在 P0.3 收敛为“先全量判定、后逐动作提交”；阻断结果作为结构化工具错误反馈，不允许未经仲裁的重试进入真实工具。
 - 离线回归覆盖真实 `FunctionsRuntime`/`ToolsExecutor`、解析失败矩阵、批次裁剪、文本回合撤权和流水线顺序：`tests/test_permission_sandbox.py`、`tests/test_sandbox_execution.py`。
 
 当时改动只完成 P0.1 的工具级 fail-closed 基线，并不等价于完成 P0：首轮候选动作参与白名单编译的问题已由下述 P0.2 修复；工具风险仍暂依赖前缀（P0.5），动作票据、统一恢复循环和完整事件账本尚未实现（P0.3）。
@@ -145,14 +145,24 @@ ActionProposal(action_id, tool, canonical_args, provenance, contract_version)
 
 ### P0.3 保证 Complete Mediation
 
-- [ ] 禁止 Sandbox 或 Checker 内部生成的新工具调用直接进入 `ToolsExecutor`。
-- [ ] 将恢复流程改为统一事件循环：`生成候选动作 -> 策略检查 -> 执行/拒绝 -> 再规划`。
-- [ ] 重试动作、纠错动作、并发动作和 Mock Error 后动作必须重新经过全部检查。
-- [ ] 为每个动作分配唯一 `action_id`，记录其 `proposed/approved/executed/failed/blocked` 状态。
-- [ ] 增加测试：安全模块触发重试后生成未授权工具，必须再次被拦截。
-- [ ] 让 `ToolsExecutor` 只接受 Reference Monitor 生成的执行票据；在组件外直接构造 `FunctionCall` 的路径全部收敛。
-- [ ] 为同一 `action_id` 设置状态转移表，拒绝 `blocked -> executed`、`executed -> approved` 等非法转移。
-- [ ] 并发批次采用“逐动作判定、统一提交”的语义，禁止部分动作绕过批次级次数/金额限制。
+- [x] 禁止 Sandbox 或 Checker 内部生成的新工具调用直接进入 `ToolsExecutor`。
+- [x] 将恢复流程改为统一事件循环：`生成候选动作 -> 策略检查 -> 执行/拒绝 -> 再规划`。
+- [x] 重试动作、纠错动作、并发动作和 Mock Error 后动作必须重新经过全部检查。
+- [x] 为每个动作分配唯一 `action_id`，记录其 `proposed/approved/executed/failed/blocked` 状态。
+- [x] 增加测试：安全模块触发重试后生成未授权工具，必须再次被拦截。
+- [x] 让 `ToolsExecutor` 只接受 Reference Monitor 生成的执行票据；在组件外直接构造 `FunctionCall` 的路径全部收敛。
+- [x] 为同一 `action_id` 设置状态转移表，拒绝 `blocked -> executed`、`executed -> approved` 等非法转移。
+- [x] 并发批次采用“先全量判定、后逐动作提交”的语义，禁止动作在批次判定完成前执行。
+
+#### P0.3 实现记录（2026-09-21）
+
+- 新增 `ReferenceMonitor` 与 `TicketedToolsExecutor`。Monitor 是唯一票据签发者，按批次为批准动作生成绑定调用指纹、契约版本和 nonce 的一次性 `ExecutionTicket`。
+- `ActionSecurityChecker` 不再自行调用主模型生成纠错动作，只输出与当前候选批次指纹绑定的审计信号。阻断结果转为结构化工具错误，后续重规划重新经过 Checker、Monitor 和票据执行器。
+- 新增 `ActionLedger` 和显式状态转移表，记录 `proposed -> approved/blocked -> executed/failed`；缺失票据、调用指纹不一致、票据重放和非法状态跃迁均默认阻断。
+- 并发候选先完成整个批次的确定性判定，再由受控执行器逐动作提交；真实工具不再由裸 `ToolsExecutor` 直接承接。
+- 离线安全回归扩展至 40 项，覆盖无票据调用、一次性票据、票据重放、混合批次、审计阻断后的越权重试和非法状态跃迁。未调用真实模型或运行付费评测。
+
+范围限制：票据完整性是进程内 HMAC 约束，不是跨进程远程证明；宿主仍必须保护 Python 进程和可信工具目录。当前票据只覆盖工具级授权，不含参数、数据来源、次数/金额和跨 Agent 委托约束；这些属于 P1/P2。
 
 ### P0.4 审计模型结构化输出并默认拒绝
 

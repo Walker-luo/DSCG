@@ -28,9 +28,9 @@
 
 主要有4个组件：
 1. `OurFrameExecutor`（P0.2）：每个新可信用户回合先撤销旧权限，由独立的 `ToolAuthorizationCompiler` 使用当前用户消息、固定系统策略和宿主工具目录编译不可变工具级契约，再生成候选动作。候选调用和 assistant/tool 历史不参与授权；编译失败默认拒绝，版本与来源摘要写入评测记录。读工具前缀策略暂保留至 P0.5，参数约束留待 P1。
-2. `PermissionSandbox` 负责对每次工具使用的**提前校验**同时**处理违规动作：**（这里可能一次性调用多个工具，分情况处理）
+2. `PermissionSandbox` 提供工具级确定性判定；`ReferenceMonitor` 对批次统一仲裁并签发一次性票据，`TicketedToolsExecutor` 是唯一真实执行入口。违规动作变成结构化工具错误，后续重规划重新经过完整链路。
   - 部分动作违规：裁剪违规动作后添加提示消息返回
-  - 全部动作违规：当前回合直接停止并返回安全失败的 assistant 消息；不在沙箱内部调用主模型重试，避免未经再次仲裁的新动作进入 `ToolsExecutor`。统一恢复事件循环和可验证的重试票据属于后续 P0.3。
+  - 全部动作违规：票据执行器返回结构化阻断结果；主模型可以重规划，但新动作必须重新经过 Checker、ReferenceMonitor 和票据校验。
 
     + <font color = red>白名单升级为“基于动态任务图的最小权限收敛 (Dynamic Task-Graph Capability Bounding)” :引入一个数学模型：在时间步 $t$，智能体的能力边界 $\mathcal{C}_t$ 并非全局常数，而是基于当前子目标 $g_t$ 和历史观察 $o_{1:t-1}$ 的动态函数：$\mathcal{C}_t = f(g_t, o_{1:t-1})$。
     -  Executor 首次解析时，不直接给工具，而是生成一个逻辑步骤的 DAG（例如：*Step 1*: 搜索 -> *Step 2*: 汇总 -> *Step 3*: 发送）。
@@ -39,8 +39,8 @@
     </font>
     - 想一下这个相对比白名单的优势，为什么要这么做
 
-3. `ActionHistoryTracker`:记录调用的工具的*名称*和*参数*（记录通过了`PermissionSandbox,ActionSecurityChecker`检验的工具）
-4. `ActionSecurityChecker`：只对**写工具**进行审计，传入`query`和`ActionHistoryTracker`记录的工作流，判断工具的执行是否符合用户意图，这里主要针对攻击者使用的写工具符合`PermissionSandbox`的校验时才进行检验（以应对更加复杂的攻击）
+3. `ActionLedger`:为候选动作分配 `action_id`，记录 `proposed/approved/executed/failed/blocked` 状态和机器可读原因。
+4. `ActionSecurityChecker`：只产生与候选批次绑定的风险信号，不直接生成替换动作；审计结果由 `ReferenceMonitor` 纳入最终判定。
        + <font color =red>记录数据来源：对外部数据分片，后记录其embedding向量，`ActionHistoryTracker`检测时添加一个策略：将写工具的参数转为向量后计算cos相似度</font>
 
 
@@ -78,7 +78,7 @@
 
 
 ### 3.基于细粒度裁剪与对抗性幻觉的可用性保全
-本框架在底层沙箱中对并发调用中的局部违规动作实施逐动作裁剪（Selective Pruning），并在面临全局违规时以 fail-closed 方式停止当前批次。当前版本不在沙箱内部注入 Mock Error 或触发隐式重试；恢复提示和重试动作必须等待统一事件循环与执行票据设计完成后再加入。
+本框架在 Reference Monitor 中对并发调用先完成全量判定，再由票据执行器逐动作提交；违规动作以结构化错误返回，恢复和重试动作仍需进入同一事件循环。
 
 #### 相关优化
    - “动作掩码（Action Masking）”与安全空间投影(**升华裁剪部分**)：大模型输出的并发工具调用，可以看作是一个“动作向量”。如果其中混入了恶意工具，说明这个动作向量超出了系统的“安全动作空间”。你做的“裁剪”，在数学和系统论上，其实是将大模型的动作向量“投影（Projection）”回了安全空间

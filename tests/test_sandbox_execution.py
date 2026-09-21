@@ -12,8 +12,9 @@ from agentdojo.logging import OutputLogger, TraceLogger
 from agentdojo.functions_runtime import EmptyEnv, FunctionCall, FunctionsRuntime
 
 from dscg.pipelines.defended import (
-    OurFrameExecutor, PermissionSandbox, SandboxPolicyState, make_defended_pipeline,
-    ToolAuthorizationCompiler, TrustedTaskRequest,
+    ActionLedger, ActionSecurityChecker, ActionState, OurFrameExecutor,
+    PermissionSandbox, ReferenceMonitor, SandboxPolicyState, TicketedToolsExecutor,
+    ToolAuthorizationCompiler, TrustedTaskRequest, make_defended_pipeline,
 )
 from dscg.model_config import ModelConfig
 
@@ -145,7 +146,7 @@ class SandboxExecutionTests(unittest.TestCase):
         self.execute(sandbox, "forbidden_tool")
         self.assertEqual(self.executed, [])
 
-    def test_checker_replacement_is_filtered_in_actual_pipeline_order(self):
+    def test_factory_uses_single_ticketed_execution_path(self):
         config = ModelConfig(
             model_id="deepseek-flash",
             api_key="test-key",
@@ -155,15 +156,9 @@ class SandboxExecutionTests(unittest.TestCase):
         with patch("dscg.pipelines.defended.create_openai_client", return_value=Mock()):
             pipeline, _, _ = make_defended_pipeline(model_config=config, sec_model_config=config)
         loop = pipeline.elements[-1]
-        sandbox = loop.elements[0]
-        sandbox.allowed_tools = ["safe_tool"]
-        checker = loop.elements[1]
-        replacement = lambda q, r, e, m, a: (q, r, e, [*m[:-1], assistant("forbidden_tool")], a)
-        with patch.object(checker, "query", side_effect=replacement):
-            state = ("test", self.runtime, self.env, [assistant("safe_tool")], {})
-            for element in loop.elements[:-1]:  # through ToolsExecutor; no model calls
-                state = element.query(*state)
-        self.assertEqual(self.executed, [])
+        self.assertEqual(sum(isinstance(e, ReferenceMonitor) for e in loop.elements), 1)
+        self.assertEqual(sum(isinstance(e, TicketedToolsExecutor) for e in loop.elements), 1)
+        self.assertFalse(any(type(e) is agent_pipeline.ToolsExecutor for e in loop.elements))
 
     def test_authorization_precedes_generation_and_first_candidate_cannot_grant_itself(self):
         llm = self.parser_llm()
@@ -332,6 +327,99 @@ class SandboxExecutionTests(unittest.TestCase):
         llm.client.chat.completions.create.return_value.choices[0].message.content = '{"tools": ["safe_tool"]}'
         with patch.object(compiler, "SYSTEM_POLICY", compiler.SYSTEM_POLICY + " Revised policy."):
             self.assertNotEqual(grant.contract_version, compiler.compile(request, self.runtime).contract_version)
+
+    def test_ticketed_executor_rejects_unmediated_calls(self):
+        monitor = ReferenceMonitor(PermissionSandbox(["safe_tool"]), require_audit=False)
+        executor = TicketedToolsExecutor(monitor)
+        state = executor.query("test", self.runtime, self.env, [assistant("safe_tool")], {})
+        self.assertEqual(self.executed, [])
+        self.assertEqual(state[4]["dscg_action_ledger"][0]["state"], "blocked")
+        self.assertEqual(
+            state[4]["dscg_action_ledger"][0]["transitions"][-1]["reason_code"],
+            "MISSING_EXECUTION_TICKET",
+        )
+
+    def test_reference_monitor_issues_one_shot_ticket_and_records_execution(self):
+        monitor = ReferenceMonitor(PermissionSandbox(["safe_tool"]), require_audit=False)
+        executor = TicketedToolsExecutor(monitor)
+        state = ("test", self.runtime, self.env, [assistant("safe_tool")], {})
+        state = monitor.query(*state)
+        pending = state[4]["_dscg_pending_batch"]
+        before = state[4]["dscg_action_ledger"]
+        self.assertEqual(before[0]["state"], "approved")
+        self.assertEqual(self.executed, [])
+
+        state = executor.query(*state)
+        self.assertEqual(self.executed, ["safe_tool"])
+        self.assertEqual(state[4]["dscg_action_ledger"][0]["state"], "executed")
+
+        # Replaying the already consumed ticket creates a separate blocked event.
+        replay_args = state[4]
+        replay_args["_dscg_pending_batch"] = pending
+        executor.query("test", self.runtime, self.env, [assistant("safe_tool")], replay_args)
+        self.assertEqual(self.executed, ["safe_tool"])
+        self.assertEqual([r["state"] for r in replay_args["dscg_action_ledger"]],
+                         ["executed", "blocked"])
+
+    def test_batch_is_decided_before_any_member_executes(self):
+        monitor = ReferenceMonitor(PermissionSandbox(["safe_tool"]), require_audit=False)
+        executor = TicketedToolsExecutor(monitor)
+        state = ("test", self.runtime, self.env,
+                 [assistant("safe_tool", "forbidden_tool")], {})
+        state = monitor.query(*state)
+        records = state[4]["dscg_action_ledger"]
+        self.assertEqual(len({record["action_id"] for record in records}), 2)
+        self.assertEqual([record["state"] for record in records], ["approved", "blocked"])
+        self.assertEqual(self.executed, [])
+
+        state = executor.query(*state)
+        self.assertEqual(self.executed, ["safe_tool"])
+        self.assertEqual([record["state"] for record in state[4]["dscg_action_ledger"]],
+                         ["executed", "blocked"])
+
+    def test_action_ledger_rejects_illegal_terminal_transition(self):
+        ledger = ActionLedger()
+        action_id = ledger.propose(assistant("safe_tool")["tool_calls"][0], "batch", "contract")
+        ledger.transition(action_id, ActionState.BLOCKED, "POLICY_DENY")
+        with self.assertRaises(ValueError):
+            ledger.transition(action_id, ActionState.EXECUTED, "BYPASS")
+        self.assertEqual(ledger.state(action_id), ActionState.BLOCKED)
+
+    def test_checker_denial_and_unauthorized_replan_are_both_mediated(self):
+        security_llm = SimpleNamespace(query=Mock())
+        security_llm.query.return_value = (
+            "test", self.runtime, self.env,
+            [{"role": "assistant", "content": [{"type": "text", "content": "UNSAFE"}],
+              "tool_calls": []}], {},
+        )
+        main_llm = Mock()
+        checker = ActionSecurityChecker(security_llm, llm=main_llm)
+        monitor = ReferenceMonitor(PermissionSandbox(["safe_tool"]), require_audit=True)
+        executor = TicketedToolsExecutor(monitor)
+        state = ("test", self.runtime, self.env, [assistant("safe_tool")], {})
+
+        state = checker.query(*state)
+        main_llm.query.assert_not_called()
+        state = monitor.query(*state)
+        state = executor.query(*state)
+        self.assertEqual(self.executed, [])
+        self.assertEqual(state[4]["dscg_action_ledger"][0]["state"], "blocked")
+
+        security_llm.query.return_value = (
+            "test", self.runtime, self.env,
+            [{"role": "assistant", "content": [{"type": "text", "content": "SAFE"}],
+              "tool_calls": []}], state[4],
+        )
+        retry_state = (state[0], state[1], state[2],
+                       [*state[3], assistant("forbidden_tool")], state[4])
+        retry_state = checker.query(*retry_state)
+        retry_state = monitor.query(*retry_state)
+        retry_state = executor.query(*retry_state)
+        self.assertEqual(self.executed, [])
+        self.assertEqual(
+            [record["state"] for record in retry_state[4]["dscg_action_ledger"]],
+            ["blocked", "blocked"],
+        )
 
 
 if __name__ == "__main__":

@@ -4,6 +4,8 @@ DSCG 是一个面向 LLM Agent 间接提示词注入（Indirect Prompt Injection
 
 > 当前代码属于研究原型。已知安全边界和后续论文路线见 [TODO.md](./TODO.md)。
 
+对外介绍可直接使用：[DSCG 项目简介（Word）](./docs/DSCG项目介绍.docx) 或 [PDF 版](./docs/DSCG项目介绍.pdf)；可编辑文本源见 [`docs/DSCG项目介绍.md`](./docs/DSCG项目介绍.md)。
+
 ## 项目结构
 
 ```text
@@ -238,7 +240,7 @@ pipeline, tracker = make_openai_compatible_pipeline(
 
 未知工具、单次请求超时、拒答、非法 JSON、非完整响应和策略更新错误都不会回退到旧权限。一个批次中如果同时出现合法和越权动作，当前实现逐动作裁剪并保留合法动作；如果全部动作被阻断，则停止当前批次，不在沙箱内部自动重试。安全检查器生成的替换动作在真实工具执行前还会再次经过沙箱。SDK 重试导致的总墙钟时间上限尚未统一纳入预算。
 
-这些保证是工具级的研究基线，不是完整安全证明：P0.2 的授权改造已完成（见下文），P0.3–P0.5、P1 的参数级授权和 P2 的 provenance 约束仍待完成，详见 [`TODO.md`](./TODO.md)。离线验证不需要 API Key，可在项目根目录运行：
+这些保证是工具级的研究基线，不是完整安全证明：P0.2、P0.3 的授权与执行改造已完成（见下文），P0.4–P0.5、P1 的参数级授权和 P2 的 provenance 约束仍待完成，详见 [`TODO.md`](./TODO.md)。离线验证不需要 API Key，可在项目根目录运行：
 
 ```bash
 conda run -n ipi python -m unittest discover -s tests -v
@@ -267,6 +269,19 @@ DSCG_FORCE_RERUN=1 python -m experiments.run_partial_benchmark
 授权编译时终端也会打印脱敏摘要：`[DSCG AUTHORIZATION] state=... contract=... tools=...`；因此即使外部日志器不支持自定义字段，也能确认 P0.2 是否实际执行。
 
 验证：35 项离线测试、Python 编译检查和 `git diff --check` 通过，未运行真实模型评测。读工具仍按旧前缀策略默认授权（记录在 `implicit_read_tools`，待 P0.5 替换），尚不约束工具参数；存在写工具时，纯文本任务也会增加一次编译调用。授权语义仍依赖 LLM，任务效用和开销需后续评测。
+
+### P0.3：统一仲裁与一次性执行票据
+
+实现见 [`dscg/pipelines/defended.py`](./dscg/pipelines/defended.py)，回归测试见 [`tests/test_sandbox_execution.py`](./tests/test_sandbox_execution.py)。
+
+| 改进项 | 改进前 | 改进后 |
+| --- | --- | --- |
+| 执行入口 | Sandbox、Checker 和 `ToolsExecutor` 之间存在分散路径 | `ReferenceMonitor -> TicketedToolsExecutor` 是唯一真实执行路径 |
+| Checker 重试 | Checker 可直接调用主模型生成替换动作 | Checker 只产生审计信号；阻断结果转为工具错误，后续重规划重新仲裁 |
+| 执行证明 | 只能看到工具调用消息，无法证明先授权后执行 | 每个动作有 `action_id`、状态转移和一次性 `ExecutionTicket` |
+| 并发批次 | 可能边判定边执行 | 先完成整个批次判定，再逐动作提交执行 |
+
+任务 JSON 顶层新增 `dscg_action_ledger`，记录动作状态和 `reason_code`。终端会显示 `[DSCG MEDIATION] proposed=... approved=... blocked=...`。40 项离线测试通过，未运行真实模型评测。票据为进程内完整性约束，不等同于跨进程安全证明；参数级授权、provenance 和委托仍待后续阶段。
 
 ## 运行评测
 
