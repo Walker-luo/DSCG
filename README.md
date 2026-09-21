@@ -238,11 +238,35 @@ pipeline, tracker = make_openai_compatible_pipeline(
 
 未知工具、单次请求超时、拒答、非法 JSON、非完整响应和策略更新错误都不会回退到旧权限。一个批次中如果同时出现合法和越权动作，当前实现逐动作裁剪并保留合法动作；如果全部动作被阻断，则停止当前批次，不在沙箱内部自动重试。安全检查器生成的替换动作在真实工具执行前还会再次经过沙箱。SDK 重试导致的总墙钟时间上限尚未统一纳入预算。
 
-这些保证是工具级的研究基线，不是完整安全证明：P0.2–P0.5 的授权与执行改造、P1 的参数级授权和 P2 的 provenance 约束仍待完成，详见 [`TODO.md`](./TODO.md)。离线验证不需要 API Key，可在项目根目录运行：
+这些保证是工具级的研究基线，不是完整安全证明：P0.2 的授权改造已完成（见下文），P0.3–P0.5、P1 的参数级授权和 P2 的 provenance 约束仍待完成，详见 [`TODO.md`](./TODO.md)。离线验证不需要 API Key，可在项目根目录运行：
 
 ```bash
 conda run -n ipi python -m unittest discover -s tests -v
 ```
+
+### P0.2：先授权，再生成候选动作
+
+实现见 [`dscg/pipelines/defended.py`](./dscg/pipelines/defended.py)，回归测试见 [`tests/test_sandbox_execution.py`](./tests/test_sandbox_execution.py)。
+
+| 改进项 | 改进前 | 改进后 |
+| --- | --- | --- |
+| 授权顺序 | 主模型先生成调用，首轮候选工具直接并入白名单 | 独立编译授权后再生成候选，候选不能给自己授权 |
+| 授权输入 | 用户请求和首轮候选共同影响权限 | 仅当前可信用户消息、固定系统策略和宿主工具目录；不传入 assistant/tool 历史 |
+| 类型边界 | 工具名列表直接用于更新白名单 | 使用不可变 `ToolAuthorizationContract`；安装契约的接口拒绝候选调用列表 |
+| 新用户回合 | 先撤权，只有生成工具调用后才编译 | 先撤权并编译，即使最终只回复文本；失败不沿用旧权限 |
+| 来源追溯 | 未记录授权版本和来源 | 保存 `contract_version`、来源、输入摘要与默认读权限，便于复核 |
+
+Python 调用可查看返回的 `extra_args["dscg_authorization"]`；AgentDojo 任务结果 JSON 顶层的 `dscg_authorizations` 保存授权记录。摘要不额外复制原始用户文本，版本哈希用于追溯，不是安全签名。授权编译复用主模型配置和 token 统计，NoSandbox 消融跳过该步骤。
+
+如果任务结果目录中已经存在同名 JSON，AgentDojo 默认会复用旧结果（`force_rerun=False`），旧文件不会自动补写 P0.2 字段。需要刷新已有任务时运行：
+
+```bash
+DSCG_FORCE_RERUN=1 python -m experiments.run_partial_benchmark
+```
+
+授权编译时终端也会打印脱敏摘要：`[DSCG AUTHORIZATION] state=... contract=... tools=...`；因此即使外部日志器不支持自定义字段，也能确认 P0.2 是否实际执行。
+
+验证：35 项离线测试、Python 编译检查和 `git diff --check` 通过，未运行真实模型评测。读工具仍按旧前缀策略默认授权（记录在 `implicit_read_tools`，待 P0.5 替换），尚不约束工具参数；存在写工具时，纯文本任务也会增加一次编译调用。授权语义仍依赖 LLM，任务效用和开销需后续评测。
 
 ## 运行评测
 

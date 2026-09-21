@@ -10,7 +10,7 @@
 
 当前框架包含以下机制：
 
-- `OurFrameExecutor`：根据原始用户请求生成写工具白名单。
+- `OurFrameExecutor`：先调用独立的 `ToolAuthorizationCompiler`，根据当前可信用户消息与固定系统策略编译工具级授权，再生成候选动作；候选动作不能扩大权限。
 - `PermissionSandbox`：在工具执行前检查工具名，并裁剪未授权动作。
 - `ActionHistoryTracker`：保存历史工具名和参数。
 - `ActionSecurityChecker`：在出现写操作时，结合原始请求和动作历史进行 LLM 审计。
@@ -58,8 +58,8 @@
 
 | 当前组件 | 当前风险/限制 | 目标职责 | 首个可验收改动 |
 | --- | --- | --- | --- |
-| `OurFrameExecutor` | 先让主模型生成工具调用，再把生成结果并入白名单；读写属性依赖名称前缀 | 只负责生成候选计划和请求 Contract 编译，不授予权限 | 首次工具调用前完成 Contract；模型生成的工具名永远不能扩大权限 |
-| `PermissionSandbox` | `[]` 可能被解释为“全部放行”；阻断和重试逻辑耦合在组件内部 | 唯一的确定性 Reference Monitor | 引入 `ActionProposal -> PolicyDecision` 接口；所有异常返回 deny |
+| `OurFrameExecutor` | P0.2 已分离授权编译与候选生成；授权语义仍依赖 LLM，读写属性仍依赖名称前缀 | 只负责生成候选计划和请求 Contract 编译，不授予权限 | 已完成：首次候选生成前安装工具级 Contract；后续补充参数级约束 |
+| `PermissionSandbox` | P0.1 已修复空策略放行并移除内部重试；目前仍只检查工具名，缺少执行票据 | 唯一的确定性 Reference Monitor | 引入 `ActionProposal -> PolicyDecision` 接口；所有异常返回 deny |
 | `ActionSecurityChecker` | 自由文本 `SAFE/UNSAFE`；依赖当前动作文本和启发式写操作判断 | 对策略层提供结构化的语义风险信号 | 输出 schema 化 decision/reason code；超时和解析失败为 abstain/deny |
 | `ActionHistoryTracker` | 只保存工具名和参数，缺少 action 状态与数据来源 | 由执行层维护的 append-only security ledger | 为每个动作和工具输出分配 ID，记录完整生命周期和 provenance |
 | `ToolsExecutor` 调用链 | 正常、重试、裁剪和并发路径可能不一致 | 只能接受已批准的执行票据 | 未持有有效 `allow` decision 的调用无法到达真实工具 |
@@ -99,7 +99,7 @@ ActionProposal(action_id, tool, canonical_args, provenance, contract_version)
 
 这些问题会直接影响现有实验结论，应在扩展功能前完成。
 
-**实现顺序**：P0.1 → P0.5 → P0.3 → P0.4。先消除放行漏洞，再统一执行入口，最后引入模型审计信号。每一步都保留一个可运行的 baseline，方便定位效用下降来自哪一层。
+**实现顺序**：P0.1 → P0.2 → P0.5 → P0.3 → P0.4。先消除放行漏洞和候选动作自授权，再替换工具风险分类、统一执行入口，最后引入模型审计信号。每一步都保留一个可运行的 baseline，方便定位效用下降来自哪一层。
 
 ### P0.1 白名单必须 fail-closed
 
@@ -122,16 +122,26 @@ ActionProposal(action_id, tool, canonical_args, provenance, contract_version)
 - 全部动作被阻断时当前回合直接停止，不在沙箱内部调用主模型重试；混合批次采用逐动作裁剪，仅保留已授权动作。统一恢复事件循环仍属于 P0.3。
 - 离线回归覆盖真实 `FunctionsRuntime`/`ToolsExecutor`、解析失败矩阵、批次裁剪、文本回合撤权和流水线顺序：`tests/test_permission_sandbox.py`、`tests/test_sandbox_execution.py`。
 
-本改动只完成 P0.1 的工具级 fail-closed 基线，并不等价于完成 P0：首轮候选动作仍可能参与白名单编译（P0.2），工具风险仍暂依赖前缀（P0.5），动作票据、统一恢复循环和完整事件账本尚未实现（P0.3）。
+当时改动只完成 P0.1 的工具级 fail-closed 基线，并不等价于完成 P0：首轮候选动作参与白名单编译的问题已由下述 P0.2 修复；工具风险仍暂依赖前缀（P0.5），动作票据、统一恢复循环和完整事件账本尚未实现（P0.3）。
 
 ### P0.2 移除“先生成、后授权”
 
-- [ ] 删除 `allowed = set(first_turn_tools)` 这种首轮候选动作自动进入白名单的逻辑。
-- [ ] 白名单或 Task Contract 只能由可信用户消息和可信系统上下文生成。
-- [ ] 主模型生成的工具调用只能作为候选动作，不能反向影响自己的权限。
-- [ ] 意图解析应发生在第一次工具调用生成之前。
-- [ ] 将“工具候选生成”和“权限授予”拆成两个不同类型；候选集合不能直接写入 Sandbox 状态。
-- [ ] 保存 `contract_version` 和授权来源，证明白名单来自用户请求/系统策略，而不是 assistant/tool 消息。
+- [x] 删除 `allowed = set(first_turn_tools)` 这种首轮候选动作自动进入白名单的逻辑。
+- [x] 白名单或 Task Contract 只能由可信用户消息和可信系统上下文生成。
+- [x] 主模型生成的工具调用只能作为候选动作，不能反向影响自己的权限。
+- [x] 意图解析应发生在第一次工具调用生成之前。
+- [x] 将“工具候选生成”和“权限授予”拆成两个不同类型；候选集合不能直接写入 Sandbox 状态。
+- [x] 保存 `contract_version` 和授权来源，供追溯白名单的用户请求/系统策略来源，配合隔离测试验证 assistant/tool 消息不参与授权。
+
+#### P0.2 实现记录（2026-09-20）
+
+- `ToolAuthorizationCompiler` 只接收 `TrustedTaskRequest` 与宿主注册的工具目录，不接收历史对话、工具返回或候选调用；复用主模型客户端，但使用独立上下文和固定系统策略。
+- 顺序调整为“撤销旧授权 → 编译并安装 `ToolAuthorizationContract` → 记录授权 → 主模型生成候选”。空用户消息不再回退读取 `query`；解析失败时清空旧契约并保持 `error`。工具反馈不能触发扩权，新可信用户回合重新编译。
+- 编译结果使用冻结数据类与 `frozenset`，与候选 `FunctionCall` 区分；`install_contract` 拒绝工具名列表和候选调用列表。旧 `set_allowlist` 仅保留给可信宿主兼容调用，主执行器不再用候选集合设置权限。
+- `extra_args["dscg_authorization"]` 保存当前授权；AgentDojo 任务 JSON 的顶层 `dscg_authorizations` 保存授权记录。记录含 `contract_version`、来源、编译模型、用户请求/目录/系统策略的 SHA-256 摘要、允许工具及 `implicit_read_tools`，不额外复制原始用户文本。版本是内容哈希，用于追溯，不是签名或形式化安全证明。
+- 35 项离线测试通过，覆盖授权先于生成、首轮自授权阻断、污染历史隔离、多回合撤权、编译失败、版本变化、真实 TraceLogger 落盘和 NoSandbox 消融。未调用真实模型或运行付费评测。
+
+范围限制：可信角色和工具目录由宿主提供，本次不防御宿主伪造角色或恶意注册目录。默认读权限仍来自旧前缀策略，已单独记录，待 P0.5 替换；契约尚不约束参数、来源或委托。授权语义仍依赖 LLM，不能据此宣称最小权限已得到证明。存在写工具时，即使最终只回复文本也会先执行一次授权编译；更严格的权限可能降低效用，需后续小批量评测量化。NoSandbox 保持跳过授权编译。
 
 ### P0.3 保证 Complete Mediation
 

@@ -29,6 +29,7 @@ def main(
     sec_provider: str | None = None,
     sec_api_key_env: str | None = None,
     config_path: str | Path | None = None,
+    force_rerun: bool = False,
 ):
     """
         model_id: 执行的llm的id
@@ -95,7 +96,7 @@ def main(
         attack = attacks.load_attack(attack_name, suite, pipeline)
 
         # Small-batch benchmark: keep the first few tasks from each suite.
-        selected_users = user_task_ids[:3]
+        selected_users = user_task_ids[:2]
         selected_injections = injection_task_ids[:2]
 
         planned_task_count = (
@@ -110,6 +111,10 @@ def main(
         )
         
         # 运行基准测试并记录日志
+        print(
+            f"缓存策略: {'强制重跑' if force_rerun else '复用已有结果'} "
+            "（已有 JSON 没有 dscg_authorizations 时请设置 DSCG_FORCE_RERUN=1）"
+        )
         with logging.OutputLogger(str(logdir)):
             if run_attack:
                 results = benchmark.benchmark_suite_with_injections(
@@ -117,7 +122,7 @@ def main(
                     suite,
                     attack,
                     logdir,
-                    force_rerun=False,
+                    force_rerun=force_rerun,
                     user_tasks = selected_users,
                     injection_tasks = selected_injections,
                     verbose= True
@@ -127,7 +132,7 @@ def main(
                     pipeline,
                     suite,
                     logdir,
-                    force_rerun=False,
+                    force_rerun=force_rerun,
                     user_tasks = selected_users,
                     injection_tasks = selected_injections
                 )
@@ -294,6 +299,7 @@ if __name__ == "__main__":
             run_attack=True,
             origin=False,
             defense=None,
+            force_rerun=os.getenv("DSCG_FORCE_RERUN", "0").lower() in {"1", "true", "yes"},
         )
     except ModelConfigurationError as exc:
         print(f"模型配置错误: {exc}")
