@@ -1,0 +1,86 @@
+# Reviewed initial classifications for AgentDojo benchmark v1.2 / agentdojo 0.1.35.
+# This is a tool-level approximation, not a parameter-level authorization policy.
+# Review implementation changes and sink arguments before using a newer suite.
+
+[tools]
+# Workspace: email and contacts
+send_email = { effect = "external_send", source = "email", sink = "external_recipient", sensitivity = "personal", idempotent = false, reversible = false }
+delete_email = { effect = "delete", source = "email", sink = "none", sensitivity = "personal", idempotent = false, reversible = false }
+# get_unread_emails marks messages as read, despite its read-like name.
+get_unread_emails = { effect = "write", source = "email", sink = "none", sensitivity = "personal", idempotent = false, reversible = false }
+get_sent_emails = { effect = "read", source = "email", sink = "none", sensitivity = "personal", idempotent = true, reversible = true }
+get_received_emails = { effect = "read", source = "email", sink = "none", sensitivity = "personal", idempotent = true, reversible = true }
+get_draft_emails = { effect = "read", source = "email", sink = "none", sensitivity = "personal", idempotent = true, reversible = true }
+search_emails = { effect = "read", source = "email", sink = "none", sensitivity = "personal", idempotent = true, reversible = true }
+search_contacts_by_name = { effect = "read", source = "email", sink = "none", sensitivity = "personal", idempotent = true, reversible = true }
+search_contacts_by_email = { effect = "read", source = "email", sink = "none", sensitivity = "personal", idempotent = true, reversible = true }
+
+# Calendar tools shared by Workspace and Travel. Mutations email participants.
+get_current_day = { effect = "read", source = "local", sink = "none", sensitivity = "public", idempotent = true, reversible = true }
+search_calendar_events = { effect = "read", source = "calendar", sink = "none", sensitivity = "personal", idempotent = true, reversible = true }
+get_day_calendar_events = { effect = "read", source = "calendar", sink = "none", sensitivity = "personal", idempotent = true, reversible = true }
+create_calendar_event = { effect = "external_send", source = "calendar", sink = "external_recipient", sensitivity = "personal", idempotent = false, reversible = false }
+cancel_calendar_event = { effect = "external_send", source = "calendar", sink = "external_recipient", sensitivity = "personal", idempotent = false, reversible = false }
+reschedule_calendar_event = { effect = "external_send", source = "calendar", sink = "external_recipient", sensitivity = "personal", idempotent = false, reversible = false }
+add_calendar_event_participants = { effect = "external_send", source = "calendar", sink = "external_recipient", sensitivity = "personal", idempotent = false, reversible = false }
+
+# Workspace: cloud drive
+append_to_file = { effect = "write", source = "cloud", sink = "none", sensitivity = "internal", idempotent = false, reversible = false }
+search_files_by_filename = { effect = "read", source = "cloud", sink = "none", sensitivity = "internal", idempotent = true, reversible = true }
+create_file = { effect = "write", source = "cloud", sink = "none", sensitivity = "internal", idempotent = false, reversible = false }
+delete_file = { effect = "delete", source = "cloud", sink = "none", sensitivity = "internal", idempotent = false, reversible = false }
+get_file_by_id = { effect = "read", source = "cloud", sink = "none", sensitivity = "internal", idempotent = true, reversible = true }
+list_files = { effect = "read", source = "cloud", sink = "none", sensitivity = "internal", idempotent = true, reversible = true }
+share_file = { effect = "external_send", source = "cloud", sink = "external_recipient", sensitivity = "internal", idempotent = false, reversible = false }
+search_files = { effect = "read", source = "cloud", sink = "none", sensitivity = "internal", idempotent = true, reversible = true }
+
+# Travel: public catalog and private user details
+get_user_information = { effect = "read", source = "local", sink = "none", sensitivity = "secret", idempotent = true, reversible = true }
+get_all_hotels_in_city = { effect = "read", source = "web", sink = "none", sensitivity = "public", idempotent = true, reversible = true }
+get_hotels_prices = { effect = "read", source = "web", sink = "none", sensitivity = "public", idempotent = true, reversible = true }
+get_rating_reviews_for_hotels = { effect = "read", source = "web", sink = "none", sensitivity = "public", idempotent = true, reversible = true }
+get_hotels_address = { effect = "read", source = "web", sink = "none", sensitivity = "public", idempotent = true, reversible = true }
+get_all_restaurants_in_city = { effect = "read", source = "web", sink = "none", sensitivity = "public", idempotent = true, reversible = true }
+get_cuisine_type_for_restaurants = { effect = "read", source = "web", sink = "none", sensitivity = "public", idempotent = true, reversible = true }
+get_restaurants_address = { effect = "read", source = "web", sink = "none", sensitivity = "public", idempotent = true, reversible = true }
+get_rating_reviews_for_restaurants = { effect = "read", source = "web", sink = "none", sensitivity = "public", idempotent = true, reversible = true }
+get_dietary_restrictions_for_all_restaurants = { effect = "read", source = "web", sink = "none", sensitivity = "public", idempotent = true, reversible = true }
+get_contact_information_for_restaurants = { effect = "read", source = "web", sink = "none", sensitivity = "public", idempotent = true, reversible = true }
+get_price_for_restaurants = { effect = "read", source = "web", sink = "none", sensitivity = "public", idempotent = true, reversible = true }
+check_restaurant_opening_hours = { effect = "read", source = "web", sink = "none", sensitivity = "public", idempotent = true, reversible = true }
+get_all_car_rental_companies_in_city = { effect = "read", source = "web", sink = "none", sensitivity = "public", idempotent = true, reversible = true }
+get_car_types_available = { effect = "read", source = "web", sink = "none", sensitivity = "public", idempotent = true, reversible = true }
+get_rating_reviews_for_car_rental = { effect = "read", source = "web", sink = "none", sensitivity = "public", idempotent = true, reversible = true }
+get_car_fuel_options = { effect = "read", source = "web", sink = "none", sensitivity = "public", idempotent = true, reversible = true }
+get_car_rental_address = { effect = "read", source = "web", sink = "none", sensitivity = "public", idempotent = true, reversible = true }
+get_car_price_per_day = { effect = "read", source = "web", sink = "none", sensitivity = "public", idempotent = true, reversible = true }
+get_flight_information = { effect = "read", source = "web", sink = "none", sensitivity = "public", idempotent = true, reversible = true }
+reserve_hotel = { effect = "write", source = "local", sink = "none", sensitivity = "personal", idempotent = false, reversible = false }
+reserve_car_rental = { effect = "write", source = "local", sink = "none", sensitivity = "personal", idempotent = false, reversible = false }
+reserve_restaurant = { effect = "write", source = "local", sink = "none", sensitivity = "personal", idempotent = false, reversible = false }
+
+# Banking
+get_iban = { effect = "read", source = "local", sink = "none", sensitivity = "secret", idempotent = true, reversible = true }
+send_money = { effect = "financial", source = "local", sink = "external_recipient", sensitivity = "secret", idempotent = false, reversible = false }
+schedule_transaction = { effect = "financial", source = "local", sink = "external_recipient", sensitivity = "secret", idempotent = false, reversible = false }
+update_scheduled_transaction = { effect = "financial", source = "local", sink = "external_recipient", sensitivity = "secret", idempotent = false, reversible = false }
+get_balance = { effect = "read", source = "local", sink = "none", sensitivity = "personal", idempotent = true, reversible = true }
+get_most_recent_transactions = { effect = "read", source = "local", sink = "none", sensitivity = "personal", idempotent = true, reversible = true }
+get_scheduled_transactions = { effect = "read", source = "local", sink = "none", sensitivity = "personal", idempotent = true, reversible = true }
+read_file = { effect = "read", source = "local", sink = "none", sensitivity = "secret", idempotent = true, reversible = true }
+get_user_info = { effect = "read", source = "local", sink = "none", sensitivity = "personal", idempotent = true, reversible = true }
+update_password = { effect = "write", source = "local", sink = "none", sensitivity = "secret", idempotent = false, reversible = false }
+update_user_info = { effect = "write", source = "local", sink = "none", sensitivity = "personal", idempotent = false, reversible = false }
+
+# Slack and web
+get_channels = { effect = "read", source = "local", sink = "none", sensitivity = "internal", idempotent = true, reversible = true }
+add_user_to_channel = { effect = "write", source = "local", sink = "none", sensitivity = "internal", idempotent = false, reversible = false }
+read_channel_messages = { effect = "read", source = "local", sink = "none", sensitivity = "internal", idempotent = true, reversible = true }
+read_inbox = { effect = "read", source = "local", sink = "none", sensitivity = "personal", idempotent = true, reversible = true }
+send_direct_message = { effect = "external_send", source = "local", sink = "external_recipient", sensitivity = "internal", idempotent = false, reversible = false }
+send_channel_message = { effect = "external_send", source = "local", sink = "public_output", sensitivity = "internal", idempotent = false, reversible = false }
+get_users_in_channel = { effect = "read", source = "local", sink = "none", sensitivity = "internal", idempotent = true, reversible = true }
+invite_user_to_slack = { effect = "write", source = "local", sink = "none", sensitivity = "internal", idempotent = false, reversible = false }
+remove_user_from_slack = { effect = "write", source = "local", sink = "none", sensitivity = "internal", idempotent = false, reversible = false }
+get_webpage = { effect = "read", source = "web", sink = "none", sensitivity = "public", idempotent = true, reversible = true }
+post_webpage = { effect = "external_send", source = "web", sink = "public_output", sensitivity = "public", idempotent = false, reversible = false }

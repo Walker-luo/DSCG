@@ -68,6 +68,7 @@ function initConfigListeners() {
     "#model-id", "#sec-model-id", "#defense", "#use-sandbox",
     "#use-security-checker", "#max-user-tasks", "#max-injection-tasks",
     "#api-key", "#base-url", "#sec-api-key", "#sec-base-url",
+    "#tool-metadata-path",
   ].forEach((selector) => {
     const element = $(selector);
     if (!element) return;
@@ -109,6 +110,7 @@ function getSelectedConfig() {
     use_security_checker: !isOrigin && $("#use-security-checker").checked,
     max_user_tasks: parseInt($("#max-user-tasks").value) || 0,
     max_injection_tasks: parseInt($("#max-injection-tasks").value) || 0,
+    tool_metadata_path: $("#tool-metadata-path").value.trim() || null,
   };
 }
 

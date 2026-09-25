@@ -240,7 +240,7 @@ pipeline, tracker = make_openai_compatible_pipeline(
 
 未知工具、单次请求超时、拒答、非法 JSON、非完整响应和策略更新错误都不会回退到旧权限。一个批次中如果同时出现合法和越权动作，当前实现逐动作裁剪并保留合法动作；如果全部动作被阻断，则停止当前批次，不在沙箱内部自动重试。安全检查器生成的替换动作在真实工具执行前还会再次经过沙箱。SDK 重试导致的总墙钟时间上限尚未统一纳入预算。
 
-这些保证是工具级的研究基线，不是完整安全证明：P0.2、P0.3 的授权与执行改造已完成（见下文），P0.4–P0.5、P1 的参数级授权和 P2 的 provenance 约束仍待完成，详见 [`TODO.md`](./TODO.md)。离线验证不需要 API Key，可在项目根目录运行：
+这些保证是工具级的研究基线，不是完整安全证明：P0.2、P0.3、P0.4、P0.5 的授权、执行、审计和工具风险元数据改造已完成（见下文），P1 的参数级授权和 P2 的 provenance 约束仍待完成，详见 [`TODO.md`](./TODO.md)。离线验证不需要 API Key，可在项目根目录运行：
 
 ```bash
 conda run -n ipi python -m unittest discover -s tests -v
@@ -268,7 +268,7 @@ DSCG_FORCE_RERUN=1 python -m experiments.run_partial_benchmark
 
 授权编译时终端也会打印脱敏摘要：`[DSCG AUTHORIZATION] state=... contract=... tools=...`；因此即使外部日志器不支持自定义字段，也能确认 P0.2 是否实际执行。
 
-验证：35 项离线测试、Python 编译检查和 `git diff --check` 通过，未运行真实模型评测。读工具仍按旧前缀策略默认授权（记录在 `implicit_read_tools`，待 P0.5 替换），尚不约束工具参数；存在写工具时，纯文本任务也会增加一次编译调用。授权语义仍依赖 LLM，任务效用和开销需后续评测。
+阶段验证：35 项离线测试、Python 编译检查和 `git diff --check` 通过，未运行真实模型评测。当前总回归数量见 P0.4/P0.5 的最新记录；授权语义仍依赖 LLM，任务效用和开销需后续评测。
 
 ### P0.3：统一仲裁与一次性执行票据
 
@@ -281,7 +281,61 @@ DSCG_FORCE_RERUN=1 python -m experiments.run_partial_benchmark
 | 执行证明 | 只能看到工具调用消息，无法证明先授权后执行 | 每个动作有 `action_id`、状态转移和一次性 `ExecutionTicket` |
 | 并发批次 | 可能边判定边执行 | 先完成整个批次判定，再逐动作提交执行 |
 
-任务 JSON 顶层新增 `dscg_action_ledger`，记录动作状态和 `reason_code`。终端会显示 `[DSCG MEDIATION] proposed=... approved=... blocked=...`。40 项离线测试通过，未运行真实模型评测。票据为进程内完整性约束，不等同于跨进程安全证明；参数级授权、provenance 和委托仍待后续阶段。
+运行态会新增 `dscg_action_ledger`，记录动作状态和 `reason_code`；是否将逐条账本写入任务 JSON 由 P0.4 的 `trace_level` 控制。终端会显示 `[DSCG MEDIATION] proposed=... approved=... blocked=...`。票据为进程内完整性约束，不等同于跨进程安全证明；参数级授权、provenance 和委托仍待后续阶段。
+
+### P0.4：结构化审计与默认拒绝
+
+实现见 [`dscg/pipelines/defended.py`](./dscg/pipelines/defended.py) 中的 `ActionSecurityChecker` 和 `AuditDecision`，回归测试见 [`tests/test_sandbox_execution.py`](./tests/test_sandbox_execution.py)。
+
+| 改进项 | 改进前 | 改进后 |
+| --- | --- | --- |
+| 审计输出 | 安全模型返回自由文本 `SAFE/UNSAFE`，解析边界不明确 | 严格校验 `decision`、`violations`、`confidence`、`reason_code` 四字段；旧格式和异常响应转为 `abstain` |
+| 审计输入 | 工具参数和动作历史直接拼接进 Prompt，容易被参数中的指令影响 | 使用 `dscg.audit-input.v1` JSON 数据包；参数做 NFKC 归一化、控制字符处理、长度/深度/数量限制，并明确标记为不可信数据 |
+| 失败策略 | 审计异常可能被误当作安全信号 | 超时、拒答、字段缺失、解析失败和 `abstain` 在启用 Checker 时默认阻断高风险动作 |
+| 安全边界 | 审计结果容易被误解为执行许可 | LLM 审计只能补充确定性 Sandbox；`allow` 不能越过白名单，`deny` 才能额外阻断已授权动作 |
+| 可追溯性 | 没有审计请求和最终判决的关联记录 | 记录输入摘要、模型版本、耗时、原始响应哈希、解析状态和最终策略判决，不保存密钥或原始敏感正文 |
+
+审计记录默认以精简摘要保存于任务 JSON：`dscg_audit_summary`、`dscg_action_summary` 和 `dscg_trace_level`。公共读取工具的免审计路径只是确定性成本优化，仍需经过显式元数据、工具注册检查、Sandbox 和 Reference Monitor；敏感读取仍进入安全模型审计。需要逐条记录时可使用下方的 `--trace-level standard/full`。
+
+记录级别说明：
+
+| 级别 | 任务 JSON 内容 | 额外文件 |
+|---|---|---|
+| `summary`（默认） | 授权摘要、审计/动作数量统计、判定原因统计 | 无 |
+| `standard` | `summary` 加裁剪后的审计列表和动作列表，不含完整状态转移 | 无 |
+| `full` | 完整 `dscg_audit_decisions` 和 `dscg_action_ledger` | 同一任务目录下的 `<injection_task>.dscg_trace.jsonl.gz` |
+
+`--include-extra-info` 是 `--trace-level full` 的快捷开关。记录级别只影响日志保存，不改变 Sandbox、Reference Monitor、审计判定或最终任务结果。
+
+验证：当前测试套件共 64 项通过，包含参数注入、伪造角色、长历史截断、Unicode 控制字符、超时/`abstain`、伪造审计记录、记录精简/压缩侧车、工具元数据 schema、sink 风险、共享目录投影、未知工具高风险记录和缺失/非法分类降级等用例；未调用真实模型或运行付费评测。
+
+### P0.5：显式工具风险元数据
+
+实现见 [`dscg/tool_metadata.py`](./dscg/tool_metadata.py)、[`dscg/pipelines/defended.py`](./dscg/pipelines/defended.py) 和 [`experiments/generate_tool_metadata.py`](./experiments/generate_tool_metadata.py)。P0.5 将工具风险判断从名称前缀迁移到 `dscg.tool-risk.v1` 显式元数据，并覆盖 AgentDojo v1.2 的 workspace、travel、banking、slack 四个场景。
+
+| 对比项 | 改进前 | 改进后 |
+| --- | --- | --- |
+| 工具风险判断 | 通过 `get_`、`read_` 等名称前缀猜测工具是否有副作用 | 由 `effect`、`source`、`sink`、`sensitivity`、`idempotent`、`reversible` 显式描述 |
+| 工具目录 | 运行时缺少统一目录，容易出现白名单与实际注册工具不一致 | 生成器校验 `agentdojo==0.1.35` 的 69 个注册工具，漏项或多余工具直接报错 |
+| 公共读取 | 读取工具和其他动作混在同一授权流程中 | `read + public + sink=none` 可走确定性低成本路径，仍经过注册检查和 Sandbox |
+| 敏感读取 | 可能因缺少分类而被静默当作普通读取，或完全无法追踪 | 获得工具级读取能力并保留安全审计；读取本地/私有源本身不因敏感性提示直接阻断，外发和公共输出仍拒绝 |
+| 授权编译 | 每个重复用户轮次都可能再次调用意图编译模型，异常时出现 `POLICY_ERROR` | 同一可信用户轮次复用已验证授权契约；新的用户轮次、工具目录或元数据变化会重新编译 |
+| 缺失/非法元数据 | 可能回退到名称推断，风险边界不清晰 | 按 `critical` 处理，不能进入确定性读取路径，并在授权摘要和动作账本中记录 |
+
+生成本地元数据目录并复测：
+
+```bash
+python -m experiments.generate_tool_metadata
+python -m experiments.run_partial_benchmark \
+  --tool-metadata config/tools.local.toml \
+  --name P0.5-reviewed
+```
+
+生成器会校验当前 AgentDojo 版本、四个场景的工具注册情况和元数据字段。默认不覆盖已有本地文件；需要覆盖时使用 `--force`，也可用 `--output PATH` 指定输出路径。`config/tools.local.toml` 已被 Git 忽略，不应提交 API Key 或本机配置。
+
+P0.5 的元数据是工具级初始分类，不是参数级授权或完整数据流证明。敏感读取仍会进入安全模型审计；只有 `read + sink=none` 的读取源在审计模型误报“敏感访问”时不会直接阻断读取，后续写入、金融、外部发送和公共输出仍必须通过严格授权。
+
+Dashboard 的“实验配置 → 工具风险元数据”字段也接受同一个项目内 TOML 路径（例如 `config/tools.local.toml`）；留空时使用 `DSCG_TOOL_METADATA` 或默认本地配置。页面只提交路径，不展示或保存元数据内容。
 
 ## 运行评测
 
@@ -318,14 +372,43 @@ python -m experiments.run_benchmark
 python -m experiments.run_partial_benchmark
 ```
 
+每次优化或消融实验都可以通过 `--name` 标记运行版本。脚本会使用配置中实际解析出的主模型 ID，自动将结果保存到 `<model_id>_<name>` 目录；名称中的路径分隔符会被转换为安全字符。这样不同版本的测试结果不会覆盖在同一个模型目录中：
+
+```bash
+# 全量测试：results/benchmarks/deepseek-flash_P0.4/
+python -m experiments.run_benchmark --name P0.4
+
+# 小批量测试：results/partial_benchmark/deepseek-flash_P0.4/
+python -m experiments.run_partial_benchmark --name P0.4
+```
+
+不传 `--name` 时，两个入口继续使用原有的流水线名称和结果目录。建议每次修改防御逻辑后使用不同的名称（例如 `P0.5-metadata`），并保留对应的配置、报告和汇总文件，便于复现实验与比较。
+
+`run_partial_benchmark` 完成所有场景后，还会在模型结果目录下生成 `all_report.txt`，按 `[workspace]`、`[travel]`、`[banking]`、`[slack]` 标记合并四个场景的任务执行报告；各场景目录中的 `report.txt` 仍会保留。
+
+评测任务 JSON 默认使用精简记录。如果需要在优化/消融实验中保留更多 P0.4 诊断信息，可选择记录级别：
+
+```bash
+# 默认摘要：适合日常回归，JSON 体积最小
+python -m experiments.run_partial_benchmark --name P0.4-summary
+
+# 标准记录：保留裁剪后的逐条审计和动作信息
+python -m experiments.run_partial_benchmark --name P0.4-standard --trace-level standard
+
+# 完整记录：保留完整数组，并生成 .dscg_trace.jsonl.gz 侧车文件
+python -m experiments.run_partial_benchmark --name P0.4-full --include-extra-info
+```
+
+全量入口 `python -m experiments.run_benchmark` 支持相同的 `--trace-level` 和 `--include-extra-info` 参数；`--include-extra-info` 等价于 `--trace-level full`。记录级别只改变结果保存方式，不改变安全仲裁、工具执行或最终评测结果。
+
 ### `run_benchmark` 与 `run_partial_benchmark` 的区别
 
 这两个入口都使用 AgentDojo 的 `important_instructions` 注入攻击，也都会输出 Utility、ASR、Defense Rate 和 token 开销；区别在于场景范围、任务取样、默认防御开关和结果目录。当前代码的实际行为如下：
 
 | 入口 | 默认套件与任务取样 | 默认防御配置 | 结果目录 | 适用场景 |
 |---|---|---|---|---|
-| `python -m experiments.run_benchmark` | `workspace`、`travel`、`banking`、`slack` 四个套件；每个套件使用全部用户任务和全部注入任务 | `use_sandbox=True`、`use_security_checker=True`，运行完整 DSCG 防御 | `results/benchmarks/ablation_study/` | 正式全量评测、跨场景对比和论文主结果 |
-| `python -m experiments.run_partial_benchmark` | 同样覆盖四个套件；每个套件只取前 3 个用户任务和前 2 个注入任务 | 使用防御流水线默认配置，即 Sandbox 和 Security Checker 均开启 | `results/partial_benchmark/` | 提交前回归、模型切换和低成本排查 |
+| `python -m experiments.run_benchmark [--name NAME]` | `workspace`、`travel`、`banking`、`slack` 四个套件；每个套件使用全部用户任务和全部注入任务 | `use_sandbox=True`、`use_security_checker=True`，运行完整 DSCG 防御 | `results/benchmarks/<model_id>_<NAME>/`（未提供名称时沿用旧目录） | 正式全量评测、跨场景对比和论文主结果 |
+| `python -m experiments.run_partial_benchmark [--name NAME]` | 同样覆盖四个套件；每个套件只取前 2 个用户任务和前 2 个注入任务 | 使用防御流水线默认配置，即 Sandbox 和 Security Checker 均开启 | `results/partial_benchmark/<model_id>_<NAME>/`（未提供名称时沿用旧目录） | 提交前回归、模型切换和低成本排查 |
 
 因此，`run_partial_benchmark` 是四个场景上的固定小批量回归，而不是完整评测。全量入口的任务组合数等于四个套件中各自的“用户任务数 × 注入任务数”之和，运行时间、Token 消耗和 API 费用会明显高于局部入口。两个脚本当前都设置了 `force_rerun=False`，重复运行时可能复用已有结果；更换模型、Provider、攻击配置或防御开关后，应清理对应结果目录，或在代码中显式改为强制重跑。
 

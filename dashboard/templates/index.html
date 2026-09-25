@@ -61,6 +61,7 @@
             <div class="field-group"><label class="form-label" for="max-user-tasks">用户任务上限</label><input type="number" id="max-user-tasks" class="form-control form-control-sm" value="0" min="0" placeholder="0 = 全部"></div>
             <div class="field-group"><label class="form-label" for="max-injection-tasks">注入任务上限</label><input type="number" id="max-injection-tasks" class="form-control form-control-sm" value="0" min="0" placeholder="0 = 全部"></div>
           </div>
+          <div class="field-group metadata-path-group"><label class="form-label" for="tool-metadata-path">工具风险元数据 <span class="field-optional">可选</span></label><input type="text" id="tool-metadata-path" class="form-control form-control-sm" placeholder="config/tools.local.toml" spellcheck="false"><small class="field-help">填写项目内 TOML 路径；未分类工具按 critical 处理。</small></div>
         </section>
 
         <section class="config-section connection-section" aria-labelledby="config-connection">
@@ -124,6 +125,7 @@
           <li class="nav-item" role="presentation"><button class="nav-link active" id="tab-live" data-bs-toggle="tab" data-bs-target="#panel-live" type="button" role="tab"><i class="bi bi-terminal"></i>运行日志</button></li>
           <li class="nav-item" role="presentation"><button class="nav-link" id="tab-overview" data-bs-toggle="tab" data-bs-target="#panel-overview" type="button" role="tab"><i class="bi bi-grid-1x2"></i>结果概览</button></li>
           <li class="nav-item" role="presentation"><button class="nav-link" id="tab-charts" data-bs-toggle="tab" data-bs-target="#panel-charts" type="button" role="tab"><i class="bi bi-bar-chart"></i>指标图表</button></li>
+          <li class="nav-item" role="presentation"><button class="nav-link" id="tab-history-analysis" data-bs-toggle="tab" data-bs-target="#panel-history-analysis" type="button" role="tab"><i class="bi bi-graph-up"></i>历史分析</button></li>
           <li class="nav-item" role="presentation"><button class="nav-link" id="tab-detail" data-bs-toggle="tab" data-bs-target="#panel-detail" type="button" role="tab"><i class="bi bi-table"></i>任务明细</button></li>
           <li class="nav-item" role="presentation"><button class="nav-link" id="tab-compare" data-bs-toggle="tab" data-bs-target="#panel-compare" type="button" role="tab"><i class="bi bi-columns-gap"></i>运行对比</button></li>
           <li class="nav-item" role="presentation"><button class="nav-link" id="tab-report" data-bs-toggle="tab" data-bs-target="#panel-report" type="button" role="tab"><i class="bi bi-file-earmark-text"></i>实验报告</button></li>
@@ -143,6 +145,85 @@
 
         <section class="tab-pane fade" id="panel-charts" role="tabpanel">
           <div class="panel-body"><div class="data-toolbar"><label for="chart-data-source">运行数据</label><select id="chart-data-source" class="form-select form-select-sm"><option value="">选择运行</option></select><button class="btn btn-sm btn-outline-secondary" onclick="refreshCharts()"><i class="bi bi-arrow-repeat"></i>载入</button></div><div class="row g-3" id="charts-container"><div class="col-12 empty-state"><i class="bi bi-bar-chart-line"></i><strong>暂无图表数据</strong><span>选择一条已完成的运行记录</span></div></div><div class="row g-3 mt-0" id="charts-row-2"></div></div>
+        </section>
+
+        <section class="tab-pane fade" id="panel-history-analysis" role="tabpanel">
+          <div class="panel-body history-panel">
+            <div class="history-layout">
+              <fieldset class="history-run-selection">
+                <div class="history-list-heading">
+                  <legend>历史实验结果</legend>
+                  <span id="history-selection-count" aria-live="polite">0 项已选</span>
+                </div>
+                <div class="history-select-actions">
+                  <button type="button" class="btn btn-sm btn-outline-secondary" id="history-select-all">全选</button>
+                  <button type="button" class="btn btn-sm btn-outline-secondary" id="history-clear-selection">清空</button>
+                  <span id="history-catalog-count" class="history-catalog-count" aria-live="polite"></span>
+                </div>
+                <div id="history-run-list" class="history-run-list" role="group" aria-label="选择历史实验结果">
+                  <div class="empty-state"><strong>正在读取 results/</strong></div>
+                </div>
+              </fieldset>
+
+              <section class="history-view-controls" aria-label="分析视图设置">
+                <div class="field-group">
+                  <label class="form-label" for="history-suite-select">场景</label>
+                  <select id="history-suite-select" class="form-select form-select-sm">
+                    <option value="all">全部场景</option>
+                  </select>
+                </div>
+                <div class="field-group">
+                  <label class="form-label" for="history-metric-select">指标</label>
+                  <select id="history-metric-select" class="form-select form-select-sm">
+                    <option value="utility_rate">任务效用率 TSR</option>
+                    <option value="attack_success_rate">攻击成功率 ASR</option>
+                    <option value="defense_success_rate">防御成功率</option>
+                    <option value="total_tokens">Token 消耗</option>
+                  </select>
+                </div>
+                <div class="field-group">
+                  <label class="form-label" for="history-chart-type">图表形式</label>
+                  <select id="history-chart-type" class="form-select form-select-sm">
+                    <option value="line">折线图</option>
+                    <option value="bar">分组柱状</option>
+                    <option value="radar">雷达对比</option>
+                    <option value="scatter">TSR-ASR 散点</option>
+                    <option value="heatmap">任务结果热图</option>
+                  </select>
+                </div>
+                <button type="button" class="btn btn-primary history-analyze-button" id="history-analyze">
+                  <i class="bi bi-graph-up-arrow" aria-hidden="true"></i>生成分析
+                </button>
+                <p id="history-analysis-status" class="history-analysis-status" role="status" aria-live="polite"></p>
+              </section>
+            </div>
+
+            <section class="history-visual-section" aria-labelledby="history-chart-title">
+              <div class="history-chart-heading">
+                <div><span class="section-kicker">Historical results</span><h2 id="history-chart-title">历史结果分析</h2></div>
+                <span id="history-source-caption" class="history-source-caption"></span>
+              </div>
+              <div class="chart-container history-chart-container">
+                <div id="history-canvas-wrap" class="history-canvas-wrap" hidden>
+                  <canvas id="history-chart" role="img" aria-label="历史实验指标图表"></canvas>
+                </div>
+                <div id="history-heatmap-container" class="history-heatmap-container" hidden></div>
+                <div id="history-chart-empty" class="empty-state history-chart-empty">
+                  <i class="bi bi-graph-up"></i><strong>选择结果并生成分析</strong><span>可比较不同优化版本及其各场景表现</span>
+                </div>
+              </div>
+            </section>
+
+            <section class="history-table-section" aria-labelledby="history-summary-title">
+              <h3 id="history-summary-title">指标明细</h3>
+              <div class="table-responsive">
+                <table class="table table-dark table-hover table-sm" id="history-summary-table">
+                  <thead><tr><th>实验</th><th>场景</th><th>TSR (%)</th><th>ASR (%)</th><th>防御率 (%)</th><th>Tokens</th><th>任务数</th></tr></thead>
+                  <tbody><tr><td colspan="7">尚无分析数据</td></tr></tbody>
+                </table>
+              </div>
+            </section>
+          </div>
         </section>
 
         <section class="tab-pane fade" id="panel-detail" role="tabpanel">
@@ -172,5 +253,6 @@
 
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
   <script src="/static/js/app.js"></script>
+  <script src="/static/js/history.js"></script>
 </body>
 </html>

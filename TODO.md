@@ -58,7 +58,7 @@
 
 | 当前组件 | 当前风险/限制 | 目标职责 | 首个可验收改动 |
 | --- | --- | --- | --- |
-| `OurFrameExecutor` | P0.2 已分离授权编译与候选生成；授权语义仍依赖 LLM，读写属性仍依赖名称前缀 | 只负责生成候选计划和请求 Contract 编译，不授予权限 | 已完成：首次候选生成前安装工具级 Contract；后续补充参数级约束 |
+| `OurFrameExecutor` | P0.2 已分离授权编译与候选生成；授权语义仍依赖 LLM，未分类工具会进入高风险路径 | 只负责生成候选计划和请求 Contract 编译，不授予权限 | 已完成：首次候选生成前安装工具级 Contract；后续补充参数级约束 |
 | `PermissionSandbox` | P0.1 已修复空策略放行；目前提供工具级判定 | 确定性工具级策略组件，由 Monitor 签发票据 | 参数/来源约束留待 P1/P2 |
 | `ActionSecurityChecker` | 自由文本 `SAFE/UNSAFE`；依赖当前动作文本和启发式写操作判断 | 对策略层提供结构化的语义风险信号 | 输出 schema 化 decision/reason code；超时和解析失败为 abstain/deny |
 | `ActionLedger` | 旧 Tracker 只保存工具名和参数，缺少 action 状态 | 由执行层维护的 append-only security ledger | 为每个动作分配 ID，记录完整生命周期和 reason code |
@@ -99,7 +99,7 @@ ActionProposal(action_id, tool, canonical_args, provenance, contract_version)
 
 这些问题会直接影响现有实验结论，应在扩展功能前完成。
 
-**实现顺序**：P0.1 → P0.2 → P0.3 → P0.5 → P0.4。先消除放行漏洞和候选动作自授权，再统一执行入口和动作账本，随后替换工具风险分类，最后引入结构化模型审计信号。每一步都保留一个可运行的 baseline，方便定位效用下降来自哪一层。
+**实现顺序**：P0.1 → P0.2 → P0.3 → P0.4 → P0.5。先消除放行漏洞和候选动作自授权，再统一执行入口和动作账本，随后引入结构化模型审计信号，最后替换工具风险分类。每一步都保留一个可运行的 baseline，方便定位效用下降来自哪一层。
 
 ### P0.1 白名单必须 fail-closed
 
@@ -122,7 +122,7 @@ ActionProposal(action_id, tool, canonical_args, provenance, contract_version)
 - P0.1 时的混合批次裁剪已在 P0.3 收敛为“先全量判定、后逐动作提交”；阻断结果作为结构化工具错误反馈，不允许未经仲裁的重试进入真实工具。
 - 离线回归覆盖真实 `FunctionsRuntime`/`ToolsExecutor`、解析失败矩阵、批次裁剪、文本回合撤权和流水线顺序：`tests/test_permission_sandbox.py`、`tests/test_sandbox_execution.py`。
 
-当时改动只完成 P0.1 的工具级 fail-closed 基线，并不等价于完成 P0：首轮候选动作参与白名单编译的问题已由下述 P0.2 修复；工具风险仍暂依赖前缀（P0.5），动作票据、统一恢复循环和完整事件账本尚未实现（P0.3）。
+当时改动只完成 P0.1 的工具级 fail-closed 基线，并不等价于完成 P0：首轮候选动作参与白名单编译的问题已由下述 P0.2 修复；在该阶段工具风险曾暂依赖前缀，现已由 P0.5 的显式元数据替代；动作票据、统一恢复循环和完整事件账本尚未实现（P0.3）。
 
 ### P0.2 移除“先生成、后授权”
 
@@ -141,7 +141,7 @@ ActionProposal(action_id, tool, canonical_args, provenance, contract_version)
 - `extra_args["dscg_authorization"]` 保存当前授权；AgentDojo 任务 JSON 的顶层 `dscg_authorizations` 保存授权记录。记录含 `contract_version`、来源、编译模型、用户请求/目录/系统策略的 SHA-256 摘要、允许工具及 `implicit_read_tools`，不额外复制原始用户文本。版本是内容哈希，用于追溯，不是签名或形式化安全证明。
 - 35 项离线测试通过，覆盖授权先于生成、首轮自授权阻断、污染历史隔离、多回合撤权、编译失败、版本变化、真实 TraceLogger 落盘和 NoSandbox 消融。未调用真实模型或运行付费评测。
 
-范围限制：可信角色和工具目录由宿主提供，本次不防御宿主伪造角色或恶意注册目录。默认读权限仍来自旧前缀策略，已单独记录，待 P0.5 替换；契约尚不约束参数、来源或委托。授权语义仍依赖 LLM，不能据此宣称最小权限已得到证明。存在写工具时，即使最终只回复文本也会先执行一次授权编译；更严格的权限可能降低效用，需后续小批量评测量化。NoSandbox 保持跳过授权编译。
+范围限制：可信角色和工具目录由宿主提供，本次不防御宿主伪造角色或恶意注册目录。契约尚不约束参数、来源或委托。授权语义仍依赖 LLM，不能据此宣称最小权限已得到证明。存在需授权工具时，即使最终只回复文本也会先执行一次授权编译；更严格的权限可能降低效用，需后续小批量评测量化。NoSandbox 保持跳过授权编译。
 
 ### P0.3 保证 Complete Mediation
 
@@ -166,7 +166,7 @@ ActionProposal(action_id, tool, canonical_args, provenance, contract_version)
 
 ### P0.4 审计模型结构化输出并默认拒绝
 
-- [ ] 将自由文本 `SAFE/UNSAFE` 改为严格 schema，例如：
+- [x] 将自由文本 `SAFE/UNSAFE` 改为严格 schema，例如：
 
 ```json
 {
@@ -177,17 +177,48 @@ ActionProposal(action_id, tool, canonical_args, provenance, contract_version)
 }
 ```
 
-- [ ] 解析失败、`abstain`、字段缺失和模型超时默认拒绝高风险动作。
-- [ ] 不把未经处理的工具参数直接拼入安全 Prompt。
-- [ ] 审计器只接收规范化字段、来源 ID 和策略特征；必要的原文放入明确的数据字段。
-- [ ] LLM 审计只作为补充判据，不作为唯一安全根。
-- [ ] 记录审计输入摘要、模型版本、耗时、原始结果哈希和最终策略判决，支持事后复盘但不记录密钥或不必要的敏感正文。
-- [ ] 增加审计器对抗测试：工具参数中出现“忽略此前规则”、伪造角色字段、长上下文截断和 Unicode 混淆时，审计器只能影响告警，不能改变确定性授权。
+- [x] 解析失败、`abstain`、字段缺失和模型超时默认拒绝高风险动作。
+- [x] 不把未经处理的工具参数直接拼入安全 Prompt。
+- [x] 审计器只接收规范化字段、来源 ID 和策略特征；必要的原文放入明确的数据字段。
+- [x] LLM 审计只作为补充判据，不作为唯一安全根。
+- [x] 记录审计输入摘要、模型版本、耗时、原始结果哈希和最终策略判决，支持事后复盘但不记录密钥或不必要的敏感正文。
+- [x] 增加审计器对抗测试：工具参数中出现“忽略此前规则”、伪造角色字段、长上下文截断和 Unicode 混淆时，审计器只能影响告警，不能改变确定性授权。
+
+#### P0.4 实现记录（2026-09-21）
+
+- `ActionSecurityChecker` 改为调用 JSON-only 审计接口，并在本地严格校验 `decision`、`violations`、`confidence` 和 `reason_code` 四个字段；旧版 `SAFE/UNSAFE`、多余字段、缺失字段、非法置信度和非 JSON 响应统一转换为 `abstain`。
+- 安全 Prompt 改为结构化 `dscg.audit-input.v1` 数据包：工具参数经过 JSON 规范化、NFKC Unicode 归一化、控制字符处理、深度/长度/条目数限制；动作历史只传工具名、状态、来源 ID 和参数摘要，不再直接拼接原始参数文本。
+- 审计请求设置独立超时；超时、拒答、解析失败和模型异常均默认阻断高风险动作。读操作的快速路径只是确定性成本优化，仍必须经过注册表、Sandbox 和 Reference Monitor。
+- `ReferenceMonitor` 将审计结果视为补充判据：`allow` 不能绕过工具级授权，`deny` 可以阻断已获确定性授权的动作，`abstain`/缺失/过期审计在启用 Checker 时默认拒绝。NoSandbox 仍是显式消融，不作为安全保证。
+- 每次审计记录 `audit_input_sha256`、模型版本、耗时、原始结果哈希、解析状态和最终策略判决；日志不保存 API Key、原始 Prompt 或未经必要处理的敏感参数。运行态始终保留完整记录，任务 JSON 按 `trace_level` 选择摘要、裁剪列表或完整列表。
+- 阶段实现时离线安全回归扩展至 47 项（含结构化 schema、超时/abstain、参数注入、伪造角色、长历史截断、Unicode 控制字符、伪造审计记录及确定性 Sandbox 不可被 `allow` 绕过）；当前在加入 P0.5 元数据测试后共 57 项，均未调用真实模型或运行付费评测。
+
+范围限制：P0.5 已移除工具名前缀风险判断，但完整 AgentDojo 工具目录仍需逐套件补齐元数据；审计输入中的可信用户请求仍由宿主/AgentDojo 提供，不能防御恶意宿主伪造可信角色；JSON schema 是本地严格校验而非模型输出的形式化证明。
+
+#### P0.4 后续待处理：精简审计记录与结果文件体积
+
+精简实现前的 P0.4 会将完整的 `dscg_audit_decisions` 和 `dscg_action_ledger` 直接写入每个任务 JSON。一个任务可能产生多轮工具调用、多个审计批次和大量状态转移，导致结果文件相较原始 AgentDojo 输出显著膨胀，降低人工阅读、版本对比和批量分析效率。该问题不影响安全判定，现已通过下方的记录级别和侧车机制处理；文件大小、写入耗时和 Dashboard 加载耗时仍待实测。
+
+- [x] 为任务 JSON 增加精简模式：仅保留授权摘要、审计总数、`allow/deny/abstain` 统计、动作状态统计和关键阻断原因。
+- [x] 为需要逐事件复盘的 `full` 模式提供独立的 `.jsonl.gz` 审计侧车，并在任务 JSON 中保存关联路径和批次摘要；默认摘要模式不再复制完整数组。
+- [x] 增加可配置记录级别：`summary`、`standard`、`full`；默认采用 `summary`，保留安全判定所需的统计信息。
+- [x] 对审计记录和动作账本做字段裁剪与去重；`standard` 模式不保存完整状态转移数组。
+- [x] 保留完整记录的可选开关，确保论文实验、争议样本和安全事件仍可进行逐动作重放。
+- [ ] 对比精简前后的文件大小、写入耗时、Dashboard 加载耗时和复盘信息完整性，确认不会丢失安全结论所需证据。
+- [x] 增加回归测试：精简模式不写入完整数组，`full` 模式写入完整记录侧车，且最终安全判定仍由同一仲裁路径产生。
+
+#### P0.4 日志精简实现记录（2026-09-22）
+
+- 默认 `trace_level=summary`：任务 JSON 保留 `dscg_authorizations`、`dscg_audit_summary`、`dscg_action_summary` 和记录级别，不再写入逐条审计决策与完整动作账本。
+- `standard` 模式写入裁剪后的审计/动作列表；动作只保留身份、哈希、最终状态、转移数量和最后原因，不重复保存完整 `transitions`。
+- `full` 模式可通过 `--trace-level full` 或 `--include-extra-info` 开启；任务 JSON 保留完整数组，同时在同一任务目录生成 `<injection_task>.dscg_trace.jsonl.gz`，用于逐事件复盘。
+- 完整运行态仍在 `extra_args` 内保留，安全仲裁、票据执行和最终 Utility/Security 判定不受记录级别影响；侧车只写脱敏哈希和结构化安全元数据，不写原始 Prompt 或 API Key。
+- `tests/test_sandbox_execution.py` 新增 summary/full 记录级别与压缩侧车测试；该阶段共有 47 项通过，当前离线测试总数以 README 的最新回归结果为准。文件大小和 Dashboard 加载耗时的真实评测仍待使用代表性任务集测量。
 
 ### P0.5 修正工具风险分类
 
-- [ ] 移除通过 `get_`、`read_`、`download_` 等前缀推断读写属性的方式。
-- [ ] 为每个工具注册显式安全元数据：
+- [x] 移除通过 `get_`、`read_`、`download_` 等前缀推断读写属性的方式。
+- [x] 为每个工具注册显式安全元数据：
 
 ```yaml
 effect: read | write | delete | financial | external_send
@@ -198,10 +229,21 @@ idempotent: true | false
 reversible: true | false
 ```
 
-- [ ] 未注册元数据的工具默认按高风险处理。
-- [ ] 区分公共读取、敏感读取、外部发送、不可逆删除和金融操作。
-- [ ] 在运行时启动阶段校验工具元数据完整性和 schema；元数据缺失、冲突或版本不匹配时阻止高风险工具注册。
-- [ ] 为每个 effect 定义默认确认/拒绝策略，并在报告中分别统计各风险级别，而不是只给一个总 ASR。
+- [x] 未注册元数据的工具默认按高风险处理。
+- [x] 区分公共读取、敏感读取、外部发送、不可逆删除和金融操作。
+- [x] 在运行时授权编译和审计阶段校验工具元数据完整性和 schema；元数据缺失、冲突或版本不匹配时进入高风险路径。
+- [x] 为每个 effect 定义默认确认/拒绝策略，并在动作摘要中分别统计各风险级别，而不是只给一个总 ASR。
+
+#### P0.5 实现记录（2026-09-23）
+
+- 新增 [`dscg/tool_metadata.py`](./dscg/tool_metadata.py)，提供 `dscg.tool-risk.v1` schema、风险等级、确认/审计默认策略、目录哈希和 TOML 加载器。
+- `ToolAuthorizationCompiler` 和 `ActionSecurityChecker` 不再使用工具名或 docstring 推断读写属性；只有显式标注为 `read + public + sink=none` 的工具可以走确定性读路径。
+- 未注册、字段缺失、字段冲突或 schema 版本错误的工具被标记为 `critical`，需要正常授权和安全审计；元数据状态、风险分布和目录哈希写入授权摘要与动作账本。
+- 评测入口支持 `--tool-metadata PATH` 或 `DSCG_TOOL_METADATA`；可复制 [`config/tools.example.toml`](./config/tools.example.toml) 为本地配置。`config/tools.local.toml` 已加入 `.gitignore`。
+- Dashboard 的实验配置新增工具元数据路径字段；页面只传递项目内 TOML 路径，不回显元数据内容。
+- 新增 P0.5 元数据 schema、TOML 加载、sink 风险、共享目录投影、未知工具高风险记录、缺失/非法分类和风险降级测试；当前离线测试共 58 项通过。
+- 新增四场景工具目录与离线生成器 [`experiments/generate_tool_metadata.py`](./experiments/generate_tool_metadata.py)：校验当前 AgentDojo 版本、注册工具覆盖率和字段格式后，生成本地 `config/tools.local.toml`；生成及缺失配置的回归测试通过，当前离线测试共 61 项。
+- P0.5 Utility 修正：同一可信用户轮次复用授权契约，避免重复意图编译导致 `POLICY_ERROR`；`read + sink=none` 的敏感读取仍保留审计记录，但不会因读取源本身被 `AUDIT_DENY` 阻断，外发和写入动作仍须通过原有安全策略。新增回归后离线测试共 64 项。
 
 ### P0 DoD（完成定义）
 

@@ -1,4 +1,6 @@
+import argparse
 import os
+import re
 from pathlib import Path
 import csv
 
@@ -10,6 +12,35 @@ from dscg.model_config import ModelConfigurationError
 from dscg.paths import BENCHMARK_RESULTS_DIR
 from dscg.pipelines.baseline import make_openai_compatible_pipeline
 from dscg.pipelines.defended import make_defended_pipeline
+from dscg.tool_metadata import ToolMetadataError, load_tool_metadata
+
+
+def _safe_result_component(value: str | None, fallback: str) -> str:
+    """Return a path-safe component for a user-provided experiment name."""
+
+    component = str(value or "").strip()
+    # Model IDs such as ``Qwen/Qwen3-...`` are valid API identifiers but must
+    # not create nested result directories. Keep common readable characters
+    # and replace everything else with a single dash.
+    component = re.sub(r"[^\w.-]+", "-", component, flags=re.UNICODE)
+    component = component.strip(" .-_")
+    return component or fallback
+
+
+def _apply_run_name(pipeline, resolved_model_id: str | None, run_name: str | None) -> str:
+    """Apply ``<model_id>_<name>`` to the pipeline/result directory name.
+
+    When no name is supplied, the historical pipeline name is kept so that
+    existing commands and result paths remain backwards compatible.
+    """
+
+    if run_name is None or not str(run_name).strip():
+        return pipeline.name
+
+    model_component = _safe_result_component(resolved_model_id, "model")
+    name_component = _safe_result_component(run_name, "run")
+    pipeline.name = f"{model_component}_{name_component}"
+    return pipeline.name
 
 
 def main(
@@ -31,6 +62,9 @@ def main(
     sec_provider: str | None = None,
     sec_api_key_env: str | None = None,
     config_path: str | Path | None = None,
+    run_name: str | None = None,
+    trace_level: str = "summary",
+    tool_metadata_path: str | Path | None = None,
 ):
     """
         model_id: 执行的llm的id
@@ -44,6 +78,7 @@ def main(
 
 
     attack_name = "important_instructions"  # 使用 AgentDojo 预定义的注入攻击
+    tool_metadata = load_tool_metadata(tool_metadata_path)
     logdir = BENCHMARK_RESULTS_DIR
     logdir.mkdir(parents=True, exist_ok=True)
 
@@ -79,13 +114,18 @@ def main(
                 sec_provider=sec_provider,
                 sec_api_key_env=sec_api_key_env,
                 config_path=config_path,
+                trace_level=trace_level,
+                tool_metadata=tool_metadata,
             )
 
         main_model_config = getattr(pipeline, "dscg_model_config", {})
         sec_model_config = getattr(pipeline, "dscg_security_model_config", {})
         resolved_model_id = main_model_config.get("model_id", model_id)
         resolved_sec_model_id = sec_model_config.get("model_id", sec_model_id)
+        result_dir_name = _apply_run_name(pipeline, resolved_model_id, run_name)
         print(f"已解析模型配置 - 主模型: {resolved_model_id}, 审计模型: {resolved_sec_model_id or '无'}")
+        if run_name:
+            print(f"本次运行名称: {run_name}，结果目录: {logdir / result_dir_name}")
         
         # 加载套件和攻击
         suite = get_suite("v1.2", suite_name)
@@ -288,6 +328,35 @@ def main(
 
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(
+        description="运行 DSCG 的四场景全量 AgentDojo 评测。"
+    )
+    parser.add_argument(
+        "--name",
+        dest="run_name",
+        metavar="NAME",
+        help="本次优化/消融实验名称；结果保存为 results/benchmarks/<model_id>_<NAME>/。",
+    )
+    parser.add_argument(
+        "--trace-level",
+        choices=("summary", "standard", "full"),
+        default=os.getenv("DSCG_TRACE_LEVEL", "summary"),
+        help="任务 JSON 中 DSCG 记录级别；默认 summary，full 会额外保存压缩审计侧车。",
+    )
+    parser.add_argument(
+        "--include-extra-info",
+        action="store_true",
+        help="兼容快捷开关，等同于 --trace-level full，将完整审计/动作记录写入 JSON。",
+    )
+    parser.add_argument(
+        "--tool-metadata",
+        dest="tool_metadata_path",
+        metavar="PATH",
+        default=os.getenv("DSCG_TOOL_METADATA"),
+        help="显式工具风险元数据 TOML；缺省时未分类工具按 critical 处理。",
+    )
+    args = parser.parse_args()
+
     try:
         main(
             model_id=os.getenv("DSCG_MAIN_MODEL_ID"),
@@ -300,7 +369,10 @@ if __name__ == "__main__":
             defense=None,
             use_sandbox=True,
             use_security_checker=True,
+            run_name=args.run_name,
+            trace_level="full" if args.include_extra_info else args.trace_level,
+            tool_metadata_path=args.tool_metadata_path,
         )
-    except ModelConfigurationError as exc:
+    except (ModelConfigurationError, ToolMetadataError) as exc:
         print(f"模型配置错误: {exc}")
         print("请设置 DSCG_MAIN_* 环境变量，或复制 config/models.example.toml 为 config/models.local.toml 后填写。")

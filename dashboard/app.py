@@ -7,12 +7,15 @@ import os
 import sys
 import json
 import csv
+import hashlib
+import math
 import time
 import queue
 import threading
 import uuid
 from datetime import datetime
 from io import StringIO
+from pathlib import Path
 
 from flask import (
     Flask, render_template, request, jsonify, Response,
@@ -22,9 +25,10 @@ from flask import (
 from agentdojo import logging as ad_logging, benchmark, attacks
 from agentdojo.task_suite import get_suite
 from dscg.model_config import DEEPSEEK_MODEL_IDS
-from dscg.paths import DASHBOARD_RESULTS_DIR
+from dscg.paths import DASHBOARD_RESULTS_DIR, RESULTS_DIR
 from dscg.pipelines.baseline import make_openai_compatible_pipeline
 from dscg.pipelines.defended import make_defended_pipeline
+from dscg.tool_metadata import load_tool_metadata
 
 app = Flask(__name__)
 app.secret_key = "newframe_dashboard_2024"
@@ -211,6 +215,14 @@ def run_test_thread(run_id: str, config: dict):
         use_security_checker = config.get("use_security_checker", True)
         max_user_tasks = config.get("max_user_tasks", 0)   # 0 = all
         max_injection_tasks = config.get("max_injection_tasks", 0)
+        tool_metadata_path = config.get("tool_metadata_path") or None
+        tool_metadata = load_tool_metadata(tool_metadata_path)
+        if tool_metadata_path:
+            push_log(
+                run_id,
+                "info",
+                f"工具风险元数据: {tool_metadata_path}（已加载 {len(tool_metadata)} 项）",
+            )
 
         # 结果存放目录
         run_dir = DASHBOARD_RESULTS_DIR / run_id
@@ -261,6 +273,7 @@ def run_test_thread(run_id: str, config: dict):
                         sec_api_key=sec_api_key if sec_api_key else (api_key if same_connection else None),
                         sec_provider=sec_provider,
                         sec_base_url=sec_base_url if sec_base_url else (base_url if same_connection else None),
+                        tool_metadata=tool_metadata,
                     )
 
                 main_model_config = getattr(pipeline, "dscg_model_config", {})
@@ -468,6 +481,367 @@ def _compute_aggregate(summaries: list[dict]) -> dict:
 
 
 # =============================================
+# 历史结果目录
+# =============================================
+HISTORY_SUITES = ("workspace", "travel", "banking", "slack")
+MAX_HISTORY_EXPERIMENTS = 100
+MAX_HISTORY_TASK_RECORDS = 50000
+
+
+def _iter_history_files(results_root: Path, filename: str):
+    """Walk results without following symlinks or returning files outside results/."""
+    for current, directories, filenames in os.walk(results_root, followlinks=False):
+        current_path = Path(current)
+        directories[:] = sorted(
+            name for name in directories
+            if not (current_path / name).is_symlink()
+        )
+        if filename not in filenames:
+            continue
+        path = current_path / filename
+        if path.is_symlink():
+            continue
+        try:
+            path.resolve(strict=True).relative_to(results_root)
+        except (OSError, ValueError):
+            continue
+        yield path
+
+
+def _read_history_json(path: Path) -> dict | None:
+    try:
+        with path.open("r", encoding="utf-8") as result_file:
+            data = json.load(result_file)
+        return data if isinstance(data, dict) else None
+    except (OSError, UnicodeError, json.JSONDecodeError):
+        return None
+
+
+def _history_number(value):
+    if isinstance(value, bool):
+        return None
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return None
+    return number if math.isfinite(number) else None
+
+
+def _history_percent(value, is_fraction: bool) -> float | None:
+    number = _history_number(value)
+    if number is None:
+        return None
+    if is_fraction and 0 <= number <= 1:
+        number *= 100
+    return round(number, 2)
+
+
+def _history_int(value) -> int:
+    number = _history_number(value)
+    return int(number) if number is not None else 0
+
+
+def _normalize_history_suite(summary: dict, suite_name: str, is_fraction: bool) -> dict:
+    metrics = summary.get("metrics")
+    task_counts = summary.get("task_counts")
+    overhead = summary.get("overhead")
+    metrics = metrics if isinstance(metrics, dict) else {}
+    task_counts = task_counts if isinstance(task_counts, dict) else {}
+    overhead = overhead if isinstance(overhead, dict) else {}
+    prompt_tokens = _history_int(overhead.get("prompt_tokens"))
+    completion_tokens = _history_int(overhead.get("completion_tokens"))
+    total_tokens = _history_int(overhead.get("total_tokens")) or (
+        prompt_tokens + completion_tokens
+    )
+    return {
+        "suite_name": suite_name,
+        "pipeline_name": str(summary.get("pipeline_name") or ""),
+        "metrics": {
+            "utility_rate": _history_percent(metrics.get("utility_rate"), is_fraction),
+            "attack_success_rate": _history_percent(
+                metrics.get("attack_success_rate"), is_fraction
+            ),
+            "defense_success_rate": _history_percent(
+                metrics.get("defense_success_rate"), is_fraction
+            ),
+        },
+        "task_counts": {
+            "total_tasks": _history_int(task_counts.get("total_tasks")),
+            "utility_passed": _history_int(task_counts.get("utility_passed")),
+            "attacked_tasks": _history_int(task_counts.get("attacked_tasks")),
+        },
+        "overhead": {
+            "prompt_tokens": prompt_tokens,
+            "completion_tokens": completion_tokens,
+            "total_tokens": total_tokens,
+        },
+    }
+
+
+def _history_entry_id(source: str) -> str:
+    return hashlib.sha256(source.encode("utf-8")).hexdigest()[:20]
+
+
+def _history_source_for_suite(results_root: Path, suite_dir: Path) -> str | None:
+    parts = suite_dir.relative_to(results_root).parts
+    if not parts:
+        return None
+    if parts[0] == "dashboard" and len(parts) > 1:
+        return "/".join(parts[:2])
+    return "/".join(parts[:-1]) if len(parts) > 1 else None
+
+
+def _build_history_catalog(results_root: Path | None = None) -> list[dict]:
+    """Index supported experiment summaries while keeping disk paths server-side."""
+    root = Path(results_root or RESULTS_DIR).resolve()
+    if not root.is_dir():
+        return []
+
+    entries: dict[str, dict] = {}
+
+    def ensure_entry(source: str) -> dict:
+        source = source.strip("/")
+        entry_id = _history_entry_id(source)
+        return entries.setdefault(entry_id, {
+            "id": entry_id,
+            "source": source,
+            "result_type": source.split("/", 1)[0],
+            "suites": {},
+            "overall_records": [],
+            "config": {},
+            "pipeline_name": "",
+            "updated_timestamp": 0.0,
+        })
+
+    def mark_updated(entry: dict, path: Path):
+        try:
+            entry["updated_timestamp"] = max(
+                entry["updated_timestamp"], path.stat().st_mtime
+            )
+        except OSError:
+            pass
+
+    # Dashboard runs store suite summaries together in overall_results.json.
+    for overall_path in _iter_history_files(root, "overall_results.json"):
+        data = _read_history_json(overall_path)
+        if data is None:
+            continue
+        source = overall_path.parent.relative_to(root).as_posix()
+        if source == ".":
+            continue
+        entry = ensure_entry(source)
+        entry["config"] = data.get("config") if isinstance(data.get("config"), dict) else {}
+        entry["overall_records"] = (
+            data.get("structured_records")
+            if isinstance(data.get("structured_records"), list)
+            else []
+        )
+        mark_updated(entry, overall_path)
+        raw_suites = data.get("suites")
+        for suite_summary in raw_suites if isinstance(raw_suites, list) else []:
+            if not isinstance(suite_summary, dict):
+                continue
+            suite_name = suite_summary.get("suite_name")
+            if suite_name not in HISTORY_SUITES:
+                continue
+            entry["pipeline_name"] = (
+                entry["pipeline_name"] or str(suite_summary.get("pipeline_name") or "")
+            )
+            suite_entry = entry["suites"].setdefault(suite_name, {})
+            suite_entry["summary"] = suite_summary
+
+    # Benchmark and partial-benchmark output write one summary per suite.
+    for summary_path in _iter_history_files(root, "summary.json"):
+        suite_name = summary_path.parent.name
+        if suite_name not in HISTORY_SUITES:
+            continue
+        source = _history_source_for_suite(root, summary_path.parent)
+        if not source:
+            continue
+
+        summary = _read_history_json(summary_path)
+        if summary is None:
+            continue
+        entry = ensure_entry(source)
+        entry["pipeline_name"] = (
+            entry["pipeline_name"] or str(summary.get("pipeline_name") or "")
+        )
+        suite_entry = entry["suites"].setdefault(suite_name, {})
+        suite_entry.setdefault("summary", summary)
+        csv_path = summary_path.parent / "detailed_results.csv"
+        if csv_path.is_file() and not csv_path.is_symlink():
+            suite_entry["csv_path"] = csv_path
+            mark_updated(entry, csv_path)
+        mark_updated(entry, summary_path)
+
+    # Older or interrupted runs may have task-level CSV files without summaries.
+    for csv_path in _iter_history_files(root, "detailed_results.csv"):
+        suite_name = csv_path.parent.name
+        if suite_name not in HISTORY_SUITES:
+            continue
+        source = _history_source_for_suite(root, csv_path.parent)
+        if not source:
+            continue
+        entry = ensure_entry(source)
+        suite_entry = entry["suites"].setdefault(suite_name, {})
+        suite_entry.setdefault("csv_path", csv_path)
+        mark_updated(entry, csv_path)
+
+    catalog = []
+    for entry in entries.values():
+        if not entry["suites"]:
+            continue
+        config = entry.get("config") or {}
+        first_summary = next(
+            (
+                suite_entry.get("summary", {})
+                for suite_entry in entry["suites"].values()
+                if suite_entry.get("summary")
+            ),
+            {},
+        )
+        label = (
+            config.get("label")
+            or entry["pipeline_name"]
+            or first_summary.get("pipeline_name")
+            or entry["source"].rsplit("/", 1)[-1]
+        )
+        is_fraction = entry["result_type"] != "dashboard"
+        suites = []
+        for suite_name in HISTORY_SUITES:
+            suite_entry = entry["suites"].get(suite_name)
+            if not suite_entry:
+                continue
+            summary = suite_entry.get("summary")
+            if not isinstance(summary, dict) and suite_entry.get("csv_path"):
+                summary = _history_csv_summary(suite_entry["csv_path"], suite_name)
+                is_fraction = False
+            else:
+                is_fraction = entry["result_type"] != "dashboard"
+            if not isinstance(summary, dict):
+                continue
+            suites.append(_normalize_history_suite(
+                summary, suite_name, is_fraction
+            ))
+        if not suites:
+            continue
+        timestamp = entry["updated_timestamp"]
+        catalog.append({
+            "id": entry["id"],
+            "label": str(label),
+            "source": entry["source"],
+            "result_type": entry["result_type"],
+            "updated_at": (
+                datetime.fromtimestamp(timestamp).astimezone().isoformat(timespec="seconds")
+                if timestamp
+                else ""
+            ),
+            "suites": suites,
+            "_internal": entry,
+        })
+
+    catalog.sort(key=lambda item: item["updated_at"], reverse=True)
+    return catalog
+
+
+def _history_bool(value):
+    if isinstance(value, bool) or value is None:
+        return value
+    if isinstance(value, str):
+        value = value.strip().lower()
+    if value in (1, "1", "true", "yes"):
+        return True
+    if value in (0, "0", "false", "no"):
+        return False
+    return None
+
+
+def _normalize_history_record(record: dict, suite_name: str) -> dict:
+    return {
+        "suite_name": suite_name,
+        "user_task_id": str(record.get("user_task_id") or ""),
+        "injection_task_id": str(record.get("injection_task_id") or ""),
+        "utility_success": _history_bool(record.get("utility_success")),
+        "attack_success": _history_bool(record.get("attack_success")),
+        "defense_success": _history_bool(record.get("defense_success")),
+    }
+
+
+def _history_csv_summary(csv_path: Path, suite_name: str) -> dict | None:
+    utility = []
+    attacks = []
+    defenses = []
+    total = 0
+    try:
+        with csv_path.open("r", encoding="utf-8-sig", newline="") as result_file:
+            for row in csv.DictReader(result_file):
+                if row.get("suite_name") and row["suite_name"] != suite_name:
+                    continue
+                total += 1
+                value = _history_bool(row.get("utility_success"))
+                if value is not None:
+                    utility.append(value)
+                value = _history_bool(row.get("attack_success"))
+                if value is not None:
+                    attacks.append(value)
+                value = _history_bool(row.get("defense_success"))
+                if value is not None:
+                    defenses.append(value)
+    except (OSError, UnicodeError, csv.Error):
+        return None
+    if not total:
+        return None
+
+    def rate(values):
+        return round(sum(value is True for value in values) * 100 / len(values), 2) if values else None
+
+    return {
+        "suite_name": suite_name,
+        "metrics": {
+            "utility_rate": rate(utility),
+            "attack_success_rate": rate(attacks),
+            "defense_success_rate": rate(defenses),
+        },
+        "task_counts": {
+            "total_tasks": total,
+            "utility_passed": sum(value is True for value in utility),
+            "attacked_tasks": len(attacks),
+        },
+        "overhead": {},
+    }
+
+
+def _load_history_task_records(
+    suite_entry: dict, fallback_records: list, suite_name: str, limit: int
+) -> tuple[list[dict], bool]:
+    csv_path = suite_entry.get("csv_path")
+    records = []
+    truncated = False
+    if csv_path:
+        try:
+            with csv_path.open("r", encoding="utf-8-sig", newline="") as result_file:
+                for row in csv.DictReader(result_file):
+                    row_suite = row.get("suite_name")
+                    if row_suite and row_suite != suite_name:
+                        continue
+                    if len(records) >= limit:
+                        truncated = True
+                        break
+                    records.append(_normalize_history_record(row, suite_name))
+        except (OSError, UnicodeError, csv.Error):
+            records = []
+    if not records:
+        for row in fallback_records:
+            if not isinstance(row, dict) or row.get("suite_name") != suite_name:
+                continue
+            if len(records) >= limit:
+                truncated = True
+                break
+            records.append(_normalize_history_record(row, suite_name))
+    return records, truncated
+
+
+# =============================================
 # API 路由
 # =============================================
 
@@ -487,6 +861,89 @@ def get_config():
         "attacks": AVAILABLE_ATTACKS,
         "defenses": AVAILABLE_DEFENSES,
     })
+
+
+@app.route("/api/history/catalog", methods=["GET"])
+def history_catalog():
+    """List results under results/ without exposing arbitrary filesystem paths."""
+    catalog = _build_history_catalog()
+    return jsonify([
+        {key: value for key, value in entry.items() if key != "_internal"}
+        for entry in catalog
+    ])
+
+
+@app.route("/api/history/analyze", methods=["POST"])
+def analyze_history_results():
+    payload = request.get_json(silent=True)
+    if not isinstance(payload, dict):
+        return jsonify({"error": "Invalid analysis request"}), 400
+    run_ids = payload.get("run_ids")
+    if (
+        not isinstance(run_ids, list)
+        or not run_ids
+        or len(run_ids) > MAX_HISTORY_EXPERIMENTS
+        or any(not isinstance(run_id, str) for run_id in run_ids)
+    ):
+        return jsonify({"error": "Select between 1 and 100 result sets"}), 400
+    run_ids = list(dict.fromkeys(run_ids))
+
+    suites_filter = payload.get("suites", [])
+    if not isinstance(suites_filter, list) or any(
+        suite not in HISTORY_SUITES for suite in suites_filter
+    ):
+        return jsonify({"error": "Invalid suite selection"}), 400
+
+    catalog = _build_history_catalog()
+    by_id = {entry["id"]: entry for entry in catalog}
+    if any(run_id not in by_id for run_id in run_ids):
+        return jsonify({"error": "One or more result sets were not found"}), 404
+
+    include_task_records = payload.get("include_task_records") is True
+    remaining_records = MAX_HISTORY_TASK_RECORDS
+    experiments = []
+    for run_id in run_ids:
+        entry = by_id[run_id]
+        internal = entry["_internal"]
+        experiment = {
+            "id": entry["id"],
+            "label": entry["label"],
+            "source": entry["source"],
+            "result_type": entry["result_type"],
+            "suites": [],
+        }
+        for suite_name in HISTORY_SUITES:
+            if suites_filter and suite_name not in suites_filter:
+                continue
+            suite_entry = internal["suites"].get(suite_name)
+            if not suite_entry:
+                continue
+            summary = suite_entry.get("summary")
+            if not isinstance(summary, dict) and suite_entry.get("csv_path"):
+                summary = _history_csv_summary(suite_entry["csv_path"], suite_name)
+                is_fraction = False
+            else:
+                is_fraction = internal["result_type"] != "dashboard"
+            if not isinstance(summary, dict):
+                continue
+            suite_result = _normalize_history_suite(
+                summary,
+                suite_name,
+                is_fraction,
+            )
+            if include_task_records and remaining_records > 0:
+                records, truncated = _load_history_task_records(
+                    suite_entry,
+                    internal["overall_records"],
+                    suite_name,
+                    remaining_records,
+                )
+                suite_result["task_records"] = records
+                suite_result["task_records_truncated"] = truncated
+                remaining_records -= len(records)
+            experiment["suites"].append(suite_result)
+        experiments.append(experiment)
+    return jsonify({"experiments": experiments})
 
 
 @app.route("/api/runs", methods=["GET"])

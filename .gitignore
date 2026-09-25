@@ -5,3 +5,4 @@ __pycache__/
 .env
 config/models.local.toml
 config/*.local.toml
+config/tools.local.toml

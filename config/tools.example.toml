@@ -1,0 +1,19 @@
+# Copy to config/tools.local.toml and replace the tool names with the tools
+# registered by the current AgentDojo suite or host runtime.
+# The local file is ignored by Git.
+
+[tools.example_read]
+effect = "read"
+source = "local"
+sink = "none"
+sensitivity = "public"
+idempotent = true
+reversible = true
+
+[tools.example_send]
+effect = "external_send"
+source = "email"
+sink = "external_recipient"
+sensitivity = "personal"
+idempotent = false
+reversible = false
