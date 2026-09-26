@@ -604,6 +604,8 @@ button, input, select { letter-spacing: 0; }
 .modal-content { color: var(--text); background: var(--surface); border: 1px solid var(--border); border-radius: 8px; box-shadow: var(--shadow); }
 .modal-header { padding: 16px 20px; border-bottom: 1px solid var(--border); }
 .modal-body { padding: 20px; }
+.history-analysis-modal .modal-dialog { max-width: 1240px; }
+.history-analysis-modal .modal-body { min-height: min(760px, calc(100vh - 150px)); }
 
 .btn { border-radius: 5px; font-size: 11px; }
 .btn i { margin-right: 5px; }
@@ -648,7 +650,7 @@ button, input, select { letter-spacing: 0; }
 }
 
 @media (max-width: 600px) {
-  .header-actions .btn-outline-secondary { display: none; }
+  .header-actions [data-bs-target="#architecture-modal"] { display: none; }
   .header-actions { gap: 4px; }
   .run-status { min-width: 32px; padding: 0 9px; }
   .run-status > span:last-child { display: none; }

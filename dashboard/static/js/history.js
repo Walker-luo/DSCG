@@ -26,7 +26,11 @@
     document.querySelector("#history-chart-type").addEventListener("change", updateControls);
     document.querySelector("#history-metric-select").addEventListener("change", updateControls);
     document.querySelector("#history-analyze").addEventListener("click", analyze);
-    document.querySelector("#tab-history-analysis").addEventListener("click", loadCatalog);
+    document.querySelector("#btn-history-analysis").addEventListener("click", loadCatalog);
+    document.querySelector("#history-analysis-modal").addEventListener("shown.bs.modal", () => {
+      loadCatalog();
+      if (chart) chart.resize();
+    });
     loadCatalog();
     updateControls();
     window.setInterval(loadCatalog, 30000);
@@ -251,22 +255,31 @@
   }
 
   function scatterConfig(experiments) {
+    const datasets = experiments.map((run, index) => ({
+      label: run.label,
+      data: (run.suites || []).flatMap((item) => {
+        const xRaw = item.metrics?.attack_success_rate;
+        const yRaw = item.metrics?.utility_rate;
+        const x = Number(xRaw);
+        const y = Number(yRaw);
+        return xRaw !== null && xRaw !== undefined &&
+          yRaw !== null && yRaw !== undefined &&
+          Number.isFinite(x) && Number.isFinite(y)
+          ? [{ x, y, suite: item.suite_name }]
+          : [];
+      }),
+      backgroundColor: colorAt(index),
+      borderColor: colorAt(index),
+      pointStyle: shapes[index % shapes.length],
+      pointRadius: 5,
+      pointHoverRadius: 7,
+    }));
+    const points = datasets.flatMap((dataset) => dataset.data);
+
     return {
       type: "scatter",
       data: {
-        datasets: experiments.map((run, index) => ({
-          label: run.label,
-          data: (run.suites || []).flatMap((item) => {
-            const x = item.metrics.attack_success_rate;
-            const y = item.metrics.utility_rate;
-            return x === null || y === null ? [] : [{ x, y, suite: item.suite_name }];
-          }),
-          backgroundColor: colorAt(index),
-          borderColor: colorAt(index),
-          pointStyle: shapes[index % shapes.length],
-          pointRadius: 5,
-          pointHoverRadius: 7,
-        })),
+        datasets,
       },
       options: {
         responsive: true,
@@ -283,14 +296,24 @@
             },
           },
         },
-        scales: { x: scatterScale("ASR (%)"), y: scatterScale("TSR (%)") },
+        scales: {
+          x: scatterScale("ASR (%)", points.map((point) => point.x)),
+          y: scatterScale("TSR (%)", points.map((point) => point.y)),
+        },
       },
     };
   }
 
-  function scatterScale(title) {
+  function scatterScale(title, values) {
+    const finiteValues = values.filter((value) => Number.isFinite(value));
+    const dataMin = finiteValues.length ? Math.min(...finiteValues) : 0;
+    const dataMax = finiteValues.length ? Math.max(...finiteValues) : 100;
+    const lower = Math.min(0, dataMin);
+    const upper = Math.max(100, dataMax);
+    const padding = Math.max(2, (upper - lower) * 0.05);
+
     return {
-      type: "linear", min: 0, max: 100,
+      type: "linear", min: lower - padding, max: upper + padding,
       title: { display: true, text: title, color: css("--text-muted") },
       ticks: { color: css("--text-secondary"), callback: (value) => value + "%" },
       grid: { color: css("--border") },
