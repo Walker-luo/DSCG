@@ -33,6 +33,32 @@ DSCG/
 └── TODO.md
 ```
 
+### 主要防御模块与协作
+
+核心防御流水线位于 [`dscg/pipelines/defended.py`](./dscg/pipelines/defended.py)。它把“模型提出动作”和“工具实际执行”分开：
+
+| 模块 | 主要职责 | 是否能直接执行真实工具 |
+| --- | --- | --- |
+| `OurFrameExecutor` | 读取可信用户回合，编译工具级授权契约，并调用主模型生成候选动作；阻断后负责重新规划 | 否 |
+| `PermissionSandbox` | 保存不可变的工具级授权状态，确定性检查工具是否在当前契约内 | 否 |
+| `ActionSecurityChecker` | 将当前候选动作、可信请求和有限动作历史交给安全模型，返回结构化 `allow/deny/abstain` 风险信号 | 否 |
+| `ReferenceMonitor` | 汇总工具注册、Sandbox、审计结果和风险元数据，记录 `ActionLedger` 状态，并为批准动作签发一次性票据 | 否；它只批准执行 |
+| `TicketedToolsExecutor` | 验证票据、调用指纹和一次性状态，通过后才调用真实 `ToolsExecutor`；执行后更新账本 | 是，且是唯一入口 |
+
+一次工具调用的协作顺序为：
+
+```text
+可信用户请求
+  -> OurFrameExecutor 编译契约
+  -> 主模型生成候选动作
+  -> ActionSecurityChecker 提供语义审计信号（启用时）
+  -> ReferenceMonitor 检查注册表、Sandbox 和审计结果
+  -> TicketedToolsExecutor 消费一次性票据
+  -> 真实工具执行
+```
+
+`ActionSecurityChecker` 的 `allow` 不能新增权限；Sandbox 拒绝时动作必然被阻断。阻断动作会变成结构化工具错误，主模型可以重规划，但新的候选动作必须再次经过审计、Monitor 和票据校验。`use_security_checker=False` 是只保留确定性工具级执行约束的 `NoChecker` 消融，不代表完整 DSCG 防御。
+
 ## 环境安装
 
 ```bash
