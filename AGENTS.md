@@ -4,38 +4,26 @@
 
 DSCG is a research prototype for defending tool-using LLM agents against indirect prompt injection (IPI). The intended project root is `/Users/luo/Desktop/AgentDefence`, with the implementation under `DSCG/` and a deliberately separate research directory under `research/`.
 
-The current Codex session is **not** mounted at that project root. Its shell falls back to `/private/tmp`; `/Users/luo/Desktop/AgentDefence` and its files are readable, but the project directory is not writable in this session. Do not create a replacement `research/` directory in a different location and imply that it is the project research directory. Recheck `pwd` and write permissions at the start of the next session.
+The repository is writable at `/Users/luo/Desktop/AgentDefence/DSCG`. Keep it separate from the sibling `research/` repository: do not create a second research directory under `DSCG/`, and do not copy paper plans into this repository.
 
-## Current Research Direction
+## Research Handoff
 
-The user's goal is to pursue a top-tier research publication, prioritizing a defensible research contribution before further system polishing. The candidate question discussed so far is:
+论文问题、文献、创新点和实验协议统一维护在项目根目录的 `research/`。本仓库只实现研究侧已经解锁的工程任务。先读取 `../research/technical_route.md`，完成后按 `../research/paper/implementation_status.md` 回报，不在本仓库复制论文计划或自行宣布新颖性。
 
-> Can provenance-aware, field-level authorization stop untrusted content from changing authority-bearing tool parameters (such as recipient, object, amount, or destination), while still allowing that content to be used as task data and preserving more utility than coarse whole-action blocking?
-
-Treat this as a hypothesis, not an established novelty claim. Existing overlap is substantial: ACE covers trusted planning/capability barriers/information-flow constraints; IPIGuard studies tool dependency graphs; SkillGuard and ActGov are close to capability confinement and per-action policy validation; Ajar motivates measuring unnecessary open privileges. A literature matrix must identify exact differences before implementation or paper claims are fixed.
-
-## Project Status (from readable `DSCG/TODO.md`)
+## Project Status (from readable `DSCG/System_TODO.md`)
 
 - P0.1–P0.5 are recorded as implemented: fail-closed authorization state, authorization before candidate generation, complete mediation with a Reference Monitor and one-use execution tickets, structured audit decisions and trace levels, and explicit tool-risk metadata.
-- Existing implementation is still primarily tool-level. Parameter/object-level Task Contracts and provenance-aware source-to-sink policy are future work (P1/P2 in `DSCG/TODO.md`).
+- Existing implementation is still primarily tool-level. Parameter/object-level Task Contracts and provenance-aware source-to-sink policy are future work in `DSCG/System_TODO.md`, and are locked until research-side route selection.
 - The TODO's own research hypotheses include parameter-level authorization, explicit provenance for sensitive-source-to-external-sink flows, and LLM audit as a supplemental signal rather than the security root.
-- Existing `research/ideas.md` appropriately calls these contribution candidates, not proven novelty. Preserve that caution.
-- `research/papers.md` says its search cutoff is July 2026. Recheck newer work and verify publication status from official proceedings; distinguish peer-reviewed papers, workshops, and preprints.
-- Relevant research files include `research/papers.md`, `research/ours.md`, `research/ideas.md`, `research/Contrast.md`, and the ACE/IPIGuard/IntentGuard analysis notes.
+- Existing `research/ideas.md` calls contribution candidates hypotheses, not proven novelty. Preserve that caution.
+- Current implementation status is recorded in `research/paper/implementation_status.md`; do not infer parameter-level provenance or I2 coverage from P0 code.
+- Relevant research files include `research/technical_route.md`, `research/paper/implementation_status.md`, `research/paper/Paper_TODO.md`, `research/papers.md`, `research/ideas.md`, `research/contrast.md`, and `research/related_papers.md`.
 
-## Next Requested Deliverable
+## Current Engineering Queue
 
-When the project is mounted and writable, create a document under the existing project `research/` directory that fixes:
+The active queue is defined only by [`../research/technical_route.md`](../research/technical_route.md). As of `route-2026-09-30`, `E0-HARNESS-AUDIT` and `I3-P0-STRESS` are ready; `I2-FIXTURE` and `I2-PILOT` remain locked until the harness audit and research-side decision pass. The old field-level provenance/source-to-sink proposal is closed as `No-Go` and must not be revived under a new name.
 
-1. A paper comparison matrix: threat model, enforcement point, authorization granularity, provenance/data-flow model, refusal granularity, utility treatment, benchmark, and overlap/gap relative to DSCG. Include AgentDojo, InjecAgent, Adaptive Attacks, ACE, IPIGuard, MELON, SecFid, SkillGuard, ActGov, Ajar, and relevant detection baselines. Mark uncertain venue/status for verification.
-2. A minimal staged experiment protocol that separates a cheap pilot from paper-grade evaluation. Include threat model, paired benign/attack cases, baselines/ablations, metrics, repeat policy, statistical analysis, cost controls, and explicit go/no-go criteria.
-3. A reading sequence ordered by research decisions: benchmark/threat model first, nearest novelty overlaps next, evaluation/fidelity next, then mechanism and attack baselines.
-
-Recommended candidate mechanism to test, without claiming it is novel yet: preserve field-level source/derivation labels through explicit transformations; distinguish content fields from authority-bearing fields; enforce at the sink; block only the affected field/action where possible; mark uncertain lineage as `unknown`, not as proven taint. The decisive comparison is whether this improves utility at a matched security level over coarse blocking, not merely whether it adds logs or reduces ASR by rejecting more tasks.
-
-Suggested experiment arms: no defense; current DSCG P0.5; deterministic parameter contract without provenance; proposed provenance-aware field-level enforcement; coarse high-risk/untrusted-action denial as a conservative upper-bound baseline. Add reproducible ACE/IPIGuard comparisons if feasible. Use paired tasks across all four AgentDojo suites for confirmatory results; a small representative pilot is for debugging only and must not support paper claims.
-
-Track task-level attack success and utility separately from action-level unauthorized side effects. Also measure benign utility, utility under attack, false refusals, unnecessary open privileges, provenance coverage/unknown rate, latency, token/API cost, and recovery attempts. Use task-paired statistics and confidence intervals; pre-register task selection and decision thresholds before the confirmatory run.
+For each ready task, keep the implementation change in `DSCG/`, run the stated checks, and append one evidence record to [`../research/paper/implementation_status.md`](../research/paper/implementation_status.md). A task report must include the exact command, exit code, code revision, working-tree state, artifact paths/hashes, sample denominators, limitations, and one next action. Research-side files are edited only in `research/`.
 
 ## Working Rules
 
@@ -43,8 +31,8 @@ Track task-level attack success and utility separately from action-level unautho
 - Do not treat capability-graph components, audit logs, or execution tickets alone as the paper's novel algorithm.
 - Keep the first study to text-based, single-agent tool use and external-content-to-tool-action flows. Defer multimodal, multi-agent, MCP, and online learning extensions.
 - Preserve existing project changes. Do not overwrite result data or local model/tool credentials.
-- Once writing is authorized, use the existing project files as the source of truth and update only the requested research document unless the user asks for broader edits.
+- Do not edit paper plans from `DSCG/`; use `research/technical_route.md` for incoming work and `research/paper/implementation_status.md` for outgoing status.
 
 ## Session Handoff
 
-This handoff file is located at `/private/tmp/AGENTS.md`, not inside the repository. In the next conversation, first verify that the active workspace is `/Users/luo/Desktop/AgentDefence` and that `research/` is writable. If not, report the exact mount/permission state before writing anywhere else.
+At the start of a new session, verify that the workspace is `/Users/luo/Desktop/AgentDefence`, read `research/technical_route.md`, and inspect `research/paper/implementation_status.md` before making research-driven changes. Do not infer a paper claim from code or a smoke benchmark. Keep the two repositories independently reviewable and do not merge them into a new nested checkout.

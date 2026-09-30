@@ -88,6 +88,7 @@ def main(
     run_name: str | None = None,
     trace_level: str = "summary",
     tool_metadata_path: str | Path | None = None,
+    results_dir: str | Path | None = None,
 ):
     """
         model_id: 执行的llm的id
@@ -102,7 +103,7 @@ def main(
 
     attack_name = "important_instructions"  # 使用 AgentDojo 预定义的注入攻击
     tool_metadata = load_tool_metadata(tool_metadata_path)
-    logdir = RESULTS_DIR / "partial_benchmark"
+    logdir = Path(results_dir) if results_dir is not None else RESULTS_DIR / "partial_benchmark"
     logdir.mkdir(parents=True, exist_ok=True)
     report_sources: list[tuple[str, Path]] = []
     output_dir: Path | None = None
@@ -369,7 +370,7 @@ if __name__ == "__main__":
         "--name",
         dest="run_name",
         metavar="NAME",
-        help="本次优化/消融实验名称；结果保存为 results/partial_benchmark/<model_id>_<NAME>/。",
+        help="本次运行名称；结果保存于 --results-dir 指定目录下的 <model_id>_<NAME>/。",
     )
     parser.add_argument(
         "--trace-level",
@@ -389,6 +390,17 @@ if __name__ == "__main__":
         default=os.getenv("DSCG_TOOL_METADATA"),
         help="显式工具风险元数据 TOML；缺省时未分类工具按 critical 处理。",
     )
+    parser.add_argument(
+        "--model-config",
+        dest="config_path",
+        metavar="PATH",
+        help="模型配置 TOML；缺省使用 config/models.local.toml。",
+    )
+    parser.add_argument(
+        "--results-dir",
+        metavar="DIR",
+        help="结果根目录；缺省使用 results/partial_benchmark/。",
+    )
     args = parser.parse_args()
 
     try:
@@ -405,6 +417,8 @@ if __name__ == "__main__":
             run_name=args.run_name,
             trace_level="full" if args.include_extra_info else args.trace_level,
             tool_metadata_path=args.tool_metadata_path,
+            config_path=args.config_path,
+            results_dir=args.results_dir,
         )
     except (ModelConfigurationError, ToolMetadataError) as exc:
         print(f"模型配置错误: {exc}")

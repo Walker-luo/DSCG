@@ -20,7 +20,7 @@ DSCG 将 Agent 的“理解任务、提出动作、审计风险、执行工具�
 
 这样可以避免模型同时扮演“动作提出者”和“权限授予者”，也避免安全检查器、重试逻辑或并发路径绕过执行检查。
 
-![DSCG 框架流程示意](./research/figures/流程框架图.png)
+![DSCG 框架流程示意](../../research/figures/流程框架图.png)
 
 图 1　DSCG 的 Agent—工具交互流程示意。图中组件名称是框架演进前的概念图，当前实现进一步加入了授权契约、Reference Monitor、执行票据和 ActionLedger。
 

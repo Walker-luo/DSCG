@@ -2,9 +2,9 @@
 
 DSCG 是一个面向 LLM Agent 间接提示词注入（Indirect Prompt Injection, IPI）的实验性防御框架。当前实现组合了动态工具权限、执行前拦截、动作历史和独立安全模型审计，并基于 AgentDojo 评估任务可用性、攻击成功率与运行开销。
 
-> 当前代码属于研究原型。已知安全边界和后续论文路线见 [TODO.md](./TODO.md)。
+> 当前代码属于研究原型。工程实现路线见 [System_TODO.md](./System_TODO.md)；论文研究和实验协议统一见项目根目录的 [`research/`](../research/)。
 
-对外介绍可直接使用：[DSCG 项目简介（Word）](./docs/DSCG项目介绍.docx) 或 [PDF 版](./docs/DSCG项目介绍.pdf)；可编辑文本源见 [`docs/DSCG项目介绍.md`](./docs/DSCG项目介绍.md)。
+对外介绍可直接使用：[DSCG 项目简介（Word）](./docs/DSCG项目介绍.docx)；可编辑文本源见 [`docs/DSCG项目介绍.md`](./docs/DSCG项目介绍.md)。
 
 ## 项目结构
 
@@ -22,16 +22,18 @@ DSCG/
 │   └── plots/              # 论文与实验绘图脚本
 ├── dashboard/              # Flask 可视化评测面板
 ├── docs/
-│   ├── research/           # 论文阅读、方案分析与框架设计
-│   ├── figures/            # 文档及论文图表
-│   └── notes/              # 临时研究笔记
+│   ├── figures/            # 工程文档和实验图表
+│   └── notes/              # 工程临时笔记
+├── RESEARCH_STATUS.md      # 发给/回传 research 的交互入口
 ├── examples/results/       # 纳入版本控制的示例实验结果
 ├── assets/fonts/           # 绘图字体等静态资源
 ├── archive/                # 旧版框架，仅用于历史对照
 ├── results/                # 运行时生成，不纳入版本控制
 ├── environment.yml
-└── TODO.md
+└── System_TODO.md
 ```
+
+论文相关文件不在 `DSCG/` 维护。研究侧的技术路线由 [`../research/technical_route.md`](../research/technical_route.md) 下发，工程完成情况按 [`../research/paper/implementation_status.md`](../research/paper/implementation_status.md) 回报；历史入口 [`Paper_TODO.md`](./Paper_TODO.md) 只保留迁移指针。
 
 ### 主要防御模块与协作
 
@@ -266,7 +268,7 @@ pipeline, tracker = make_openai_compatible_pipeline(
 
 未知工具、单次请求超时、拒答、非法 JSON、非完整响应和策略更新错误都不会回退到旧权限。一个批次中如果同时出现合法和越权动作，当前实现逐动作裁剪并保留合法动作；如果全部动作被阻断，则停止当前批次，不在沙箱内部自动重试。安全检查器生成的替换动作在真实工具执行前还会再次经过沙箱。SDK 重试导致的总墙钟时间上限尚未统一纳入预算。
 
-这些保证是工具级的研究基线，不是完整安全证明：P0.2、P0.3、P0.4、P0.5 的授权、执行、审计和工具风险元数据改造已完成（见下文），P1 的参数级授权和 P2 的 provenance 约束仍待完成，详见 [`TODO.md`](./TODO.md)。离线验证不需要 API Key，可在项目根目录运行：
+这些保证是工具级的研究基线，不是完整安全证明：P0.2、P0.3、P0.4、P0.5 的授权、执行、审计和工具风险元数据改造已完成（见下文），P1 的参数级授权和 P2 的 provenance 约束仍待研究侧路线解锁，详见 [`System_TODO.md`](./System_TODO.md)。离线验证不需要 API Key，可在项目根目录运行：
 
 ```bash
 conda run -n ipi python -m unittest discover -s tests -v
@@ -514,10 +516,12 @@ Workspace 消融实验的历史记录：
 
 当前实验环境曾对 AgentDojo 的 OpenAI LLM 适配层做过本地调整，以处理部分模型将 `system` message 转换为 `developer` message 的行为。重新创建环境时，应检查当前 AgentDojo 版本的消息角色兼容性，不要依赖旧机器上的绝对环境路径。
 
-## 研究资料
+## 研究交互
 
-- 框架设计草稿：[docs/research/ours.md](./docs/research/ours.md)
-- IPIGuard 分析：[docs/research/IPIGuard_分析.md](./docs/research/IPIGuard_分析.md)
-- IntentGuard 分析：[docs/research/IntentGuard_分析.md](./docs/research/IntentGuard_分析.md)
-- ACE 分析：[docs/research/ACE_分析.md](./docs/research/ACE_分析.md)
-- 论文清单：[docs/research/papers.md](./docs/research/papers.md)
+论文问题、文献分析、创新点和实验协议统一维护在 [`../research/`](../research/)。
+
+- 研究侧技术路线：[`../research/technical_route.md`](../research/technical_route.md)
+- 工程侧实现回报：[`../research/paper/implementation_status.md`](../research/paper/implementation_status.md)
+- 本仓库交互说明：[`RESEARCH_STATUS.md`](./RESEARCH_STATUS.md)
+
+`docs/` 只保留工程说明、图表和临时笔记；不再作为论文研究资料目录。

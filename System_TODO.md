@@ -1,8 +1,9 @@
-# DSCG 防御框架优化与论文路线
+# DSCG 防御框架优化与工程实现路线
 
 > 目标：将当前的“动态工具白名单 + 状态化 LLM 审计”原型，升级为一个以确定性执行约束为安全根、兼顾可用性与开销的间接提示词注入（IPI）防御框架。
 >
-> 论文主线候选：**Provenance-aware Dynamic Capability Graph**（面向数据来源的动态能力图）。
+> 论文研究、文献矩阵和 Go/No-Go 判断统一在 [`../research/`](../research/) 维护。本文件只记录工程实现任务；研究侧解锁的技术路线见 [`../research/technical_route.md`](../research/technical_route.md)，完成后的状态回报见 [`../research/paper/implementation_status.md`](../research/paper/implementation_status.md)。
+> 旧论文主线候选：**Provenance-aware Dynamic Capability Graph**（面向数据来源的动态能力图），因与 ROPE 等工作高度重合已暂停，不再作为默认实施路线。
 >
 > 执行原则：先把“任何动作都必须经过同一个策略入口”做成可测试的不变量，再增加 provenance、委托和模型检测。每个新模块都必须有独立消融、失败行为和开销记录，不能只用更低的 ASR 证明防御有效。
 
@@ -243,18 +244,21 @@ reversible: true | false
 - Dashboard 的实验配置新增工具元数据路径字段；页面只传递项目内 TOML 路径，不回显元数据内容。
 - 新增 P0.5 元数据 schema、TOML 加载、sink 风险、共享目录投影、未知工具高风险记录、缺失/非法分类和风险降级测试；当前离线测试共 58 项通过。
 - 新增四场景工具目录与离线生成器 [`experiments/generate_tool_metadata.py`](./experiments/generate_tool_metadata.py)：校验当前 AgentDojo 版本、注册工具覆盖率和字段格式后，生成本地 `config/tools.local.toml`；生成及缺失配置的回归测试通过，当前离线测试共 61 项。
-- P0.5 Utility 修正：同一可信用户轮次复用授权契约，避免重复意图编译导致 `POLICY_ERROR`；`read + sink=none` 的敏感读取仍保留审计记录，但不会因读取源本身被 `AUDIT_DENY` 阻断，外发和写入动作仍须通过原有安全策略。新增回归后离线测试共 64 项。
+- P0.5 Utility 修正：同一可信用户轮次复用授权契约，避免重复意图编译导致 `POLICY_ERROR`；`read + sink=none` 的敏感读取仍保留审计记录，但不会因读取源本身被 `AUDIT_DENY` 阻断，外发和写入动作仍须通过原有安全策略。当前离线回归共 68 项通过；其中包括历史分析页面契约标识的兼容回归。
 
 ### P0 DoD（完成定义）
 
-- [ ] 通过空策略、未知工具、异常解析、超时、重试、并发和批次裁剪测试。
-- [ ] 能从事件账本证明每个真实工具调用都先产生了唯一的 `allow` 决策。
-- [ ] 在不接入真实模型的 mock runtime 中，安全路径和阻断路径都可重复运行。
-- [ ] 重新运行一次当前 baseline，确认 P0 改动没有悄悄改变对照组的配置和指标定义。
+- [x] 通过空策略、未知工具、异常解析、超时、重试、并发和批次裁剪测试。
+- [x] 能从事件账本证明每个真实工具调用都先产生了唯一的 `allow` 决策。
+- [x] 在不接入真实模型的 mock runtime 中，安全路径和阻断路径都可重复运行。
+- [x] 重新运行一次当前 P0.5 小批量 baseline，核对结果格式、分母和 token 字段；研究侧 [`../research/paper/baseline_review.md`](../research/paper/baseline_review.md) 记录了 16 条攻击结果、8 条预检及与旧运行的差异。
+- [ ] 固定旧/新运行的完整配置、代码状态与随机性后，再判定 P0 改动是否改变对照组指标；旧运行缺少完整元数据，不能从两次小样本分数差异直接归因。
 
 ---
 
-## P1：实现参数级 Task Contract
+## P1：参数级机制（等待研究侧解锁）
+
+> 以下条目保留为工程设计草稿，不是当前执行任务。只有 [`../research/technical_route.md`](../research/technical_route.md) 将对应任务标为 `ready` 后才可以实现；研究侧未通过 `P0-ALT-SELECT` 前，旧 provenance/source-to-sink 路线保持锁定。
 
 工具级白名单只能回答“能否调用 `send_email`”，无法回答“能发给谁、发什么、发几次”。需要在读取不可信数据前，从原始用户请求生成不可变的任务契约。
 
@@ -322,7 +326,7 @@ allow_untrusted_instruction_expansion: false
 
 ---
 
-## P2：实现 Provenance 与信息流约束
+## P2：数据来源约束（等待研究侧解锁）
 
 **实现边界**：第一版只做显式数据依赖和可解释的 source-to-sink 规则。控制流、隐式流和模型内部状态先作为 `unknown` 记录，不能假装已经完成精确污点分析。
 
@@ -502,65 +506,11 @@ allow_untrusted_instruction_expansion: false
 
 ---
 
-## P5：论文设计
+## P5：论文研究已迁移
 
-### P5.1 建议研究问题
+论文问题、创新点、文献矩阵、实验协议、投稿条件和 Go/No-Go 判断统一维护在 [`../research/`](../research/)。本文件不再复制论文主线，也不解锁旧 provenance、Task Contract 或 source-to-sink 方向。
 
-- RQ1：参数级动态能力约束能否比工具级白名单显著降低 IPI 的 ASR？
-- RQ2：provenance-aware source-to-sink 策略能否防御同工具参数劫持和多阶段攻击？
-- RQ3：单调能力图能否在安全性、任务效用和运行开销之间取得更好的平衡？
-- RQ4：LLM 审计从安全根降级为辅助信号后，是否仍能提升对语义越权的覆盖率？
-- RQ5：Delegation Envelope 能否处理合法的“按外部文档指令执行”任务？
-- RQ6：在自适应攻击、提示模板变形和模型/provider 更换后，防御收益是否仍然稳定？
-- RQ7：哪些失败来自授权粒度、数据来源不确定性、模型误判或执行器故障，能否由事件账本准确归因？
-
-### P5.2 可能的贡献点
-
-1. **动态参数级能力图**：把用户意图编译成随任务状态推进、但不能被不可信观察扩大的能力边界。
-2. **面向 Agent 动作参数的 provenance 约束**：追踪外部数据如何影响工具参数，并在危险 sink 前强制执行策略。
-3. **完整仲裁的弹性执行循环**：所有正常、并发和恢复动作都经过相同检查，同时通过安全裁剪保持 utility。
-4. **有界外部委托模型**：允许用户授予外部资源有限指令权，解决全拒绝与全信任之间的冲突。
-5. **可复现的安全—效用—成本评测协议**：将 ASR、任务效用、误拒绝、延迟、token/费用和失败归因放在同一实验协议中。
-
-创新性最终需要通过系统文献检索确认。在实现完成前避免使用“首次”“彻底解决”“唯一信任源”等绝对表述。
-
-### P5.3 基线与对比对象
-
-- AgentDojo 原生无防御与内置防御；
-- Tool Filter / Prompt Injection Detector；
-- Spotlighting / Delimiting / Repeat User Prompt；
-- IPIGuard：重点比较固定 TDG 与动态单调能力图；
-- IntentGuard：重点比较推理痕迹检测与执行层强制约束；
-- ACE：重点比较重型 IFC/隔离与轻量运行时 provenance enforcement。
-
-### P5.4 论文成立的最低条件
-
-- [ ] P0 的完整仲裁和 fail-closed 测试全部通过。
-- [ ] 至少实现 Task Contract、参数级 Reference Monitor 和显式 provenance。
-- [ ] 在完整或有代表性的多领域基准上显著降低 ASR。
-- [ ] 相比强基线没有不可接受的 benign utility 下降。
-- [ ] 对多阶段、同工具参数劫持和审计器注入给出专项结果。
-- [ ] 所有主要结论附带样本数、方差或置信区间。
-- [ ] 代码、配置、攻击样本和原始结果能够复现。
-- [ ] 至少一个强基线在安全、效用和成本的 Pareto 比较中有清晰位置；不能只挑单一指标最优方案。
-- [ ] 至少报告一个负结果或已知失效边界，并给出可复现样例。
-- [ ] 论文中的每个组件都能通过消融证明作用，删除组件后不能只是改变日志格式。
-
-### P5.5 论文叙事建议
-
-建议将论文组织为一条清晰因果链：
-
-```text
-IPI 让不可信数据影响动作
-        -> 工具级白名单无法约束参数和数据流
-        -> Task Contract 固定授权上界
-        -> Capability Graph 表示任务状态和单调权限
-        -> Provenance ledger 连接 source 到 sink
-        -> Reference Monitor 在唯一入口执行判决
-        -> LLM 审计只补充语义告警，失败时仍 fail-closed
-```
-
-论文实验按同一链条安排：先验证安全不变量，再验证单组件增益，最后验证完整系统的安全—效用—成本 Pareto 前沿。把“检测到了注入”与“阻止了危险动作”分开报告；后者才是 DSCG 的系统安全结果。
+工程侧只接收研究侧已经解锁的任务：[`../research/technical_route.md`](../research/technical_route.md)。完成后按 [`../research/paper/implementation_status.md`](../research/paper/implementation_status.md) 回报代码、测试、运行结果和阻塞原因。当前 `P0-ALT-SELECT` 尚未解锁新的论文机制。
 
 ---
 
@@ -573,26 +523,23 @@ IPI 让不可信数据影响动作
 - 建立工具元数据与策略单元测试。
 - 产出：`reference_monitor`、工具注册表、事件 schema、P0 回归报告。
 
-### 里程碑 M2：核心论文机制
+### 里程碑 M2：研究路线任务
 
-- 完成 Task Contract；
-- 完成参数级 Capability Graph；
-- 完成确定性 Reference Monitor。
-- 产出：Contract schema/编译器、参数策略样例、合法/越权对照集。
+- 只执行 [`../research/technical_route.md`](../research/technical_route.md) 中状态为 `ready` 的任务；
+- 每项任务先写实现计划，再补代码、测试和运行证据；
+- 产出：对应任务的代码 diff、测试输出和 [`../research/paper/implementation_status.md`](../research/paper/implementation_status.md) 回报。
 
-### 里程碑 M3：复杂攻击防御
+### 里程碑 M3：候选机制实现
 
-- 完成 provenance ledger；
-- 完成 source-to-sink 策略；
-- 完成 Delegation Envelope 和用户确认。
-- 产出：可重放事件账本、流规则、委托与确认测试集。
+- 只有研究侧将任务从 `locked` 改为 `ready` 后，才实现 I2 或其他候选机制；
+- 研究假设、基线和主要指标由 `research/` 定义，DSCG 只提供可复现实验入口；
+- 产出：版本化配置、离线 fixture、环境状态和原始结果路径。
 
-### 里程碑 M4：系统实验与论文
+### 里程碑 M4：工程复现支持
 
-- 固化攻击矩阵和回归样本；
-- 运行主实验、消融实验和开销实验；
-- 根据实验结果收缩论文 claim，整理威胁模型、算法和局限性。
-- 产出：版本化实验配置、原始轨迹、统计表、图表生成命令和复现说明。
+- 提供一条命令运行已冻结的研究实验；
+- 保存 manifest、代码 commit、环境版本、有效分母、失败状态和结果哈希；
+- 论文图表、统计解释和投稿判断回到 `research/`，不在 DSCG 复制。
 
 ## 暂不优先
 
