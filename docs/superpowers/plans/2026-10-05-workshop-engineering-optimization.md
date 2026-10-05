@@ -24,7 +24,7 @@
 ## Completion Ledger
 
 - [x] Create `workshop` from `master`.
-- [ ] Baseline gate recorded on `workshop`.
+- [x] Baseline gate recorded on `workshop`.
 - [ ] Compact sample-record schema and serializer implemented.
 - [ ] Deterministic task selection and passive harness metadata implemented.
 - [ ] Benchmark, partial runner, and dashboard consume compact records without changing P0 execution.
@@ -64,7 +64,7 @@
 
   Result: `conda run -n ipi python -m unittest discover -s tests -q` passed 68 tests under Python 3.10.21. The system Python 3.14.6 run was not used because project dependencies were unavailable there.
 
-- [ ] **Step 3: Commit the plan and baseline record**
+- [x] **Step 3: Commit the plan and baseline record**
 
   Run:
 
