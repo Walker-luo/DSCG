@@ -25,7 +25,7 @@
 
 - [x] Create `workshop` from `master`.
 - [x] Baseline gate recorded on `workshop`.
-- [ ] Compact sample-record schema and serializer implemented.
+- [x] Compact sample-record schema and serializer implemented.
 - [ ] Deterministic task selection and passive harness metadata implemented.
 - [ ] Benchmark, partial runner, and dashboard expose compact harness summaries without changing native AgentDojo cache JSON or P0 execution.
 - [ ] E0 offline replay/oracle audit passes.
@@ -83,11 +83,11 @@
 - Consumes: run identifiers, suite/task identifiers, payload delivery evidence, existing utility/security outputs, and compact action counters.
 - Produces: `SampleStatus`, `SampleRecord`, `RunRecord`, `compact_dict()`, and `full_dict()` used by runners and offline replay.
 
-- [ ] **Step 1: Write failing tests for valid and non-valid records**
+- [x] **Step 1: Write failing tests for valid and non-valid records**
 
   Cover accepted statuses `valid`, `model_error`, `policy_error`, `tool_error`, `timeout`, `infrastructure_error`, and `skipped`; reject unknown statuses; preserve missing security results as non-valid instead of `False`.
 
-- [ ] **Step 2: Run the focused tests and verify failure**
+- [x] **Step 2: Run the focused tests and verify failure**
 
   Run:
 
@@ -97,15 +97,15 @@
 
   Expected: failure because the record module is not present yet.
 
-- [ ] **Step 3: Implement the minimal compact record model**
+- [x] **Step 3: Implement the minimal compact record model**
 
   `SampleRecord.compact_dict()` must contain only IDs, `sample_status`, `error_type`, payload delivery status, one `payload_hash`, predicate result, utility result, action counts, and a bounded final-state summary. It must not include raw prompts, complete tool arguments, or complete environment objects. This projection is written to a separate harness summary; native AgentDojo cache JSON is not rewritten.
 
-- [ ] **Step 4: Add explicit opt-in full serialization**
+- [x] **Step 4: Add explicit opt-in full serialization**
 
   `SampleRecord.full_dict()` may include bounded candidate/action details but must not add new per-field hashes. The full serializer is only for the existing `full` trace path and is never used by dashboard summary aggregation.
 
-- [ ] **Step 5: Run focused tests and commit**
+- [x] **Step 5: Run focused tests and commit**
 
   Run:
 
@@ -121,6 +121,8 @@
   git add dscg/harness_records.py tests/test_harness_records.py
   git commit -m "feat: add compact harness sample records"
   ```
+
+  Result: focused harness-record tests passed (7 tests); complete regression passed (75 tests) under Python 3.10.21 in `conda -n ipi`; commit `b99b52d`.
 
 ### Task 3: Make selection and replay metadata deterministic
 
