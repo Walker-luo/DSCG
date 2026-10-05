@@ -115,3 +115,6 @@ reproducibility:
   metadata_required: [git_commit, environment, model, provider, suite, task_ids, attack, defense, seed, budget, trace_level, start_time, end_time]
   artifacts_required: [candidate_actions, normalized_arguments, contract_version, policy_input, raw_trace, aggregation_script]
   force_rerun_required: true
+  harness_bookkeeping_hashes: [manifest_hash_per_run, payload_hash_per_sample, final_artifact_hash]
+  native_task_json_cache: retain_messages_field
+  compact_summary_default: true

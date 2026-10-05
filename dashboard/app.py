@@ -29,6 +29,7 @@ from dscg.paths import DASHBOARD_RESULTS_DIR, RESULTS_DIR
 from dscg.pipelines.baseline import make_openai_compatible_pipeline
 from dscg.pipelines.defended import make_defended_pipeline
 from dscg.tool_metadata import load_tool_metadata
+from experiments.harness_audit import rank_ids, security_result_fields
 
 app = Flask(__name__)
 app.secret_key = "newframe_dashboard_2024"
@@ -215,6 +216,7 @@ def run_test_thread(run_id: str, config: dict):
         use_security_checker = config.get("use_security_checker", True)
         max_user_tasks = config.get("max_user_tasks", 0)   # 0 = all
         max_injection_tasks = config.get("max_injection_tasks", 0)
+        selection_seed = int(config.get("selection_seed", 20260927))
         tool_metadata_path = config.get("tool_metadata_path") or None
         tool_metadata = load_tool_metadata(tool_metadata_path)
         if tool_metadata_path:
@@ -296,12 +298,14 @@ def run_test_thread(run_id: str, config: dict):
 
                 # ---- 选择任务子集 ----
                 if max_user_tasks > 0 and max_user_tasks < len(user_task_ids):
-                    selected_users = user_task_ids[:max_user_tasks]
+                    selected_users = rank_ids(user_task_ids, selection_seed, limit=max_user_tasks)
                 else:
                     selected_users = user_task_ids
 
                 if max_injection_tasks > 0 and max_injection_tasks < len(injection_task_ids):
-                    selected_injections = injection_task_ids[:max_injection_tasks]
+                    selected_injections = rank_ids(
+                        injection_task_ids, selection_seed, limit=max_injection_tasks
+                    )
                 else:
                     selected_injections = injection_task_ids
 
@@ -344,8 +348,9 @@ def run_test_thread(run_id: str, config: dict):
                 for task_key, util_status in utility_results.items():
                     user_task_id = task_key[0]
                     injection_task_id = task_key[1] if len(task_key) > 1 else "None"
-                    attack_success = security_results.get(task_key, False) if run_attack else None
-                    defense_success = not attack_success if run_attack else None
+                    attack_success, defense_success, sample_status = security_result_fields(
+                        security_results, task_key, run_attack=run_attack
+                    )
 
                     all_structured_records.append({
                         "suite_name": suite_name,
@@ -355,7 +360,8 @@ def run_test_thread(run_id: str, config: dict):
                         "injection_task_id": injection_task_id,
                         "utility_success": bool(util_status),
                         "attack_success": attack_success,
-                        "defense_success": defense_success
+                        "defense_success": defense_success,
+                        "sample_status": sample_status,
                     })
 
                 # 指标计算
@@ -363,9 +369,14 @@ def run_test_thread(run_id: str, config: dict):
                     sum(utility_results.values()) / len(utility_results)
                     if utility_results else 0
                 )
+                valid_security_results = [
+                    security_results[task_key]
+                    for task_key in utility_results
+                    if task_key in security_results and isinstance(security_results[task_key], bool)
+                ]
                 security_score = (
-                    sum(security_results.values()) / len(security_results)
-                    if run_attack and security_results else 0
+                    sum(valid_security_results) / len(valid_security_results)
+                    if run_attack and valid_security_results else 0
                 )
                 defense_score = 1.0 - security_score if run_attack else 1.0
 
@@ -385,6 +396,9 @@ def run_test_thread(run_id: str, config: dict):
                         "total_tasks": len(utility_results),
                         "utility_passed": int(sum(utility_results.values())),
                         "attacked_tasks": len(security_results),
+                        "security_missing": sum(
+                            task_key not in security_results for task_key in utility_results
+                        ) if run_attack else 0,
                     },
                     "overhead": {
                         "prompt_tokens": prompt_tokens,

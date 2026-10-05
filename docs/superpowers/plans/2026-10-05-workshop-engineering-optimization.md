@@ -26,10 +26,10 @@
 - [x] Create `workshop` from `master`.
 - [x] Baseline gate recorded on `workshop`.
 - [x] Compact sample-record schema and serializer implemented.
-- [ ] Deterministic task selection and passive harness metadata implemented.
-- [ ] Benchmark, partial runner, and dashboard expose compact harness summaries without changing native AgentDojo cache JSON or P0 execution.
-- [ ] E0 offline replay/oracle audit passes.
-- [ ] I3 P0 recovery stress fixture passes or produces a route-compliant `no_go`.
+- [x] Deterministic task selection and passive harness metadata implemented.
+- [x] Benchmark, partial runner, and dashboard expose compact harness summaries without changing native AgentDojo cache JSON or P0 execution.
+- [x] E0 offline replay/oracle audit passes.
+- [x] I3 P0 recovery stress fixture passes or produces a route-compliant `no_go`.
 - [ ] Research implementation status updated with commands, exit codes, commit, working-tree state, artifacts, denominators, limitations, and next action.
 - [ ] Final verification passes and all implementation commits are on `workshop`.
 
@@ -136,11 +136,11 @@
 - Consumes: suite task IDs, fixed seed, attack name, and compact sample records.
 - Produces: deterministic SHA-256-ranked task IDs, one run-level manifest hash, payload delivery checks, valid/error denominator counts, and an independent predicate replay result.
 
-- [ ] **Step 1: Write failing selector and denominator tests**
+- [x] **Step 1: Write failing selector and denominator tests**
 
   Verify the same seed and IDs produce the same ordered selection; verify changed IDs change the manifest hash; verify unavailable tasks and attacks are retained with a status; verify a missing security result is never classified as a safe attack result.
 
-- [ ] **Step 2: Run the focused tests and verify failure**
+- [x] **Step 2: Run the focused tests and verify failure**
 
   Run:
 
@@ -150,15 +150,15 @@
 
   Expected: failure before the helper functions exist.
 
-- [ ] **Step 3: Implement deterministic selection and one-time hashes**
+- [x] **Step 3: Implement deterministic selection and one-time hashes**
 
   Use the protocol seed and canonical sorted task IDs for selection. Hash the canonical manifest once per run and the delivered payload once per sample. Do not hash each normalized argument, event, or environment field.
 
-- [ ] **Step 4: Implement replay and status classification**
+- [x] **Step 4: Implement replay and status classification**
 
   Replay the attack predicate from the captured final-state summary/oracle input. Return `valid` only when payload delivery, trace reconstruction, predicate replay, and task result are all available; otherwise return the specific error status.
 
-- [ ] **Step 5: Run focused tests and commit**
+- [x] **Step 5: Run focused tests and commit**
 
   Run:
 
@@ -189,11 +189,11 @@
 - Consumes: existing AgentDojo results and `SampleRecord` helpers.
 - Produces: compact per-task JSON/CSV summaries, separate non-valid counters, optional compressed full sidecars, and unchanged P0 pipeline calls.
 
-- [ ] **Step 1: Write regression tests for compact output and missing security results**
+- [x] **Step 1: Write regression tests for compact output and missing security results**
 
   Assert that new harness summary output omits raw prompts and complete action arrays, that native AgentDojo cache JSON remains compatible, that `full` mode remains opt-in, and that missing `security_results[task_key]` yields `infrastructure_error` rather than `attack_success=False`.
 
-- [ ] **Step 2: Run dashboard and runner-focused tests and verify failure**
+- [x] **Step 2: Run dashboard and runner-focused tests and verify failure**
 
   Run:
 
@@ -203,15 +203,15 @@
 
   Expected: new assertions fail before integration changes.
 
-- [ ] **Step 3: Add passive record collection**
+- [x] **Step 3: Add passive record collection**
 
   Keep the existing `make_defended_pipeline`, benchmark calls, authorization, audit, and ticket flow unchanged. Build records after each task result is available and write only the compact projection by default.
 
-- [ ] **Step 4: Preserve optional full traces and dashboard laziness**
+- [x] **Step 4: Preserve optional full traces and dashboard laziness**
 
   Reuse the existing `summary`/`standard`/`full` levels. Write full records only to the existing compressed sidecar mechanism and keep dashboard history/summary endpoints on compact files.
 
-- [ ] **Step 5: Run focused tests and commit**
+- [x] **Step 5: Run focused tests and commit**
 
   Run:
 
@@ -239,15 +239,15 @@
 - Consumes: deterministic task selection, synthetic payload delivery cases, compact records, and the existing trace summary contract.
 - Produces: an offline E0 report containing payload delivery, predicate replay, valid/non-valid denominators, and a single manifest hash.
 
-- [ ] **Step 1: Add synthetic fixture cases**
+- [x] **Step 1: Add synthetic fixture cases**
 
   Include delivered payload, undelivered payload, missing security result, replayable final state, incomplete trace, and tool/policy/model error cases. Keep fixture contents short and non-sensitive.
 
-- [ ] **Step 2: Add replay tests**
+- [x] **Step 2: Add replay tests**
 
   Assert that the independent oracle agrees with the stored predicate for valid cases and rejects incomplete or inconsistent cases.
 
-- [ ] **Step 3: Run the offline E0 command**
+- [x] **Step 3: Run the offline E0 command**
 
   Run:
 
@@ -257,7 +257,7 @@
 
   Expected: exit code 0, explicit valid/error/skipped counts, and no raw prompt or full environment object in the default report.
 
-- [ ] **Step 4: Run the complete offline suite and commit**
+- [x] **Step 4: Run the complete offline suite and commit**
 
   Run:
 
@@ -284,11 +284,11 @@
 - Consumes: existing `PermissionSandbox`, `ReferenceMonitor`, `ExecutionTicket`, `TicketedToolsExecutor`, and mock tool runtime.
 - Produces: per-fixture compact records and a route-compliant `pass` or `no_go` report; no new authorization mechanism.
 
-- [ ] **Step 1: Write fixtures for the eight required recovery paths**
+- [x] **Step 1: Write fixtures for the eight required recovery paths**
 
   Cover normal in-scope retry, unauthorized tool request, expanded object scope, check disabling, forged administrator message, stale ticket replay, modified destination/parameter, and duplicate/concurrent submission.
 
-- [ ] **Step 2: Run the focused stress tests and verify failure**
+- [x] **Step 2: Run the focused stress tests and verify failure**
 
   Run:
 
@@ -298,11 +298,11 @@
 
   Expected: failure until the fixtures and assertions are implemented.
 
-- [ ] **Step 3: Implement the offline driver**
+- [x] **Step 3: Implement the offline driver**
 
   Feed each recovery candidate through the same monitor and ticketed executor used by P0. Assert that every retry receives a fresh decision and that stale tickets, modified calls, and concurrent duplicates cannot execute.
 
-- [ ] **Step 4: Run the I3 report command**
+- [x] **Step 4: Run the I3 report command**
 
   Run:
 
@@ -312,7 +312,7 @@
 
   Expected: exit code 0. If all unauthorized recovery paths are blocked and the in-scope retry succeeds, report `no_go` for a new mechanism as required by the route.
 
-- [ ] **Step 5: Run complete tests and commit**
+- [x] **Step 5: Run complete tests and commit**
 
   Run:
 
@@ -339,7 +339,7 @@
 - Consumes: final test outputs, current `workshop` commit, working-tree status, report paths, report hashes, and valid/non-valid denominators.
 - Produces: one E0 record, one I3 record, completed plan checkboxes, and a final verification commit on `workshop`.
 
-- [ ] **Step 1: Compute final evidence**
+- [x] **Step 1: Compute final evidence**
 
   Run:
 
@@ -353,7 +353,7 @@
 
   Include exact commands, exit codes, code revision, working-tree state, environment, changed paths, artifact paths/hashes, valid/invalid/error/skipped counts, limitations, and one next action. Do not claim improved defense rate or utility without an actual benchmark.
 
-- [ ] **Step 3: Run final verification**
+- [x] **Step 3: Run final verification**
 
   Run:
 
@@ -366,6 +366,10 @@
   Expected: all tests pass, no whitespace errors, and only intentional untracked input files remain.
 
 - [ ] **Step 4: Commit the completed plan and status**
+
+  The research-side status file is outside the DSCG-only scope, and Git commit
+  writes were blocked by the workspace permission review while creating
+  `.git/index.lock`. The verified changes remain in the `workshop` worktree.
 
   Run:
 

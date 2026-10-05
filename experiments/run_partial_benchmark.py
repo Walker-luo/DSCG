@@ -13,6 +13,7 @@ from dscg.paths import RESULTS_DIR
 from dscg.pipelines.baseline import make_openai_compatible_pipeline
 from dscg.pipelines.defended import make_defended_pipeline
 from dscg.tool_metadata import ToolMetadataError, load_tool_metadata
+from experiments.harness_audit import rank_ids, security_result_fields
 
 
 def _safe_result_component(value: str | None, fallback: str) -> str:
@@ -102,6 +103,7 @@ def main(
 
 
     attack_name = "important_instructions"  # 使用 AgentDojo 预定义的注入攻击
+    selection_seed = 20260927
     tool_metadata = load_tool_metadata(tool_metadata_path)
     logdir = Path(results_dir) if results_dir is not None else RESULTS_DIR / "partial_benchmark"
     logdir.mkdir(parents=True, exist_ok=True)
@@ -163,8 +165,8 @@ def main(
         attack = attacks.load_attack(attack_name, suite, pipeline)
 
         # Small-batch benchmark: keep the first few tasks from each suite.
-        selected_users = user_task_ids[:2]
-        selected_injections = injection_task_ids[:2]
+        selected_users = rank_ids(user_task_ids, selection_seed, limit=2)
+        selected_injections = rank_ids(injection_task_ids, selection_seed, limit=2)
 
         planned_task_count = (
             len(selected_users) * len(selected_injections)
@@ -233,8 +235,9 @@ def main(
             injection_task_id = task_key[1] if len(task_key) > 1 else "None"
             
             # AgentDojo 原生定义: True 代表执行了恶意指令(攻击成功)，False 代表安全
-            attack_success = security_results.get(task_key, False) if run_attack else None
-            defense_success = not attack_success if run_attack else None
+            attack_success, defense_success, sample_status = security_result_fields(
+                security_results, task_key, run_attack=run_attack
+            )
 
             structured_records.append({
                 "suite_name": suite_name,
@@ -244,12 +247,21 @@ def main(
                 "injection_task_id": injection_task_id,
                 "utility_success": bool(util_status),        # 是否完成用户任务
                 "attack_success": attack_success,            # 是否被黑客攻破
-                "defense_success": defense_success           # 是否防御成功 (画图常用)
+                "defense_success": defense_success,          # 是否防御成功 (画图常用)
+                "sample_status": sample_status,
             })
 
         # 3. 计算聚合得分 (Summary)
         utility_score = sum(utility_results.values()) / len(utility_results) if utility_results else 0
-        security_score = sum(security_results.values()) / len(security_results) if run_attack and security_results else 0
+        valid_security_results = [
+            security_results[task_key]
+            for task_key in utility_results
+            if task_key in security_results and isinstance(security_results[task_key], bool)
+        ]
+        security_score = (
+            sum(valid_security_results) / len(valid_security_results)
+            if run_attack and valid_security_results else 0
+        )
         defense_score = 1.0 - security_score if run_attack else 1.0
 
 
@@ -273,6 +285,9 @@ def main(
                 "total_tasks": len(utility_results),
                 "utility_passed": sum(utility_results.values()),
                 "attacked_tasks": len(security_results),
+                "security_missing": sum(
+                    task_key not in security_results for task_key in utility_results
+                ) if run_attack else 0,
                 "selected_user_tasks": len(selected_users),
                 "selected_injection_tasks": len(selected_injections),
                 "available_user_tasks": len(user_task_ids),
@@ -304,7 +319,10 @@ def main(
                 util_str = "✅ 成功 (True)" if record["utility_success"] else "❌ 失败 (False)"
                 
                 if run_attack:
-                    sec_str = "🛡️ 防御成功 (True)" if record["defense_success"] else "⚠️ 被攻破 (False)"
+                    if record["sample_status"] != "valid":
+                        sec_str = f"⚪ 无效样本 ({record['sample_status']})"
+                    else:
+                        sec_str = "🛡️ 防御成功 (True)" if record["defense_success"] else "⚠️ 被攻破 (False)"
                     f.write(f"📌 [用户任务]: {record['user_task_id']:<25} | [注入攻击]: {record['injection_task_id']:<25}\n")
                     f.write(f"   -> 功能性 (Utility): {util_str:<15} | 安全性 (Security): {sec_str}\n")
                 else:
