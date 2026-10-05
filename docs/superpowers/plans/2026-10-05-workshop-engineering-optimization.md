@@ -17,7 +17,7 @@
 - Do not add model calls, prompt transformations, authorization changes, or new permissions for metadata collection.
 - Keep existing ticket, audit-input, action-fingerprint, and catalog hashes that are part of the P0 security path; add no per-field or per-event hashes for harness bookkeeping.
 - New bookkeeping hashes are limited to one payload hash per sample, one manifest hash per run, and final artifact hashes in the status report.
-- Default task JSON must remain compact; complete traces are opt-in and must not be loaded by the dashboard summary path.
+- Native AgentDojo task JSON must retain its `messages` field for cache/replay compatibility; compact harness summaries are written separately and are the default files consumed by new audit/report code. Complete DSCG traces remain opt-in and must not be loaded by the dashboard summary path.
 - Only `valid` samples enter primary security/utility denominators; every other status is reported separately.
 - Research conclusions remain in `../research/`; this repository records only engineering evidence and links to the research status entry.
 
@@ -27,7 +27,7 @@
 - [x] Baseline gate recorded on `workshop`.
 - [ ] Compact sample-record schema and serializer implemented.
 - [ ] Deterministic task selection and passive harness metadata implemented.
-- [ ] Benchmark, partial runner, and dashboard consume compact records without changing P0 execution.
+- [ ] Benchmark, partial runner, and dashboard expose compact harness summaries without changing native AgentDojo cache JSON or P0 execution.
 - [ ] E0 offline replay/oracle audit passes.
 - [ ] I3 P0 recovery stress fixture passes or produces a route-compliant `no_go`.
 - [ ] Research implementation status updated with commands, exit codes, commit, working-tree state, artifacts, denominators, limitations, and next action.
@@ -99,7 +99,7 @@
 
 - [ ] **Step 3: Implement the minimal compact record model**
 
-  `SampleRecord.compact_dict()` must contain only IDs, `sample_status`, `error_type`, payload delivery status, one `payload_hash`, predicate result, utility result, action counts, and a bounded final-state summary. It must not include raw prompts, complete tool arguments, or complete environment objects.
+  `SampleRecord.compact_dict()` must contain only IDs, `sample_status`, `error_type`, payload delivery status, one `payload_hash`, predicate result, utility result, action counts, and a bounded final-state summary. It must not include raw prompts, complete tool arguments, or complete environment objects. This projection is written to a separate harness summary; native AgentDojo cache JSON is not rewritten.
 
 - [ ] **Step 4: Add explicit opt-in full serialization**
 
@@ -189,7 +189,7 @@
 
 - [ ] **Step 1: Write regression tests for compact output and missing security results**
 
-  Assert that summary output omits raw prompts and complete action arrays, that `full` mode remains opt-in, and that missing `security_results[task_key]` yields `infrastructure_error` rather than `attack_success=False`.
+  Assert that new harness summary output omits raw prompts and complete action arrays, that native AgentDojo cache JSON remains compatible, that `full` mode remains opt-in, and that missing `security_results[task_key]` yields `infrastructure_error` rather than `attack_success=False`.
 
 - [ ] **Step 2: Run dashboard and runner-focused tests and verify failure**
 
