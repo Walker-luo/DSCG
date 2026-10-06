@@ -14,6 +14,7 @@ from enum import Enum
 from dataclasses import dataclass
 from hashlib import sha256
 from uuid import uuid4
+from threading import Lock
 
 from typing import Any
 from agentdojo import types as ad_types
@@ -1310,6 +1311,7 @@ class ReferenceMonitor(agent_pipeline.BasePipelineElement):
         self.require_audit = require_audit
         self._secret = secrets.token_bytes(32)
         self._issued: dict[str, ExecutionTicket] = {}
+        self._ticket_lock = Lock()
 
     def _sign(self, action_id: str, call_fingerprint: str, contract_version: str, nonce: str) -> str:
         payload = f"{action_id}|{call_fingerprint}|{contract_version}|{nonce}".encode("utf-8")
@@ -1325,24 +1327,35 @@ class ReferenceMonitor(agent_pipeline.BasePipelineElement):
             nonce=nonce,
             signature=self._sign(action_id, call_fingerprint, contract_version, nonce),
         )
-        self._issued[action_id] = ticket
+        with self._ticket_lock:
+            self._issued[action_id] = ticket
         return ticket
 
     def consume(self, ticket: ExecutionTicket | None, call) -> bool:
+        return self._consume_result(ticket, call)[0]
+
+    def _consume_result(self, ticket: ExecutionTicket | None, call) -> tuple[bool, str]:
+        """Atomically distinguish a spent ticket from an invalid ticket.
+
+        A duplicate can arrive while its winning action is still APPROVED.
+        Its denial must not transition that in-flight action to FAILED.
+        """
         if not isinstance(ticket, ExecutionTicket):
-            return False
-        issued = self._issued.get(ticket.action_id)
+            return False, "INVALID_EXECUTION_TICKET"
         expected_signature = self._sign(
             ticket.action_id, ticket.call_fingerprint, ticket.contract_version, ticket.nonce
         )
-        valid = (
-            issued == ticket
-            and hmac.compare_digest(ticket.signature, expected_signature)
-            and ticket.call_fingerprint == _tool_call_fingerprint(call)
-        )
-        if valid:
+        if (not hmac.compare_digest(ticket.signature, expected_signature)
+                or ticket.call_fingerprint != _tool_call_fingerprint(call)):
+            return False, "INVALID_EXECUTION_TICKET"
+        with self._ticket_lock:
+            issued = self._issued.get(ticket.action_id)
+            if issued is None:
+                return False, "REPLAYED_EXECUTION_TICKET"
+            if issued != ticket:
+                return False, "INVALID_EXECUTION_TICKET"
             del self._issued[ticket.action_id]
-        return valid
+        return True, "EXECUTION_TICKET_CONSUMED"
 
     def query(self, query, runtime, env, messages, extra_args):
         if not messages:
@@ -1553,8 +1566,10 @@ class TicketedToolsExecutor(agent_pipeline.BasePipelineElement):
             if not action.approved:
                 results.append(self._blocked_result(action, action.reason_code))
                 continue
-            if not self.monitor.consume(action.ticket, action.call):
-                if ledger.state(action.action_id) == ActionState.APPROVED:
+            consumed, ticket_reason = self.monitor._consume_result(action.ticket, action.call)
+            if not consumed:
+                if (ticket_reason == "INVALID_EXECUTION_TICKET"
+                        and ledger.state(action.action_id) == ActionState.APPROVED):
                     ledger.transition(action.action_id, ActionState.FAILED, "INVALID_EXECUTION_TICKET")
                     blocked_action = action
                     reason_code = "INVALID_EXECUTION_TICKET"
