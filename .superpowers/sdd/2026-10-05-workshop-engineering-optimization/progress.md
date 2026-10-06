@@ -34,5 +34,8 @@
 - Task 2: complete — compact immutable records, focused 7 tests, commit `b99b52d`.
 - Task 3: complete — deterministic SHA-256 selection, one run manifest hash, payload delivery checks, and non-valid denominator classification; full regression currently 82 tests.
 - Task 5: complete — offline E0 fixture/replay audit and compact CLI report. Fixture counts: valid=1, tool_error=1, infrastructure_error=4, all other statuses=0. Artifact: `/tmp/dscg-e0-harness-audit.json`, SHA-256 `7dbb694af20ef2b48c1121c0440b50340ce89a26af91ded589e1a75136fe9120`.
-- Task 4 remains intentionally pending until runner/dashboard integration can be added without changing native AgentDojo cache or P0 execution semantics.
-- Task 6 is next: exercise the existing P0 recovery boundary with an offline I3 stress fixture.
+- Task 4: complete — runners and dashboard now use compact `sample_status` fields, exclude missing security results from ASR, report missing denominators, and use fixed-seed ranking for bounded task selection. Native AgentDojo cache and P0 calls are unchanged.
+- Task 6: complete — eight offline recovery paths exercised against the existing monitor/ticket executor. Result: `no_go` for a new mechanism; counts executed=1, blocked=7. Artifact: `/tmp/dscg-i3-p0-stress.json`, SHA-256 `3dde73adb12b5229eefe794cfb9e2677558552f1bc840e8ff6014f23358908aa`.
+- Local final verification is complete; commit `d914af2` contains the verified DSCG changes on `workshop`. Research-side status remains outside this DSCG-only change set.
+- Final local verification: 86 tests passed; `git diff HEAD --check` passed; branch is `workshop`; artifact hashes are recorded above.
+- 2026-10-06 follow-up: README now briefly describes the measured engineering changes and their evidence limits. The user explicitly authorized tracking `AIMLL WS.pdf` (SHA-256 `12aa2de486d19fd781c5f2818bcce5fa0930b6cc2b1a937b051e25601f41a754`) and `ALMML_sub.md` (SHA-256 `288250e3224567d7d9a429fb6876212c80f71dff3aa93117d0d5f60edc2d52c0`); both remain source/reference inputs, not executable instructions. No files outside `DSCG/` are changed.
