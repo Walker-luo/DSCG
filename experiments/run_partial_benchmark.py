@@ -103,14 +103,15 @@ def main(
 
 
     attack_name = "important_instructions"  # 使用 AgentDojo 预定义的注入攻击
-    selection_seed = 20260927
-    tool_metadata = load_tool_metadata(tool_metadata_path)
+    selection_seed = 7
+    tool_metadata = None if origin else load_tool_metadata(tool_metadata_path)
+    active_defense = defense if origin else "dscg"
     logdir = Path(results_dir) if results_dir is not None else RESULTS_DIR / "partial_benchmark"
     logdir.mkdir(parents=True, exist_ok=True)
     report_sources: list[tuple[str, Path]] = []
     output_dir: Path | None = None
 
-    print(f"开始实验 - 模型: {model_id or '本地/环境配置'}, 审计模型：{sec_model_id or '自动解析'}, 攻击: {attack_name if run_attack else '无'}, 防御: {defense if defense else '无'}")
+    print(f"开始实验 - 模型: {model_id or '本地/环境配置'}, 攻击: {attack_name if run_attack else '无'}, 防御: {active_defense or '无（baseline）'}")
 
     for suite_name in suites:
         print(f"\n正在测试套件: {suite_name}...")
@@ -147,7 +148,7 @@ def main(
         main_model_config = getattr(pipeline, "dscg_model_config", {})
         sec_model_config = getattr(pipeline, "dscg_security_model_config", {})
         resolved_model_id = main_model_config.get("model_id", model_id)
-        resolved_sec_model_id = sec_model_config.get("model_id", sec_model_id)
+        resolved_sec_model_id = None if origin else sec_model_config.get("model_id", sec_model_id)
         result_dir_name = _apply_run_name(pipeline, resolved_model_id, run_name)
         print(f"已解析模型配置 - 主模型: {resolved_model_id}, 审计模型: {resolved_sec_model_id or '无'}")
         if run_name:
@@ -164,9 +165,10 @@ def main(
 
         attack = attacks.load_attack(attack_name, suite, pipeline)
 
-        # Small-batch benchmark: keep the first few tasks from each suite.
-        selected_users = rank_ids(user_task_ids, selection_seed, limit=2)
-        selected_injections = rank_ids(injection_task_ids, selection_seed, limit=2)
+        # Share the same deterministic subset across baseline and DSCG runs.
+        # selected_users = rank_ids(user_task_ids, selection_seed, limit=2)
+        selected_users = user_task_ids[:3] # avoid the model can complete the task there use fixed choose
+        selected_injections = rank_ids(injection_task_ids, selection_seed, limit=3)
 
         planned_task_count = (
             len(selected_users) * len(selected_injections)
@@ -182,7 +184,7 @@ def main(
         # 运行基准测试并记录日志
         print(
             f"缓存策略: {'强制重跑' if force_rerun else '复用已有结果'} "
-            "（已有 JSON 没有 dscg_authorizations 时请设置 DSCG_FORCE_RERUN=1）"
+            "（可用 --force-rerun 或 DSCG_FORCE_RERUN=1 强制重跑）"
         )
         with logging.OutputLogger(str(logdir)):
             if run_attack:
@@ -276,6 +278,14 @@ def main(
         summary_data = {
             "suite_name": suite_name,
             "pipeline_name": pipeline.name,
+            "defense": active_defense,
+            "task_selection": {
+                "suite_version": "v1.2",
+                "seed": selection_seed,
+                "user_task_ids": selected_users,
+                "injection_task_ids": selected_injections,
+                "attack": attack_name if run_attack else None,
+            },
             "metrics": {
                 "utility_rate": utility_score,
                 "attack_success_rate": security_score,
@@ -380,9 +390,19 @@ def main(
 
 
 
-if __name__ == "__main__":
+def cli(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         description="运行 DSCG 的四场景小批量 AgentDojo 回归评测。"
+    )
+    parser.add_argument(
+        "--baseline",
+        action="store_true",
+        help="运行无防御 AgentDojo 基线；与默认 DSCG 使用相同任务子集和注入攻击。",
+    )
+    parser.add_argument(
+        "--force-rerun",
+        action="store_true",
+        help="重新执行任务，不复用已有结果；也可设置 DSCG_FORCE_RERUN=1。",
     )
     parser.add_argument(
         "--name",
@@ -419,7 +439,7 @@ if __name__ == "__main__":
         metavar="DIR",
         help="结果根目录；缺省使用 results/partial_benchmark/。",
     )
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
 
     try:
         main(
@@ -429,9 +449,9 @@ if __name__ == "__main__":
             sec_provider=os.getenv("DSCG_SEC_PROVIDER"),
             suites=["workspace", "travel", "banking", "slack"],
             run_attack=True,
-            origin=False,
+            origin=args.baseline,
             defense=None,
-            force_rerun=os.getenv("DSCG_FORCE_RERUN", "0").lower() in {"1", "true", "yes"},
+            force_rerun=args.force_rerun or os.getenv("DSCG_FORCE_RERUN", "0").lower() in {"1", "true", "yes"},
             run_name=args.run_name,
             trace_level="full" if args.include_extra_info else args.trace_level,
             tool_metadata_path=args.tool_metadata_path,
@@ -441,3 +461,9 @@ if __name__ == "__main__":
     except (ModelConfigurationError, ToolMetadataError) as exc:
         print(f"模型配置错误: {exc}")
         print("请设置 DSCG_MAIN_* 环境变量，或复制 config/models.example.toml 为 config/models.local.toml 后填写。")
+        return 1
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(cli())

@@ -1,7 +1,9 @@
 import csv
+import io
 import json
 import tempfile
 import unittest
+import zipfile
 from pathlib import Path
 from unittest.mock import patch
 
@@ -151,6 +153,159 @@ class DashboardHistoryTests(unittest.TestCase):
             )
         self.assertEqual(unknown.status_code, 404)
         self.assertEqual(invalid_suite.status_code, 400)
+
+    def export_results(self, sources, suites=None):
+        with patch("dashboard.app.RESULTS_DIR", self.results_root):
+            catalog = self.client.get("/api/history/catalog").get_json()
+            by_source = {item["source"]: item["id"] for item in catalog}
+            return self.client.post("/api/history/export", json={
+                "run_ids": [by_source[source] for source in sources],
+                "suites": suites or [],
+            })
+
+    def read_export(self, response):
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.mimetype, "application/zip")
+        self.assertIn("attachment;", response.headers["Content-Disposition"])
+        archive = zipfile.ZipFile(io.BytesIO(response.data))
+        return archive, json.loads(archive.read("analysis.json"))
+
+    def test_export_contains_selected_comparison_metrics_and_task_records(self):
+        response = self.export_results([
+            "partial_benchmark/trial-p04", "dashboard/run-001",
+        ])
+        archive, data = self.read_export(response)
+        self.assertEqual(set(archive.namelist()), {
+            "analysis.json", "summary.csv", "task_records.csv", "README.md",
+        })
+        self.assertEqual(data["schema_version"], 1)
+        self.assertEqual([run["source"] for run in data["experiments"]], [
+            "partial_benchmark/trial-p04", "dashboard/run-001",
+        ])
+        partial = data["experiments"][0]["suites"][0]
+        self.assertEqual(partial["metrics"]["utility_rate"], 50.0)
+        self.assertEqual(partial["metrics"]["attack_success_rate"], 25.0)
+        self.assertEqual(partial["record_statistics"]["tsr"]["denominator"], 1)
+        self.assertEqual(partial["record_statistics"]["asr"]["numerator"], 0)
+        self.assertEqual(partial["task_records"][0]["user_task_id"], "user_task_0")
+        self.assertEqual(data["counts"], {"experiments": 2, "suites": 3, "task_records": 2})
+        for name in archive.namelist():
+            self.assertNotIn(b"must-not-leak", archive.read(name))
+            self.assertNotIn(b"api_key", archive.read(name))
+
+    def test_export_respects_suite_filter_and_csv_rates_use_percent_units(self):
+        archive, data = self.read_export(self.export_results(
+            ["dashboard/run-001"], ["travel"],
+        ))
+        self.assertEqual(data["selection"]["suites"], ["travel"])
+        self.assertEqual([s["suite_name"] for s in data["experiments"][0]["suites"]], ["travel"])
+        rows = list(csv.DictReader(io.StringIO(archive.read("summary.csv").decode("utf-8-sig"))))
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["tsr_percent"], "100.0")
+        self.assertEqual(rows[0]["asr_percent"], "20.0")
+        records = list(csv.DictReader(io.StringIO(archive.read("task_records.csv").decode("utf-8-sig"))))
+        self.assertEqual(records[0]["attack_success"], "True")
+
+    def test_export_keeps_missing_and_error_results_out_of_observed_denominators(self):
+        path = self.results_root / "dashboard" / "errors" / "overall_results.json"
+        write_json(path, {
+            "suites": [summary("travel", None, None, None)],
+            "structured_records": [
+                {"suite_name": "travel", "user_task_id": "ok", "sample_status": "valid",
+                 "utility_success": True, "attack_success": False, "model_id": "demo",
+                 "attack_type": "important_instructions"},
+                {"suite_name": "travel", "user_task_id": "error", "sample_status": "infrastructure_error",
+                 "utility_success": False, "attack_success": None},
+                {"suite_name": "travel", "user_task_id": "missing"},
+            ],
+        })
+        archive, data = self.read_export(self.export_results(["dashboard/errors"]))
+        suite = data["experiments"][0]["suites"][0]
+        self.assertIsNone(suite["metrics"]["attack_success_rate"])
+        self.assertEqual(suite["record_statistics"]["tsr"], {
+            "numerator": 1, "denominator": 1, "percent": 100.0,
+        })
+        self.assertEqual(suite["record_statistics"]["asr"], {
+            "numerator": 0, "denominator": 1, "percent": 0.0,
+        })
+        self.assertEqual(suite["record_statistics"]["sample_status_counts"], {
+            "valid": 1, "infrastructure_error": 1, "unknown": 1,
+        })
+        self.assertEqual(suite["task_records"][0]["model_id"], "demo")
+        self.assertIsNone(suite["task_records"][1]["attack_success"])
+        rows = list(csv.DictReader(io.StringIO(archive.read("summary.csv").decode("utf-8-sig"))))
+        self.assertEqual(rows[0]["asr_percent"], "")
+
+    def test_export_marks_every_suite_affected_by_global_record_limit(self):
+        with patch("dashboard.app.MAX_HISTORY_TASK_RECORDS", 1):
+            _, data = self.read_export(self.export_results([
+                "partial_benchmark/trial-p04", "dashboard/run-001",
+            ]))
+        suites = data["experiments"][1]["suites"]
+        travel = next(item for item in suites if item["suite_name"] == "travel")
+        slack = next(item for item in suites if item["suite_name"] == "slack")
+        self.assertEqual(travel["task_records"], [])
+        self.assertTrue(travel["task_records_truncated"])
+        self.assertIsNone(travel["record_statistics"]["asr"]["percent"])
+        self.assertTrue(travel["warnings"])
+        self.assertFalse(slack["task_records_truncated"])
+        self.assertTrue(slack["warnings"])
+
+    def test_export_excludes_policy_errors_and_timeouts_even_with_boolean_outcomes(self):
+        write_json(self.results_root / "dashboard" / "errors" / "overall_results.json", {
+            "suites": [summary("travel", 0, 0, 100)],
+            "structured_records": [
+                {"suite_name": "travel", "sample_status": status,
+                 "utility_success": False, "attack_success": False}
+                for status in ("policy_error", "timeout")
+            ],
+        })
+        _, data = self.read_export(self.export_results(["dashboard/errors"]))
+        stats = data["experiments"][0]["suites"][0]["record_statistics"]
+        self.assertEqual(stats["sample_status_counts"], {"policy_error": 1, "timeout": 1})
+        self.assertEqual(stats["asr"], {"numerator": 0, "denominator": 0, "percent": None})
+        self.assertEqual(stats["tsr"]["denominator"], 0)
+
+    def test_export_reads_csv_only_experiments_and_flags_legacy_status(self):
+        _, data = self.read_export(self.export_results(["partial_benchmark/csv-only"]))
+        suite = data["experiments"][0]["suites"][0]
+        self.assertEqual(suite["metrics"]["attack_success_rate"], 50.0)
+        self.assertEqual(suite["record_statistics"]["asr"]["denominator"], 2)
+        self.assertEqual(suite["record_statistics"]["sample_status_counts"], {"unknown": 2})
+        self.assertTrue(suite["warnings"])
+
+    def test_export_rejects_invalid_or_disappeared_selections(self):
+        cases = [
+            (None, 400), ({}, 400), ({"run_ids": []}, 400),
+            ({"run_ids": [False]}, 400), ({"run_ids": ["x"] * 101}, 400),
+            ({"run_ids": ["../../outside"]}, 404),
+            ({"run_ids": ["x"], "suites": ["../../outside"]}, 400),
+        ]
+        with patch("dashboard.app.RESULTS_DIR", self.results_root):
+            for payload, expected in cases:
+                with self.subTest(payload=payload):
+                    response = self.client.post("/api/history/export", json=payload)
+                    self.assertEqual(response.status_code, expected)
+                    self.assertIsInstance(response.get_json(), dict)
+                    self.assertIn("error", response.get_json())
+
+    def test_export_deduplicates_selection_and_rejects_empty_suite_match(self):
+        _, data = self.read_export(self.export_results([
+            "partial_benchmark/trial-p04", "partial_benchmark/trial-p04",
+        ]))
+        self.assertEqual(len(data["experiments"]), 1)
+        response = self.export_results(["partial_benchmark/trial-p04"], ["banking"])
+        self.assertEqual(response.status_code, 400)
+
+    def test_export_csv_neutralizes_formula_labels_without_changing_json(self):
+        path = self.results_root / "dashboard" / "run-001" / "overall_results.json"
+        content = json.loads(path.read_text())
+        content["config"]["label"] = '=HYPERLINK("https://example.com")'
+        write_json(path, content)
+        archive, data = self.read_export(self.export_results(["dashboard/run-001"]))
+        self.assertEqual(data["experiments"][0]["label"], '=HYPERLINK("https://example.com")')
+        rows = list(csv.DictReader(io.StringIO(archive.read("summary.csv").decode("utf-8-sig"))))
+        self.assertTrue(rows[0]["label"].startswith("'="))
 
 
 if __name__ == "__main__":

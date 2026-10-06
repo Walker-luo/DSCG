@@ -1,0 +1,86 @@
+{
+  "colorAssignments": [
+    {
+      "color": "rgb(117, 167, 238)",
+      "id": "adc70fd161c22b899437",
+      "label": "deepseek-flash_baseline_new"
+    },
+    {
+      "color": "rgb(72, 198, 164)",
+      "id": "2f3a6d48751097dfb134",
+      "label": "deepseek-flash_workshop_2.0"
+    },
+    {
+      "color": "rgb(233, 179, 95)",
+      "id": "1f55307d86272a6465f2",
+      "label": "deepseek-flash_workshop_1.1"
+    },
+    {
+      "color": "rgb(237, 116, 116)",
+      "id": "5b8f99b5fb59d06af030",
+      "label": "deepseek-flash_workshop_1.0"
+    },
+    {
+      "color": "rgb(176, 147, 229)",
+      "id": "4464a0375d0fcd981084",
+      "label": "deepseek-flash_P0-baseline-20260927"
+    },
+    {
+      "color": "rgb(218, 98, 163)",
+      "id": "f9f0f19964072dd53750",
+      "label": "deepseek-flash_P0.5-auditfix"
+    },
+    {
+      "color": "rgb(128, 218, 98)",
+      "id": "48f1919e7c21d6515f94",
+      "label": "deepseek-flash_P0.5"
+    },
+    {
+      "color": "rgb(103, 98, 218)",
+      "id": "42908e12e9a2ec10e78f",
+      "label": "deepseek-flash_P0.4"
+    },
+    {
+      "color": "rgb(218, 138, 98)",
+      "id": "6284354b3ca34bc9efcb",
+      "label": "deepseek-flash-newFrame-NoSandbox"
+    }
+  ],
+  "desktopViewport": [
+    1280,
+    720
+  ],
+  "narrowViewport": [
+    768,
+    900
+  ],
+  "narrowCards": [
+    {
+      "metric": "utility_rate",
+      "left": 38,
+      "top": 492.1953125,
+      "width": 685,
+      "height": 373.59375
+    },
+    {
+      "metric": "attack_success_rate",
+      "left": 38,
+      "top": 881.7890625,
+      "width": 685,
+      "height": 373.59375
+    }
+  ],
+  "checks": [
+    "TSR and ASR separate charts with matching experiment colors",
+    "four metrics create four canvases; Token separate own axis",
+    "legend hide blue reveals green ASR; hide green reveals amber ASR",
+    "single travel suite bars match experiment colors; labels wrap",
+    "two separate radar charts",
+    "scatter1 canvas to heatmap0 canvases to line2 canvases",
+    "deselect baseline preserves green and amber colors",
+    "narrow viewport stacks cards without overlap"
+  ],
+  "consoleWarnings": [],
+  "consoleErrors": [],
+  "newBenchmarkSamples": 0
+}

@@ -112,17 +112,28 @@ python -m experiments.run_benchmark --name full-check
 
 两个入口默认均启用完整 DSCG，覆盖 workspace、travel、banking、slack，使用 `important_instructions` 攻击。partial 是固定 seed 的小批量回归，full 使用全部任务；结果分别保存到 `results/partial_benchmark/` 和 `results/benchmarks/` 的 `<model_id>_<name>/` 目录。正式实验需另行固定 manifest、模型、攻击、seed 和防御开关。
 
+重新运行与 partial 相同任务的**无防御 baseline**：
+
+```bash
+conda run -n ipi python -m experiments.run_partial_benchmark \
+  --baseline --force-rerun --name baseline-20261006
+```
+
+该模式使用原生 AgentDojo 工具循环和当前主模型配置，不启用 DSCG、安全模型或 AgentDojo 防御。保留 `important_instructions` 注入攻击；与防御版共用 v1.2 套件和 seed `20260927`，每场景选 2 个用户任务 × 2 个注入任务，四场景共计划 16 个组合。各场景 `summary.json` 的 `task_selection` 保存 seed 和具体任务 ID，`defense: null` 表示无防御。比较时保持主模型配置一致，使用不同运行名称保留两组结果；旧版本若采用不同任务选择规则，需核对原始任务 ID。
+
 常用选项：
 
 | 选项 | 用途 |
 | --- | --- |
 | `--name NAME` | 区分运行版本，避免复用其他实验的结果 |
+| `--baseline` | partial 入口使用无防御基线，任务子集和攻击保持一致 |
+| `--force-rerun` | partial 入口重新执行已有任务，不复用缓存 |
 | `--trace-level summary/standard/full` | 默认摘要、裁剪后的逐条记录、完整记录与 `.dscg_trace.jsonl.gz` 侧车 |
 | `--include-extra-info` | 等价于 `--trace-level full` |
 | `--tool-metadata PATH` | 指定工具风险元数据 TOML；也可设置 `DSCG_TOOL_METADATA` |
 | `--model-config PATH`、`--results-dir DIR` | partial 入口支持的配置与结果路径覆盖 |
 
-工具目录可用 `python -m experiments.generate_tool_metadata` 生成，默认不覆盖已有本地文件；分类规则见 [`dscg/tool_metadata.py`](./dscg/tool_metadata.py)。评测默认可能复用缓存；partial 可用 `DSCG_FORCE_RERUN=1` 强制重跑。调整实验配置时使用新的运行名称并保留原始结果。
+工具目录可用 `python -m experiments.generate_tool_metadata` 生成，默认不覆盖已有本地文件；分类规则见 [`dscg/tool_metadata.py`](./dscg/tool_metadata.py)。评测默认可能复用缓存；partial 可用 `--force-rerun` 或 `DSCG_FORCE_RERUN=1` 强制重跑。调整实验配置时使用新的运行名称并保留原始结果。
 
 启动 Web 面板：
 
@@ -131,6 +142,17 @@ python -m dashboard.app
 ```
 
 默认地址为 [http://127.0.0.1:8888](http://127.0.0.1:8888)，可用 `PORT` 覆盖；结果保存到 `results/dashboard/`。面板支持实验配置、历史分析和图表。绘图脚本位于 [`experiments/plots/`](./experiments/plots/)，输出到 `docs/figures/benchmarks/`。
+
+“历史分析”的指标支持多选，默认选择 TSR 与 ASR，每个指标各自成图，桌面端并排、窄屏纵向展示。同一实验的颜色与点形在各图、图例和实验列表中一致，取消部分实验或切换指标时保留颜色对应。Token 图使用自身的千单位纵轴；百分比图继续保留 −5%～105% 的范围，雷达图外圈为 110%。雷达图仅适用于全部场景的百分比指标，散点图与任务热图使用固定指标。验收证据见[历史分析分图与颜色报告](./docs/history_separate_report.md)。
+
+在“历史分析”中勾选需要对比的实验、选择场景，点击 **下载分析数据** 即可下载 ZIP，无需先生成图表。下载同时包含 ASR 与 TSR，不受图表类型或指标选择影响：
+
+- `analysis.json`：交给 agent 分析的结构化入口，包含实验来源、ASR/TSR 汇总、逐任务 outcome、明细分子/分母及缺失/截断告警。
+- `summary.csv`：各实验与场景的指标对比；`task_records.csv`：按任务 ID、模型和攻击类型对齐的结果。
+- `README.md`：指标口径、数据限制和 agent 分析建议。百分比统一为 0–100；缺失值保留为空，明确报错的明细不计入观察性 ASR/TSR 分母；旧记录状态为 unknown。
+
+每个下载最多包含 50,000 条明细，截断与无明细场景会标注。原汇总与明细统计分开保存；下载结果不包含完整工具轨迹，历史 smoke 数据仍不能直接作为正式 benchmark 结论。
+实现与验收证据见[历史分析下载报告](./docs/history_export_report.md)。
 
 ## 目录与研究交接
 

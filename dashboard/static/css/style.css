@@ -478,7 +478,7 @@ button, input, select { letter-spacing: 0; }
   min-height: 50px;
   padding: 8px 10px;
   display: grid;
-  grid-template-columns: 16px minmax(0, 1fr);
+  grid-template-columns: 16px 8px minmax(0, 1fr);
   align-items: center;
   gap: 9px;
   cursor: pointer;
@@ -486,6 +486,7 @@ button, input, select { letter-spacing: 0; }
 }
 .history-run-option:last-child { border-bottom: 0; }
 .history-run-option:has(input:checked) { background: var(--green-soft); }
+.history-run-swatch { width: 8px; height: 8px; flex-shrink: 0; border-radius: 50%; }
 .history-run-option > span { min-width: 0; display: block; }
 .history-run-option strong, .history-run-option small {
   display: block;
@@ -503,7 +504,17 @@ button, input, select { letter-spacing: 0; }
   gap: 0 12px;
 }
 .history-view-controls .field-group { min-width: 0; margin-bottom: 10px; }
-.history-analyze-button { align-self: end; min-height: 34px; margin-bottom: 10px; }
+.history-metric-field { padding: 0; border: 0; }
+.history-metric-field legend { float: none; width: auto; font-size: 11px; }
+.history-metric-options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+.history-metric-options label { display: flex; align-items: center; gap: 7px; min-width: 0; padding: 6px 8px; border: 1px solid var(--border); border-radius: var(--radius); color: var(--text-secondary); font-size: 11px; cursor: pointer; }
+.history-metric-options label:has(input:checked) { color: var(--text); background: var(--green-soft); }
+.history-metric-options input { flex-shrink: 0; margin: 0; }
+.history-metric-field:disabled .history-metric-options { opacity: 0.5; }
+.history-metric-field:disabled label { cursor: default; }
+.history-metric-hint { margin: 6px 0 0; color: var(--text-muted); font-size: 11px; }
+.history-analysis-actions { display: flex; flex-wrap: wrap; align-self: end; gap: 8px; margin-bottom: 10px; }
+.history-analyze-button { flex: 1; min-height: 34px; white-space: nowrap; }
 .history-analysis-status {
   grid-column: 1 / -1;
   min-height: 16px;
@@ -521,9 +532,14 @@ button, input, select { letter-spacing: 0; }
   font-size: 11px;
   text-align: right;
 }
-.history-chart-container { min-height: 360px; }
-.history-canvas-wrap { position: relative; min-height: 320px; }
-.history-canvas-wrap canvas { height: 320px !important; max-height: 320px; }
+.history-chart-container { min-height: 360px; height: auto; }
+.history-canvas-wrap { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.history-canvas-wrap[hidden] { display: none; }
+.history-chart-card { min-width: 0; padding: 12px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); }
+.history-chart-card:only-child { grid-column: 1 / -1; }
+.history-chart-card h3 { margin: 0 0 12px; color: var(--text); font-size: 13px; font-weight: 650; }
+.history-chart-plot { position: relative; height: 320px; }
+.history-chart-plot canvas { height: 320px !important; max-height: 320px; }
 .history-chart-empty { min-height: 320px; }
 .history-chart-container.is-ready .history-chart-empty { display: none; }
 .history-heatmap-container { max-height: 520px; overflow: auto; }
@@ -630,6 +646,7 @@ button, input, select { letter-spacing: 0; }
 }
 
 @media (max-width: 860px) {
+  .history-canvas-wrap { grid-template-columns: minmax(0, 1fr); }
   .app-header { padding: 0 12px; }
   .brand-copy small { display: none; }
   .header-actions .btn span { display: none; }

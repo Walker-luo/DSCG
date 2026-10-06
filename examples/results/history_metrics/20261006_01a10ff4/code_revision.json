@@ -1,0 +1,58 @@
+{
+  "base_commit": "e4862aeaaa4c2e674b02877c7bec9fb7fe983727",
+  "working_tree": "dirty",
+  "files": {
+    "dashboard/static/js/history.js": "5f954d1968c3be598aa007fba541c327a93ee9916f878786fdcb304a12bba18a",
+    "dashboard/static/js/history_charts.js": "d75c232b9f9aabb4e3f3077861970cc7004b57c28e5668f60d471975f9e7200b",
+    "dashboard/static/css/style.css": "b549a0910152901da2dd79b36b191b2398d6cd35e04355a775c3321111bd055e",
+    "dashboard/templates/index.html": "040332320696ac1e34f75475f068130ad508195fa507d9fd9b1a65e10c5e104e",
+    "tests/test_history_charts.cjs": "d9beb09395064bec5ed67aae42cc42a96e38c5991e4598d60f7d0125910a3bd0",
+    "README.md": "83ef72adabcedbb38d49d154a6010ce9739474734963f9b7a88d2f1323c4d925",
+    "docs/history_metrics_report.md": "12287ecf8ff820a284f34f9938441ecd89149f8f3c8a5981c65e77272c18d98e"
+  },
+  "code_working_tree_sha256": "b2272462db63e6a9805eae580c4d5c64ef8496849fd385a4c0bd3631404597d1",
+  "hash_definition": "SHA256 of canonical sorted compact JSON of base_commit, working_tree and files, before metadata additions; identifies this UI change, not unrelated concurrent changes.",
+  "working_tree_status": [
+    " M AGENTS.md",
+    " M README.md",
+    " M dashboard/app.py",
+    " M dashboard/static/css/style.css",
+    " M dashboard/static/js/history.js",
+    " M dashboard/templates/index.html",
+    " M experiments/run_partial_benchmark.py",
+    " M tests/test_dashboard_history.py",
+    "?? dashboard/history_export.py",
+    "?? dashboard/static/js/history_charts.js",
+    "?? docs/history_export_report.md",
+    "?? docs/history_metrics_report.md",
+    "?? examples/results/history_export/",
+    "?? examples/results/history_metrics/",
+    "?? tests/test_history_charts.cjs",
+    "?? tests/test_partial_baseline.py"
+  ],
+  "preserved_changes": [
+    "AGENTS.md",
+    "dashboard/app.py",
+    "dashboard/history_export.py",
+    "experiments/run_partial_benchmark.py",
+    "tests/test_dashboard_history.py",
+    "tests/test_partial_baseline.py",
+    "docs/history_export_report.md",
+    "examples/results/history_export/"
+  ],
+  "runtime_dependencies": {
+    "dashboard/app.py": "ae72c3d80301ee171ab2e9711469e75f00ae866c1e5e425086ff8ee50b8dcb9c",
+    "dashboard/static/js/app.js": "c5ebd1fca4572177f1f3d07c560073ae4d42c0c836c5784842ad491b93f47438",
+    "tests/test_partial_baseline.py": "9119966e7bbd6dd50d660a5a28542aacb7dfcfa124ae8a4fcdc61300ce243b14"
+  },
+  "input_files": {
+    "results/partial_benchmark/deepseek-flash_baseline_new/workspace/summary.json": "7673ab14f28d089d351702c7c46befd52dc241d90fd9e77a97f30cbf41ed2d8a",
+    "results/partial_benchmark/deepseek-flash_baseline_new/travel/summary.json": "14aaa3a2a3c3345a28763b033fae9fc7c4dca07366680cf55cb6f2d99c8774ca",
+    "results/partial_benchmark/deepseek-flash_baseline_new/banking/summary.json": "1363996a955efae1c02692c3bce2cb7a55038486106028d2d13a4a083d47bbaf",
+    "results/partial_benchmark/deepseek-flash_baseline_new/slack/summary.json": "5d83d083af2a86c813d88df6369993486373f6d3c162da2c9753839ba30b9cc4",
+    "results/partial_benchmark/deepseek-flash_workshop_2.0/workspace/summary.json": "4396c7828767bcb40503d3e96bc59b8123c3e2bece51adf8182554c19ef962d9",
+    "results/partial_benchmark/deepseek-flash_workshop_2.0/travel/summary.json": "ebd39226873d55043adbeff93d90c12f920a032e65e37a7825412d6356acf17d",
+    "results/partial_benchmark/deepseek-flash_workshop_2.0/banking/summary.json": "97652bc0977dd9fe42869a0be05aabb27b5d2a80f23153bb40defdc7eac51f17",
+    "results/partial_benchmark/deepseek-flash_workshop_2.0/slack/summary.json": "f2682c2e76633549ac2e3c9d2d8f14d42cbf592dc9958d891b6e37f1f107b3f4"
+  }
+}

@@ -202,15 +202,16 @@
                 <option value="all">全部场景</option>
               </select>
             </div>
-            <div class="field-group">
-              <label class="form-label" for="history-metric-select">指标</label>
-              <select id="history-metric-select" class="form-select form-select-sm">
-                <option value="utility_rate">任务效用率 TSR</option>
-                <option value="attack_success_rate">攻击成功率 ASR</option>
-                <option value="defense_success_rate">防御成功率</option>
-                <option value="total_tokens">Token 消耗</option>
-              </select>
-            </div>
+            <fieldset class="field-group history-metric-field" id="history-metric-select" aria-describedby="history-metric-hint">
+              <legend class="form-label">指标（可多选）</legend>
+              <div class="history-metric-options">
+                <label><input type="checkbox" class="form-check-input history-metric-cb" value="utility_rate" checked><span>任务效用率 TSR</span></label>
+                <label><input type="checkbox" class="form-check-input history-metric-cb" value="attack_success_rate" checked><span>攻击成功率 ASR</span></label>
+                <label><input type="checkbox" class="form-check-input history-metric-cb" value="defense_success_rate"><span>防御成功率</span></label>
+                <label><input type="checkbox" class="form-check-input history-metric-cb" value="total_tokens"><span>Token 消耗</span></label>
+              </div>
+              <p id="history-metric-hint" class="history-metric-hint" aria-live="polite"></p>
+            </fieldset>
             <div class="field-group">
               <label class="form-label" for="history-chart-type">图表形式</label>
               <select id="history-chart-type" class="form-select form-select-sm">
@@ -221,9 +222,15 @@
                 <option value="heatmap">任务结果热图</option>
               </select>
             </div>
-            <button type="button" class="btn btn-primary history-analyze-button" id="history-analyze">
-              <i class="bi bi-graph-up-arrow" aria-hidden="true"></i>生成分析
-            </button>
+            <div class="history-analysis-actions">
+              <button type="button" class="btn btn-primary history-analyze-button" id="history-analyze">
+                <i class="bi bi-graph-up-arrow" aria-hidden="true"></i>生成分析
+              </button>
+              <button type="button" class="btn btn-outline-secondary history-analyze-button" id="history-export" disabled aria-describedby="history-export-hint">
+                <i class="bi bi-download" aria-hidden="true"></i>下载分析数据
+              </button>
+            </div>
+            <p id="history-export-hint" class="history-analysis-status">下载所选实验与场景的 ZIP，包含 ASR / TSR 汇总、任务明细和 agent 可读 JSON。</p>
             <p id="history-analysis-status" class="history-analysis-status" role="status" aria-live="polite"></p>
           </section>
         </div>
@@ -234,9 +241,7 @@
             <span id="history-source-caption" class="history-source-caption"></span>
           </div>
           <div class="chart-container history-chart-container">
-            <div id="history-canvas-wrap" class="history-canvas-wrap" hidden>
-              <canvas id="history-chart" role="img" aria-label="历史实验指标图表"></canvas>
-            </div>
+            <div id="history-canvas-wrap" class="history-canvas-wrap" hidden></div>
             <div id="history-heatmap-container" class="history-heatmap-container" hidden></div>
             <div id="history-chart-empty" class="empty-state history-chart-empty">
               <i class="bi bi-graph-up"></i><strong>选择结果并生成分析</strong><span>可比较不同优化版本及其各场景表现</span>
@@ -259,6 +264,7 @@
 
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
   <script src="/static/js/app.js"></script>
+  <script src="/static/js/history_charts.js"></script>
   <script src="/static/js/history.js"></script>
 </body>
 </html>

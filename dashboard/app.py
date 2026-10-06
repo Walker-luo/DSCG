@@ -13,7 +13,7 @@ import time
 import queue
 import threading
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from io import StringIO
 from pathlib import Path
 
@@ -25,11 +25,13 @@ from flask import (
 from agentdojo import logging as ad_logging, benchmark, attacks
 from agentdojo.task_suite import get_suite
 from dscg.model_config import DEEPSEEK_MODEL_IDS
+from dscg.harness_records import SampleStatus
 from dscg.paths import DASHBOARD_RESULTS_DIR, RESULTS_DIR
 from dscg.pipelines.baseline import make_openai_compatible_pipeline
 from dscg.pipelines.defended import make_defended_pipeline
 from dscg.tool_metadata import load_tool_metadata
 from experiments.harness_audit import rank_ids, security_result_fields
+from dashboard.history_export import build_history_export
 
 app = Flask(__name__)
 app.secret_key = "newframe_dashboard_2024"
@@ -498,6 +500,7 @@ def _compute_aggregate(summaries: list[dict]) -> dict:
 # 历史结果目录
 # =============================================
 HISTORY_SUITES = ("workspace", "travel", "banking", "slack")
+HISTORY_SAMPLE_STATUSES = {status.value for status in SampleStatus} | {"invalid"}
 MAX_HISTORY_EXPERIMENTS = 100
 MAX_HISTORY_TASK_RECORDS = 50000
 
@@ -583,6 +586,13 @@ def _normalize_history_suite(summary: dict, suite_name: str, is_fraction: bool) 
             "total_tasks": _history_int(task_counts.get("total_tasks")),
             "utility_passed": _history_int(task_counts.get("utility_passed")),
             "attacked_tasks": _history_int(task_counts.get("attacked_tasks")),
+            **{
+                key: _history_int(task_counts[key])
+                for key in (
+                    "security_missing", "selected_user_tasks", "selected_injection_tasks",
+                    "available_user_tasks", "available_injection_tasks",
+                ) if key in task_counts
+            },
         },
         "overhead": {
             "prompt_tokens": prompt_tokens,
@@ -771,6 +781,9 @@ def _history_bool(value):
 
 
 def _normalize_history_record(record: dict, suite_name: str) -> dict:
+    status = str(record.get("sample_status") or "unknown")
+    if status not in HISTORY_SAMPLE_STATUSES:
+        status = "unknown"
     return {
         "suite_name": suite_name,
         "user_task_id": str(record.get("user_task_id") or ""),
@@ -778,6 +791,9 @@ def _normalize_history_record(record: dict, suite_name: str) -> dict:
         "utility_success": _history_bool(record.get("utility_success")),
         "attack_success": _history_bool(record.get("attack_success")),
         "defense_success": _history_bool(record.get("defense_success")),
+        "model_id": str(record.get("model_id") or ""),
+        "attack_type": str(record.get("attack_type") or ""),
+        "sample_status": status,
     }
 
 
@@ -887,11 +903,10 @@ def history_catalog():
     ])
 
 
-@app.route("/api/history/analyze", methods=["POST"])
-def analyze_history_results():
-    payload = request.get_json(silent=True)
+def _build_history_analysis(payload):
+    """Use the same validated selection and metric units for charts and exports."""
     if not isinstance(payload, dict):
-        return jsonify({"error": "Invalid analysis request"}), 400
+        return {"error": "Invalid analysis request"}, 400
     run_ids = payload.get("run_ids")
     if (
         not isinstance(run_ids, list)
@@ -899,19 +914,19 @@ def analyze_history_results():
         or len(run_ids) > MAX_HISTORY_EXPERIMENTS
         or any(not isinstance(run_id, str) for run_id in run_ids)
     ):
-        return jsonify({"error": "Select between 1 and 100 result sets"}), 400
+        return {"error": "Select between 1 and 100 result sets"}, 400
     run_ids = list(dict.fromkeys(run_ids))
 
     suites_filter = payload.get("suites", [])
     if not isinstance(suites_filter, list) or any(
         suite not in HISTORY_SUITES for suite in suites_filter
     ):
-        return jsonify({"error": "Invalid suite selection"}), 400
+        return {"error": "Invalid suite selection"}, 400
 
     catalog = _build_history_catalog()
     by_id = {entry["id"]: entry for entry in catalog}
     if any(run_id not in by_id for run_id in run_ids):
-        return jsonify({"error": "One or more result sets were not found"}), 404
+        return {"error": "One or more result sets were not found"}, 404
 
     include_task_records = payload.get("include_task_records") is True
     remaining_records = MAX_HISTORY_TASK_RECORDS
@@ -924,6 +939,7 @@ def analyze_history_results():
             "label": entry["label"],
             "source": entry["source"],
             "result_type": entry["result_type"],
+            "updated_at": entry["updated_at"],
             "suites": [],
         }
         for suite_name in HISTORY_SUITES:
@@ -945,7 +961,7 @@ def analyze_history_results():
                 suite_name,
                 is_fraction,
             )
-            if include_task_records and remaining_records > 0:
+            if include_task_records:
                 records, truncated = _load_history_task_records(
                     suite_entry,
                     internal["overall_records"],
@@ -957,7 +973,37 @@ def analyze_history_results():
                 remaining_records -= len(records)
             experiment["suites"].append(suite_result)
         experiments.append(experiment)
-    return jsonify({"experiments": experiments})
+    return {"experiments": experiments}, 200
+
+
+@app.route("/api/history/analyze", methods=["POST"])
+def analyze_history_results():
+    data, status = _build_history_analysis(request.get_json(silent=True))
+    return jsonify(data), status
+
+
+@app.route("/api/history/export", methods=["POST"])
+def export_history_results():
+    payload = request.get_json(silent=True)
+    if isinstance(payload, dict):
+        payload = {**payload, "include_task_records": True}
+    data, status = _build_history_analysis(payload)
+    if status != 200:
+        return jsonify(data), status
+    if not any(run["suites"] for run in data["experiments"]):
+        return jsonify({"error": "所选实验中没有与当前场景匹配的数据。"}), 400
+    exported_at = datetime.now(timezone.utc)
+    archive = build_history_export(
+        data["experiments"], payload.get("suites", []), exported_at.isoformat(),
+    )
+    response = send_file(
+        archive,
+        mimetype="application/zip",
+        as_attachment=True,
+        download_name=f"dscg-history-analysis-{exported_at:%Y%m%dT%H%M%SZ}.zip",
+    )
+    response.headers["Cache-Control"] = "no-store"
+    return response
 
 
 @app.route("/api/runs", methods=["GET"])

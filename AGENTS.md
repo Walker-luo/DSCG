@@ -33,6 +33,7 @@ For each ready task, keep the implementation change in `DSCG/`, run the stated c
 - Offline regression: `conda run -n ipi python -m unittest discover -s tests -v`.
 - I3 fixture: `conda run -n ipi python -m experiments.i3_p0_stress --output <new-output-path>`. Current expected exit is 1 (`partial`, scope violations); exit 0 is reserved for a fully valid run with all constraints passing (`no_go`), and exit 2 indicates sample errors.
 - E0 self-check: `conda run -n ipi python -m experiments.harness_audit --fixture tests/fixtures/harness_audit_cases.json --output <new-output-path>`.
+- Matched no-defense partial baseline: `conda run -n ipi python -m experiments.run_partial_benchmark --baseline --force-rerun --name <new-baseline-name>`. Uses the native AgentDojo tool loop, the same main-model configuration, v1.2 suites, `important_instructions`, and seed 20260927 as the default DSCG partial run (2 user tasks × 2 injection tasks per suite). No security model or defense metadata is used. Verify exact IDs in `summary.json` → `task_selection`; historical runs may have used another selection rule. Offline checks: `conda run -n ipi python -m unittest discover -s tests -p test_partial_baseline.py -v`; these do not call a model or establish benchmark efficacy.
 - Keep old result files and evidence hashes intact. Documentation-only edits need link/state consistency checks and `git diff --check`; rerun runtime tests when code or an unresolved concern changes.
 
 ## Working Rules
