@@ -16,6 +16,7 @@ from dscg.pipelines.defended import (
     AUDIT_SCHEMA_VERSION, ActionLedger, ActionSecurityChecker, ActionState, OurFrameExecutor,
     PermissionSandbox, ReferenceMonitor, SandboxPolicyState, TicketedToolsExecutor,
     ToolAuthorizationCompiler, TrustedTaskRequest, _batch_fingerprint, make_defended_pipeline,
+    _compact_action_record, _compact_authorization_record,
 )
 from dscg.model_config import ModelConfig
 from dscg.tool_metadata import metadata_for_runtime, set_tool_metadata
@@ -321,6 +322,8 @@ class SandboxExecutionTests(unittest.TestCase):
                     self.assertNotIn("dscg_action_ledger", trace)
                     self.assertIn("dscg_audit_summary", trace)
                     self.assertIn("dscg_action_summary", trace)
+                    self.assertNotIn("_sha256", json.dumps(trace))
+                    self.assertNotIn("arguments_sha256", json.dumps(trace))
                 elif level == "standard":
                     self.assertIn("dscg_audit_decisions", trace)
                     self.assertIn("dscg_action_ledger", trace)
@@ -329,6 +332,8 @@ class SandboxExecutionTests(unittest.TestCase):
                         "transitions" not in record
                         for record in trace["dscg_action_ledger"]
                     ))
+                    self.assertNotIn("_sha256", json.dumps(trace))
+                    self.assertNotIn("arguments_sha256", json.dumps(trace))
                 else:
                     self.assertIn("dscg_audit_decisions", trace)
                     sidecars = list(Path(directory).rglob("*.dscg_trace.jsonl.gz"))
@@ -336,9 +341,35 @@ class SandboxExecutionTests(unittest.TestCase):
                     with gzip.open(sidecars[0], "rt", encoding="utf-8") as stream:
                         events = [json.loads(line) for line in stream]
                     self.assertEqual(events[0]["event"], "authorization")
+                    sidecar_text = json.dumps(events)
+                    self.assertIn("_sha256", sidecar_text)
                     self.assertEqual(
                         trace["dscg_trace_artifact"]["format"], "jsonl.gz"
                     )
+
+    def test_task_json_projection_keeps_only_contract_and_runtime_state(self):
+        authorization = _compact_authorization_record({
+            "user_request_sha256": "u" * 64,
+            "tool_catalog_sha256": "t" * 64,
+            "system_policy_sha256": "s" * 64,
+            "tool_metadata_catalog_sha256": "m" * 64,
+            "contract_version": "contract-id",
+            "policy_state": "allowlist",
+        })
+        action = _compact_action_record({
+            "action_id": "action-id",
+            "tool_name": "safe_tool",
+            "arguments_sha256": "a" * 64,
+            "contract_version": "contract-id",
+            "state": "executed",
+        })
+        self.assertEqual(authorization["contract_version"], "contract-id")
+        self.assertEqual(action["contract_version"], "contract-id")
+        self.assertNotIn("user_request_sha256", authorization)
+        self.assertNotIn("tool_catalog_sha256", authorization)
+        self.assertNotIn("system_policy_sha256", authorization)
+        self.assertNotIn("tool_metadata_catalog_sha256", authorization)
+        self.assertNotIn("arguments_sha256", action)
 
     def test_no_sandbox_ablation_skips_authorization(self):
         llm = self.parser_llm()

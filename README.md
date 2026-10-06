@@ -6,7 +6,7 @@ DSCG 是一个面向 LLM Agent 间接提示词注入（Indirect Prompt Injection
 
 ## Workshop 工程优化
 
-近期 `workshop` 分支优化了 harness 记录与恢复路径验证：评测明细记录样本状态，缺失安全结果会单独标为基础设施错误；有限任务子集按固定 seed 排序。Harness bookkeeping 只保留每次运行一个 manifest hash 和每个样本一个 payload hash，P0 现有安全校验保持不变。I3 离线压力测试覆盖八种恢复路径，合法重试可执行，越权与票据重放路径被阻断。该结果不是实际模型 benchmark，不能据此推断防御率或可用性提升。详细证据见[优化报告](./docs/workshop_optimization_report.md)。
+近期 `workshop` 分支优化了 harness 记录与恢复路径验证：评测明细记录样本状态，缺失安全结果会单独标为基础设施错误；有限任务子集按固定 seed 排序。默认 summary/standard 任务 JSON 去掉重复的输入、目录和参数哈希，只保留必要的契约或批次关联标识；P0 运行时校验和 full 压缩 sidecar 保持不变。Harness bookkeeping 只保留每次运行一个 manifest hash 和每个样本一个 payload hash。I3 离线压力测试覆盖八种恢复路径，合法重试可执行，越权与票据重放路径被阻断。该结果不是实际模型 benchmark，不能据此推断防御率或可用性提升。详细证据见[优化报告](./docs/workshop_optimization_report.md)。
 
 对外介绍可直接使用：[DSCG 项目简介（Word）](./docs/DSCG项目介绍.docx)；可编辑文本源见 [`docs/DSCG项目介绍.md`](./docs/DSCG项目介绍.md)。
 

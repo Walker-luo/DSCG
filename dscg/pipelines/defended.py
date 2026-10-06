@@ -445,15 +445,18 @@ def _trace_logger():
 
 
 def _compact_authorization_record(record: dict) -> dict:
+    """Keep policy state and one opaque contract identifier for task JSON.
+
+    The underlying integrity hashes remain in the in-memory contract and in
+    the explicit full sidecar. Repeating each input hash in every task JSON
+    adds size without changing the P0 decision path.
+    """
+
     keys = (
         "schema_version",
         "authorization_source",
         "compiler_model",
-        "user_request_sha256",
-        "tool_catalog_sha256",
-        "system_policy_sha256",
         "tool_metadata_schema",
-        "tool_metadata_catalog_sha256",
         "tool_risk_counts",
         "metadata_errors",
         "allowed_tools",
@@ -496,7 +499,6 @@ def _compact_action_record(record: dict) -> dict:
             "batch_id",
             "call_id",
             "tool_name",
-            "arguments_sha256",
             "contract_version",
             "state",
             "effect",
@@ -632,11 +634,16 @@ def _sync_trace_context(extra_args: dict) -> None:
     if logger is None:
         return
     level = _trace_level(extra_args)
-    authorizations = [
-        _compact_authorization_record(record)
+    raw_authorizations = [
+        record
         for record in extra_args.get("dscg_authorizations", [])
         if isinstance(record, dict)
     ]
+    authorizations = (
+        deepcopy(raw_authorizations)
+        if level == "full"
+        else [_compact_authorization_record(record) for record in raw_authorizations]
+    )
     audits = [
         record for record in extra_args.get("dscg_audit_decisions", [])
         if isinstance(record, dict)

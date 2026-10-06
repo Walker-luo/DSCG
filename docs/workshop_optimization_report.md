@@ -7,6 +7,7 @@
 - E0 harness 审计：固定 seed 的任务排序、每次运行一个 manifest hash、每个样例一个 payload hash，并独立重放宿主 final-state predicate。
 - 紧凑记录：默认摘要只保留任务标识、状态、错误类型、delivery 标志、结果、动作计数和受限 final-state 摘要；原生 AgentDojo cache 继续保留 `messages`，完整 trace 仍是显式 opt-in。
 - 评测 runner/dashboard：缺少 `security_results[task_key]` 不再默认当作安全成功，而是写入 `infrastructure_error` 状态并从 ASR 有效分母排除；partial/dashboard 的有限任务选择改为固定 seed 排序。
+- JSON 哈希投影：默认 `summary` 每个授权记录移除 4 个重复输入/目录哈希；`standard` 每个动作记录移除参数哈希，只保留契约或批次关联标识。P0 内存校验和 `full` 压缩 sidecar 保留原始哈希。
 - I3 P0 压力测试：覆盖合法重试、未授权工具、扩大对象范围、关闭检查、伪造管理员、旧票据重放、修改目的地/参数、并发重复提交八条路径。
 
 ## 证据
