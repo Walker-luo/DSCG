@@ -623,6 +623,62 @@ def _history_source_for_suite(results_root: Path, suite_dir: Path) -> str | None
     return "/".join(parts[:-1]) if len(parts) > 1 else None
 
 
+def _history_group_metadata(entry: dict) -> dict:
+    """Identify recorded attacks and directory groups without guessing legacy defaults."""
+    attacks = set()
+    kinds = set()
+
+    def add_attack(value):
+        if isinstance(value, str) and value.strip():
+            attacks.add("none" if value.strip().lower() == "none" else value.strip())
+
+    for suite_name, suite in entry["suites"].items():
+        summary = suite.get("summary") or {}
+        selection = summary.get("task_selection")
+        if isinstance(selection, dict) and "attack" in selection:
+            add_attack(selection["attack"] if selection["attack"] is not None else "none")
+        add_attack(summary.get("attack_type"))
+        kind = summary.get("attack_kind")
+        if kind in ("none", "targeted", "dos"):
+            kinds.add(kind)
+            if kind == "none":
+                add_attack("none")
+        if suite.get("csv_path"):
+            try:
+                with suite["csv_path"].open(encoding="utf-8-sig", newline="") as stream:
+                    for row in csv.DictReader(stream):
+                        if not row.get("suite_name") or row["suite_name"] == suite_name:
+                            add_attack(row.get("attack_type"))
+            except (OSError, UnicodeError, csv.Error):
+                pass
+    for row in entry["overall_records"]:
+        if isinstance(row, dict):
+            add_attack(row.get("attack_type"))
+    if not attacks:
+        if entry["config"].get("run_attack") is False:
+            add_attack("none")
+            kinds.add("none")
+        else:
+            add_attack(entry["config"].get("attack_name"))
+    attack_name = next(iter(attacks)) if len(attacks) == 1 else "mixed" if attacks else "unknown"
+    parts = entry["source"].split("/")
+    model_parts = parts[1:]
+    if len(model_parts) > 1 and model_parts[-1] == attack_name:
+        model_parts = model_parts[:-1]
+    if model_parts and attack_name not in ("unknown", "mixed"):
+        suffix = "__" + attack_name
+        if model_parts[-1].endswith(suffix):
+            model_parts[-1] = model_parts[-1][:-len(suffix)]
+    return {
+        "result_folder": parts[0],
+        "model_group": "/".join(model_parts),
+        "model_suffix": model_parts[-1] if model_parts else parts[0],
+        "attack_name": attack_name,
+        "attack_names": sorted(attacks),
+        "attack_kind": next(iter(kinds)) if len(kinds) == 1 else "unknown",
+    }
+
+
 def _build_history_catalog(results_root: Path | None = None) -> list[dict]:
     """Index supported experiment summaries while keeping disk paths server-side."""
     root = Path(results_root or RESULTS_DIR).resolve()
@@ -763,6 +819,7 @@ def _build_history_catalog(results_root: Path | None = None) -> list[dict]:
             "label": str(label),
             "source": entry["source"],
             "result_type": entry["result_type"],
+            **_history_group_metadata(entry),
             "updated_at": (
                 datetime.fromtimestamp(timestamp).astimezone().isoformat(timespec="seconds")
                 if timestamp
@@ -886,7 +943,13 @@ def _load_history_task_records(
 @app.route("/")
 def index():
     """主页面"""
-    return render_template("index.html")
+    return render_template("index.html", active_page="experiment")
+
+
+@app.route("/history")
+def history_page():
+    """独立历史分析页。"""
+    return render_template("history.html", active_page="history")
 
 
 @app.route("/api/config")
@@ -947,6 +1010,9 @@ def _build_history_analysis(payload):
             "label": entry["label"],
             "source": entry["source"],
             "result_type": entry["result_type"],
+            **{key: entry[key] for key in (
+                "result_folder", "model_group", "model_suffix", "attack_name", "attack_names", "attack_kind",
+            )},
             "updated_at": entry["updated_at"],
             "suites": [],
         }

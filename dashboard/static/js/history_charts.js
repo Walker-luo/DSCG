@@ -9,7 +9,7 @@
   const shapes = ["circle", "rect", "triangle", "cross", "star"];
   const dashes = [[], [6, 4], [2, 3], [10, 3, 2, 3]];
   const defaultTheme = {
-    colors: ["#91b8ee", "#48c6a4", "#e4b66a", "#ed7474", "#b89ae4"],
+    colors: ["#91b8ee", "#e4b66a", "#b89ae4", "#48c6a4", "#ed7474"],
     text: "#b2bfba", muted: "#74817d", border: "#303b35",
   };
 
@@ -25,25 +25,110 @@
     return run.id || run.source || run.label;
   }
 
+  function badgeFor(index) {
+    let badge = "", number = index + 1;
+    while (number > 0) {
+      number--;
+      badge = String.fromCharCode(65 + number % 26) + badge;
+      number = Math.floor(number / 26);
+    }
+    return badge;
+  }
+
   function createExperimentStyles(experiments, colors = defaultTheme.colors, previousStyles = {}) {
-    const styles = Object.assign(Object.create(null), previousStyles);
+    const styles = Object.create(null);
+    const models = new Map();
+    const runsById = new Map(experiments.map(run => [experimentKey(run), run]));
+    Object.entries(previousStyles).forEach(([key, previous]) => {
+      const run = runsById.get(key);
+      const modelKey = previous.modelKey || run?.model_group || run?.model_suffix || key;
+      const index = models.size;
+      const style = models.get(modelKey) || {
+        pointStyle: shapes[index % shapes.length], borderDash: dashes[index % dashes.length],
+        ...previous, modelKey, badge: previous.badge || badgeFor(index),
+      };
+      models.set(modelKey, style);
+      styles[key] = style;
+    });
     experiments.forEach((run) => {
       const key = experimentKey(run);
       if (Object.hasOwn(styles, key)) return;
-      const index = Object.keys(styles).length;
-      styles[key] = {
+      const modelKey = run.model_group || run.model_suffix || key;
+      if (models.has(modelKey)) { styles[key] = models.get(modelKey); return; }
+      const index = models.size;
+      const style = {
+        modelKey, badge: badgeFor(index),
         color: colors[index] || "hsl(" + ((index * 137.508) % 360).toFixed(2) + ", 62%, 62%)",
         pointStyle: shapes[index % shapes.length],
         borderDash: dashes[index % dashes.length],
       };
+      styles[key] = style;
+      models.set(modelKey, style);
     });
     return styles;
   }
 
+  function describeExperiment(run) {
+    const model = run.model_suffix || run.model_group;
+    const separator = model ? model.indexOf("_") : -1;
+    return {
+      label: separator >= 0 ? model.slice(separator + 1) : model || run.label || experimentKey(run),
+      fullLabel: run.label || [run.model_group || model || experimentKey(run), run.attack_name].filter(Boolean).join(" / "),
+      subtitle: [run.attack_name, run.model_group || model].filter(Boolean).join(" · "),
+    };
+  }
+
+  const identityLabels = {
+    id: "historyIdentityLabels",
+    afterDatasetsDraw(chart) {
+      if (chart.config.type !== "bar") return;
+      const { ctx } = chart;
+      ctx.save();
+      ctx.font = "bold 11px sans-serif";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "bottom";
+      chart.data.datasets.forEach((dataset, index) => {
+        if (!chart.isDatasetVisible(index)) return;
+        const bars = chart.getDatasetMeta(index).data;
+        ctx.fillStyle = dataset.borderColor;
+        dataset.data.forEach((value, position) => {
+          const bar = bars[position];
+          if (!Number.isFinite(value) || !bar || !Number.isFinite(bar.x) || !Number.isFinite(bar.y)) return;
+          ctx.fillText(dataset.identityBadge, bar.x, Math.max(chart.chartArea.top + 12, bar.y - 6));
+        });
+      });
+      ctx.restore();
+    },
+  };
+
   function resolveTheme(experiments, customTheme) {
     const theme = { ...defaultTheme, ...customTheme };
     theme.experimentStyles = createExperimentStyles(experiments, theme.colors, theme.experimentStyles);
+    theme.attackNames = Array.from(new Set([...(theme.attackNames || []), ...experiments.map(run => run.attack_name).filter(Boolean)])).sort();
+    const attacksByModel = new Map();
+    experiments.forEach(run => {
+      const key = theme.experimentStyles[experimentKey(run)].modelKey;
+      if (!attacksByModel.has(key)) attacksByModel.set(key, new Set());
+      attacksByModel.get(key).add(run.attack_name);
+    });
+    theme.multiAttackModels = new Set(Array.from(attacksByModel).filter(([, attacks]) => attacks.size > 1).map(([key]) => key));
     return theme;
+  }
+
+  function chartIdentity(run, theme) {
+    const style = theme.experimentStyles[experimentKey(run)];
+    const identity = describeExperiment(run);
+    const multiple = theme.multiAttackModels.has(style.modelKey);
+    const attackIndex = theme.attackNames.indexOf(run.attack_name);
+    return {
+      label: identity.label + (multiple ? " · " + run.attack_name : ""),
+      legendLabel: identity.label,
+      fullLabel: identity.fullLabel + (run.source ? " · " + run.source : ""),
+      legendSubtitle: identity.subtitle,
+      identityBadge: style.badge + (multiple ? String(attackIndex + 1) : ""),
+      pointStyle: multiple ? shapes[attackIndex % shapes.length] : style.pointStyle,
+      borderDash: multiple ? dashes[attackIndex % dashes.length] : style.borderDash,
+    };
   }
 
   function percentScale(title, values, theme) {
@@ -121,7 +206,7 @@
     const byScenario = suite === "all";
     const labels = byScenario
       ? suites.filter((name) => experiments.some((run) => run.suites.some((item) => item.suite_name === name)))
-      : experiments.map((run) => run.label);
+      : experiments.map((run) => chartIdentity(run, theme).label);
     const readMetric = (run, name, key) => {
       const item = run.suites.find((entry) => entry.suite_name === name);
       if (!item) return null;
@@ -129,22 +214,22 @@
     };
     const datasets = experiments.map((run, index) => {
       const style = theme.experimentStyles[experimentKey(run)];
+      const identity = chartIdentity(run, theme);
       const color = style.color;
       const data = byScenario ? labels.map((name) => readMetric(run, name, metric))
         : experiments.map((_, position) => position === index ? readMetric(run, suite, metric) : null);
       const dataset = {
-        label: run.label, data, metricKey: metric, borderColor: color,
+        ...identity, data, metricKey: metric, borderColor: color,
         backgroundColor: view === "radar" ? alpha(color, 0.16) : color,
         borderWidth: view === "line" ? 2 : 1, spanGaps: false,
-        pointStyle: style.pointStyle,
       };
       if (view !== "radar") dataset.yAxisID = "y";
       if (view === "bar") {
         Object.assign(dataset, { borderWidth: 0, borderRadius: 2, maxBarThickness: 24, grouped: byScenario });
       } else {
         Object.assign(dataset, {
-          pointRadius: 3, pointHoverRadius: 5, pointBackgroundColor: color,
-          borderDash: style.borderDash,
+          pointRadius: 4, pointHoverRadius: 6, pointBackgroundColor: color,
+          borderDash: identity.borderDash,
           ...(view === "line" ? { tension: 0.28, fill: false } : {}),
         });
       }
@@ -154,7 +239,7 @@
     chartOptions.plugins.tooltip.callbacks = {
       label(context) {
         const value = context.raw;
-        return context.dataset.label + "：" + (value === null ? "无数据" : value + (context.dataset.metricKey === "total_tokens" ? " K tokens" : "%"));
+        return context.dataset.fullLabel + "：" + (value === null ? "无数据" : value + (context.dataset.metricKey === "total_tokens" ? " K tokens" : "%"));
       },
     };
     if (view === "radar") {
@@ -187,13 +272,13 @@
         };
       }
     }
-    return { type: view, data: { labels, datasets }, options: chartOptions };
+    return { type: view, data: { labels, datasets }, options: chartOptions, plugins: view === "bar" ? [identityLabels] : [] };
   }
 
   function scatterConfig(experiments, customTheme) {
     const theme = resolveTheme(experiments, customTheme);
     const datasets = experiments.map((run) => ({
-      label: run.label,
+      ...chartIdentity(run, theme),
       data: run.suites.flatMap((item) => {
         const x = item.metrics.attack_success_rate;
         const y = item.metrics.utility_rate;
@@ -201,13 +286,13 @@
       }),
       backgroundColor: theme.experimentStyles[experimentKey(run)].color,
       borderColor: theme.experimentStyles[experimentKey(run)].color,
-      pointStyle: theme.experimentStyles[experimentKey(run)].pointStyle, pointRadius: 5, pointHoverRadius: 7,
+      pointRadius: 6, pointHoverRadius: 8,
     }));
     const points = datasets.flatMap((dataset) => dataset.data);
     const chartOptions = options(theme);
     chartOptions.plugins.tooltip.callbacks = {
       label(context) {
-        return context.dataset.label + " · " + context.raw.suite + " · ASR " + context.raw.x + "% / TSR " + context.raw.y + "%";
+        return context.dataset.fullLabel + " · " + context.raw.suite + " · ASR " + context.raw.x + "% / TSR " + context.raw.y + "%";
       },
     };
     chartOptions.scales = {
@@ -217,7 +302,7 @@
     return { type: "scatter", data: { datasets }, options: chartOptions };
   }
 
-  const api = { metricInfo, metricConfigs, scatterConfig, canUseRadar, createExperimentStyles };
+  const api = { metricInfo, metricConfigs, scatterConfig, canUseRadar, createExperimentStyles, describeExperiment };
   if (typeof module === "object" && module.exports) module.exports = api;
   else root.DSCGHistoryCharts = api;
 })(typeof window === "undefined" ? globalThis : window);

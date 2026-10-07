@@ -62,6 +62,64 @@ test("additional experiments receive distinct colors instead of recycling the fi
   assert.equal(new Set(Object.values(styles).map((style) => style.color)).size, 9);
 });
 
+test("legacy styles retain their colors and receive usable identity badges", () => {
+  const styles = charts.createExperimentStyles(experiments, undefined, {a: {color: "#123456"}});
+  assert.equal(styles.a.color, "#123456");
+  assert.equal(styles.a.badge, "A");
+  assert.equal(styles.b.badge, "B");
+  assert.ok(styles.a.pointStyle);
+});
+
+test("architecture identity shares a stable badge and style across attacks without merging data", () => {
+  const runs = [
+    {id: "new/a", model_group: "deepseek-flash_workshop_new", model_suffix: "deepseek-flash_workshop_new", attack_name: "injecagent", suites: experiments[0].suites},
+    {id: "base/a", model_group: "deepseek-flash_baseline", model_suffix: "deepseek-flash_baseline", attack_name: "injecagent", suites: experiments[1].suites},
+    {id: "new/b", model_group: "deepseek-flash_workshop_new", model_suffix: "deepseek-flash_workshop_new", attack_name: "tool_knowledge", suites: experiments[0].suites},
+  ];
+  const styles = charts.createExperimentStyles(runs);
+  assert.equal(styles["new/a"].badge, "A");
+  assert.equal(styles["base/a"].badge, "B");
+  assert.deepEqual(styles["new/a"], styles["new/b"]);
+  assert.notEqual(styles["new/a"].color, styles["base/a"].color);
+  const panels = charts.metricConfigs(runs.slice(0, 2), {...selection, view: "bar", theme: {experimentStyles: styles}});
+  assert.deepEqual(panels[0].config.data.datasets.map(d=>d.label), ["workshop_new", "baseline"]);
+  assert.deepEqual(panels[0].config.data.datasets.map(d=>d.identityBadge), ["A", "B"]);
+  assert.equal(panels[0].config.plugins[0].id, "historyIdentityLabels");
+  assert.deepEqual(charts.createExperimentStyles([runs[1]], undefined, styles)["base/a"], styles["base/a"]);
+});
+
+test("bar identity labels include zero values and skip hidden or missing observations", () => {
+  const config = charts.metricConfigs(experiments, {...selection, view: "bar"})[0].config;
+  const drawn = [];
+  const ctx = {save(){}, restore(){}, fillText(text,x,y){drawn.push({text,x,y});}};
+  config.data.datasets[0].data = [0, null];
+  config.plugins[0].afterDatasetsDraw({
+    config: {type: "bar"}, ctx, data: config.data, chartArea: {top: 0, bottom: 100},
+    isDatasetVisible: index=>index === 0,
+    getDatasetMeta: ()=>({data: [{x: 20,y: 100}, {x: 50,y: 100}]}),
+  });
+  assert.deepEqual(drawn.map(d=>d.text), ["A"]);
+  assert.equal(drawn[0].x, 20);
+  assert.ok(drawn[0].y < 100);
+});
+
+test("multiple attacks keep the model color while exposing distinct attack badges and line styles", () => {
+  const runs = ["injecagent", "tool_knowledge"].map(attack => ({
+    ...experiments[0], id: "new/" + attack, model_group: "deepseek-flash_workshop_new",
+    model_suffix: "deepseek-flash_workshop_new", attack_name: attack,
+  }));
+  const datasets = charts.metricConfigs(runs, {...selection, theme: {attackNames: ["tool_knowledge", "injecagent"]}})[0].config.data.datasets;
+  assert.equal(datasets[0].borderColor, datasets[1].borderColor);
+  assert.deepEqual(datasets.map(row => row.identityBadge), ["A1", "A2"]);
+  assert.notDeepEqual(datasets[0].borderDash, datasets[1].borderDash);
+  assert.notEqual(datasets[0].pointStyle, datasets[1].pointStyle);
+  assert.match(datasets[0].label, /injecagent/);
+  assert.match(datasets[1].label, /tool_knowledge/);
+  const bar = charts.metricConfigs(runs, {...selection, view: "bar", suite: "workspace"})[0].config;
+  assert.notEqual(bar.data.labels[0], bar.data.labels[1]);
+  assert.deepEqual(bar.data.datasets.map(row=>row.data), [[100,null],[null,100]]);
+});
+
 test("percentage endpoints stay inside cartesian, radar and scatter plot bounds", () => {
   for (const view of ["line", "bar"]) {
     const config = charts.metricConfigs(experiments, { metrics: ["utility_rate"], view, suite: "all" })[0].config;

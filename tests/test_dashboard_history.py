@@ -110,7 +110,20 @@ class DashboardHistoryTests(unittest.TestCase):
         response = self.client.get("/")
         self.assertEqual(response.status_code, 200)
         self.assertIn(b"tab-history-analysis", response.data)
+        self.assertIn(b'href="/history"', response.data)
+        self.assertNotIn(b"history-analysis-modal", response.data)
+        self.assertNotIn(b"/static/js/history.js", response.data)
+
+    def test_history_is_a_separate_page_with_multiselect_models_and_no_experiment_script(self):
+        response = self.client.get("/history")
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b"history-model-options", response.data)
+        self.assertIn(b"history-model-select-all", response.data)
+        self.assertIn(b"history-model-clear", response.data)
         self.assertIn(b"/static/js/history.js", response.data)
+        self.assertNotIn(b"/static/js/app.js", response.data)
+        self.assertNotIn(b"history-analysis-modal", response.data)
+        self.assertIn(b'aria-current="page"', response.data)
 
     def test_catalog_discovers_result_layouts_and_normalizes_rates(self):
         with patch("dashboard.app.RESULTS_DIR", self.results_root):
@@ -125,6 +138,69 @@ class DashboardHistoryTests(unittest.TestCase):
         dashboard = next(item for item in catalog if item["source"] == "dashboard/run-001")
         self.assertEqual({item["suite_name"] for item in dashboard["suites"]}, {"travel", "slack"})
         self.assertNotIn("must-not-leak", json.dumps(catalog))
+
+    def test_catalog_groups_nested_attacks_by_folder_and_model_suffix(self):
+        for attack in ["injecagent", "tool_knowledge"]:
+            data = summary("workspace", 0.5, 0.25, 0.75)
+            data["task_selection"] = {"attack": attack}
+            write_json(self.results_root / "partial_benchmark/model_baseline" / attack / "workspace/summary.json", data)
+        with patch("dashboard.app.RESULTS_DIR", self.results_root):
+            catalog = self.client.get("/api/history/catalog").get_json()
+            nested = [item for item in catalog if item["source"].startswith("partial_benchmark/model_baseline/")]
+            self.assertEqual(len(nested), 2)
+            self.assertEqual({item["attack_name"] for item in nested}, {"injecagent", "tool_knowledge"})
+            for item in nested:
+                self.assertEqual(item["result_folder"], "partial_benchmark")
+                self.assertEqual(item["model_suffix"], "model_baseline")
+                self.assertEqual(item["model_group"], "model_baseline")
+            selected = next(item for item in nested if item["attack_name"] == "injecagent")
+            result = self.client.post("/api/history/analyze", json={"run_ids": [selected["id"]]}).get_json()
+            self.assertEqual(result["experiments"][0]["attack_name"], "injecagent")
+            self.assertEqual(result["experiments"][0]["model_suffix"], "model_baseline")
+        archive, exported = self.read_export(self.export_results([selected["source"]]))
+        self.assertEqual(exported["experiments"][0]["attack_name"], "injecagent")
+        rows = list(csv.DictReader(io.StringIO(archive.read("summary.csv").decode("utf-8-sig"))))
+        self.assertEqual(rows[0]["result_folder"], "partial_benchmark")
+        self.assertEqual(rows[0]["model_suffix"], "model_baseline")
+        self.assertEqual(rows[0]["attack_name"], "injecagent")
+
+    def test_disabled_attack_config_takes_precedence_over_retained_attack_name(self):
+        write_json(self.results_root / "dashboard/benign/overall_results.json", {
+            "config": {"run_attack": False, "attack_name": "important_instructions"},
+            "suites": [summary("workspace", 100, 0, 100)],
+        })
+        with patch("dashboard.app.RESULTS_DIR", self.results_root):
+            catalog = self.client.get("/api/history/catalog").get_json()
+        benign = next(item for item in catalog if item["source"] == "dashboard/benign")
+        self.assertEqual(benign["attack_name"], "none")
+        self.assertEqual(benign["attack_names"], ["none"])
+
+    def test_legacy_attack_metadata_is_read_without_guessing_missing_or_mixed_attacks(self):
+        path = self.results_root / "partial_benchmark/trial-p04/workspace/detailed_results.csv"
+        with path.open() as stream:
+            rows = list(csv.DictReader(stream))
+        with path.open("w", newline="") as stream:
+            writer = csv.DictWriter(stream, fieldnames=[*rows[0], "attack_type"])
+            writer.writeheader()
+            writer.writerow({**rows[0], "attack_type": "important_instructions"})
+        write_json(self.results_root / "benchmarks/ablation_study/model__injecagent/workspace/summary.json",
+                   {**summary("workspace", 0.5, 0.5, 0.5), "task_selection": {"attack": "injecagent"}})
+        write_json(self.results_root / "benchmark/model/workspace/summary.json", summary("workspace", 0.5, 0.5, 0.5))
+        write_json(self.results_root / "dashboard/mixed/overall_results.json", {
+            "suites": [summary("workspace", 50, 50, 50)],
+            "structured_records": [
+                {"suite_name": "workspace", "attack_type": attack} for attack in ["injecagent", "tool_knowledge"]
+            ],
+        })
+        with patch("dashboard.app.RESULTS_DIR", self.results_root):
+            by_source = {item["source"]: item for item in self.client.get("/api/history/catalog").get_json()}
+        self.assertEqual(by_source["partial_benchmark/trial-p04"]["attack_name"], "important_instructions")
+        legacy = by_source["benchmarks/ablation_study/model__injecagent"]
+        self.assertEqual(legacy["model_group"], "ablation_study/model")
+        self.assertEqual(legacy["model_suffix"], "model")
+        self.assertEqual(by_source["benchmark/model"]["result_folder"], "benchmark")
+        self.assertEqual(by_source["benchmark/model"]["attack_name"], "unknown")
+        self.assertEqual(by_source["dashboard/mixed"]["attack_name"], "mixed")
 
     def test_analyze_loads_task_records_only_for_selected_results(self):
         with patch("dashboard.app.RESULTS_DIR", self.results_root):

@@ -5,6 +5,7 @@ from pathlib import Path
 import csv
 
 from agentdojo import logging, benchmark, attacks
+from agentdojo.attacks.attack_registry import ATTACKS
 from agentdojo.task_suite import get_suite
 import json
 
@@ -16,6 +17,11 @@ from dscg.tool_metadata import ToolMetadataError, load_tool_metadata
 from experiments.harness_audit import rank_ids, security_result_fields
 from experiments.partial_controls import (validate_controls, make_task_manifest, load_task_manifest,
                                           select_tasks, guard_run, source_revision, preserve_cached_cost)
+
+
+TYPICAL_ATTACKS = (
+    "ignore_previous", "injecagent", "important_instructions", "tool_knowledge",
+)
 
 
 def _safe_result_component(value: str | None, fallback: str) -> str:
@@ -53,7 +59,7 @@ def _write_combined_report(output_dir: Path, report_sources: list[tuple[str, Pat
     with combined_report_path.open("w", encoding="utf-8") as combined:
         combined.write("DSCG 小批量评测总报告\n")
         combined.write("=" * 70 + "\n")
-        combined.write("本文件按场景合并各套件的 report.txt，具体任务结果见各场景标题下的内容。\n")
+        combined.write("本文件按攻击或场景合并报告，具体任务结果见对应标题下的内容。\n")
 
         for suite_name, report_path in report_sources:
             combined.write("\n\n")
@@ -70,7 +76,122 @@ def _write_combined_report(output_dir: Path, report_sources: list[tuple[str, Pat
     return combined_report_path
 
 
+def resolve_attack_names(selection: str | list[str] = "typical") -> list[str]:
+    """Resolve automatic attacks without starting a model or prompting for input."""
+    available = sorted(name for name in ATTACKS if name != "manual")
+    names = [selection] if isinstance(selection, str) else list(selection)
+    if not names:
+        raise ValueError("至少指定一个攻击，或使用 typical / all。")
+    presets = set(names) & {"typical", "all"}
+    if presets:
+        if len(set(names)) != 1:
+            raise ValueError("typical / all 不能与其他预设或具体攻击名称同时使用。")
+        if "all" in presets:
+            return available
+        missing = sorted(set(TYPICAL_ATTACKS) - set(available))
+        if missing:
+            raise ValueError(f"典型攻击未注册: {', '.join(missing)}")
+        return list(TYPICAL_ATTACKS)
+    unknown = sorted(set(names) - set(available))
+    if unknown:
+        raise ValueError(f"未知攻击: {', '.join(unknown)}")
+    return list(dict.fromkeys(names))
+
+
 def main(
+    model_id: str | None = None,
+    sec_model_id: str | None = None,
+    suites: list[str] = ["workspace", "travel", "banking", "slack"],
+    run_attack: bool = True,
+    origin=False,
+    defense: str = None,
+    *,
+    api_key: str | None = None,
+    base_url: str | None = None,
+    provider: str | None = None,
+    api_key_env: str | None = None,
+    sec_api_key: str | None = None,
+    sec_base_url: str | None = None,
+    sec_provider: str | None = None,
+    sec_api_key_env: str | None = None,
+    config_path: str | Path | None = None,
+    force_rerun: bool = False,
+    run_name: str | None = None,
+    trace_level: str = "summary",
+    tool_metadata_path: str | Path | None = None,
+    use_security_checker: bool = True,
+    audit_retries: int = 0,
+    completion_prompt: bool = False,
+    task_manifest_path: str | Path | None = None,
+    results_dir: str | Path | None = None,
+    attack: str | list[str] = "typical",
+) -> int:
+    validate_controls(origin=origin, use_security_checker=use_security_checker,
+                      audit_retries=audit_retries, completion_prompt=completion_prompt)
+    load_task_manifest(task_manifest_path)
+    attack_names = resolve_attack_names(attack) if run_attack else ["none"]
+    logdir = Path(results_dir) if results_dir is not None else RESULTS_DIR / "partial_benchmark"
+    multiple = len(attack_names) > 1
+    context = {}
+    run_records = []
+    report_sources = []
+    if run_attack:
+        print(f"本次攻击 ({len(attack_names)}): {', '.join(attack_names)}")
+
+    for attack_name in attack_names:
+        try:
+            output_dir = _run_single_attack(
+                model_id, sec_model_id, suites, run_attack, origin, defense,
+                api_key=api_key, base_url=base_url, provider=provider, api_key_env=api_key_env,
+                sec_api_key=sec_api_key, sec_base_url=sec_base_url, sec_provider=sec_provider,
+                sec_api_key_env=sec_api_key_env, config_path=config_path, force_rerun=force_rerun,
+                run_name=run_name, trace_level=trace_level, tool_metadata_path=tool_metadata_path,
+                results_dir=logdir, attack_name=attack_name,
+                report_context=context, use_security_checker=use_security_checker,
+                audit_retries=audit_retries, completion_prompt=completion_prompt,
+                task_manifest_path=task_manifest_path,
+            )
+        except (ModelConfigurationError, ToolMetadataError):
+            raise
+        except Exception as exc:
+            # Keep the other attacks runnable without turning a failed attack
+            # into a zero-ASR result. Avoid persisting raw provider exceptions.
+            run_records.append({"attack": attack_name, "status": "error", "error_type": type(exc).__name__})
+            print(f"❌ [{attack_name}] 运行失败: {type(exc).__name__}；保留已有结果并继续其他攻击。")
+        else:
+            run_records.append({
+                "attack": attack_name, "status": "completed",
+                "output_dir": str(output_dir) if output_dir is not None else None,
+            })
+            if output_dir is not None:
+                report_sources.append((attack_name, output_dir / "all_report.txt"))
+
+    fallback = logdir / _safe_result_component(run_name, "attack-run")
+    batch_dir = context.get("base_output_dir", fallback)
+    batch_dir.mkdir(parents=True, exist_ok=True)
+    manifest = {
+        "result_layout": "model_run/attack/suite",
+        "pipeline_name": context.get("pipeline_name"),
+        "model_id": context.get("model_id"),
+        "attacks": attack_names if run_attack else [],
+        "excluded_from_all": {"manual": "requires interactive input"},
+        "runs": run_records,
+    }
+    manifest_path = batch_dir / "attack_manifest.json"
+    manifest_path.write_text(json.dumps(manifest, indent=2, ensure_ascii=False), encoding="utf-8")
+    if multiple:
+        for record in run_records:
+            if record["status"] == "error":
+                error_path = batch_dir / f"{_safe_result_component(record['attack'], 'attack')}_error.txt"
+                error_path.write_text(f"运行失败: {record['error_type']}；未生成完整指标，已有逐任务结果可能不完整。\n", encoding="utf-8")
+                report_sources.append((record["attack"], error_path))
+    if report_sources:
+        _write_combined_report(batch_dir, report_sources)
+    print(f"📋 攻击执行清单: {manifest_path}")
+    return 1 if any(record["status"] == "error" for record in run_records) else 0
+
+
+def _run_single_attack(
     model_id: str | None = None,
     sec_model_id: str | None = None,
     suites: list[str] = ["workspace", "travel", "banking", "slack"],
@@ -96,6 +217,8 @@ def main(
     completion_prompt: bool = False,
     task_manifest_path: str | Path | None = None,
     results_dir: str | Path | None = None,
+    attack_name: str = "important_instructions",
+    report_context: dict | None = None,
 ):
     """
         model_id: 执行的llm的id
@@ -108,7 +231,6 @@ def main(
 
 
 
-    attack_name = "important_instructions"  # 使用 AgentDojo 预定义的注入攻击
     validate_controls(origin=origin, use_security_checker=use_security_checker,
                       audit_retries=audit_retries, completion_prompt=completion_prompt)
     frozen_tasks = load_task_manifest(task_manifest_path)
@@ -161,9 +283,15 @@ def main(
         resolved_model_id = main_model_config.get("model_id", model_id)
         resolved_sec_model_id = None if origin or not use_security_checker else sec_model_config.get("model_id", sec_model_id)
         result_dir_name = _apply_run_name(pipeline, resolved_model_id, run_name)
+        base_output_dir = logdir / result_dir_name
+        attack_component = _safe_result_component(attack_name if run_attack else "none", "attack")
+        output_dir = base_output_dir / attack_component
+        if report_context is not None:
+            report_context.update(base_output_dir=base_output_dir,
+                                  pipeline_name=result_dir_name, model_id=resolved_model_id)
         print(f"已解析模型配置 - 主模型: {resolved_model_id}, 审计模型: {resolved_sec_model_id or '无'}")
         if run_name:
-            print(f"本次运行名称: {run_name}，结果目录: {logdir / result_dir_name}")
+            print(f"本次运行名称: {run_name}，结果目录: {output_dir}")
         
         # 加载套件和攻击
         suite = get_suite("v1.2", suite_name)
@@ -175,7 +303,7 @@ def main(
         print(f"总计 Injection Tasks 数量: {len(injection_task_ids)}")
 
         attack = attacks.load_attack(attack_name, suite, pipeline) if run_attack else None
-        is_dos_attack = bool(attack and attack.is_dos_attack)
+        is_dos_attack = run_attack and attack.is_dos_attack
 
         # Share the same deterministic subset across baseline and DSCG runs.
         selected_users, selected_injections = select_tasks(
@@ -192,7 +320,7 @@ def main(
             "trace_level": None if origin else trace_level,
             "tool_metadata": tool_metadata, "source": source_revision(),
         }
-        guard_run(logdir / result_dir_name / suite_name / "run_manifest.json", run_binding)
+        guard_run(output_dir / suite_name / "run_manifest.json", run_binding)
 
         planned_task_count = (
             len(selected_users) * len(selected_injections)
@@ -210,26 +338,33 @@ def main(
             f"缓存策略: {'强制重跑' if force_rerun else '复用已有结果'} "
             "（可用 --force-rerun 或 DSCG_FORCE_RERUN=1 强制重跑）"
         )
-        with logging.OutputLogger(str(logdir)):
-            if run_attack:
-                results = benchmark.benchmark_suite_with_injections(
-                    pipeline,
-                    suite,
-                    attack,
-                    logdir,
-                    force_rerun=force_rerun,
-                    user_tasks = selected_users,
-                    injection_tasks = selected_injections,
-                    verbose= True
-                )
-            else:
-                results = benchmark.benchmark_suite_without_injections(
-                    pipeline,
-                    suite,
-                    logdir,
-                    force_rerun=force_rerun,
-                    user_tasks = selected_users
-                )
+        # AgentDojo prefixes traces, sidecars and cache lookups with pipeline.name.
+        # Infer attack/model names above first, then use the attack as the local
+        # storage component inside the model/run directory for the native loop.
+        pipeline.name = attack_component
+        try:
+            with logging.OutputLogger(str(base_output_dir)):
+                if run_attack:
+                    results = benchmark.benchmark_suite_with_injections(
+                        pipeline,
+                        suite,
+                        attack,
+                        base_output_dir,
+                        force_rerun=force_rerun,
+                        user_tasks = selected_users,
+                        injection_tasks = selected_injections,
+                        verbose= True
+                    )
+                else:
+                    results = benchmark.benchmark_suite_without_injections(
+                        pipeline,
+                        suite,
+                        base_output_dir,
+                        force_rerun=force_rerun,
+                        user_tasks = selected_users,
+                    )
+        finally:
+            pipeline.name = result_dir_name
 
         # 结果分析
         utility_results = results["utility_results"]
@@ -237,7 +372,6 @@ def main(
         print(f"实际完成评测任务数量: {len(utility_results)}")
 
         # 1. 确保目录存在 (避免 FileNotFoundError)
-        output_dir = logdir / pipeline.name
         suite_output_dir = output_dir / suite_name
         suite_output_dir.mkdir(parents=True, exist_ok=True)
         
@@ -285,9 +419,9 @@ def main(
         ]
         security_score = (
             sum(valid_security_results) / len(valid_security_results)
-            if run_attack and valid_security_results else 0
+            if run_attack and valid_security_results else None
         )
-        defense_score = 1.0 - security_score if run_attack else 1.0
+        defense_score = 1.0 - security_score if security_score is not None else None
 
 
         prompt_tokens = main_tracker.total_prompt_tokens 
@@ -300,11 +434,14 @@ def main(
 
         summary_data = {
             "suite_name": suite_name,
-            "pipeline_name": pipeline.name,
+            "pipeline_name": f"{result_dir_name}/{attack_component}",
+            "model_id": resolved_model_id,
             "defense": active_defense,
             "run_manifest": run_binding,
             "api_accounting": {"main": main_tracker.snapshot() if hasattr(main_tracker, "snapshot") else {},
                                "security": sec_tracker.snapshot() if sec_tracker and hasattr(sec_tracker, "snapshot") else {}},
+            "attack_kind": "dos" if is_dos_attack else "targeted" if run_attack else "none",
+            "security_definition": "not utility (AgentDojo DoS)" if is_dos_attack else "injection task predicate" if run_attack else None,
             "task_selection": {
                 "suite_version": "v1.2",
                 "seed": selection_seed,
@@ -314,11 +451,12 @@ def main(
             },
             "metrics": {
                 "utility_rate": utility_score,
-                "attack_success_rate": security_score if run_attack and valid_security_results else None,
-                "defense_success_rate": defense_score if run_attack and valid_security_results else None
+                "attack_success_rate": security_score,
+                "defense_success_rate": defense_score
             },
             "task_counts": {
                 "total_tasks": len(utility_results),
+                "planned_tasks": planned_task_count,
                 "utility_passed": sum(utility_results.values()),
                 "attacked_tasks": len(valid_security_results) if run_attack else 0,
                 "security_missing": sum(
@@ -356,7 +494,10 @@ def main(
         # 4.1 保存供人类阅读的 TXT 报告
         with open(report_file_path, "w", encoding="utf-8") as f:
             f.write("\n" + "="*50 + "\n")
-            f.write(f"Pipeline: {pipeline.name} | Model: {resolved_model_id}, Sec Model:{resolved_sec_model_id}\n")
+            f.write(f"Pipeline: {summary_data['pipeline_name']} | Model: {resolved_model_id}, Sec Model:{resolved_sec_model_id}\n")
+            f.write(f"Attack: {attack_name if run_attack else 'none'} | Kind: {summary_data['attack_kind']}\n")
+            if is_dos_attack:
+                f.write("DoS ASR 使用 AgentDojo 的任务失败口径（not utility），不等于目标工具攻击成功率。\n")
             f.write(f"📊 [{suite_name}] 任务详细执行报告\n")
             f.write("="*50 + "\n")
 
@@ -380,7 +521,7 @@ def main(
             f.write(f"👉 User Tasks: {len(selected_users)}/{len(user_task_ids)}\n")
             f.write(f"👉 Injection Tasks: {len(selected_injections)}/{len(injection_task_ids)}\n")
             f.write(f"👉 [{suite_name}] 整体可用性 (Utility): {utility_score:.2%}\n")
-            if run_attack and valid_security_results:
+            if run_attack and security_score is not None:
                 f.write(f"👉 [{suite_name}] 攻击成功率 (ASR): {security_score:.2%}\n")
                 f.write(f"👉 [{suite_name}] 整体安全性 (Defense Rate): {defense_score:.2%}\n")
 
@@ -419,8 +560,9 @@ def main(
 
     if output_dir is not None and report_sources:
         combined_report_path = _write_combined_report(output_dir, report_sources)
-        print("✅ 四个场景的报告已合并")
+        print("✅ 所选场景的报告已合并")
         print(f"📚 总报告: {combined_report_path}\n")
+    return output_dir
 
 
 
@@ -429,6 +571,14 @@ def main(
 def cli(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         description="运行 DSCG 的四场景小批量 AgentDojo 回归评测。"
+    )
+    parser.add_argument(
+        "--attack",
+        nargs="+",
+        action="extend",
+        choices=("typical", "all", *resolve_attack_names("all")),
+        metavar="ATTACK",
+        help="默认 typical（4 种典型目标型攻击）；all 运行全部自动攻击，也可指定具体名称。",
     )
     parser.add_argument(
         "--baseline",
@@ -494,9 +644,14 @@ def cli(argv: list[str] | None = None) -> int:
             return 0
     except ValueError as exc:
         parser.error(str(exc))
+    selected_attacks = args.attack or ["typical"]
+    try:
+        resolve_attack_names(selected_attacks)
+    except ValueError as exc:
+        parser.error(str(exc))
 
     try:
-        main(
+        status = main(
             model_id=os.getenv("DSCG_MAIN_MODEL_ID"),
             sec_model_id=os.getenv("DSCG_SEC_MODEL_ID"),
             provider=os.getenv("DSCG_MAIN_PROVIDER"),
@@ -511,6 +666,7 @@ def cli(argv: list[str] | None = None) -> int:
             tool_metadata_path=args.tool_metadata_path,
             config_path=args.config_path,
             results_dir=args.results_dir,
+            attack=selected_attacks,
             use_security_checker=not args.no_checker, audit_retries=args.audit_retries,
             completion_prompt=args.completion_prompt, task_manifest_path=args.task_manifest_path,
         )
@@ -518,7 +674,7 @@ def cli(argv: list[str] | None = None) -> int:
         print(f"模型配置错误: {exc}")
         print("请设置 DSCG_MAIN_* 环境变量，或复制 config/models.example.toml 为 config/models.local.toml 后填写。")
         return 1
-    return 0
+    return 1 if status == 1 else 0
 
 
 if __name__ == "__main__":

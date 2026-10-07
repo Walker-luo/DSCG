@@ -14,7 +14,6 @@ from agentdojo.task_suite import get_suite
 from dscg.model_config import ModelConfigurationError, resolve_model_config
 from dscg.pipelines import baseline
 from experiments import run_partial_benchmark as runner
-from experiments.harness_audit import rank_ids
 
 
 SUITES = ["workspace", "travel", "banking", "slack"]
@@ -25,6 +24,7 @@ class PartialBaselineTests(unittest.TestCase):
         with patch.object(runner, "main") as run, patch.dict(os.environ, {}, clear=True):
             self.assertEqual(runner.cli([
                 "--baseline", "--force-rerun", "--name", "baseline-check",
+                "--attack", "important_instructions",
             ]), 0)
         options = run.call_args.kwargs
         self.assertTrue(options["origin"])
@@ -33,6 +33,7 @@ class PartialBaselineTests(unittest.TestCase):
         self.assertTrue(options["force_rerun"])
         self.assertEqual(options["suites"], SUITES)
         self.assertEqual(options["run_name"], "baseline-check")
+        self.assertEqual(options["attack"], ["important_instructions"])
 
     def test_cli_default_keeps_dscg_and_cache_policy(self):
         with patch.object(runner, "main") as run, patch.dict(os.environ, {}, clear=True):
@@ -82,13 +83,13 @@ class PartialBaselineTests(unittest.TestCase):
             runner, "make_defended_pipeline",
             side_effect=lambda *args, **kwargs: (*self.fake_pipeline(), None),
         ) as defended, patch.object(runner, "load_tool_metadata", return_value={}), patch.object(
-            runner.attacks, "load_attack", return_value=Mock()
+            runner.attacks, "load_attack", return_value=SimpleNamespace(is_dos_attack=False)
         ) as attack, patch.object(
             runner.benchmark, "benchmark_suite_with_injections", side_effect=self.fake_results
         ) as benchmark:
             for origin, name in [(True, "baseline"), (False, "dscg")]:
                 runner.main(origin=origin, suites=SUITES, run_name=name,
-                            force_rerun=True, results_dir=directory)
+                            force_rerun=True, results_dir=directory, attack="important_instructions")
             self.assertEqual(original.call_count, 4)
             self.assertEqual(defended.call_count, 4)
             self.assertEqual(benchmark.call_count, 8)
@@ -96,9 +97,9 @@ class PartialBaselineTests(unittest.TestCase):
                 suite = get_suite("v1.2", suite_name)
                 expected = {
                     "suite_version": "v1.2",
-                    "seed": 20260927,
-                    "user_task_ids": rank_ids(list(suite.user_tasks), 20260927, limit=2),
-                    "injection_task_ids": rank_ids(list(suite.injection_tasks), 20260927, limit=2),
+                    "seed": 7,
+                    "user_task_ids": list(suite.user_tasks)[:3],
+                    "injection_task_ids": list(suite.injection_tasks)[:3],
                     "attack": "important_instructions",
                 }
                 for call_index, mode in [(index, "baseline"), (index + 4, "dscg")]:
@@ -106,9 +107,9 @@ class PartialBaselineTests(unittest.TestCase):
                     self.assertEqual(options["user_tasks"], expected["user_task_ids"])
                     self.assertEqual(options["injection_tasks"], expected["injection_task_ids"])
                     self.assertTrue(options["force_rerun"])
-                    report = json.loads((Path(directory) / f"offline-model_{mode}" / suite_name / "summary.json").read_text())
+                    report = json.loads((Path(directory) / f"offline-model_{mode}" / "important_instructions" / suite_name / "summary.json").read_text())
                     self.assertEqual(report["task_selection"], expected)
-                    self.assertEqual(report["task_counts"]["total_tasks"], 4)
+                    self.assertEqual(report["task_counts"]["total_tasks"], 9)
                     self.assertEqual(report["defense"], None if mode == "baseline" else "dscg")
                     if mode == "baseline":
                         self.assertNotIn("sec_overhead", report)
@@ -120,11 +121,11 @@ class PartialBaselineTests(unittest.TestCase):
             runner, "make_openai_compatible_pipeline", side_effect=self.fake_pipeline
         ), patch.object(runner, "make_defended_pipeline") as defended, patch.object(
             runner, "load_tool_metadata", side_effect=AssertionError("defense metadata was read")
-        ) as metadata, patch.object(runner.attacks, "load_attack", return_value=Mock()), patch.object(
+        ) as metadata, patch.object(runner.attacks, "load_attack", return_value=SimpleNamespace(is_dos_attack=False)), patch.object(
             runner.benchmark, "benchmark_suite_with_injections", side_effect=self.fake_results
         ):
             runner.main(origin=True, suites=["workspace"], results_dir=directory,
-                        tool_metadata_path="/nonexistent/defense.toml")
+                        tool_metadata_path="/nonexistent/defense.toml", attack="important_instructions")
             defended.assert_not_called()
             metadata.assert_not_called()
 

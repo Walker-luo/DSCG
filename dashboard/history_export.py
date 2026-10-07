@@ -73,6 +73,8 @@ README = """# 历史对比分析数据
 - `summary.csv`：每个实验 × 场景一行，可在 Excel 中查看。
 - `task_records.csv`：带实验 ID 的逐任务结果，可按场景、user_task_id、injection_task_id、model_id、attack_type 对齐对比。
 
+实验身份保留 result_folder、model_group、model_suffix、attack_name，可按原结果目录、模型/运行名称和攻击分组。unknown 表示没有记录攻击；mixed 表示旧汇总含多种攻击，不能据此拆分汇总分母。
+
 ## 指标口径
 
 所有百分比均为 0–100，JSON 缺失值为 null，CSV 对应空单元格。布尔 False 是一次未成功的结果，与缺失值不同。
@@ -117,6 +119,7 @@ def build_history_export(experiments, suites_filter, exported_at):
         identity = {
             "experiment_id": run["id"], "label": run["label"],
             "source": run["source"], "result_type": run["result_type"],
+            **{key: run.get(key, "") for key in ("result_folder", "model_group", "model_suffix", "attack_name")},
         }
         for suite in run["suites"]:
             suite["record_statistics"] = _record_statistics(suite["task_records"])
@@ -173,7 +176,8 @@ def build_history_export(experiments, suites_filter, exported_at):
         "experiments": experiments,
     }
     task_fields = [
-        "experiment_id", "label", "source", "result_type", "suite_name", "model_id",
+        "experiment_id", "label", "source", "result_type", "result_folder", "model_group",
+        "model_suffix", "attack_name", "suite_name", "model_id",
         "attack_type", "user_task_id", "injection_task_id", "sample_status",
         "utility_success", "attack_success", "defense_success",
     ]

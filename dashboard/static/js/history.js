@@ -1,7 +1,10 @@
 (() => {
   const suites = ["workspace", "travel", "banking", "slack"];
-  const colors = ["--blue", "--green", "--amber", "--red", "--purple"];
+  const colors = ["--blue", "--amber", "--purple", "--green", "--red"];
   const historyCharts = window.DSCGHistoryCharts;
+  const historySelection = window.DSCGHistorySelection;
+  const analysisRequests = historySelection.createRequestGate();
+  let filters = { folder: "all", models: null, attack: "all" };
   let catalog = [];
   let loaded = false;
   let charts = [];
@@ -9,25 +12,43 @@
   let exporting = false;
 
   document.addEventListener("DOMContentLoaded", () => {
+    document.querySelector("#history-analysis-page").addEventListener("change", () => analysisRequests.invalidate());
     document.querySelector("#history-select-all").addEventListener("click", () => {
+      analysisRequests.invalidate();
       document.querySelectorAll(".history-run-cb").forEach((item) => { item.checked = true; });
       updateSelection();
     });
     document.querySelector("#history-clear-selection").addEventListener("click", () => {
+      analysisRequests.invalidate();
       document.querySelectorAll(".history-run-cb").forEach((item) => { item.checked = false; });
       updateSelection();
     });
     document.querySelector("#history-run-list").addEventListener("change", updateSelection);
+    ["folder", "attack"].forEach((key) => {
+      document.querySelector("#history-" + key + "-select").addEventListener("change", () => {
+        filters[key] = document.querySelector("#history-" + key + "-select").value;
+        refreshFilterResults(true);
+      });
+    });
+    document.querySelector("#history-model-options").addEventListener("change", () => {
+      const options = Array.from(document.querySelectorAll(".history-model-cb"));
+      const chosen = options.filter(item => item.checked).map(item => item.value);
+      filters.models = chosen.length === options.length ? null : chosen;
+      refreshFilterResults(true);
+    });
+    document.querySelector("#history-model-select-all").addEventListener("click", () => {
+      filters.models = null;
+      refreshFilterResults(true);
+    });
+    document.querySelector("#history-model-clear").addEventListener("click", () => {
+      filters.models = [];
+      refreshFilterResults(true);
+    });
     document.querySelector("#history-suite-select").addEventListener("change", updateControls);
     document.querySelector("#history-chart-type").addEventListener("change", updateControls);
     document.querySelector("#history-metric-select").addEventListener("change", updateControls);
     document.querySelector("#history-analyze").addEventListener("click", analyze);
     document.querySelector("#history-export").addEventListener("click", exportAnalysis);
-    document.querySelector("#btn-history-analysis").addEventListener("click", loadCatalog);
-    document.querySelector("#history-analysis-modal").addEventListener("shown.bs.modal", () => {
-      loadCatalog();
-      charts.forEach((chart) => chart.resize());
-    });
     loadCatalog();
     updateControls();
     window.setInterval(loadCatalog, 30000);
@@ -56,39 +77,105 @@
     }
   }
 
-  function renderCatalog(selected, chooseLatest) {
+  function refreshFilterResults(selectAllVisible) {
+    analysisRequests.invalidate();
+    renderCatalog(new Set(selectedRunIds()), true, selectAllVisible);
+    clearCharts();
+    renderSummaryTable([]);
+    document.querySelector("#history-source-caption").textContent = "";
+    showEmpty("筛选已更新", "勾选当前列表中的结果，生成分析或下载数据。");
+  }
+
+  function versionBadge(style) {
+    const badge = document.createElement("i");
+    badge.className = "history-version-badge";
+    badge.textContent = style.badge;
+    badge.style.backgroundColor = style.color;
+    badge.setAttribute("aria-hidden", "true");
+    return badge;
+  }
+
+  function renderModelChoices(models) {
+    const target = document.querySelector("#history-model-options");
+    target.replaceChildren();
+    models.forEach(model => {
+      const label = document.createElement("label");
+      label.className = "history-model-option";
+      const checkbox = document.createElement("input");
+      checkbox.type = "checkbox";
+      checkbox.className = "form-check-input history-model-cb";
+      checkbox.value = model;
+      checkbox.setAttribute("aria-label", model);
+      checkbox.checked = filters.models === null || filters.models.includes(model);
+      const run = catalog.find(item => item.model_group === model);
+      const text = document.createElement("span");
+      const title = document.createElement("strong");
+      title.textContent = historyCharts.describeExperiment(run).label;
+      const detail = document.createElement("small");
+      detail.textContent = model;
+      text.append(title, detail);
+      label.append(checkbox, versionBadge(experimentStyles[run.id]), text);
+      target.append(label);
+    });
+    const count = filters.models === null ? models.length : filters.models.length;
+    document.querySelector("#history-model-count").textContent = count + " / " + models.length + " 项";
+  }
+
+  function renderCatalog(selected, chooseLatest, selectAllVisible = false) {
+    const resolved = historySelection.resolveFilters(catalog, filters);
+    filters = resolved.filters;
+    [["folder", resolved.folders, "全部目录"],
+      ["attack", resolved.attacks, "全部攻击"]].forEach(([key, values, allLabel]) => {
+      const select = document.querySelector("#history-" + key + "-select");
+      select.replaceChildren();
+      addOption(select, "all", allLabel);
+      values.forEach(value => addOption(select, value, key === "attack" ? historySelection.attackLabel(value) : value));
+      select.value = filters[key];
+    });
+    renderModelChoices(resolved.models);
+    const visible = historySelection.filterRuns(catalog, filters);
+    selected = new Set(historySelection.visibleSelection(visible, Array.from(selected), selectAllVisible));
+    if (chooseLatest && !selected.size && visible.length) selected.add(visible[0].id);
     const list = document.querySelector("#history-run-list");
     list.replaceChildren();
-    document.querySelector("#history-catalog-count").textContent = catalog.length + " 项结果";
-    if (!catalog.length) {
+    document.querySelector("#history-catalog-count").textContent = visible.length + " / " + catalog.length + " 项";
+    if (!visible.length) {
       const empty = document.createElement("div");
       empty.className = "empty-state history-list-empty";
-      empty.textContent = "尚无可分析的结果";
+      empty.textContent = "当前筛选下没有结果";
       list.append(empty);
       updateSelection();
       return;
     }
-    catalog.forEach((run, index) => {
+    const groups = new Map();
+    visible.forEach(run => {
+      const key = run.result_folder + "/" + run.model_group;
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key).push(run);
+    });
+    groups.forEach((runs, group) => {
+      const heading = document.createElement("div");
+      heading.className = "history-run-group-title";
+      heading.textContent = group;
+      list.append(heading);
+      runs.forEach((run) => {
       const label = document.createElement("label");
       label.className = "history-run-option";
       const checkbox = document.createElement("input");
       checkbox.type = "checkbox";
       checkbox.className = "form-check-input history-run-cb";
       checkbox.value = run.id;
-      checkbox.checked = selected.has(run.id) || (chooseLatest && index === 0);
+      checkbox.checked = selected.has(run.id);
       const text = document.createElement("span");
       const title = document.createElement("strong");
-      title.textContent = run.label || run.source;
+      title.textContent = historySelection.attackLabel(run.attack_name);
+      label.title = (run.label || "") + " · " + run.source;
       const detail = document.createElement("small");
-      detail.textContent = (run.result_type || "results") + " · " + run.source + " · " +
-        (run.suites || []).map((item) => item.suite_name).join(", ");
+      detail.textContent = (run.suites || []).map((item) => item.suite_name).join(", ");
       text.append(title, detail);
-      const swatch = document.createElement("i");
-      swatch.className = "history-run-swatch";
-      swatch.setAttribute("aria-hidden", "true");
-      swatch.style.backgroundColor = experimentStyles[run.id].color;
-      label.append(checkbox, swatch, text);
+      label.append(checkbox, versionBadge(experimentStyles[run.id]), text);
       list.append(label);
+      });
     });
     updateSelection();
   }
@@ -185,15 +272,24 @@
     const radar = view.querySelector('option[value="radar"]');
     radar.disabled = !historyCharts.canUseRadar(metrics, document.querySelector("#history-suite-select").value);
     if (radar.disabled && view.value === "radar") view.value = "bar";
-    document.querySelector("#history-analyze").disabled = !fixedMetrics && !metrics.length;
+    document.querySelector("#history-analyze").disabled = !selectedRunIds().length || (!fixedMetrics && !metrics.length);
     document.querySelector("#history-metric-hint").textContent = fixedMetrics
       ? (view.value === "scatter" ? "散点图固定比较 ASR 与 TSR。" : "热图固定展示逐任务效用结果。")
       : !metrics.length ? "请至少选择一个指标。"
-        : "每个指标单独成图，同一实验颜色一致；雷达图仅支持全部场景的百分比指标。";
+        : "同一模型 / 运行名称共用颜色与字母标记；点击图例可隐藏单项。雷达图仅支持全部场景的百分比指标。";
   }
 
   function selectedMetricKeys() {
     return Array.from(document.querySelectorAll(".history-metric-cb:checked"), (item) => item.value);
+  }
+
+  function analysisSelectionKey() {
+    return JSON.stringify({
+      ids: selectedRunIds().sort(), filters,
+      suite: document.querySelector("#history-suite-select").value,
+      view: document.querySelector("#history-chart-type").value,
+      metrics: selectedMetricKeys(),
+    });
   }
 
   async function analyze() {
@@ -206,6 +302,9 @@
     const suite = document.querySelector("#history-suite-select").value;
     const view = document.querySelector("#history-chart-type").value;
     const settings = { suite, view, metrics: selectedMetricKeys() };
+    const request = analysisRequests.start();
+    const selectionKey = analysisSelectionKey();
+    const isCurrent = () => analysisRequests.isCurrent(request) && selectionKey === analysisSelectionKey();
     status.textContent = "正在汇总所选结果…";
     try {
       const response = await fetch("/api/history/analyze", {
@@ -218,10 +317,11 @@
         }),
       });
       const data = await response.json();
+      if (!isCurrent()) return;
       if (!response.ok) throw new Error(data.error || "历史结果分析失败");
       renderAnalysis(data, settings);
     } catch (error) {
-      status.textContent = error.message || "历史结果分析失败。";
+      if (isCurrent()) status.textContent = error.message || "历史结果分析失败。";
     }
   }
 
@@ -255,6 +355,7 @@
     const heatmap = document.querySelector("#history-heatmap-container");
     const chartContainer = document.querySelector(".history-chart-container");
     wrap.hidden = false;
+    wrap.classList.toggle("is-dense", experiments.length > 6);
     heatmap.hidden = true;
     chartContainer.classList.add("is-ready");
     if (view === "scatter") {
@@ -292,15 +393,44 @@
     canvas.setAttribute("role", "img");
     canvas.setAttribute("aria-label", description);
     plot.append(canvas);
-    panel.append(heading, plot);
+    const legend = document.createElement("div");
+    legend.className = "history-chart-legend";
+    legend.setAttribute("aria-label", "实验图例；点击显示或隐藏对应实验");
+    panel.append(heading, legend, plot);
     wrap.append(panel);
-    charts.push(new Chart(canvas, config));
+    config.options.plugins.legend.display = false;
+    const chart = new Chart(canvas, config);
+    charts.push(chart);
+    config.data.datasets.forEach((dataset, index) => {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "history-legend-item";
+      button.title = dataset.fullLabel;
+      button.setAttribute("aria-label", dataset.identityBadge + " · " + dataset.fullLabel);
+      button.setAttribute("aria-pressed", "true");
+      const text = document.createElement("span");
+      const name = document.createElement("strong");
+      name.textContent = dataset.legendLabel;
+      const detail = document.createElement("small");
+      detail.textContent = dataset.legendSubtitle;
+      text.append(name, detail);
+      button.style.borderLeftColor = dataset.borderColor;
+      button.append(versionBadge({badge: dataset.identityBadge, color: dataset.borderColor}), text);
+      button.addEventListener("click", () => {
+        const visible = !chart.isDatasetVisible(index);
+        chart.setDatasetVisibility(index, visible);
+        button.setAttribute("aria-pressed", String(visible));
+        chart.update();
+      });
+      legend.append(button);
+    });
   }
 
   function chartTheme() {
     return {
       colors: colors.map(css),
       experimentStyles,
+      attackNames: catalog.map(run => run.attack_name),
       text: css("--text-secondary"), muted: css("--text-muted"), border: css("--border"),
     };
   }
@@ -349,7 +479,11 @@
     experiments.forEach((run) => {
       const cell = document.createElement("th");
       cell.scope = "col";
-      cell.textContent = run.label;
+      cell.append(versionBadge(experimentStyles[run.id]), document.createTextNode(" " + historyCharts.describeExperiment(run).label));
+      const detail = document.createElement("small");
+      detail.className = "history-table-source";
+      detail.textContent = historyCharts.describeExperiment(run).subtitle;
+      cell.append(detail);
       cell.setAttribute("aria-label", run.label + " · " + run.source);
       heading.append(cell);
     });
@@ -398,7 +532,7 @@
     if (!rows.length) {
       const row = document.createElement("tr");
       const cell = document.createElement("td");
-      cell.colSpan = 7;
+      cell.colSpan = 8;
       cell.textContent = "尚无分析数据";
       row.append(cell);
       body.append(row);
@@ -408,12 +542,13 @@
       const row = document.createElement("tr");
       const nameCell = document.createElement("td");
       const name = document.createElement("strong");
-      name.textContent = run.label;
+      name.textContent = historyCharts.describeExperiment(run).label;
       const source = document.createElement("small");
       source.className = "history-table-source";
       source.textContent = run.source;
-      nameCell.append(name, source);
+      nameCell.append(versionBadge(experimentStyles[run.id]), name, source);
       row.append(nameCell);
+      addCell(row, historySelection.attackLabel(run.attack_name));
       addCell(row, item.suite_name);
       addCell(row, formatRate(item.metrics.utility_rate));
       addCell(row, formatRate(item.metrics.attack_success_rate));

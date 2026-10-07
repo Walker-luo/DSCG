@@ -112,22 +112,70 @@ python -m experiments.run_partial_benchmark --name partial-check
 python -m experiments.run_benchmark --name full-check
 ```
 
-两个入口默认均启用完整 DSCG，覆盖 workspace、travel、banking、slack，使用 `important_instructions` 攻击。partial 是固定 seed 的小批量回归，full 使用全部任务；结果分别保存到 `results/partial_benchmark/` 和 `results/benchmarks/` 的 `<model_id>_<name>/` 目录。正式实验需另行固定 manifest、模型、攻击、seed 和防御开关。
+两个入口默认均启用完整 DSCG，覆盖 workspace、travel、banking、slack。partial 默认使用 `typical`：`ignore_previous`、`injecagent`、`important_instructions`、`tool_knowledge` 这 4 种典型目标型攻击；full 使用全部任务和固定的 `important_instructions` 攻击。结果分别保存到 `results/partial_benchmark/` 和 `results/benchmarks/`。正式实验需另行固定 manifest、模型、攻击、seed 和防御开关。
 
 重新运行与 partial 相同任务的**无防御 baseline**：
 
 ```bash
-python -m experiments.run_partial_benchmark \
-  --baseline --force-rerun --name baseline-20261006
+python -m experiments.run_partial_benchmark --baseline --force-rerun --name baseline-typical-20261007
 ```
 
-该模式使用原生 AgentDojo 工具循环和当前主模型配置，不启用 DSCG、安全模型或 AgentDojo 防御。保留 `important_instructions` 注入攻击；与防御版共用 v1.2 套件和 seed `20260927`，每场景选 2 个用户任务 × 2 个注入任务，四场景共计划 16 个组合。各场景 `summary.json` 的 `task_selection` 保存 seed 和具体任务 ID，`defense: null` 表示无防御。比较时保持主模型配置一致，使用不同运行名称保留两组结果；旧版本若采用不同任务选择规则，需核对原始任务 ID。
+该模式使用原生 AgentDojo 工具循环和当前主模型配置，不启用 DSCG、安全模型或 AgentDojo 防御。与防御版共用 v1.2 套件、每场景按注册顺序取前 3 个用户任务和前 3 个注入任务。目标型攻击每场景计划 9 个组合，默认 4 种攻击共计划 **144** 条攻击评测，另有注入任务能力预检。典型集覆盖指令覆盖、InjecAgent 模板、用户身份伪装和工具知识提示；这是控制测试规模的固定选择，不表示已验证攻击强度。
+
+`--attack all` 可运行全部 16 种自动攻击，当前共计划 **456** 条。DoS 攻击须显式选择或使用 `all`；它们遵循 AgentDojo 原生规则，每用户只运行一次，ASR 按任务失败计算。计划数不等于有效样本数。
+
+指定一种或多种攻击：
+
+```bash
+python -m experiments.run_partial_benchmark --baseline --attack tool_knowledge --name baseline-tools
+python -m experiments.run_partial_benchmark --attack tool_knowledge injecagent --name dscg-two-attacks
+python -m experiments.run_partial_benchmark --baseline --attack all --name baseline-all
+```
+
+可选攻击（当前 AgentDojo 安装版本）：
+
+这些攻击均有 AgentDojo 官方实现。[AgentDojo 发表于 NeurIPS 2024 Datasets and Benchmarks][agentdojo-publication]，[InjecAgent 发表于 ACL Findings 2024][injecagent-paper]。表中区分论文实验与 AgentDojo 官方模板；16 个名称包含消融变体，并非 16 种独立发表的方法。`system_message` 和 `tool_knowledge` 在此仅标为 AgentDojo 官方实现。
+
+| `--attack` 值 | 简要说明 | 类型 | 来源 |
+| --- | --- | --- | --- |
+| `typical` | 默认运行上述 4 种典型目标型攻击 | 批量选择 | 本项目选择器 |
+| `all` | 显式运行全部 16 种自动攻击 | 批量选择 | 本项目选择器 |
+| `direct` | 用 `TODO` 直接要求执行攻击目标 | 目标型 | [AgentDojo §4.2][agentdojo-paper] |
+| `ignore_previous` | 要求忽略原指令，改做攻击任务 | 目标型 | [AgentDojo §4.2][agentdojo-paper] |
+| `system_message` | 用系统消息标记伪装指令来源 | 目标型 | [AgentDojo 官方模板][agentdojo-baseline] |
+| `injecagent` | 用 `IMPORTANT` 和“忽略之前指令”强调攻击目标 | 目标型 | [InjecAgent][injecagent-paper]、[AgentDojo 官方适配][agentdojo-baseline] |
+| `important_instructions` | 冒充用户，声称必须先完成攻击目标才能做原任务 | 目标型 | [AgentDojo §4.1–4.2][agentdojo-paper] |
+| `important_instructions_no_user_name` | 上述模板中，用泛称代替真实用户名 | 目标型变体 | [AgentDojo 表 2][agentdojo-paper]、[AgentDojo 官方变体][agentdojo-variants] |
+| `important_instructions_no_model_name` | 上述模板中，用泛称代替真实模型名 | 目标型变体 | [AgentDojo 表 2][agentdojo-paper]、[AgentDojo 官方变体][agentdojo-variants] |
+| `important_instructions_no_names` | 同时用泛称代替用户名和模型名 | 目标型变体 | [AgentDojo 表 2][agentdojo-paper]、[AgentDojo 官方变体][agentdojo-variants] |
+| `important_instructions_wrong_user_name` | 换成错误用户名，测试身份线索的影响 | 目标型变体 | [AgentDojo 表 2][agentdojo-paper]、[AgentDojo 官方变体][agentdojo-variants] |
+| `important_instructions_wrong_model_name` | 换成错误模型名，测试模型称呼的影响 | 目标型变体 | [AgentDojo 表 2][agentdojo-paper]、[AgentDojo 官方变体][agentdojo-variants] |
+| `tool_knowledge` | 在重要指令模板中补充工具调用顺序和参数占位符 | 目标型 | [AgentDojo 官方模板][agentdojo-baseline] |
+| `dos` | 要求立即停止当前任务，输出指定文本 | DoS | [AgentDojo 附录 D][agentdojo-paper]、[AgentDojo 官方实现][agentdojo-dos] |
+| `swearwords_dos` | 用辱骂内容诱使模型停止任务 | DoS | [AgentDojo 附录 D][agentdojo-paper]、[AgentDojo 官方实现][agentdojo-dos] |
+| `captcha_dos` | 声称须先解决验证码，否则停止任务 | DoS | [AgentDojo 附录 D][agentdojo-paper]、[AgentDojo 官方实现][agentdojo-dos] |
+| `offensive_email_dos` | 要求发送威胁性消息，诱使模型拒绝并中断任务 | DoS | [AgentDojo 附录 D][agentdojo-paper]、[AgentDojo 官方实现][agentdojo-dos] |
+| `felony_dos` | 声称处理当前内容违法，诱使模型停止任务 | DoS | [AgentDojo 附录 D][agentdojo-paper]、[AgentDojo 官方实现][agentdojo-dos] |
+
+[agentdojo-publication]: https://papers.neurips.cc/paper_files/paper/2024/hash/97091a5177d8dc64b1da8bf3e1f6fb54-Abstract-Datasets_and_Benchmarks_Track.html
+[agentdojo-paper]: https://arxiv.org/html/2406.13352v2
+[injecagent-paper]: https://aclanthology.org/2024.findings-acl.624/
+[agentdojo-baseline]: https://agentdojo.spylab.ai/api/attacks/baseline_attacks/
+[agentdojo-variants]: https://github.com/ethz-spylab/agentdojo/blob/main/src/agentdojo/attacks/important_instructions_attacks.py
+[agentdojo-dos]: https://github.com/ethz-spylab/agentdojo/blob/main/src/agentdojo/attacks/dos_attacks.py
+
+partial 的单攻击和多攻击统一保存到 `results/partial_benchmark/<model_id>_<name>/<attack>/<suite>/`。例如 `--baseline --name baseline` 的 workspace 结果为 `<model_id>_baseline/<attack>/workspace/`，其中包含 summary/CSV/文本报告及原始任务 JSON；完整 trace 侧车与对应 JSON 同目录。新运行按此层级读取缓存，旧目录和结果保留。
+
+`<model_id>_<name>/` 下保存 `attack_manifest.json` 和 `all_report.txt`；每个攻击目录下另有跨场景的 `all_report.txt`，不混合目标型与 DoS 的 ASR。攻击运行异常会记录为 error，并继续其他攻击，最终退出码为 1；全部运行完成为 0，不表示 harness 或安全性验收通过。
+
+各场景 `summary.json` 的 `task_selection` 保存具体任务 ID，`defense: null` 表示无防御。当前 partial 保留的 `seed: 7` 字段不参与前 3 项选择，应以具体 ID 为准。比较时保持主模型配置和攻击选择一致，使用不同运行名称保留两组结果；旧版本若采用不同任务选择规则，需核对原始任务 ID。当前 AgentDojo 输出文本 predicate 的已知误报仍需 E0 审计，新增攻击入口不修改原始判定。
 
 常用选项：
 
 | 选项 | 用途 |
 | --- | --- |
 | `--name NAME` | 区分运行版本，避免复用其他实验的结果 |
+| `--attack typical/all/NAME [NAME ...]` | partial 默认 typical；all 测全部，或指定一个/多个名称；预设不能与具体名称混用，非法选择在模型初始化前拒绝 |
 | `--baseline` | partial 入口使用无防御基线，任务子集和攻击保持一致 |
 | `--force-rerun` | partial 入口重新执行已有任务，不复用缓存 |
 | `--trace-level summary/standard/full` | 默认摘要、裁剪后的逐条记录、完整记录与 `.dscg_trace.jsonl.gz` 侧车 |
@@ -145,7 +193,11 @@ python -m dashboard.app
 
 默认地址为 [http://127.0.0.1:8888](http://127.0.0.1:8888)，可用 `PORT` 覆盖；结果保存到 `results/dashboard/`。面板支持实验配置、历史分析和图表。绘图脚本位于 [`experiments/plots/`](./experiments/plots/)，输出到 `docs/figures/benchmarks/`。
 
-“历史分析”的指标支持多选，默认选择 TSR 与 ASR，每个指标各自成图，桌面端并排、窄屏纵向展示。同一实验的颜色与点形在各图、图例和实验列表中一致，取消部分实验或切换指标时保留颜色对应。Token 图使用自身的千单位纵轴；百分比图继续保留 −5%～105% 的范围，雷达图外圈为 110%。雷达图仅适用于全部场景的百分比指标，散点图与任务热图使用固定指标。验收证据见[历史分析分图与颜色报告](./docs/history_separate_report.md)。
+顶部 **实验配置** 与 **历史分析** 是并列页面；历史分析可直接访问 [http://127.0.0.1:8888/history](http://127.0.0.1:8888/history)。按 **结果目录 → 模型 / 运行名称（可多选）→ 攻击名称** 筛选。比较框架版本时，先清空模型，勾选 baseline 与改进版本，再选择同一攻击和场景，生成 TSR / ASR 对比或下载数据。每次更新筛选默认勾选全部匹配结果，也可在结果列表逐项取消；自动刷新保留当前选择。
+
+目录沿用实际名称，如 `partial_benchmark/`、`benchmark/` 或 `benchmarks/`；新结果按 `<model>_<name>/<attack>/<suite>/` 分组，旧目录也可读取。攻击从已保存的汇总、CSV 或配置识别；缺失时显示“未记录攻击”，含多种攻击的旧汇总显示“混合攻击”。分析和下载仅使用当前勾选结果；比较改进前后时还需核对具体任务 ID 是否一致。验收见[独立历史页与模型多选报告](./docs/history_multiselect_page_report.md)。
+
+桌面端左侧筛选、右侧分析；窄屏纵向排列。默认分别绘制 TSR 与 ASR，顶部图例突出 `baseline`、`workshop_new` 等版本名，可点击隐藏单项。同一模型 / 运行名称在列表、各图与明细表中共用颜色和字母标记，柱上也标出字母（含零值）；同时比较多个攻击时，另加攻击编号、点形和线型。对比超过 6 项时图表改为单列。完整运行名称与来源保留在提示和下载数据中。Token 使用独立的千单位轴；百分比范围为 −5%～105%，雷达图外圈为 110%。雷达图仅支持全部场景的百分比指标，散点图与任务热图使用固定指标。验收见[版本视觉区分报告](./docs/history_version_identity_report.md)。
 
 在“历史分析”中勾选需要对比的实验、选择场景，点击 **下载分析数据** 即可下载 ZIP，无需先生成图表。下载同时包含 ASR 与 TSR，不受图表类型或指标选择影响：
 

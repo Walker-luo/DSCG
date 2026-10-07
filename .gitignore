@@ -6,3 +6,5 @@ __pycache__/
 config/models.local.toml
 config/*.local.toml
 config/tools.local.toml
+/examples/
+/download/
