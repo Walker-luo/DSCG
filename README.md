@@ -174,77 +174,41 @@ python -m dashboard.app
 <!-- framework-optimization-20261007 -->
 ## 本轮框架优化
 
-2026-10-07 V2 阶段一已实施：授权编译固定 `temperature=0`、工具目录排序，明确条件预订与已有支付更新的任务语义；失败原因写入 `error_code`，仍 fail-closed。无需新增配置或参数。161 项回归通过；12 次真实模型编译检查仅用于核对工具选择，不能代表 benchmark 收益。见 [V2 实施报告](docs/framework_v2_report.md)。
+本轮 V2 保持两层，每层只负责一件事，无需新增配置文件或参数：
 
-| 阶段 | 工程状态 |
+| 层 | 本次修正 |
 |---|---|
-| P0-A 任务隔离 | 顶层调用新建 context，清除旧授权缓存和历史、撤销票据；任务内循环沿用。 |
-| P0-B 成本与诊断 | 记录主模型/授权/审计 API、Token、耗时；历史分析显示两模型合计。官方攻击分数保留，E0 独立送达/环境复核仍待完成。 |
-| P0-C 外部请求 | 网页请求按外部接收方路由至现有审计；离线成对样例覆盖合法访问和注入网址。未实现 URL 对象约束。 |
-| P1-A 有界重审 | 可选一次语义 abstain 重审；保留当前任务历史，parser/超时不重试，持续不确定阻断。 |
-| P1-B 任务完成提示 | 可选通用提示继续已授权任务并覆盖用户要求字段；每次工具动作仍受现有 monitor/ticket 检查。 |
-| P2 消融入口 | partial CLI 支持 no-checker、重审和完成提示开关及匹配任务 manifest；实际安全/效用收益仍需有效在线对照。 |
+| 工具授权 | 固定 `temperature=0`、排序工具目录，明确条件预订与已有支付更新；编译失败记录 `error_code` 并 fail-closed。只读取可信用户请求，外部反馈不能补授权。 |
+| 动作审计 | 加入当前任务最近 4 条工具返回，每条最多 2,048 字符，标明不可信及截断；用事实判断当前动作，外部新增命令不能扩大任务。默认每批一次审计。 |
 
-离线验证与限制见 [优化实施报告](docs/framework_optimization_report.md)。上述工程测试不证明 benchmark 防御收益；I3 仍为 partial，参数、对象和数据约束及 I2 保持锁定。
+Monitor 和一次性 ticket 沿用。重审和任务完成提示仍默认关闭。没有本地 `config/tools.local.toml` 时自动使用仓库内置 `config/tools.agentdojo-v1.2.toml`；显式路径/环境变量、本地覆盖优先，未知工具仍按 critical 处理。模型凭据沿用现有配置或环境变量。
 
-### 本次新增参数
+回归 **167/167**；真实模型合成检查：授权 **12/12** 无缺失/额外写工具，审计加入上下文后 **8/8** 符合预设判断，对照无上下文 **4/8**。这不是 benchmark 防御率。报告与限制见 [V2 实施记录](docs/framework_v2_report.md)。I3 仍为 **partial：24 条有效样例中 8 个范围缺口**，对象/数据权限与 I2 仍未实现。
 
-- `--no-checker`：关闭 LLM 审计，保留工具授权、Reference Monitor 和一次性 ticket。
-- `--audit-retries 1`：语义 abstain 最多重审一次，默认 `0`；超时、格式错误和持续不确定仍阻断。
-- `--completion-prompt`：启用通用任务完成提示，继续已授权任务并覆盖用户要求的字段；默认关闭。
-- `--clean`：使用相同用户任务运行无攻击效用控制，安全指标为 N/A。
-- `--task-manifest PATH`：读取冻结任务 ID，确保 baseline 与防御版使用相同任务。
-- `--write-task-manifest PATH`：离线生成任务清单后退出，不调用模型，不覆盖已有文件。
+### 可选对照参数
 
-`--baseline` 不能与 `--no-checker`、非零 `--audit-retries` 或 `--completion-prompt` 同用；`--no-checker` 不能启用重审。默认防御版已包含任务隔离、成本统计和外部请求风险修正；重审与完成提示默认关闭，分别加测后再决定是否组合。
+- `--no-checker`：只测工具授权与 Monitor/ticket，关闭 LLM 审计。
+- `--clean`：相同用户任务的无攻击效用控制，安全指标为 N/A。
+- `--audit-retries 1`：可选一次语义 abstain 重审，默认 `0`。
+- `--completion-prompt`：可选通用任务完成提示，默认关闭，单独加测。
+- `--task-manifest PATH`：仅自定义任务时使用；本轮默认任务已匹配旧结果，无需传入。
+- `--write-task-manifest PATH`：可选离线导出清单后退出，不调用模型。
+
+`--baseline` 不能与 `--no-checker`、重审或完成提示组合；`--no-checker` 不能启用重审。
 
 ### 匹配对比命令
 
-以下命令默认已进入 `ipi` 环境。
-
-已核对旧 `baseline` 与 `workshop_new` 的 **32 个场景汇总**：下方清单的 v1.2 用户 / 注入任务 ID 与旧结果一致；每场景 3×3 组合，四种典型攻击共 **144 条 / 组**，覆盖 12 个用户任务。核对记录见 [comparison_check.json](examples/results/framework_optimization/20261007_readme_comparison/comparison_check.json)。
-
-**1. 冻结任务与模型。** 清单已在本次文档核对中生成；若换新清单路径，执行下面的生成命令。已有文件直接复用，不重复生成。主模型与审计模型 ID 保持前次的 `deepseek-flash`，沿用当前 DeepSeek provider 配置。
+以下默认已进入 `ipi` 环境，沿用 `deepseek-flash` 模型配置。**不需要生成或导入任务清单**：默认 v1.2 任务 ID 已核对与旧 `baseline` / `workshop_new` 的冻结清单一致，每组四种典型攻击 **144 条**、**12 个用户任务簇**。每次结果仍自动保存实际 `task_selection` / `run_manifest`。
 
 ```bash
 cd /Users/luo/Desktop/AgentDefence/DSCG
-export DSCG_MAIN_MODEL_ID=deepseek-flash
-export DSCG_SEC_MODEL_ID=deepseek-flash
-
-# 仅在清单不存在时执行
-python -m experiments.run_partial_benchmark \
-  --write-task-manifest examples/results/framework_optimization/20261007_readme_comparison/task_manifest.json
+python -m experiments.run_partial_benchmark --baseline --force-rerun --name baseline_v2_control
+python -m experiments.run_partial_benchmark --no-checker --force-rerun --trace-level full --name workshop_v2_authorization
+python -m experiments.run_partial_benchmark --force-rerun --trace-level full --name workshop_v2_two_layer
 ```
 
-**2. 重跑无防御 baseline。** 使用新名称作为同批次主对照。
+先做 clean 控制：三条分别加 `--clean`，名称加 `_clean`（每组 12 条）；攻击调试分别加 `--attack tool_knowledge`，名称加 `_tk`（每组 36 条）。正式重复使用新名称 `_r2`、`_r3`；保留旧结果。完成提示单独加测，不合并默认重审。
 
-```bash
-python -m experiments.run_partial_benchmark \
-  --baseline --attack typical \
-  --task-manifest examples/results/framework_optimization/20261007_readme_comparison/task_manifest.json \
-  --force-rerun --name baseline_control_20261007
-```
+结果路径：`results/partial_benchmark/deepseek-flash_<NAME>/<attack>/<suite>/`。在“历史分析”勾选同期 baseline、授权对照、两层版，再加旧 `baseline`、`workshop_new`、`workshop_opt` 作历史参照，保持攻击和场景相同。对比 TSR、官方 ASR、合法任务误拦和总 Token；目标任务与额外预检成本分开统计。旧 provider revision 不完整，不能用历史差异单独归因。
 
-**3. 运行当前默认优化版。** 本组衡量隔离与外部请求风险修复后的完整 P0；未启用重审或任务完成提示。
-
-```bash
-python -m experiments.run_partial_benchmark \
-  --attack typical \
-  --task-manifest examples/results/framework_optimization/20261007_readme_comparison/task_manifest.json \
-  --force-rerun --trace-level full --name workshop_opt_p0_20261007
-```
-
-需要测另外两项优化时，复制第 3 条命令，分别修改：
-
-| 加测配置 | 新增参数 | 替换 `--name` |
-|---|---|---|
-| 有界重审 | `--audit-retries 1` | `workshop_opt_reaudit_20261007` |
-| 任务完成提示 | `--completion-prompt` | `workshop_opt_completion_20261007` |
-
-无攻击控制另加 `--clean` 并给名称加 `_clean`；不把其样本计入攻击分母。
-
-### 结果比较
-
-新结果保存到 `results/partial_benchmark/deepseek-flash_<NAME>/<attack>/<suite>/`。在“历史分析”选择 `partial_benchmark`，同时勾选旧 `baseline`、旧 `workshop_new`、新 `baseline_control_20261007` 和 `workshop_opt_p0_20261007`，选择相同攻击与场景。对比 TSR、原始 ASR 和**主模型 + 审计模型总 Token**；以新 baseline 衡量当前净收益，旧结果用于历史参照。
-
-核对各 `summary.json` 的 `task_selection` 与 `run_manifest`；旧运行未完整记录 provider/model revision，任务 ID 一致不能排除模型版本或运行波动。保留官方 ASR，并另查警告中引用目标文本的误判及 E0 有效分母。混合缓存成本仅表示本次新增调用，不作为完整样本组成本。上述在线命令本次尚未执行。
+E0 真实载荷送达/终态复核和重复对照仍是有效性门槛。只有排除漏授权、缺上下文及评测误判后，两层仍无净收益，才按研究侧路线评估三层候选；本轮未新增第三层。

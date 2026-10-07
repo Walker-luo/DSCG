@@ -19,6 +19,7 @@ import os
 TOOL_METADATA_SCHEMA_VERSION = "dscg.tool-risk.v1"
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_TOOL_METADATA_PATH = PROJECT_ROOT / "config" / "tools.local.toml"
+BUILTIN_TOOL_METADATA_PATH = PROJECT_ROOT / "config" / "tools.agentdojo-v1.2.toml"
 EFFECTS = frozenset({"read", "write", "delete", "financial", "external_send"})
 SOURCES = frozenset({"calendar", "email", "cloud", "web", "local"})
 SINKS = frozenset({"none", "external_recipient", "public_output"})
@@ -35,11 +36,17 @@ def load_tool_metadata(
     *,
     env: Mapping[str, str] | None = None,
 ) -> dict[str, Mapping[str, Any]]:
-    """Load ``[tools.<name>]`` metadata from an optional local TOML file."""
+    """Load explicit/local metadata, falling back to the shipped AgentDojo catalog.
+
+    A fresh checkout needs no copied configuration. Explicit missing paths
+    still fail; unclassified runtime tools remain critical.
+    """
 
     environ = os.environ if env is None else env
     configured = config_path or environ.get("DSCG_TOOL_METADATA")
     path = Path(configured).expanduser() if configured else DEFAULT_TOOL_METADATA_PATH
+    if not configured and not path.exists():
+        path = BUILTIN_TOOL_METADATA_PATH
     if not path.is_absolute():
         path = PROJECT_ROOT / path
     if not path.exists():

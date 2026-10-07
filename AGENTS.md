@@ -51,7 +51,7 @@ At the start of a new session, verify that the workspace is `/Users/luo/Desktop/
 <!-- framework-optimization-20261007 -->
 ## Optimization handoff (2026-10-07)
 
-- V2 stage 1: sorted authorization catalogue, explicit temperature 0, conditional-task semantics and compact failure codes; no authority from tool feedback. Regression 161/161. Synthetic real-model compiler probes are observations, not task execution or defense efficacy. No new configuration files/flags are required. See `docs/framework_v2_report.md`; continue bounded current-task audit context next.
+- V2 stage 1: sorted authorization catalogue, explicit temperature 0, conditional-task semantics and compact failure codes; no authority from tool feedback. Regression 161/161. Synthetic real-model compiler probes are observations, not task execution or defense efficacy. No new configuration files/flags are required. See `docs/framework_v2_report.md`; stage 1 commit `48ae317f4dd88736b5b00c1dcd7baa04466a0033`.
 
 - P0-A: 顶层调用新建 context，清除旧授权缓存和历史、撤销票据；任务内循环沿用。
 - P0-B: 记录主模型/授权/审计 API、Token、耗时；历史分析显示两模型合计。官方攻击分数保留，E0 独立送达/环境复核仍待完成。
@@ -65,3 +65,10 @@ Use `docs/framework_optimization_report.md` for validation. Preserve existing re
 - Matched optimization comparison: README `本轮框架优化` documents defaults/conflicts and separate baseline/P0/reaudit/completion runs. The frozen `examples/results/framework_optimization/20261007_readme_comparison/task_manifest.json` matches all 32 historical suite summaries for `deepseek-flash_baseline` / `deepseek-flash_workshop_new`; typical attacks plan 144 rollouts per arm across 12 user tasks. Use new names `baseline_control_20261007` and `workshop_opt_p0_20261007`, the same main/security model IDs, and force-rerun; add retry/prompt individually. Compare fresh baseline as the primary control and old runs as historical references; matching IDs does not recover historical provider revision or prove E0 validity. Documentation verification called no model.
 
 - Documentation preference: explain only the six newly added optimization CLI options as a concise list. User-facing commands assume the `ipi` environment is already active and use `python` directly. Keep exact historical executed commands in reports/evidence unchanged.
+
+### V2 bounded audit context (2026-10-07)
+
+- Stage 2: current-task last four tool returns, at most 2,048 characters each, marked untrusted with separate content/window truncation flags. Facts may inform the current action; feedback/auditor never changes the grant or candidate arguments. No object/data provenance enforcement. Single audit default, retries=0 and completion_prompt=false.
+- Missing ignored local tool metadata falls back to tracked `config/tools.agentdojo-v1.2.toml`; explicit path/env and existing local override remain authoritative. Unknown/invalid tools remain critical. No new external configuration or CLI flags required.
+- Default partial IDs verified against the original frozen comparison manifest: 12 user-task clusters, 36 tool_knowledge or 144 typical rollouts, 12 clean tasks. V2 commands in README omit --task-manifest; use new names baseline_v2_control / workshop_v2_authorization / workshop_v2_two_layer, same current provider/model. This supersedes earlier instructions to generate/import a manifest for this comparison.
+- Stage 2 regression 167/167; real synthetic audit: 8/8 expected decisions with context, 4/8 without context (same revised prompt, one pass), no model errors. Compiler/auditor probes do not establish end-to-end efficacy. I3 still partial: valid24/scope8/tool-boundary0; E0 self-check6 valid1/tool-error1/infra4 is not a real harness gate. See `docs/framework_v2_report.md`.
