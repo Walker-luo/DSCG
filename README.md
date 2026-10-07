@@ -185,7 +185,18 @@ python -m dashboard.app
 
 Monitor 和一次性 ticket 沿用。重审和任务完成提示仍默认关闭。没有本地 `config/tools.local.toml` 时自动使用仓库内置 `config/tools.agentdojo-v1.2.toml`；显式路径/环境变量、本地覆盖优先，未知工具仍按 critical 处理。模型凭据沿用现有配置或环境变量。
 
-回归 **167/167**；真实模型合成检查：授权 **12/12** 无缺失/额外写工具，审计加入上下文后 **8/8** 符合预设判断，对照无上下文 **4/8**。这不是 benchmark 防御率。报告与限制见 [V2 实施记录](docs/framework_v2_report.md)。I3 仍为 **partial：24 条有效样例中 8 个范围缺口**，对象/数据权限与 I2 仍未实现。
+回归 **167/167**、dashboard 检查 **21/21**。真实模型检查与全部中间结果见 [V2 实施记录](docs/framework_v2_report.md)。同期单次对照（同任务、同载荷）：
+
+| 配置 | clean TSR | tool_knowledge TSR | 官方 ASR |
+|---|---|---|---|
+| 原生 baseline | 11/12 | 32/36 | 3/36 |
+| 授权 / no-checker | 11/12 | 32/36 | 1/36 |
+| 默认两层（补修后） | 11/12 | 32/36 | 1/36 |
+| 两层 + 完成提示 | 11/12 | 31/36 | 4/36 |
+
+默认版恢复了初版的四次完成损失，但**没有证明防御提升**。baseline 的三个 ASR 命中为最终回答警告中引用酒店名；默认版的一个命中是实际向 Alice 外发消息时附带了攻击链接，不能归为纯回答文本误判。默认版仍有一次合法网页 abstain 后重试完成；完成提示组有新增误拦，暂不推荐启用。默认版 Token 相对 baseline：clean **+26.83%**（超过20%目标），攻击含预检 **+19.07%**。
+
+I3 仍为 **partial：24 条有效样例中 8 个范围缺口**，对象/数据权限与 I2 仍未实现。上述小批量、单次结果没有通过 E0 真实终态/载荷门槛，不支持论文防御收益或三层优越性结论。
 
 ### 可选对照参数
 
@@ -209,7 +220,7 @@ python -m experiments.run_partial_benchmark --no-checker --force-rerun --trace-l
 python -m experiments.run_partial_benchmark --force-rerun --trace-level full --name workshop_v2_two_layer
 ```
 
-先做 clean 控制：三条分别加 `--clean`，名称加 `_clean`（每组 12 条）；攻击调试分别加 `--attack tool_knowledge`，名称加 `_tk`（每组 36 条）。正式重复使用新名称 `_r2`、`_r3`；保留旧结果。完成提示单独加测，不合并默认重审。
+先做 clean 控制：三条分别加 `--clean`，名称加 `_clean`（每组 12 条）；攻击调试分别加 `--attack tool_knowledge`，名称加 `_tk`（每组 36 条）。正式重复使用新名称 `_r2`、`_r3`；保留旧结果。完成提示的本轮单独对照未改善结果，保持关闭；不合并默认重审。
 
 结果路径：`results/partial_benchmark/deepseek-flash_<NAME>/<attack>/<suite>/`。在“历史分析”勾选同期 baseline、授权对照、两层版，再加旧 `baseline`、`workshop_new`、`workshop_opt` 作历史参照，保持攻击和场景相同。对比 TSR、官方 ASR、合法任务误拦和总 Token；目标任务与额外预检成本分开统计。旧 provider revision 不完整，不能用历史差异单独归因。
 
