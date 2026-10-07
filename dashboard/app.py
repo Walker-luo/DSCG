@@ -570,7 +570,15 @@ def _normalize_history_suite(summary: dict, suite_name: str, is_fraction: bool) 
     total_tokens = _history_int(overhead.get("total_tokens")) or (
         prompt_tokens + completion_tokens
     )
+    security = summary.get("sec_overhead")
+    security = security if isinstance(security, dict) else {}
+    sec_prompt = _history_int(security.get("prompt_tokens"))
+    sec_completion = _history_int(security.get("completion_tokens"))
+    sec_total = _history_int(security.get("total_tokens")) or sec_prompt + sec_completion
     return {
+        "main_overhead": {"prompt_tokens": prompt_tokens, "completion_tokens": completion_tokens, "total_tokens": total_tokens},
+        "sec_overhead": {"prompt_tokens": sec_prompt, "completion_tokens": sec_completion, "total_tokens": sec_total},
+        "security_usage_recorded": bool(security),
         "suite_name": suite_name,
         "pipeline_name": str(summary.get("pipeline_name") or ""),
         "metrics": {
@@ -595,9 +603,9 @@ def _normalize_history_suite(summary: dict, suite_name: str, is_fraction: bool) 
             },
         },
         "overhead": {
-            "prompt_tokens": prompt_tokens,
-            "completion_tokens": completion_tokens,
-            "total_tokens": total_tokens,
+            "prompt_tokens": prompt_tokens + sec_prompt,
+            "completion_tokens": completion_tokens + sec_completion,
+            "total_tokens": total_tokens + sec_total,
         },
     }
 

@@ -4,7 +4,7 @@
     utility_rate: ["任务效用率 TSR", "%"],
     attack_success_rate: ["攻击成功率 ASR", "%"],
     defense_success_rate: ["防御成功率", "%"],
-    total_tokens: ["Token 消耗", "Tokens (K)"],
+    total_tokens: ["已记录总 Token（主模型 + 审计）", "Tokens (K)"],
   };
   const shapes = ["circle", "rect", "triangle", "cross", "star"];
   const dashes = [[], [6, 4], [2, 3], [10, 3, 2, 3]];

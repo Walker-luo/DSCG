@@ -10,6 +10,7 @@ import time
 import unicodedata
 from collections import Counter
 from copy import deepcopy
+from contextlib import nullcontext
 from enum import Enum
 from dataclasses import dataclass
 from hashlib import sha256
@@ -621,6 +622,7 @@ def _append_full_trace(extra_args: dict, event_type: str, record: dict) -> None:
     event = {
         "schema_version": TRACE_ARTIFACT_SCHEMA_VERSION,
         "event": event_type,
+        "task_id": extra_args.get("dscg_task_id"),
         "record": deepcopy(record),
     }
     with gzip.open(path, "at", encoding="utf-8") as stream:
@@ -989,7 +991,9 @@ class ToolAuthorizationCompiler:
         reasoning_effort = getattr(self.llm, "reasoning_effort", None)
         if reasoning_effort is not None:
             request_kwargs["reasoning_effort"] = reasoning_effort
-        response = self.llm.client.chat.completions.create(**request_kwargs)
+        with (self.llm.client.phase("authorization")
+              if isinstance(self.llm.client, TokenTrackerClient) else nullcontext()):
+            response = self.llm.client.chat.completions.create(**request_kwargs)
         # 解析并严格验证返回值。解析失败必须由调用方转换为 ERROR
         # 状态，不能悄悄退回一个可能被误解释的空列表。
         choice = response.choices[0]
@@ -1624,11 +1628,12 @@ class TaskIsolatedPipeline(agent_pipeline.AgentPipeline):
     A shared pipeline serializes outer calls because its sandbox is mutable.
     """
 
-    def __init__(self, elements, *, executor=None, monitor=None):
+    def __init__(self, elements, *, executor=None, monitor=None, trackers=()):
         super().__init__(elements)
         self.task_executor = executor
         self.reference_monitor = monitor
         self._task_lock = RLock()
+        self.trackers = trackers
 
     def query(self, query, runtime, env=None, messages=None, extra_args=None):
         with self._task_lock:
@@ -1651,12 +1656,23 @@ class TaskIsolatedPipeline(agent_pipeline.AgentPipeline):
                     executor.sandbox.allowed_tools = None
             if self.reference_monitor is not None:
                 self.reference_monitor.revoke_tickets()
+            costs_before = [t.snapshot() for t in self.trackers]
+            started = time.perf_counter()
             try:
                 return super().query(
                     query, runtime, env if env is not None else functions_runtime.EmptyEnv(),
                     list(messages or []), context,
                 )
             finally:
+                context["dscg_cost"] = {
+                    "elapsed_ms": round((time.perf_counter() - started) * 1000, 3),
+                    "models": [{phase: {key: value - before.get(phase, {}).get(key, 0)
+                                          for key, value in counters.items()}
+                                for phase, counters in tracker.snapshot().items()}
+                               for tracker, before in zip(self.trackers, costs_before)],
+                }
+                if isinstance(getattr(logger, "context", None), dict):
+                    logger.context["dscg_cost"] = context["dscg_cost"]
                 if self.reference_monitor is not None:
                     self.reference_monitor.revoke_tickets()
 
@@ -1841,6 +1857,7 @@ class ActionSecurityChecker(agent_pipeline.BasePipelineElement):
 
         batch_fingerprint = _batch_fingerprint(tool_calls)
         packet = self._audit_packet(query, runtime, tool_calls, extra_args)
+        _append_full_trace(extra_args, "audit_input", packet)
         input_hash = _hash_json(packet)
         metadata = metadata_for_runtime(runtime)
         has_high_risk = any(
@@ -1993,7 +2010,7 @@ def make_qwen_newFrame_pipeline(
             fallback=main_config,
         )
         sec_client = create_openai_client(sec_config)
-        sec_tracker = TokenTrackerClient(sec_client)
+        sec_tracker = TokenTrackerClient(sec_client, default_phase="audit")
         MODEL_NAMES.update({sec_config.model_id: sec_config.model_id})
         sec_llm = agent_pipeline.OpenAILLM(
             sec_tracker,
@@ -2028,7 +2045,8 @@ def make_qwen_newFrame_pipeline(
         agent_pipeline.InitQuery(),
         new_executor,
         tools_loop
-    ], executor=new_executor, monitor=reference_monitor)
+    ], executor=new_executor, monitor=reference_monitor,
+       trackers=tuple(t for t in (main_tracker, sec_tracker) if t is not None))
     
     # 5. 动态命名 Pipeline，方便看实验日志
     ablation_suffix = ""
