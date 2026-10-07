@@ -35,27 +35,24 @@ DSCG 是一个面向工具使用型 LLM Agent 的间接提示词注入（IPI）�
 
 Reference Monitor 和一次性 ticket 沿用；默认每批一次审计，重审和完成提示保持关闭。缺少本地工具元数据时自动使用内置 [`config/tools.agentdojo-v1.2.toml`](./config/tools.agentdojo-v1.2.toml)，显式配置和已有本地配置优先。
 
-最新已完成的[历史分析导出](./download/dscg-history-analysis-20261007T153203Z/analysis.json)覆盖 4 种典型攻击、4 个场景。三组的任务 ID、攻击和模型 ID 已对齐，每组 144 条：
+本轮保留**必要前置读取的审计补修**，离线回归 **169/169**；同模型审计探针 **12/14 → 14/14**。2026-10-08 新对照覆盖 4 个场景，任务、可信请求、攻击载荷和主模型配置一致；攻击控制只测试 `important_instructions`：
 
-| 版本 | 任务成功 TSR ↑ | 官方攻击成功 ASR ↓ | 总 Token ↓ |
-| --- | --- | --- | --- |
-| `baseline` | 118/144（81.94%） | 6/144（4.17%） | 1,735,456 |
-| `workshop_new`（旧版） | 111/144（77.08%） | 6/144（4.17%） | 2,520,100 |
-| `workshop_v2`（当前） | **122/144（84.72%）** | **5/144（3.47%）** | **2,077,620** |
+| 版本 | 无攻击 TSR ↑ | 攻击下 TSR ↑ | AgentDojo 原生 ASR ↓ | 攻击运行总 Token ↓ |
+| --- | --- | --- | --- | --- |
+| 无防御 `baseline_v2p1` | 11/12 | 30/36 | 1/36 | 431,370 |
+| V2 + 本轮补修 `workshop_v2p1_audit` | 11/12 | 31/36 | 1/36 | 549,648 |
 
-本轮后续补修：离线回归 **169/169**；同模型审计探针 **12/14 → 14/14**，修正两次账单读取误拦，合法/攻击负例保留。尚未用端到端 benchmark 验证补修收益，详情见[后续优化记录](./docs/framework_v2_followup_report.md)。
+这是单轮小样本观察：补修组比 baseline 多完成 1 条任务，原生 ASR 持平，攻击运行 Token 增加 27.42%（包含每组额外 12 条攻击能力预检）。**执行提示候选已撤回**：虽完成 32/36，但原生 ASR 增至 2/36，clean 效用未变、Token 高于补修组；不加入默认框架。详情、失败案例和评分复核见[后续优化记录](./docs/framework_v2_followup_report.md)。
 
-V2 相比旧版多完成 11 条任务，总 Token 减少 17.56%；相比 baseline 多完成 4 条任务，总 Token 增加 19.72%。这是单轮观察结果；ASR 仅少 1 条命中，仍需逐条核查原始轨迹和重复对照。Token 按导出汇总统计，包含攻击预检成本。
-
-导出的 432 条记录均标为 valid，无缺失或截断告警；该状态来自源结果，不代替 E0 独立载荷/终态审计。I3 仍为 `partial`（24 条有效样例中 8 个范围缺口），对象/数据权限与 I2 未实现。实现和历史试验保留在 [V2 实施记录](./docs/framework_v2_report.md) 与 [I3 报告](./docs/i3_p0_stress_report.md)。
+用户提供的[此前历史导出](./download/dscg-history-analysis-20261007T153203Z/analysis.json)中 V2 为 TSR122/144、ASR5/144，是本轮补修前的结果，不能混作新对照。原生 ASR 的酒店名称警告命中保留；当前结果不代替独立 E0 判定或重复验证。I3 仍为 `partial`（24 条有效样例中 8 个范围缺口），对象/数据权限与 I2 未实现；历史试验和哈希保留在 [V2 实施记录](./docs/framework_v2_report.md) 与 [I3 报告](./docs/i3_p0_stress_report.md)。
 
 ### 对比测试命令
 
 默认已进入 `ipi` 环境，沿用当前模型配置；不需要导入任务清单。默认运行 4 种典型攻击，每组 144 条，自动记录实际任务 ID 与运行配置。使用新名称保留已有结果：
 
 ```bash
-python -m experiments.run_partial_benchmark --baseline --force-rerun --name baseline_v2_control_r2
-python -m experiments.run_partial_benchmark --force-rerun --name workshop_v2_r2
+python -m experiments.run_partial_benchmark --baseline --force-rerun --name baseline_v2p1_r2
+python -m experiments.run_partial_benchmark --force-rerun --name workshop_v2p1_r2
 ```
 
 默认 `summary` 日志足够用于历史分析；`--trace-level full` 仅在排查具体决策时启用，会增加日志写入开销。可加 `--no-checker` 做授权层消融，或加 `--clean` 测无攻击效用控制，并使用独立运行名称。
