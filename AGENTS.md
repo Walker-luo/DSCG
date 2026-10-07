@@ -56,5 +56,6 @@ At the start of a new session, verify that the workspace is `/Users/luo/Desktop/
 - P0-C: 网页请求按外部接收方路由至现有审计；离线成对样例覆盖合法访问和注入网址。未实现 URL 对象约束。
 - P1-A: 可选一次语义 abstain 重审；保留当前任务历史，parser/超时不重试，持续不确定阻断。
 - P1-B: 可选通用提示继续已授权任务并覆盖用户要求字段；每次工具动作仍受现有 monitor/ticket 检查。
+- P2: partial CLI 支持 no-checker、重审和完成提示开关及匹配任务 manifest；实际安全/效用收益仍需有效在线对照。
 
 Use `docs/framework_optimization_report.md` for validation. Preserve existing results and separate original official scores from diagnostics. No new target-model samples were run; E0 real payload/end-state gate and online performance goals remain pending. Commit only stage deltas; pre-existing attack/dashboard edits are intentionally retained.

@@ -179,5 +179,10 @@ python -m dashboard.app
 | P0-C 外部请求 | 网页请求按外部接收方路由至现有审计；离线成对样例覆盖合法访问和注入网址。未实现 URL 对象约束。 |
 | P1-A 有界重审 | 可选一次语义 abstain 重审；保留当前任务历史，parser/超时不重试，持续不确定阻断。 |
 | P1-B 任务完成提示 | 可选通用提示继续已授权任务并覆盖用户要求字段；每次工具动作仍受现有 monitor/ticket 检查。 |
+| P2 消融入口 | partial CLI 支持 no-checker、重审和完成提示开关及匹配任务 manifest；实际安全/效用收益仍需有效在线对照。 |
 
 离线验证与限制见 [优化实施报告](docs/framework_optimization_report.md)。上述工程测试不证明 benchmark 防御收益；I3 仍为 partial，参数、对象和数据约束及 I2 保持锁定。
+
+消融开关：`--no-checker` 保留确定性 P0、关闭语义审计；`--audit-retries 1` 启用一次重审；`--completion-prompt` 启用完成提示；`--clean` 使用同一用户任务运行无攻击控制。后三项涉及的安全/效用收益尚待有效对照。重审和完成提示默认关闭，baseline 不接受 DSCG 开关。
+
+先用 `conda run -n ipi python -m experiments.run_partial_benchmark --write-task-manifest examples/results/optimization_tasks.json` 离线冻结当前 ID；各配置统一加 `--task-manifest examples/results/optimization_tasks.json --force-rerun --name <新名称>`。无攻击安全指标为 N/A；混合缓存成本仅表示本次新增调用，正式比较使用新名称与强制重跑。

@@ -49,3 +49,9 @@ class BoundedReauditTests(unittest.TestCase):
         checker.query('Read facts',self.runtime,EmptyEnv(),self.messages,
                       {'dscg_action_ledger':[{'state':'executed'}]*33})
         self.assertEqual(checker._request_audit.call_count,1)
+    def test_public_read_bypass_has_no_semantic_attempt_or_model_call(self):
+        set_tool_metadata(self.runtime,{'read_private':dict(effect='read',source='local',sink='none',sensitivity='public',idempotent=True,reversible=True)})
+        checker=self.checker(['allow'])
+        state=checker.query('Read facts',self.runtime,EmptyEnv(),self.messages,{})
+        checker._request_audit.assert_not_called()
+        self.assertEqual(state[-1]['_dscg_audit_decision']['reason_code'],'READ_AUDIT_BYPASS')

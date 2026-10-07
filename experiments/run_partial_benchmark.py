@@ -14,6 +14,8 @@ from dscg.pipelines.baseline import make_openai_compatible_pipeline
 from dscg.pipelines.defended import make_defended_pipeline
 from dscg.tool_metadata import ToolMetadataError, load_tool_metadata
 from experiments.harness_audit import rank_ids, security_result_fields
+from experiments.partial_controls import (validate_controls, make_task_manifest, load_task_manifest,
+                                          select_tasks, guard_run, source_revision, preserve_cached_cost)
 
 
 def _safe_result_component(value: str | None, fallback: str) -> str:
@@ -89,6 +91,10 @@ def main(
     run_name: str | None = None,
     trace_level: str = "summary",
     tool_metadata_path: str | Path | None = None,
+    use_security_checker: bool = True,
+    audit_retries: int = 0,
+    completion_prompt: bool = False,
+    task_manifest_path: str | Path | None = None,
     results_dir: str | Path | None = None,
 ):
     """
@@ -103,7 +109,10 @@ def main(
 
 
     attack_name = "important_instructions"  # 使用 AgentDojo 预定义的注入攻击
-    selection_seed = 7
+    validate_controls(origin=origin, use_security_checker=use_security_checker,
+                      audit_retries=audit_retries, completion_prompt=completion_prompt)
+    frozen_tasks = load_task_manifest(task_manifest_path)
+    selection_seed = frozen_tasks.get("seed", 7) if frozen_tasks else 7
     tool_metadata = None if origin else load_tool_metadata(tool_metadata_path)
     active_defense = defense if origin else "dscg"
     logdir = Path(results_dir) if results_dir is not None else RESULTS_DIR / "partial_benchmark"
@@ -143,12 +152,14 @@ def main(
                 config_path=config_path,
                 trace_level=trace_level,
                 tool_metadata=tool_metadata,
+                use_security_checker=use_security_checker,
+                audit_retries=audit_retries, completion_prompt=completion_prompt,
             )
 
         main_model_config = getattr(pipeline, "dscg_model_config", {})
         sec_model_config = getattr(pipeline, "dscg_security_model_config", {})
         resolved_model_id = main_model_config.get("model_id", model_id)
-        resolved_sec_model_id = None if origin else sec_model_config.get("model_id", sec_model_id)
+        resolved_sec_model_id = None if origin or not use_security_checker else sec_model_config.get("model_id", sec_model_id)
         result_dir_name = _apply_run_name(pipeline, resolved_model_id, run_name)
         print(f"已解析模型配置 - 主模型: {resolved_model_id}, 审计模型: {resolved_sec_model_id or '无'}")
         if run_name:
@@ -163,12 +174,25 @@ def main(
         print(f"总计 User Tasks 数量: {len(user_task_ids)}")
         print(f"总计 Injection Tasks 数量: {len(injection_task_ids)}")
 
-        attack = attacks.load_attack(attack_name, suite, pipeline)
+        attack = attacks.load_attack(attack_name, suite, pipeline) if run_attack else None
+        is_dos_attack = bool(attack and attack.is_dos_attack)
 
         # Share the same deterministic subset across baseline and DSCG runs.
-        # selected_users = rank_ids(user_task_ids, selection_seed, limit=2)
-        selected_users = user_task_ids[:3] # avoid the model can complete the task there use fixed choose
-        selected_injections = rank_ids(injection_task_ids, selection_seed, limit=3)
+        selected_users, selected_injections = select_tasks(
+            frozen_tasks, suite_name, user_task_ids, injection_task_ids, run_attack, is_dos_attack,
+        )
+        run_binding = {
+            "schema_version": "dscg.partial-run.v1",
+            "task_selection": {"users": selected_users, "injections": selected_injections,
+                               "suite_version": "v1.2", "seed": selection_seed},
+            "attack": attack_name if run_attack else None,
+            "main_model": main_model_config, "security_model": sec_model_config,
+            "profile": "baseline" if origin else "full" if use_security_checker else "no-checker",
+            "audit_retries": audit_retries, "completion_prompt": completion_prompt,
+            "trace_level": None if origin else trace_level,
+            "tool_metadata": tool_metadata, "source": source_revision(),
+        }
+        guard_run(logdir / result_dir_name / suite_name / "run_manifest.json", run_binding)
 
         planned_task_count = (
             len(selected_users) * len(selected_injections)
@@ -204,8 +228,7 @@ def main(
                     suite,
                     logdir,
                     force_rerun=force_rerun,
-                    user_tasks = selected_users,
-                    injection_tasks = selected_injections
+                    user_tasks = selected_users
                 )
 
         # 结果分析
@@ -279,6 +302,9 @@ def main(
             "suite_name": suite_name,
             "pipeline_name": pipeline.name,
             "defense": active_defense,
+            "run_manifest": run_binding,
+            "api_accounting": {"main": main_tracker.snapshot() if hasattr(main_tracker, "snapshot") else {},
+                               "security": sec_tracker.snapshot() if sec_tracker and hasattr(sec_tracker, "snapshot") else {}},
             "task_selection": {
                 "suite_version": "v1.2",
                 "seed": selection_seed,
@@ -288,13 +314,13 @@ def main(
             },
             "metrics": {
                 "utility_rate": utility_score,
-                "attack_success_rate": security_score,
-                "defense_success_rate": defense_score
+                "attack_success_rate": security_score if run_attack and valid_security_results else None,
+                "defense_success_rate": defense_score if run_attack and valid_security_results else None
             },
             "task_counts": {
                 "total_tasks": len(utility_results),
                 "utility_passed": sum(utility_results.values()),
-                "attacked_tasks": len(security_results),
+                "attacked_tasks": len(valid_security_results) if run_attack else 0,
                 "security_missing": sum(
                     task_key not in security_results for task_key in utility_results
                 ) if run_attack else 0,
@@ -316,6 +342,15 @@ def main(
                 "completion_tokens": sec_completion_tokens,
                 "total_tokens": sec_total_tokens
             }
+
+        preserve_cached_cost(summary_data, summary_file_path, force_rerun)
+        prompt_tokens = summary_data["overhead"]["prompt_tokens"]
+        completion_tokens = summary_data["overhead"]["completion_tokens"]
+        total_tokens = summary_data["overhead"]["total_tokens"]
+        if sec_tracker and "sec_overhead" in summary_data:
+            sec_prompt_tokens = summary_data["sec_overhead"]["prompt_tokens"]
+            sec_completion_tokens = summary_data["sec_overhead"]["completion_tokens"]
+            sec_total_tokens = summary_data["sec_overhead"]["total_tokens"]
 
         # 4. 写入文件 (TXT, CSV, JSON)
         # 4.1 保存供人类阅读的 TXT 报告
@@ -345,12 +380,13 @@ def main(
             f.write(f"👉 User Tasks: {len(selected_users)}/{len(user_task_ids)}\n")
             f.write(f"👉 Injection Tasks: {len(selected_injections)}/{len(injection_task_ids)}\n")
             f.write(f"👉 [{suite_name}] 整体可用性 (Utility): {utility_score:.2%}\n")
-            if run_attack:
+            if run_attack and valid_security_results:
                 f.write(f"👉 [{suite_name}] 攻击成功率 (ASR): {security_score:.2%}\n")
                 f.write(f"👉 [{suite_name}] 整体安全性 (Defense Rate): {defense_score:.2%}\n")
 
 
             f.write("\n💰 系统开销评估 (Overhead):\n")
+            f.write(f"统计范围: {summary_data['cost_scope']}；本次新增调用 Token: {summary_data['invocation_cost']['overhead']['total_tokens']}\n")
             f.write(f"👉 任务 Input Tokens: {prompt_tokens:.1f}\n")
             f.write(f"👉 任务 Output Tokens: {completion_tokens:.1f}\n")
             f.write(f"👉 任务总计 Tokens: {total_tokens:.1f}\n")
@@ -439,7 +475,25 @@ def cli(argv: list[str] | None = None) -> int:
         metavar="DIR",
         help="结果根目录；缺省使用 results/partial_benchmark/。",
     )
+    parser.add_argument("--no-checker", action="store_true", help="P0 消融：保留授权/monitor/ticket，关闭语义审计。")
+    parser.add_argument("--audit-retries", type=int, choices=(0, 1), default=0, help="语义 abstain 有界重审次数；默认 0。")
+    parser.add_argument("--completion-prompt", action="store_true", help="启用通用任务完成提示；默认关闭。")
+    parser.add_argument("--clean", action="store_true", help="用相同用户任务运行无攻击效用控制。")
+    parser.add_argument("--task-manifest", dest="task_manifest_path", help="读取冻结 v1.2 任务 ID 清单。")
+    parser.add_argument("--write-task-manifest", metavar="PATH", help="离线导出当前任务 ID 清单并退出，不调用模型。")
     args = parser.parse_args(argv)
+    try:
+        validate_controls(origin=args.baseline, use_security_checker=not args.no_checker,
+                          audit_retries=args.audit_retries, completion_prompt=args.completion_prompt)
+        if args.write_task_manifest:
+            path = Path(args.write_task_manifest)
+            if path.exists(): parser.error("task manifest already exists; preserve old evidence")
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(json.dumps(make_task_manifest(), ensure_ascii=False, indent=2) + "\n")
+            print(f"任务清单: {path}")
+            return 0
+    except ValueError as exc:
+        parser.error(str(exc))
 
     try:
         main(
@@ -448,7 +502,7 @@ def cli(argv: list[str] | None = None) -> int:
             provider=os.getenv("DSCG_MAIN_PROVIDER"),
             sec_provider=os.getenv("DSCG_SEC_PROVIDER"),
             suites=["workspace", "travel", "banking", "slack"],
-            run_attack=True,
+            run_attack=not args.clean,
             origin=args.baseline,
             defense=None,
             force_rerun=args.force_rerun or os.getenv("DSCG_FORCE_RERUN", "0").lower() in {"1", "true", "yes"},
@@ -457,8 +511,10 @@ def cli(argv: list[str] | None = None) -> int:
             tool_metadata_path=args.tool_metadata_path,
             config_path=args.config_path,
             results_dir=args.results_dir,
+            use_security_checker=not args.no_checker, audit_retries=args.audit_retries,
+            completion_prompt=args.completion_prompt, task_manifest_path=args.task_manifest_path,
         )
-    except (ModelConfigurationError, ToolMetadataError) as exc:
+    except (ModelConfigurationError, ToolMetadataError, ValueError) as exc:
         print(f"模型配置错误: {exc}")
         print("请设置 DSCG_MAIN_* 环境变量，或复制 config/models.example.toml 为 config/models.local.toml 后填写。")
         return 1

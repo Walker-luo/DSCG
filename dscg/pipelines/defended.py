@@ -1,4 +1,5 @@
 import os
+import sys
 from pathlib import Path
 import json
 import gzip
@@ -1664,6 +1665,9 @@ class TaskIsolatedPipeline(agent_pipeline.AgentPipeline):
                     list(messages or []), context,
                 )
             finally:
+                task_failed = sys.exc_info()[0] is not None
+                if self.reference_monitor is not None:
+                    self.reference_monitor.revoke_tickets()
                 context["dscg_cost"] = {
                     "elapsed_ms": round((time.perf_counter() - started) * 1000, 3),
                     "models": [{phase: {key: value - before.get(phase, {}).get(key, 0)
@@ -1674,9 +1678,12 @@ class TaskIsolatedPipeline(agent_pipeline.AgentPipeline):
                 if isinstance(getattr(logger, "context", None), dict):
                     logger.context["dscg_cost"] = context["dscg_cost"]
                     if isinstance(logger, logging.TraceLogger):
-                        logger.save()
-                if self.reference_monitor is not None:
-                    self.reference_monitor.revoke_tickets()
+                        try:
+                            logger.save()
+                        except Exception as exc:
+                            context["dscg_trace_save_error"] = type(exc).__name__
+                            if not task_failed:
+                                raise
 
 
 class ActionSecurityChecker(agent_pipeline.BasePipelineElement):
@@ -1888,7 +1895,7 @@ class ActionSecurityChecker(agent_pipeline.BasePipelineElement):
                 parser_status="deterministic_bypass",
             )
             record = decision.public_dict()
-            record["semantic_attempt"] = attempt + 1
+            record["semantic_attempt"] = 0
             _publish_audit_record(extra_args, record)
             extra_args["_dscg_audit_decision"] = record
             return query, runtime, env, messages, extra_args

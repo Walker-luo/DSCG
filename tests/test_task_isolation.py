@@ -64,3 +64,19 @@ class TaskIsolationTests(unittest.TestCase):
         with self.assertRaises(RuntimeError):
             TaskIsolatedPipeline([Broken()], monitor=monitor).query('new', FunctionsRuntime())
         self.assertFalse(monitor.consume(tickets[0], call))
+
+    def test_trace_save_failure_cannot_leave_ticket_live_or_hide_task_error(self):
+        from unittest.mock import Mock, patch
+        from agentdojo.logging import TraceLogger
+        monitor=ReferenceMonitor(None,False)
+        call=FunctionCall(function='x',args={},id='1');tickets=[]
+        class Broken(agent_pipeline.BasePipelineElement):
+            def query(self,*state):
+                tickets.append(monitor._issue('action',call,'contract'))
+                raise RuntimeError('original task error')
+        logger=Mock(spec=TraceLogger);logger.context={};logger.save.side_effect=OSError('disk full')
+        with patch('dscg.pipelines.defended.logging.Logger') as manager:
+            manager.return_value.get.return_value=logger
+            with self.assertRaisesRegex(RuntimeError,'original task error'):
+                TaskIsolatedPipeline([Broken()],monitor=monitor).query('new',FunctionsRuntime())
+        self.assertFalse(monitor.consume(tickets[0],call))
