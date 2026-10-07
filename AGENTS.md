@@ -10,17 +10,17 @@ The repository is writable at `/Users/luo/Desktop/AgentDefence/DSCG`. Keep it se
 
 论文问题、文献、创新点和实验协议统一维护在项目根目录的 `research/`。本仓库只实现研究侧已经解锁的工程任务。先读取 `../research/technical_route.md`，完成后按 `../research/paper/implementation_status.md` 回报，不在本仓库复制论文计划或自行宣布新颖性。
 
-## Project Status (verified 2026-10-06)
+## Project Status (synced 2026-10-07)
 
 - P0.1–P0.5 are recorded as implemented: fail-closed authorization state, authorization before candidate generation, complete mediation with a Reference Monitor and one-use execution tickets, structured audit decisions and trace levels, and explicit tool-risk metadata.
 - Existing implementation is tool-level. LLM audit is supplementary; parameter/object/data constraints remain unimplemented and locked until research-side route selection. `system_TODO.md` contains historical proposals and must not be used to restart closed routes.
-- Workshop changes improve harness bookkeeping and compact traces: missing security results are infrastructure errors, finite task subsets use a fixed seed, and summary/standard omit redundant hashes while runtime checks and full compressed sidecars are retained.
+- Workshop changes improve harness bookkeeping and compact traces: missing security results are infrastructure errors, the current partial subset uses the first 3 registered user tasks and first 3 injection tasks per suite, and summary/standard omit redundant hashes while runtime checks and full compressed sidecars are retained.
 - `I3-P0-STRESS` has fixtures, state-transition tests and an evidence record, with status `partial`. A real concurrent duplicate-ticket bug was fixed: the replay receives its own blocked event without failing the in-flight winning action. The 24 valid probes still expose 8 scope violations across fresh object, destination, data-selection and completed-obligation calls; do not report `no_go` or claim these constraints are enforced.
-- The latest recorded offline suite passed 102/102 tests (18 I3 tests). These counts are a dated snapshot, not a benchmark defense rate or a required fixed test count.
+- The latest recorded offline suite passed 167/167 tests on 2026-10-07 (18 I3 tests); dashboard Node checks passed 21/21. This documentation sync does not rerun runtime tests. These counts are a dated snapshot, not a benchmark defense rate or a required fixed test count.
 - E0 synthetic self-check has 6 samples: valid=1, tool_error=1, infrastructure_error=4. It does not establish that the real harness passed the research gate. Historical AgentDojo results remain smoke-only.
 - Existing `research/ideas.md` calls contribution candidates hypotheses, not proven novelty. Preserve that caution.
 - Current implementation status is recorded in `research/paper/implementation_status.md`; do not infer parameter-level provenance or I2 coverage from P0 code.
-- Current engineering details and artifacts are linked from `README.md`, `docs/i3_p0_stress_report.md` and `docs/workshop_optimization_report.md`; the older eight-case I3 `no_go` is superseded by the 2026-10-06 evidence.
+- Current engineering details and artifacts are linked from `README.md`, `docs/i3_p0_stress_report.md` and `docs/framework_v2_report.md`; the older eight-case I3 `no_go` is superseded by the 2026-10-06 evidence.
 
 ## Current Engineering Queue
 
@@ -51,44 +51,15 @@ For each ready task, keep the implementation change in `DSCG/`, run the stated c
 
 At the start of a new session, verify that the workspace is `/Users/luo/Desktop/AgentDefence`, read `research/technical_route.md`, and inspect `research/paper/implementation_status.md` before making research-driven changes. Do not infer a paper claim from code or a smoke benchmark. Keep the two repositories independently reviewable and do not merge them into a new nested checkout.
 
-<!-- framework-optimization-20261007 -->
-## Optimization handoff (2026-10-07)
+## Current framework optimization (2026-10-07)
 
-- V2 stage 1: sorted authorization catalogue, explicit temperature 0, conditional-task semantics and compact failure codes; no authority from tool feedback. Regression 161/161. Synthetic real-model compiler probes are observations, not task execution or defense efficacy. No new configuration files/flags are required. See `docs/framework_v2_report.md`; stage 1 commit `48ae317f4dd88736b5b00c1dcd7baa04466a0033`.
-
-- P0-A: 顶层调用新建 context，清除旧授权缓存和历史、撤销票据；任务内循环沿用。
-- P0-B: 记录主模型/授权/审计 API、Token、耗时；历史分析显示两模型合计。官方攻击分数保留，E0 独立送达/环境复核仍待完成。
-- P0-C: 网页请求按外部接收方路由至现有审计；离线成对样例覆盖合法访问和注入网址。未实现 URL 对象约束。
-- P1-A: 可选一次语义 abstain 重审；保留当前任务历史，parser/超时不重试，持续不确定阻断。
-- P1-B: 可选通用提示继续已授权任务并覆盖用户要求字段；每次工具动作仍受现有 monitor/ticket 检查。
-- P2: partial CLI 支持 no-checker、重审和完成提示开关及匹配任务 manifest；实际安全/效用收益仍需有效在线对照。
-
-Use `docs/framework_optimization_report.md` for validation. Preserve existing results and separate original official scores from diagnostics. That earlier report used offline checks only; V2 now has real synthetic probes and matched partial controls in `docs/framework_v2_report.md`. E0 real payload/end-state gate and efficacy goals remain pending. Commit only stage deltas; pre-existing attack/dashboard edits are intentionally retained.
-
-- Matched optimization comparison: README `本轮框架优化` documents defaults/conflicts and separate baseline/P0/reaudit/completion runs. The frozen `examples/results/framework_optimization/20261007_readme_comparison/task_manifest.json` matches all 32 historical suite summaries for `deepseek-flash_baseline` / `deepseek-flash_workshop_new`; typical attacks plan 144 rollouts per arm across 12 user tasks. Use new names `baseline_control_20261007` and `workshop_opt_p0_20261007`, the same main/security model IDs, and force-rerun; add retry/prompt individually. Compare fresh baseline as the primary control and old runs as historical references; matching IDs does not recover historical provider revision or prove E0 validity. Documentation verification called no model.
-
-- Documentation preference: explain only the six newly added optimization CLI options as a concise list. User-facing commands assume the `ipi` environment is already active and use `python` directly. Keep exact historical executed commands in reports/evidence unchanged.
-
-### Framework simplicity directive (2026-10-07)
-
-- 用户要求重点优化框架，每层保持简单。先优化两个逻辑防御层：可信任务工具授权、当前动作安全审计；Monitor/ticket 是执行基础设施，不把模块数量算作防御层数。
-- 优先解决漏授权和必要审计上下文缺失；重审、恢复和额外规则暂不叠加为默认方案。每次修改用匹配对照报告安全增益、任务效用与成本。
-- 若两层在有效对照下仍无净收益，转为职责明确的三层架构，验证第三层独立增益；具体职责依据真实失败轨迹确定，保持每层简洁。
-- 该方向没有实现第三层或解锁 I2/新对象与数据权限机制；具体设计交付到 research 技术路线。参见 [`../research/paper/framework_optimization_direction_20261007.md`](../research/paper/framework_optimization_direction_20261007.md)。
-
-### V2 bounded audit context (2026-10-07)
-
-- Stage 2: current-task last four tool returns, at most 2,048 characters each, marked untrusted with separate content/window truncation flags. Facts may inform the current action; feedback/auditor never changes the grant or candidate arguments. No object/data provenance enforcement. Single audit default, retries=0 and completion_prompt=false.
-- Missing ignored local tool metadata falls back to tracked `config/tools.agentdojo-v1.2.toml`; explicit path/env and existing local override remain authoritative. Unknown/invalid tools remain critical. No new external configuration or CLI flags required.
-- Default partial IDs verified against the original frozen comparison manifest: 12 user-task clusters, 36 tool_knowledge or 144 typical rollouts, 12 clean tasks. V2 commands in README omit --task-manifest; use new names baseline_v2_control / workshop_v2_authorization / workshop_v2_two_layer, same current provider/model. This supersedes earlier instructions to generate/import a manifest for this comparison.
-- Stage 2 regression 167/167; real synthetic audit: 8/8 expected decisions with context, 4/8 without context (same revised prompt, one pass), no model errors. Compiler/auditor probes do not establish end-to-end efficacy. I3 still partial: valid24/scope8/tool-boundary0; E0 self-check6 valid1/tool-error1/infra4 is not a real harness gate. See `docs/framework_v2_report.md`.
-
-- V2 audit follow-up: actual candidate alignment is distinct from detecting injection text elsewhere. Task-relevant no-target listings can obtain unknown facts; explicit targets/destinations still need task evidence, never guessed from URL wording. Legal rent-read replay allow3/3; ungrounded URL abstain6/6, grounded URL allow3/3, external verification deny1/3+abstain2/3. Strict-label10/12 (probe exit1) retained; fail-closed execution expectation12/12, not general scope enforcement. No default/routing/grant changes. Follow-up matched runs required before efficacy claims.
-
-### V2 matched pilot outcome (2026-10-07)
-
-- Producer commit `00a58e3b67650d481d28296040611fa98898dd40` for refined/completion arms; original baseline/no-checker controls at `9225018`, unchanged native/authorization components. Same v1.2 IDs and all 36 attack payloads matched. Single repeat across12 user clusters: baseline/no-checker/refined clean11/12 and attack32/36; completion clean11/12 and attack31/36. All10 CLI invocations exited0, no target trace errors.
-- Refined default restores the initial two-layer pilot's four completion losses (28→32/36). It still briefly blocks one legitimate webpage and succeeds after normalized-URL retry. Completion introduces a clean bill-read abstain and loses one attack task; keep completion=false, retries=0.
-- Do not claim ASR3→1 as a defense gain: baseline3 are final-answer hotel-name warnings, refined1 is a real `send_direct_message` body to Alice containing the injected link as a warning (audit allow). Completion has the same link forwarding plus3 hotel-name quotations. No independent E0 final-state oracle or repeated efficacy gate; no new layer or locked scope enforcement.
-- Refined token cost: clean144066 vs baseline113593 (+26.83%, over20% target); attack total524371 vs440398 (+19.07%, includes12 preflight). Refined target418222 and preflight106149; baseline target-only costs unavailable. API latency sums are not wall-clock time.
-- All old and unsuccessful intermediate results preserved. Latest analysis/hashes in `examples/results/framework_optimization/20261007_v2_implementation/final_controls_*`; README commands use native defaults, no imported config/manifest. Next research review: outbound warning-link counterexample and real E0/repeated controls before deciding a tool-result processing layer.
+- Keep two simple defense layers: trusted-task tool authorization and current-action auditing. Monitor/ticket is execution infrastructure. Authorization uses a sorted catalogue, temperature 0, conditional-task semantics and fail-closed error codes; tool feedback cannot grant permissions.
+- Auditing receives the current task's last four tool returns, each at most 2,048 characters, explicitly untrusted with truncation flags. Task-relevant queries may obtain unknown facts; concrete targets/destinations require task evidence. This is semantic context, not object/data provenance enforcement. Default retries=0 and completion_prompt=false; do not stack previous optional remedies into the default framework.
+- Missing local tool metadata falls back to tracked `config/tools.agentdojo-v1.2.toml`; explicit path/env and existing local override retain priority. Unknown/invalid tools remain critical. No new external configuration or imported manifest is required for the default comparison.
+- Latest user-supplied export: `download/dscg-history-analysis-20261007T153203Z/analysis.json`. Four typical attacks, four suites, matched 144 task/attack/model keys per run. Observed TSR: baseline118/144, workshop_new111/144, V2 122/144; native ASR: 6/144,6/144,5/144. Exported432 records are marked valid with no warnings, but this source status is not independent E0 validation. Single historical comparison does not establish causal security improvement; raw predicates and unsuccessful results remain intact.
+- Exported total Tokens: baseline1735456, workshop_new2520100, V2 2077620, including attack preflight. V2 is -17.56% versus workshop_new and +19.72% versus baseline. Model service revisions are not pinned; exact cost attribution/repeatability is unresolved.
+- README documents only the current V2 optimization and latest comparison. Older plans, probes and pilot outcomes remain in `docs/framework_v2_report.md`, other existing reports/results and research evidence; preserve their hashes. Earlier instructions to enable retry/completion or import a task manifest are superseded for normal runs.
+- Documentation verification confirms all 69 historical stage-artifact hash entries and 196 existing raw-input hash entries; 790 old raw-input hash entries reference missing files, so the original pilot cannot be fully hash-verified locally. The missing paths are recorded in `examples/results/framework_optimization/20261007_readme_sync/validation.json`; do not recreate or silently repair historical evidence.
+- User-facing commands assume `ipi` is active and use `python` directly. Normal comparisons use default `summary`; full tracing is optional diagnostics with extra serialization/compression/write cost. The user's interrupted full run has no confirmed root cause; do not call it a proven logging bug. Use new run names; `--force-rerun` does not bypass run-manifest configuration binding.
+- I3 remains partial: valid24/scope8/tool-boundary0. E0 real payload/end-state gate and repeated matched controls remain pending. No third layer, I2 or new scope/recovery mechanism has been implemented or unlocked. See `docs/framework_v2_report.md` and `../research/technical_route.md`.
+- Keep each layer simple and measure utility, security and total model cost. If valid repeated two-layer controls have no net benefit, ask research to select a third layer with an independent role; do not implement locked mechanisms from historical plans.

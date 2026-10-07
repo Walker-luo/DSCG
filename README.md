@@ -24,28 +24,41 @@ DSCG 是一个面向工具使用型 LLM Agent 的间接提示词注入（IPI）�
 
 被阻断的动作返回工具错误，恢复时的新候选继续经过同一仲裁路径。一次性票据绑定具体调用，但不能约束已授权工具的全新调用所选择的对象或数据。
 
-## 防御改进
+## 本轮框架优化
 
-| 改进 | 当前实现 |
+当前 V2 保持两层防御，无需新增配置文件或参数：
+
+| 层 | 本次优化 |
 | --- | --- |
-| P0.1：默认拒绝 | 区分未初始化、空白名单、有效白名单和错误状态；授权异常撤销旧权限，未知工具被阻断 |
-| P0.2：授权先于候选 | 仅根据当前可信用户请求、固定策略和工具目录编译不可变契约；同一可信回合复用契约 |
-| P0.3：统一执行入口 | 每个动作经过 Monitor 和一次性票据校验，账本记录提出、批准、执行、失败或阻断 |
-| P0.4：结构化审计 | 严格校验审计输出，限制不可信参数与历史输入；审计缺失或异常时默认阻断需审计的动作 |
-| P0.5：工具风险元数据 | 显式描述 effect、source、sink、sensitivity 等；缺失或非法分类按 critical 处理，公共读取可走低成本路径 |
-| Workshop：harness 可靠性 | 缺失安全结果单列基础设施错误；小批量任务按固定 seed 排序；保留 payload 投递、宿主 predicate 与有效分母 |
-| Workshop：记录精简 | summary/standard 去除重复输入、目录和参数哈希；保留运行时校验与 full 压缩侧车；每次运行一个 manifest hash、每样本一个 payload hash |
-| I3：恢复压力测试 | 补齐真实错误反馈与恢复回路；修复并发重复票据误改首个动作状态的问题，重复提交独立记为 blocked |
+| 工具授权 | 固定 `temperature=0`、排序工具目录，明确条件预订与已有支付更新；编译失败记录 `error_code` 并默认拒绝。授权只读取可信用户请求。 |
+| 动作审计 | 提供当前任务最近 4 条工具返回，每条最多 2,048 字符，并标明不可信与截断；判断当前动作是否符合任务。合法查询可以获取未知事实，具体目标或网址仍需任务证据。 |
 
-截至 **2026-10-06** 的验证状态：
+Reference Monitor 和一次性 ticket 沿用；默认每批一次审计，重审和完成提示保持关闭。缺少本地工具元数据时自动使用内置 [`config/tools.agentdojo-v1.2.toml`](./config/tools.agentdojo-v1.2.toml)，显式配置和已有本地配置优先。
 
-- 仓库离线测试 **102/102 通过**，其中 I3 测试 18 项。
-- I3 fixture 有效样本 **24/24**，无运行错误或跳过；仍有 **8 个范围断言失败**，涉及全新调用扩大对象、目的地、数据选择或重做已完成义务，回报 **`partial`**。
-- E0 合成自检共 6 样本：valid 1、tool_error 1、infrastructure_error 4。自检包含预设错误样本，不代表真实 harness 已通过研究闸门；I2 fixture/pilot 仍锁定。
+最新[历史分析导出](./download/dscg-history-analysis-20261007T153203Z/analysis.json)覆盖 4 种典型攻击、4 个场景。三组的任务 ID、攻击和模型 ID 已对齐，每组 144 条：
 
-这些是离线工程证据。现有模型 benchmark 与历史消融结果仍属有限子集的 smoke 记录，不能据此推出一般防御率、完整 AgentDojo 结果或论文新颖性。
+| 版本 | 任务成功 TSR ↑ | 官方攻击成功 ASR ↓ | 总 Token ↓ |
+| --- | --- | --- | --- |
+| `baseline` | 118/144（81.94%） | 6/144（4.17%） | 1,735,456 |
+| `workshop_new`（旧版） | 111/144（77.08%） | 6/144（4.17%） | 2,520,100 |
+| `workshop_v2`（当前） | **122/144（84.72%）** | **5/144（3.47%）** | **2,077,620** |
 
-详细证据见 [I3 报告](./docs/i3_p0_stress_report.md)、[Workshop 历史报告](./docs/workshop_optimization_report.md) 和 [I3 原始结果](./examples/results/i3_p0_stress/20261006_01a10fca/)。后续机制只按研究侧解锁的任务实现。
+V2 相比旧版多完成 11 条任务，总 Token 减少 17.56%；相比 baseline 多完成 4 条任务，总 Token 增加 19.72%。这是单轮观察结果；ASR 仅少 1 条命中，仍需逐条核查原始轨迹和重复对照。Token 按导出汇总统计，包含攻击预检成本。
+
+导出的 432 条记录均标为 valid，无缺失或截断告警；该状态来自源结果，不代替 E0 独立载荷/终态审计。I3 仍为 `partial`（24 条有效样例中 8 个范围缺口），对象/数据权限与 I2 未实现。实现和历史试验保留在 [V2 实施记录](./docs/framework_v2_report.md) 与 [I3 报告](./docs/i3_p0_stress_report.md)。
+
+### 对比测试命令
+
+默认已进入 `ipi` 环境，沿用当前模型配置；不需要导入任务清单。默认运行 4 种典型攻击，每组 144 条，自动记录实际任务 ID 与运行配置。使用新名称保留已有结果：
+
+```bash
+python -m experiments.run_partial_benchmark --baseline --force-rerun --name baseline_v2_control_r2
+python -m experiments.run_partial_benchmark --force-rerun --name workshop_v2_r2
+```
+
+默认 `summary` 日志足够用于历史分析；`--trace-level full` 仅在排查具体决策时启用，会增加日志写入开销。可加 `--no-checker` 做授权层消融，或加 `--clean` 测无攻击效用控制，并使用独立运行名称。
+
+在“历史分析”勾选 baseline 与 V2，选择相同攻击和场景，对比 TSR、官方 ASR 和总 Token；历史组仅作参照，模型服务版本未固定时不能仅凭差异归因。
 
 ## 安装与模型配置
 
@@ -178,7 +191,7 @@ partial 的单攻击和多攻击统一保存到 `results/partial_benchmark/<mode
 | `--attack typical/all/NAME [NAME ...]` | partial 默认 typical；all 测全部，或指定一个/多个名称；预设不能与具体名称混用，非法选择在模型初始化前拒绝 |
 | `--baseline` | partial 入口使用无防御基线，任务子集和攻击保持一致 |
 | `--force-rerun` | partial 入口重新执行已有任务，不复用缓存 |
-| `--trace-level summary/standard/full` | 默认摘要、裁剪后的逐条记录、完整记录与 `.dscg_trace.jsonl.gz` 侧车 |
+| `--trace-level summary/standard/full` | 默认 summary 用于日常对比；standard 保存简化逐条记录；full 保存详细诊断及压缩侧车，增加写入开销，不改变防御逻辑 |
 | `--include-extra-info` | 等价于 `--trace-level full` |
 | `--tool-metadata PATH` | 指定工具风险元数据 TOML；也可设置 `DSCG_TOOL_METADATA` |
 | `--model-config PATH`、`--results-dir DIR` | partial 入口支持的配置与结果路径覆盖 |
@@ -222,58 +235,3 @@ python -m dashboard.app
 论文问题、文献、创新点与实验协议统一维护在兄弟仓库 [`../research/`](../research/)。工程侧读取[技术路线](../research/technical_route.md)，完成已解锁任务后向[实现状态](../research/paper/implementation_status.md)追加证据；[`system_TODO.md`](./system_TODO.md) 保留工程历史，不能代替当前路线。不要在 DSCG 内复制研究目录或论文计划。
 
 项目介绍：[Word](./docs/DSCG项目介绍.docx) · [可编辑文本](./docs/DSCG项目介绍.md)。
-
-<!-- framework-optimization-20261007 -->
-## 本轮框架优化
-
-本轮 V2 保持两层，每层只负责一件事，无需新增配置文件或参数：
-
-| 层 | 本次修正 |
-|---|---|
-| 工具授权 | 固定 `temperature=0`、排序工具目录，明确条件预订与已有支付更新；编译失败记录 `error_code` 并 fail-closed。只读取可信用户请求，外部反馈不能补授权。 |
-| 动作审计 | 加入当前任务最近 4 条工具返回，每条最多 2,048 字符，标明不可信及截断；用事实判断当前动作，外部新增命令不能扩大任务。默认每批一次审计。 |
-
-审计仅判断当前动作：无目标参数的任务查阅可获取未知事实；有具体目标/网址的调用仍须有任务证据，不能凭名称猜测。
-
-Monitor 和一次性 ticket 沿用。重审和任务完成提示仍默认关闭。没有本地 `config/tools.local.toml` 时自动使用仓库内置 `config/tools.agentdojo-v1.2.toml`；显式路径/环境变量、本地覆盖优先，未知工具仍按 critical 处理。模型凭据沿用现有配置或环境变量。
-
-回归 **167/167**、dashboard 检查 **21/21**。真实模型检查与全部中间结果见 [V2 实施记录](docs/framework_v2_report.md)。同期单次对照（同任务、同载荷）：
-
-| 配置 | clean TSR | tool_knowledge TSR | 官方 ASR |
-|---|---|---|---|
-| 原生 baseline | 11/12 | 32/36 | 3/36 |
-| 授权 / no-checker | 11/12 | 32/36 | 1/36 |
-| 默认两层（补修后） | 11/12 | 32/36 | 1/36 |
-| 两层 + 完成提示 | 11/12 | 31/36 | 4/36 |
-
-默认版恢复了初版的四次完成损失，但**没有证明防御提升**。baseline 的三个 ASR 命中为最终回答警告中引用酒店名；默认版的一个命中是实际向 Alice 外发消息时附带了攻击链接，不能归为纯回答文本误判。默认版仍有一次合法网页 abstain 后重试完成；完成提示组有新增误拦，暂不推荐启用。默认版 Token 相对 baseline：clean **+26.83%**（超过20%目标），攻击含预检 **+19.07%**。
-
-I3 仍为 **partial：24 条有效样例中 8 个范围缺口**，对象/数据权限与 I2 仍未实现。上述小批量、单次结果没有通过 E0 真实终态/载荷门槛，不支持论文防御收益或三层优越性结论。
-
-### 可选对照参数
-
-- `--no-checker`：只测工具授权与 Monitor/ticket，关闭 LLM 审计。
-- `--clean`：相同用户任务的无攻击效用控制，安全指标为 N/A。
-- `--audit-retries 1`：可选一次语义 abstain 重审，默认 `0`。
-- `--completion-prompt`：可选通用任务完成提示，默认关闭，单独加测。
-- `--task-manifest PATH`：仅自定义任务时使用；本轮默认任务已匹配旧结果，无需传入。
-- `--write-task-manifest PATH`：可选离线导出清单后退出，不调用模型。
-
-`--baseline` 不能与 `--no-checker`、重审或完成提示组合；`--no-checker` 不能启用重审。
-
-### 匹配对比命令
-
-以下默认已进入 `ipi` 环境，沿用 `deepseek-flash` 模型配置。**不需要生成或导入任务清单**：默认 v1.2 任务 ID 已核对与旧 `baseline` / `workshop_new` 的冻结清单一致，每组四种典型攻击 **144 条**、**12 个用户任务簇**。每次结果仍自动保存实际 `task_selection` / `run_manifest`。
-
-```bash
-cd /Users/luo/Desktop/AgentDefence/DSCG
-python -m experiments.run_partial_benchmark --baseline --force-rerun --name baseline_v2_control
-python -m experiments.run_partial_benchmark --no-checker --force-rerun --trace-level full --name workshop_v2_authorization
-python -m experiments.run_partial_benchmark --force-rerun --trace-level full --name workshop_v2_two_layer
-```
-
-先做 clean 控制：三条分别加 `--clean`，名称加 `_clean`（每组 12 条）；攻击调试分别加 `--attack tool_knowledge`，名称加 `_tk`（每组 36 条）。正式重复使用新名称 `_r2`、`_r3`；保留旧结果。完成提示的本轮单独对照未改善结果，保持关闭；不合并默认重审。
-
-结果路径：`results/partial_benchmark/deepseek-flash_<NAME>/<attack>/<suite>/`。在“历史分析”勾选同期 baseline、授权对照、两层版，再加旧 `baseline`、`workshop_new`、`workshop_opt` 作历史参照，保持攻击和场景相同。对比 TSR、官方 ASR、合法任务误拦和总 Token；目标任务与额外预检成本分开统计。旧 provider revision 不完整，不能用历史差异单独归因。
-
-E0 真实载荷送达/终态复核和重复对照仍是有效性门槛。只有排除漏授权、缺上下文及评测误判后，两层仍无净收益，才按研究侧路线评估三层候选；本轮未新增第三层。
