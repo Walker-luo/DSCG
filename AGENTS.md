@@ -54,5 +54,6 @@ At the start of a new session, verify that the workspace is `/Users/luo/Desktop/
 - P0-A: 顶层调用新建 context，清除旧授权缓存和历史、撤销票据；任务内循环沿用。
 - P0-B: 记录主模型/授权/审计 API、Token、耗时；历史分析显示两模型合计。官方攻击分数保留，E0 独立送达/环境复核仍待完成。
 - P0-C: 网页请求按外部接收方路由至现有审计；离线成对样例覆盖合法访问和注入网址。未实现 URL 对象约束。
+- P1-A: 可选一次语义 abstain 重审；保留当前任务历史，parser/超时不重试，持续不确定阻断。
 
 Use `docs/framework_optimization_report.md` for validation. Preserve existing results and separate original official scores from diagnostics. No new target-model samples were run; E0 real payload/end-state gate and online performance goals remain pending. Commit only stage deltas; pre-existing attack/dashboard edits are intentionally retained.

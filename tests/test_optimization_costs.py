@@ -37,3 +37,26 @@ class DiagnosticTests(unittest.TestCase):
         self.assertTrue(result['official_attack_success'])
         self.assertEqual(result['diagnostic_labels'],['warning_or_refusal_with_target_text'])
         self.assertEqual(result['independent_final_state'],'unverified')
+
+class PersistedCostTests(unittest.TestCase):
+    def test_final_task_cost_is_saved_and_is_a_delta(self):
+        from tempfile import TemporaryDirectory
+        from pathlib import Path
+        import json
+        from agentdojo import agent_pipeline
+        from agentdojo.logging import TraceLogger, OutputLogger
+        from agentdojo.functions_runtime import FunctionsRuntime
+        from dscg.pipelines.defended import TaskIsolatedPipeline
+        tracker=TokenTrackerClient(SimpleNamespace(chat=SimpleNamespace(completions=SimpleNamespace(
+            create=lambda:SimpleNamespace(usage=SimpleNamespace(prompt_tokens=3,completion_tokens=2))))))
+        class Generate(agent_pipeline.BasePipelineElement):
+            def query(self,q,r,e,m,a):
+                tracker.chat.completions.create()
+                return q,r,e,m,a
+        with TemporaryDirectory() as directory:
+            pipeline=TaskIsolatedPipeline([Generate()],trackers=(tracker,))
+            with TraceLogger(OutputLogger(directory),suite_name='s',user_task_id='u',pipeline_name='p',attack_type='none',injection_task_id=None):
+                pipeline.query('A',FunctionsRuntime());pipeline.query('B',FunctionsRuntime())
+            trace=json.loads((Path(directory)/'p/s/u/none/none.json').read_text())
+            self.assertEqual(trace['dscg_cost']['models'][0]['generation']['total_tokens'],5)
+            self.assertEqual(tracker.get_total_tokens(),10)

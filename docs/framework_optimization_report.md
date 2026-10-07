@@ -17,3 +17,8 @@
 网页请求按外部接收方路由至现有审计；离线成对样例覆盖合法访问和注入网址。未实现 URL 对象约束。
 
 离线回归：`conda run -n ipi python -m unittest discover -s tests -v`，退出码 0（完整日志 `P0-C_tests.log`）。新模型样本 0；不推断效用或防御率改善。
+## P1-A — 有界重审
+
+可选一次语义 abstain 重审；保留当前任务历史，parser/超时不重试，持续不确定阻断。
+
+离线回归：`conda run -n ipi python -m unittest discover -s tests -v`，退出码 0（完整日志 `P1-A_tests.log`）。新模型样本 0；不推断效用或防御率改善。

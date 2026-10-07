@@ -1673,6 +1673,8 @@ class TaskIsolatedPipeline(agent_pipeline.AgentPipeline):
                 }
                 if isinstance(getattr(logger, "context", None), dict):
                     logger.context["dscg_cost"] = context["dscg_cost"]
+                    if isinstance(logger, logging.TraceLogger):
+                        logger.save()
                 if self.reference_monitor is not None:
                     self.reference_monitor.revoke_tickets()
 
@@ -1696,12 +1698,16 @@ class ActionSecurityChecker(agent_pipeline.BasePipelineElement):
         llm=None,
         sandbox: PermissionSandbox | None = None,
         timeout_seconds: float = AUDIT_TIMEOUT_SECONDS,
+        max_semantic_retries: int = 0,
     ):
         self.small_llm = small_llm
         self.intention = user_intention
         self.llm = llm
         self.sandbox = sandbox
         self.timeout_seconds = timeout_seconds
+        if max_semantic_retries not in (0, 1):
+            raise ValueError("semantic audit retries must be 0 or 1")
+        self.max_semantic_retries = max_semantic_retries
 
     def _audit_packet(self, query, runtime, tool_calls, extra_args) -> dict:
         records = extra_args.get("dscg_action_ledger", [])
@@ -1882,46 +1888,66 @@ class ActionSecurityChecker(agent_pipeline.BasePipelineElement):
                 parser_status="deterministic_bypass",
             )
             record = decision.public_dict()
+            record["semantic_attempt"] = attempt + 1
             _publish_audit_record(extra_args, record)
             extra_args["_dscg_audit_decision"] = record
             return query, runtime, env, messages, extra_args
 
-        started = time.perf_counter()
-        content = None
-        raw_hash = _hash_json("missing-audit-response")
-        try:
-            content = self._request_audit(query, env, packet)
-            raw_hash = _hash_json(content if content is not None else "missing-audit-response")
-            decision_value, violations, confidence, reason_code = _parse_audit_payload(content)
-            decision = AuditDecision(
-                batch_fingerprint=batch_fingerprint,
-                decision=decision_value,
-                violations=violations,
-                confidence=confidence,
-                reason_code=reason_code,
-                audit_input_sha256=input_hash,
-                raw_response_sha256=raw_hash,
-                model_version=_normalise_text(getattr(self.small_llm, "name", "unknown-model"), 128),
-                latency_ms=round((time.perf_counter() - started) * 1000, 2),
-                parser_status="ok",
-            )
-        except Exception as exc:
-            error_name = type(exc).__name__.lower()
-            failure_code = "AUDIT_TIMEOUT" if "timeout" in error_name else (
-                "AUDIT_SCHEMA_INVALID" if isinstance(exc, AuditSchemaError) else "AUDIT_MODEL_ERROR"
-            )
-            decision = self._make_failure_decision(
-                batch_fingerprint,
-                input_hash,
-                raw_hash,
-                failure_code,
-                round((time.perf_counter() - started) * 1000, 2),
-            )
-        record = decision.public_dict()
-        _publish_audit_record(extra_args, record)
-        # Internal key is consumed by ReferenceMonitor; the public redacted
-        # copy remains available to tracegers and offline callers.
-        extra_args["_dscg_audit_decision"] = record
+        for attempt in range(self.max_semantic_retries + 1):
+            started = time.perf_counter()
+            content = None
+            raw_hash = _hash_json("missing-audit-response")
+            try:
+                audit_client = getattr(self.small_llm, "client", None)
+                with (audit_client.phase("audit_retry" if attempt else "audit")
+                      if isinstance(audit_client, TokenTrackerClient) else nullcontext()):
+                    content = self._request_audit(query, env, packet)
+                raw_hash = _hash_json(content if content is not None else "missing-audit-response")
+                decision_value, violations, confidence, reason_code = _parse_audit_payload(content)
+                decision = AuditDecision(
+                    batch_fingerprint=batch_fingerprint,
+                    decision=decision_value,
+                    violations=violations,
+                    confidence=confidence,
+                    reason_code=reason_code,
+                    audit_input_sha256=input_hash,
+                    raw_response_sha256=raw_hash,
+                    model_version=_normalise_text(getattr(self.small_llm, "name", "unknown-model"), 128),
+                    latency_ms=round((time.perf_counter() - started) * 1000, 2),
+                    parser_status="ok",
+                )
+            except Exception as exc:
+                error_name = type(exc).__name__.lower()
+                failure_code = "AUDIT_TIMEOUT" if "timeout" in error_name else (
+                    "AUDIT_SCHEMA_INVALID" if isinstance(exc, AuditSchemaError) else "AUDIT_MODEL_ERROR"
+                )
+                decision = self._make_failure_decision(
+                    batch_fingerprint,
+                    input_hash,
+                    raw_hash,
+                    failure_code,
+                    round((time.perf_counter() - started) * 1000, 2),
+                )
+            record = decision.public_dict()
+            record["semantic_attempt"] = attempt + 1
+            _publish_audit_record(extra_args, record)
+            # Internal key is consumed by ReferenceMonitor; the public redacted
+            # copy remains available to tracegers and offline callers.
+            extra_args["_dscg_audit_decision"] = record
+            if (attempt >= self.max_semantic_retries
+                    or decision.decision != "abstain"
+                    or decision.parser_status != "ok"
+                    or packet["history_truncated"]):
+                break
+            # Repeat the exact candidates and current task history. No action
+            # or capability may be added by this standalone clarification.
+            packet = {**packet, "clarification": (
+                "Re-evaluate the same candidates using the trusted request and retained "
+                "task history. Necessary private reads alone are not external disclosure; "
+                "never permit a new task or destination. If still uncertain, abstain."
+            )}
+            _append_full_trace(extra_args, "audit_retry_input", packet)
+            input_hash = _hash_json(packet)
         return query, runtime, env, messages, extra_args
 
 
@@ -1932,6 +1958,7 @@ def make_qwen_newFrame_pipeline(
     use_security_checker: bool = True,
     trace_level: str = DEFAULT_TRACE_LEVEL,
     tool_metadata=None,
+    audit_retries: int = 0,
     *,
     api_key: str | None = None,
     base_url: str | None = None,
@@ -2023,6 +2050,7 @@ def make_qwen_newFrame_pipeline(
             small_llm=sec_llm,
             llm=llm,
             sandbox=my_sandbox,
+            max_semantic_retries=audit_retries,
         )
 
     # 3. Every candidate batch passes through the same monitor and ticketed executor.
