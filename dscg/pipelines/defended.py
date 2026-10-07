@@ -14,7 +14,7 @@ from enum import Enum
 from dataclasses import dataclass
 from hashlib import sha256
 from uuid import uuid4
-from threading import Lock
+from threading import Lock, RLock
 
 from typing import Any
 from agentdojo import types as ad_types
@@ -1313,6 +1313,11 @@ class ReferenceMonitor(agent_pipeline.BasePipelineElement):
         self._issued: dict[str, ExecutionTicket] = {}
         self._ticket_lock = Lock()
 
+    def revoke_tickets(self):
+        """Invalidate all unspent authority at the outer task boundary."""
+        with self._ticket_lock:
+            self._issued.clear()
+
     def _sign(self, action_id: str, call_fingerprint: str, contract_version: str, nonce: str) -> str:
         payload = f"{action_id}|{call_fingerprint}|{contract_version}|{nonce}".encode("utf-8")
         return hmac.new(self._secret, payload, sha256).hexdigest()
@@ -1609,6 +1614,51 @@ class TicketedToolsExecutor(agent_pipeline.BasePipelineElement):
         _publish_action_ledger(extra_args)
         return query, runtime, env, [*messages, *results], extra_args
 
+
+
+class TaskIsolatedPipeline(agent_pipeline.AgentPipeline):
+    """Create host-owned DSCG state once per outer task, retaining it in the loop.
+
+    Explicit caller dictionaries carry non-DSCG host options only. Reusing the
+    returned dictionary is a new task, never an authorization resume operation.
+    A shared pipeline serializes outer calls because its sandbox is mutable.
+    """
+
+    def __init__(self, elements, *, executor=None, monitor=None):
+        super().__init__(elements)
+        self.task_executor = executor
+        self.reference_monitor = monitor
+        self._task_lock = RLock()
+
+    def query(self, query, runtime, env=None, messages=None, extra_args=None):
+        with self._task_lock:
+            context = {
+                key: value for key, value in (extra_args or {}).items()
+                if not key.startswith(("dscg_", "_dscg_"))
+            }
+            context["dscg_task_id"] = str(uuid4())
+            logger = logging.Logger().get()
+            if isinstance(getattr(logger, "context", None), dict):
+                for key in list(logger.context):
+                    if key.startswith(("dscg_", "_dscg_")):
+                        logger.context.pop(key)
+                logger.context["dscg_task_id"] = context["dscg_task_id"]
+            executor = self.task_executor
+            if executor is not None:
+                executor._authorization_cache_key = None
+                executor._authorization_cache_contract = None
+                if executor.sandbox is not None:
+                    executor.sandbox.allowed_tools = None
+            if self.reference_monitor is not None:
+                self.reference_monitor.revoke_tickets()
+            try:
+                return super().query(
+                    query, runtime, env if env is not None else functions_runtime.EmptyEnv(),
+                    list(messages or []), context,
+                )
+            finally:
+                if self.reference_monitor is not None:
+                    self.reference_monitor.revoke_tickets()
 
 
 class ActionSecurityChecker(agent_pipeline.BasePipelineElement):
@@ -1973,12 +2023,12 @@ def make_qwen_newFrame_pipeline(
     tools_loop = agent_pipeline.ToolsExecutionLoop(loop_components)
 
     # 4. 构建主 Pipeline
-    pipeline = agent_pipeline.AgentPipeline([
+    pipeline = TaskIsolatedPipeline([
         agent_pipeline.SystemMessage(load_system_message(None)), 
         agent_pipeline.InitQuery(),
         new_executor,
         tools_loop
-    ])
+    ], executor=new_executor, monitor=reference_monitor)
     
     # 5. 动态命名 Pipeline，方便看实验日志
     ablation_suffix = ""

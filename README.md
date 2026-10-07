@@ -168,3 +168,12 @@ python -m dashboard.app
 论文问题、文献、创新点与实验协议统一维护在兄弟仓库 [`../research/`](../research/)。工程侧读取[技术路线](../research/technical_route.md)，完成已解锁任务后向[实现状态](../research/paper/implementation_status.md)追加证据；[`system_TODO.md`](./system_TODO.md) 保留工程历史，不能代替当前路线。不要在 DSCG 内复制研究目录或论文计划。
 
 项目介绍：[Word](./docs/DSCG项目介绍.docx) · [可编辑文本](./docs/DSCG项目介绍.md)。
+
+<!-- framework-optimization-20261007 -->
+## 本轮框架优化
+
+| 阶段 | 工程状态 |
+|---|---|
+| P0-A 任务隔离 | 顶层调用新建 context，清除旧授权缓存和历史、撤销票据；任务内循环沿用。 |
+
+离线验证与限制见 [优化实施报告](docs/framework_optimization_report.md)。上述工程测试不证明 benchmark 防御收益；I3 仍为 partial，参数、对象和数据约束及 I2 保持锁定。

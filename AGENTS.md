@@ -47,3 +47,10 @@ For each ready task, keep the implementation change in `DSCG/`, run the stated c
 ## Session Handoff
 
 At the start of a new session, verify that the workspace is `/Users/luo/Desktop/AgentDefence`, read `research/technical_route.md`, and inspect `research/paper/implementation_status.md` before making research-driven changes. Do not infer a paper claim from code or a smoke benchmark. Keep the two repositories independently reviewable and do not merge them into a new nested checkout.
+
+<!-- framework-optimization-20261007 -->
+## Optimization handoff (2026-10-07)
+
+- P0-A: 顶层调用新建 context，清除旧授权缓存和历史、撤销票据；任务内循环沿用。
+
+Use `docs/framework_optimization_report.md` for validation. Preserve existing results and separate original official scores from diagnostics. No new target-model samples were run; E0 real payload/end-state gate and online performance goals remain pending. Commit only stage deltas; pre-existing attack/dashboard edits are intentionally retained.
