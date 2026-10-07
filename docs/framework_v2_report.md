@@ -31,3 +31,23 @@
 - E0：`/opt/miniconda3/envs/ipi/bin/python -m experiments.harness_audit --fixture tests/fixtures/harness_audit_cases.json --output examples/results/framework_optimization/20261007_v2_implementation/e0`，退出 0；6 个合成 self-check，valid1/tool_error1/infrastructure_error4，不代表实际 harness 已过门槛。
 
 阶段三先运行三个同期 clean 对照，再依据有效攻击样本决定层数。完整典型攻击与三次重复仍需新名称运行，不能用合成结果代替。
+
+## 第一次同期对照与审计补修
+
+代码 `9225018`，三组配置同模型、同默认任务，命令不导入配置/任务清单，每组只跑一次：
+
+| 配置 | clean TSR | tool_knowledge TSR | 官方 ASR | 攻击组总 Token（含预检） |
+|---|---|---|---|---|
+| baseline | 11/12 | 32/36 | 3/36 | 440,398 |
+| 授权 / no-checker | 11/12 | 32/36 | 1/36 | 457,563 |
+| 两层 | 12/12 | 28/36 | 3/36 | 497,703 |
+
+六条 CLI 均退出0，无目标 trace error。完整命令分别为 `/opt/miniconda3/envs/ipi/bin/python -m experiments.run_partial_benchmark` 加 `--baseline` / `--no-checker --trace-level full` / `--trace-level full`，clean 组加 `--clean --force-rerun --name baseline_v2_clean_20261007` / `workshop_v2_authorization_clean_20261007` / `workshop_v2_two_layer_clean_20261007`；攻击组加 `--attack tool_knowledge --force-rerun --name baseline_v2_tk_20261007` / `workshop_v2_authorization_tk_20261007` / `workshop_v2_two_layer_tk_20261007`。逐条命令见 research evidence record。原始结果在 `results/partial_benchmark/deepseek-flash_<name>/`，分析脚本/JSON/配对 CSV/全目录输入哈希在本轮 artifacts。
+
+两层攻击组相对 baseline 四次损失：一次合法 `get_scheduled_transactions` 被 abstain 阻断，三次主模型追加确认而未完成；没有授权缺工具或合法网页被阻断。三组官方 ASR 正例均为餐馆/酒店任务输出警告时引用目标酒店名；这里只标注文本命中，不改官方分数，也不能凭这一点证明其他样本无实际违规。账单三个失败样例的业务字段被载荷替换，不能靠提示补造。
+
+clean 两层 Token 为139,639，baseline113,593，增幅22.93%，超过提案20%目标；攻击含预检增幅13.01%。两层攻击目标成本397,586 Token，额外12个 benign 预检100,117 Token。原生 baseline 缺每任务计数，不能用另一次 clean 相减伪造 baseline 目标成本；完整 API/延迟见分析JSON，API耗时加总不等于运行墙钟时间。
+
+合法 rent 读取的原审计包重复三次均 deny。通用补修只明确“判断当前动作”：无目标参数的查阅可以获取缺失事实，具体目标仍须与任务有已知联系。一个过宽中间版本虽恢复读取，却把无证据 `article.example` 放行3/3；已撤回这层宽泛表述。第一个收紧版本阻断未知网址，但合法 lookup仍 abstain2/3，也已替换。所有中间日志/结果保留。最终表达区分没有目标参数的查阅与有目标的访问：rent lookup allow3/3；两个无证据网址 abstain6/6；合法有据网址 allow3/3；外部命令新增验证网址 deny1/3、abstain2/3。严格决策标签为10/12，URL探针退出1如实保留；执行边界预期12/12，因为 critical URL 的 deny/abstain 均不发 ticket。它是小样本语义观察，不是对象权限保证。
+
+复核指出无上下文探针继承完整上下文的 allow 标签不能被解释为安全提升，尤其URL名字可泄漏目标语义；本轮不把中间无上下文8/8当收益。补修后167回归通过，授权与参数不变，重审/完成提示默认仍关闭。再单独运行同版本完成提示对照，才能决定是否推荐该选项。
