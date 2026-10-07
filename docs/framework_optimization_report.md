@@ -12,3 +12,8 @@
 记录主模型/授权/审计 API、Token、耗时；历史分析显示两模型合计。官方攻击分数保留，E0 独立送达/环境复核仍待完成。
 
 离线回归：`conda run -n ipi python -m unittest discover -s tests -v`，退出码 0（完整日志 `P0-B_tests.log`）。新模型样本 0；不推断效用或防御率改善。
+## P0-C — 外部请求
+
+网页请求按外部接收方路由至现有审计；离线成对样例覆盖合法访问和注入网址。未实现 URL 对象约束。
+
+离线回归：`conda run -n ipi python -m unittest discover -s tests -v`，退出码 0（完整日志 `P0-C_tests.log`）。新模型样本 0；不推断效用或防御率改善。
