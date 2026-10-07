@@ -57,13 +57,15 @@ Node 图表/选择器测试 21/21；新消融接线的暂存版本单独测试 8
 
 建议先冻结任务，再分别使用新名称运行 B0 / B1 / B3 / B4；每个配置另加 `--clean` 测相同 12 个用户任务。默认四种典型目标型攻击计划 144 条，保留官方 ASR；第一次在线运行前独立审查 E0 有效分母。完整 P0 默认包含隔离与外部请求风险修正；可用旧审阅 catalog 的副本配合 `--tool-metadata` 做风险分类单因素对照。
 
+以下推荐命令默认已进入 `ipi` 环境。
+
 ```bash
-conda run -n ipi python -m experiments.run_partial_benchmark --write-task-manifest examples/results/optimization_tasks.json
-conda run -n ipi python -m experiments.run_partial_benchmark --baseline --task-manifest examples/results/optimization_tasks.json --force-rerun --name b0_optimization
-conda run -n ipi python -m experiments.run_partial_benchmark --no-checker --task-manifest examples/results/optimization_tasks.json --force-rerun --name b1_optimization
-conda run -n ipi python -m experiments.run_partial_benchmark --task-manifest examples/results/optimization_tasks.json --force-rerun --trace-level full --name b3_optimization
-conda run -n ipi python -m experiments.run_partial_benchmark --audit-retries 1 --task-manifest examples/results/optimization_tasks.json --force-rerun --name b4_reaudit
-conda run -n ipi python -m experiments.run_partial_benchmark --completion-prompt --task-manifest examples/results/optimization_tasks.json --force-rerun --name b4_completion
+python -m experiments.run_partial_benchmark --write-task-manifest examples/results/optimization_tasks.json
+python -m experiments.run_partial_benchmark --baseline --task-manifest examples/results/optimization_tasks.json --force-rerun --name b0_optimization
+python -m experiments.run_partial_benchmark --no-checker --task-manifest examples/results/optimization_tasks.json --force-rerun --name b1_optimization
+python -m experiments.run_partial_benchmark --task-manifest examples/results/optimization_tasks.json --force-rerun --trace-level full --name b3_optimization
+python -m experiments.run_partial_benchmark --audit-retries 1 --task-manifest examples/results/optimization_tasks.json --force-rerun --name b4_reaudit
+python -m experiments.run_partial_benchmark --completion-prompt --task-manifest examples/results/optimization_tasks.json --force-rerun --name b4_completion
 ```
 
 以上仅为待运行命令，本轮新模型样本 **0**。TSR 损失 ≤2pp 和 Token 增幅 ≤20% 仍是待验证目标；尚无证据支持继续缩减审计范围。下一步：独立核验 E0 后运行冻结 manifest 的单因素配对，至少 3 次，并按 suite/user 任务簇分析。

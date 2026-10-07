@@ -92,12 +92,14 @@ pipeline, main_tracker, sec_tracker = make_defended_pipeline(
 
 ## 运行与验证
 
+以下命令默认已进入 `ipi` 环境，直接使用 `python`。
+
 离线测试和 fixture 无需 API Key：
 
 ```bash
-conda run -n ipi python -m unittest discover -s tests -v
-conda run -n ipi python -m experiments.i3_p0_stress --output /tmp/dscg-i3-check.json
-conda run -n ipi python -m experiments.harness_audit \
+python -m unittest discover -s tests -v
+python -m experiments.i3_p0_stress --output /tmp/dscg-i3-check.json
+python -m experiments.harness_audit \
   --fixture tests/fixtures/harness_audit_cases.json --output /tmp/dscg-e0-check.json
 ```
 
@@ -115,7 +117,7 @@ python -m experiments.run_benchmark --name full-check
 重新运行与 partial 相同任务的**无防御 baseline**：
 
 ```bash
-conda run -n ipi python -m experiments.run_partial_benchmark \
+python -m experiments.run_partial_benchmark \
   --baseline --force-rerun --name baseline-20261006
 ```
 
@@ -183,25 +185,20 @@ python -m dashboard.app
 
 离线验证与限制见 [优化实施报告](docs/framework_optimization_report.md)。上述工程测试不证明 benchmark 防御收益；I3 仍为 partial，参数、对象和数据约束及 I2 保持锁定。
 
-### 参数说明
+### 本次新增参数
 
-| 参数 | 默认值 | 作用 / 对比时用法 |
-|---|---|---|
-| `--baseline` | 关闭 | 原生无防御 AgentDojo；作为同批次主模型对照。 |
-| `--no-checker` | 关闭 | 关闭 LLM 审计，保留工具授权、Reference Monitor 和 ticket；用于拆分审计收益。 |
-| `--audit-retries 0\|1` | `0` | `1` 对正常解析的语义 abstain 重审一次；超时、格式错误和持续不确定仍阻断。 |
-| `--completion-prompt` | 关闭 | 提醒模型继续已授权任务并报告请求字段；单独测任务完成行为。 |
-| `--clean` | 关闭 | 相同用户任务的无攻击效用控制；12 个用户任务，安全指标为 N/A。 |
-| `--attack typical` | `typical` | 固定四种典型目标型攻击；当前每组计划 144 条，具体攻击见上方攻击表。 |
-| `--task-manifest PATH` | 未指定 | 读取冻结任务 ID；baseline 和所有防御配置使用同一文件。 |
-| `--write-task-manifest PATH` | 未指定 | 离线生成当前任务清单后退出，不调用模型；拒绝覆盖已有文件。 |
-| `--name NAME` | pipeline 名称 | 区分配置与结果目录；每个对照使用新名称，保留旧结果。 |
-| `--force-rerun` | 关闭 | 重新执行任务；正式成本比较启用，避免混入缓存结果。 |
-| `--trace-level summary\|standard\|full` | `summary` | `full` 保存审计输入的压缩侧车，便于逐例核验；baseline 使用原生轨迹。 |
+- `--no-checker`：关闭 LLM 审计，保留工具授权、Reference Monitor 和一次性 ticket。
+- `--audit-retries 1`：语义 abstain 最多重审一次，默认 `0`；超时、格式错误和持续不确定仍阻断。
+- `--completion-prompt`：启用通用任务完成提示，继续已授权任务并覆盖用户要求的字段；默认关闭。
+- `--clean`：使用相同用户任务运行无攻击效用控制，安全指标为 N/A。
+- `--task-manifest PATH`：读取冻结任务 ID，确保 baseline 与防御版使用相同任务。
+- `--write-task-manifest PATH`：离线生成任务清单后退出，不调用模型，不覆盖已有文件。
 
 `--baseline` 不能与 `--no-checker`、非零 `--audit-retries` 或 `--completion-prompt` 同用；`--no-checker` 不能启用重审。默认防御版已包含任务隔离、成本统计和外部请求风险修正；重审与完成提示默认关闭，分别加测后再决定是否组合。
 
 ### 匹配对比命令
+
+以下命令默认已进入 `ipi` 环境。
 
 已核对旧 `baseline` 与 `workshop_new` 的 **32 个场景汇总**：下方清单的 v1.2 用户 / 注入任务 ID 与旧结果一致；每场景 3×3 组合，四种典型攻击共 **144 条 / 组**，覆盖 12 个用户任务。核对记录见 [comparison_check.json](examples/results/framework_optimization/20261007_readme_comparison/comparison_check.json)。
 
@@ -213,14 +210,14 @@ export DSCG_MAIN_MODEL_ID=deepseek-flash
 export DSCG_SEC_MODEL_ID=deepseek-flash
 
 # 仅在清单不存在时执行
-conda run -n ipi python -m experiments.run_partial_benchmark \
+python -m experiments.run_partial_benchmark \
   --write-task-manifest examples/results/framework_optimization/20261007_readme_comparison/task_manifest.json
 ```
 
 **2. 重跑无防御 baseline。** 使用新名称作为同批次主对照。
 
 ```bash
-conda run -n ipi python -m experiments.run_partial_benchmark \
+python -m experiments.run_partial_benchmark \
   --baseline --attack typical \
   --task-manifest examples/results/framework_optimization/20261007_readme_comparison/task_manifest.json \
   --force-rerun --name baseline_control_20261007
@@ -229,7 +226,7 @@ conda run -n ipi python -m experiments.run_partial_benchmark \
 **3. 运行当前默认优化版。** 本组衡量隔离与外部请求风险修复后的完整 P0；未启用重审或任务完成提示。
 
 ```bash
-conda run -n ipi python -m experiments.run_partial_benchmark \
+python -m experiments.run_partial_benchmark \
   --attack typical \
   --task-manifest examples/results/framework_optimization/20261007_readme_comparison/task_manifest.json \
   --force-rerun --trace-level full --name workshop_opt_p0_20261007
