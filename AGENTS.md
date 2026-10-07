@@ -51,6 +51,8 @@ At the start of a new session, verify that the workspace is `/Users/luo/Desktop/
 <!-- framework-optimization-20261007 -->
 ## Optimization handoff (2026-10-07)
 
+- V2 stage 1: sorted authorization catalogue, explicit temperature 0, conditional-task semantics and compact failure codes; no authority from tool feedback. Regression 161/161. Synthetic real-model compiler probes are observations, not task execution or defense efficacy. No new configuration files/flags are required. See `docs/framework_v2_report.md`; continue bounded current-task audit context next.
+
 - P0-A: 顶层调用新建 context，清除旧授权缓存和历史、撤销票据；任务内循环沿用。
 - P0-B: 记录主模型/授权/审计 API、Token、耗时；历史分析显示两模型合计。官方攻击分数保留，E0 独立送达/环境复核仍待完成。
 - P0-C: 网页请求按外部接收方路由至现有审计；离线成对样例覆盖合法访问和注入网址。未实现 URL 对象约束。

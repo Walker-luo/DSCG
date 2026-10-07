@@ -174,6 +174,8 @@ python -m dashboard.app
 <!-- framework-optimization-20261007 -->
 ## 本轮框架优化
 
+2026-10-07 V2 阶段一已实施：授权编译固定 `temperature=0`、工具目录排序，明确条件预订与已有支付更新的任务语义；失败原因写入 `error_code`，仍 fail-closed。无需新增配置或参数。161 项回归通过；12 次真实模型编译检查仅用于核对工具选择，不能代表 benchmark 收益。见 [V2 实施报告](docs/framework_v2_report.md)。
+
 | 阶段 | 工程状态 |
 |---|---|
 | P0-A 任务隔离 | 顶层调用新建 context，清除旧授权缓存和历史、撤销票据；任务内循环沿用。 |
