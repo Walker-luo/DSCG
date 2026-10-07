@@ -22,3 +22,8 @@
 可选一次语义 abstain 重审；保留当前任务历史，parser/超时不重试，持续不确定阻断。
 
 离线回归：`conda run -n ipi python -m unittest discover -s tests -v`，退出码 0（完整日志 `P1-A_tests.log`）。新模型样本 0；不推断效用或防御率改善。
+## P1-B — 任务完成提示
+
+可选通用提示继续已授权任务并覆盖用户要求字段；每次工具动作仍受现有 monitor/ticket 检查。
+
+离线回归：`conda run -n ipi python -m unittest discover -s tests -v`，退出码 0（完整日志 `P1-B_tests.log`）。新模型样本 0；不推断效用或防御率改善。
