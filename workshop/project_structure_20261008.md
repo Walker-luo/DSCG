@@ -50,3 +50,4 @@
 - Final: Ruling: 既有ignored历史输入依赖维持现状；不补造缺失数据。代价：fresh clone仍不能完整核验本地历史证据。
 - Final: Ruling: 用户既有System_TODO删除及research修改保留；只暂存本轮变更，状态记录追加采用选择性index补丁。代价：完成后工作树仍有用户原有修改。
 - Task 1: complete — fresh structural verification exit0; document/layout commit and outgoing evidence tracked by PROJECT-STRUCTURE-CLEANUP-20261008 in research/paper/implementation_status.md.
+- Postcommit: 发现两个结果目录的外部路径变动；冻结results快照检查退出1，迁移/文档/归档独立检查仍通过。原校验记录不覆盖；新增postcommit_observation.json，保留用户目录新名称。结果全量内容身份未独立证明。
