@@ -14,6 +14,7 @@ WORKSHOP = ROOT / "workshop"
 OUT = WORKSHOP / "results/materials_migration_20261008"
 STRUCTURE_MANIFEST = WORKSHOP / "artifacts/20261008_project_structure/structure_manifest.json"
 REORGANIZATION_MANIFEST = WORKSHOP / "artifacts/20261008_workshop_cleanup/relocation_manifest.json"
+PRESENTATION_MANIFEST = WORKSHOP / "artifacts/20261008_dashboard_defense_structure/presentation_manifest.json"
 
 
 def sha(path):
@@ -114,7 +115,16 @@ def main():
     runtime_changes = subprocess.check_output([
         "git", "-C", str(ROOT), "diff", "--name-only", manifest["dscg_base_revision"],
         "--", "dscg", "tests", "experiments", "dashboard", "config"], text=True)
-    assert not runtime_changes.strip(), runtime_changes
+    presentation = json.loads(PRESENTATION_MANIFEST.read_text())
+    expected_presentation = {
+        "dashboard/templates/index.html", "dashboard/templates/_header.html",
+        "dashboard/static/css/style.css",
+    }
+    assert set(presentation["files"]) == expected_presentation
+    for name, digest in presentation["files"].items():
+        assert sha(ROOT / name) == digest, name
+    changed_files = set(runtime_changes.splitlines())
+    assert not changed_files - expected_presentation, runtime_changes
     assert not (ROOT / "System_TODO.md").exists(), "Restore of user's deletion is outside scope"
     catalog = json.loads((WORKSHOP / "3_layer_sources_20261008.json").read_text())
     doc = (WORKSHOP / "3_layer_opt.md").read_text()
@@ -133,6 +143,9 @@ def main():
         "local_links_checked": len(checked_links), "preexisting_missing_document_links": old_missing,
         "python_artifact_syntax_checked": len(python_files), "script_root_depths_checked": len(roots_checked),
         "runtime_changed": False, "research_route_changed": False, "raw_result_roots_moved": 0,
+        "dashboard_presentation_changed": bool(changed_files),
+        "dashboard_presentation_files": sorted(changed_files),
+        "presentation_manifest_sha256": sha(PRESENTATION_MANIFEST),
         "new_model_calls": 0, "new_benchmark_samples": 0,
         "runtime_sha256": manifest["runtime_sha256"],
         "migration_manifest_sha256": sha(OUT / "migration_manifest.json"),

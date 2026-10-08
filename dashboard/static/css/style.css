@@ -617,8 +617,9 @@ button, input, select { letter-spacing: 0; }
 .report-sheet h6 { color: var(--text-secondary); font-size: 11px; font-weight: 650; }
 
 .architecture-diagram { padding: 8px 0; }
+.arch-status { margin: 0 0 12px; padding: 10px 12px; color: var(--text-muted); background: var(--blue-soft); border-radius: var(--radius); font-size: 12px; line-height: 1.6; }
 .arch-lane { padding: 12px 0 14px; border: 1px solid var(--border); border-radius: var(--radius); background: rgba(255, 255, 255, 0.012); }
-.arch-lane-label { display: block; margin: 0 14px 10px; color: var(--text-muted); font-size: 9px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; }
+.arch-lane-label { display: block; margin: 0 14px 10px; color: var(--text-muted); font-size: 11px; font-weight: 700; letter-spacing: 0.04em; }
 .arch-flow { display: flex; align-items: stretch; justify-content: center; gap: 8px; }
 .arch-box {
   width: 145px;
@@ -635,8 +636,8 @@ button, input, select { letter-spacing: 0; }
   border-radius: var(--radius);
 }
 .arch-box > i { margin-bottom: 8px; font-size: 18px; }
-.arch-box strong { font-size: 11px; line-height: 1.35; }
-.arch-box small { margin-top: 4px; color: var(--text-muted); font-size: 9px; }
+.arch-box strong { font-size: 12px; line-height: 1.35; }
+.arch-box small { margin-top: 4px; color: var(--text-muted); font-size: 11px; line-height: 1.5; }
 .arch-input > i { color: var(--blue); }
 .arch-compiler > i { color: var(--blue); }
 .arch-sandbox > i { color: var(--amber); }
@@ -654,8 +655,8 @@ button, input, select { letter-spacing: 0; }
 .arch-details > div { padding: 16px; border-right: 1px solid var(--border); }
 .arch-details > div:last-child { border-right: 0; }
 .arch-details span { color: var(--green); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 9px; }
-.arch-details h6 { margin: 4px 0 7px; color: var(--text); font-size: 11px; }
-.arch-details p { margin: 0; color: var(--text-muted); font-size: 10px; line-height: 1.6; }
+.arch-details h6 { margin: 4px 0 7px; color: var(--text); font-size: 12px; }
+.arch-details p { margin: 0; color: var(--text-muted); font-size: 11px; line-height: 1.7; }
 
 .modal-content { color: var(--text); background: var(--surface); border: 1px solid var(--border); border-radius: 8px; box-shadow: var(--shadow); }
 .modal-header { padding: 16px 20px; border-bottom: 1px solid var(--border); }
@@ -714,7 +715,6 @@ button, input, select { letter-spacing: 0; }
   .history-page-heading { flex-direction: column; align-items: start; gap: 8px; }
   .page-nav-link { padding: 8px; font-size: 11px; }
   .history-filter-grid { grid-template-columns: minmax(0, 1fr); }
-  .header-actions [data-bs-target="#architecture-modal"] { display: none; }
   .header-actions { gap: 4px; }
   .run-status { min-width: 32px; padding: 0 9px; }
   .run-status > span:last-child { display: none; }
@@ -732,6 +732,9 @@ button, input, select { letter-spacing: 0; }
   .history-chart-heading { align-items: flex-start; flex-direction: column; }
   .history-source-caption { max-width: 100%; text-align: left; }
   .arch-details { grid-template-columns: 1fr; }
+  .arch-flow { flex-direction: column; align-items: center; }
+  .arch-box { width: 100%; max-width: 320px; flex: 0 0 auto; min-height: 82px; }
+  .arch-arrow { transform: rotate(90deg); }
   .arch-details > div { border-right: 0; border-bottom: 1px solid var(--border); }
   .arch-details > div:last-child { border-bottom: 0; }
 }

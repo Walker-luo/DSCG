@@ -44,14 +44,14 @@
           <h2 id="config-defense"><span>03</span> 防御与采样</h2>
           <div id="ablation-group" class="toggle-list">
             <label class="toggle-row" for="use-sandbox"><span><i class="bi bi-funnel"></i><strong>权限沙箱</strong><small>确定性工具白名单</small></span><input class="form-check-input" type="checkbox" id="use-sandbox" checked></label>
-            <label class="toggle-row" for="use-security-checker"><span><i class="bi bi-shield-check"></i><strong>安全校验器</strong><small>动作序列语义审计</small></span><input class="form-check-input" type="checkbox" id="use-security-checker" checked></label>
+            <label class="toggle-row" for="use-security-checker"><span><i class="bi bi-shield-check"></i><strong>安全校验器</strong><small>当前候选动作语义审计</small></span><input class="form-check-input" type="checkbox" id="use-security-checker" checked></label>
           </div>
           <div class="field-group" id="defense-group" style="display:none;"><label class="form-label" for="defense">AgentDojo 防御</label><select id="defense" class="form-select form-select-sm"><option value="" selected>无防御</option><option value="tool_filter">工具过滤器</option><option value="transformers_pi_detector">注入检测器</option><option value="spotlighting_with_delimiting">定界高亮</option><option value="repeat_user_prompt">重复用户提示</option></select></div>
           <div class="limit-grid">
             <div class="field-group"><label class="form-label" for="max-user-tasks">用户任务上限</label><input type="number" id="max-user-tasks" class="form-control form-control-sm" value="0" min="0" placeholder="0 = 全部"></div>
             <div class="field-group"><label class="form-label" for="max-injection-tasks">注入任务上限</label><input type="number" id="max-injection-tasks" class="form-control form-control-sm" value="0" min="0" placeholder="0 = 全部"></div>
           </div>
-          <div class="field-group metadata-path-group"><label class="form-label" for="tool-metadata-path">工具风险元数据 <span class="field-optional">可选</span></label><input type="text" id="tool-metadata-path" class="form-control form-control-sm" placeholder="config/tools.local.toml" spellcheck="false"><small class="field-help">填写项目内 TOML 路径；未分类工具按 critical 处理。</small></div>
+          <div class="field-group metadata-path-group"><label class="form-label" for="tool-metadata-path">工具风险元数据 <span class="field-optional">可选</span></label><input type="text" id="tool-metadata-path" class="form-control form-control-sm" placeholder="config/tools.local.toml" spellcheck="false"><small class="field-help">留空按本地或环境配置解析，缺省使用内置风险目录；未知或无效工具按 critical 处理。</small></div>
         </section>
 
         <section class="config-section connection-section" aria-labelledby="config-connection">
@@ -152,15 +152,52 @@
   </div>
 
   <div class="modal fade" id="architecture-modal" tabindex="-1" aria-labelledby="architecture-title" aria-hidden="true">
-    <div class="modal-dialog modal-xl modal-dialog-centered"><div class="modal-content">
-      <div class="modal-header"><div><span class="section-kicker">P0.2–P0.5 execution path</span><h5 class="modal-title" id="architecture-title">DSCG 确定性执行防线</h5></div><button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="关闭"></button></div>
-      <div class="modal-body"><div class="architecture-diagram">
-        <div class="arch-lane"><span class="arch-lane-label">授权先行</span><div class="arch-flow"><div class="arch-box arch-input"><i class="bi bi-person-check"></i><strong>可信用户回合</strong><small>TrustedTaskRequest</small></div><i class="bi bi-arrow-right arch-arrow"></i><div class="arch-box arch-compiler"><i class="bi bi-file-earmark-lock"></i><strong>编译授权契约</strong><small>LLM + schema validation</small></div><i class="bi bi-arrow-right arch-arrow"></i><div class="arch-box arch-sandbox"><i class="bi bi-shield-lock"></i><strong>安装不可变契约</strong><small>PermissionSandbox</small></div></div></div>
-        <div class="arch-connector"><i class="bi bi-arrow-down"></i><span>契约安装完成后才生成候选动作</span></div>
-        <div class="arch-lane"><span class="arch-lane-label">动作仲裁</span><div class="arch-flow"><div class="arch-box arch-model"><i class="bi bi-cpu"></i><strong>候选动作</strong><small>Main Executor / LLM</small></div><i class="bi bi-arrow-right arch-arrow"></i><div class="arch-box arch-checker"><i class="bi bi-shield-check"></i><strong>结构化审计</strong><small>ActionSecurityChecker</small></div><i class="bi bi-arrow-right arch-arrow"></i><div class="arch-box arch-monitor"><i class="bi bi-diagram-3"></i><strong>统一仲裁</strong><small>ReferenceMonitor + Ledger</small></div><i class="bi bi-arrow-right arch-arrow"></i><div class="arch-box arch-exec"><i class="bi bi-ticket-perforated"></i><strong>一次性执行票据</strong><small>TicketedToolsExecutor</small></div><i class="bi bi-arrow-right arch-arrow"></i><div class="arch-box arch-tool"><i class="bi bi-gear"></i><strong>真实工具</strong><small>ToolsExecutor</small></div></div></div>
-        <div class="arch-recovery"><i class="bi bi-arrow-return-left"></i><span>阻断动作 → 结构化工具错误 → 主模型重规划 → 重新经过审计、仲裁和票据校验</span></div>
-        <div class="arch-details"><div><span>01</span><h6>授权契约</h6><p><code>OurFrameExecutor</code> 只根据可信用户回合、固定策略、注册工具和显式风险元数据编译契约；<code>PermissionSandbox</code> 保存并检查工具级权限，候选动作不能给自己扩权。</p></div><div><span>02</span><h6>结构化审计</h6><p><code>ActionSecurityChecker</code> 读取当前候选动作和有限动作历史，输出 <code>allow/deny/abstain</code> 风险信号。它不能授予权限；低风险公共读取可走确定性旁路。</p></div><div><span>03</span><h6>统一仲裁</h6><p><code>ReferenceMonitor</code> 先检查工具注册和 Sandbox，再结合审计结果逐个判定，并把每个动作写入 <code>ActionLedger</code>。混合批次先全量判定，再逐动作提交。</p></div><div><span>04</span><h6>票据执行与边界</h6><p>只有绑定 action_id、调用指纹、契约版本和 nonce 的一次性票据能经 <code>TicketedToolsExecutor</code> 到达真实工具；当前主要覆盖工具级授权，参数级 Contract 和 provenance 属于后续 P1/P2。</p></div></div>
-      </div></div>
+    <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable"><div class="modal-content">
+      <div class="modal-header"><div><span class="section-kicker">当前已实施 · V2 stage1</span><h5 class="modal-title" id="architecture-title">DSCG 两层防御结构</h5></div><button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="关闭"></button></div>
+      <div class="modal-body">
+        <p class="arch-status">完整防御默认启用以下两层；审计重试为 0，完成提示关闭。关闭任一开关属于消融配置。</p>
+        <div class="architecture-diagram">
+          <div class="arch-lane" data-defense-layer="authorization">
+            <span class="arch-lane-label">第一层 · 可信任务工具授权</span>
+            <div class="arch-flow">
+              <div class="arch-box arch-input"><i class="bi bi-person-check"></i><strong>可信用户请求</strong><small>任务与固定宿主策略</small></div>
+              <i class="bi bi-arrow-right arch-arrow" aria-hidden="true"></i>
+              <div class="arch-box arch-compiler"><i class="bi bi-list-check"></i><strong>任务级授权判断</strong><small>注册工具与风险元数据</small></div>
+              <i class="bi bi-arrow-right arch-arrow" aria-hidden="true"></i>
+              <div class="arch-box arch-sandbox"><i class="bi bi-funnel"></i><strong>工具白名单</strong><small>条件任务 · 失败默认拒绝</small></div>
+            </div>
+          </div>
+          <div class="arch-connector"><i class="bi bi-arrow-down" aria-hidden="true"></i><span>先授权，再由主模型生成候选动作；工具反馈不能授予新工具权限</span></div>
+          <div class="arch-lane" data-defense-layer="audit">
+            <span class="arch-lane-label">第二层 · 当前动作语义审计</span>
+            <div class="arch-flow">
+              <div class="arch-box arch-model"><i class="bi bi-cpu"></i><strong>当前候选动作</strong><small>工具、参数与有限动作历史</small></div>
+              <i class="bi bi-arrow-right arch-arrow" aria-hidden="true"></i>
+              <div class="arch-box arch-checker"><i class="bi bi-shield-check"></i><strong>任务对齐审计</strong><small>工具返回 + 宿主工具描述</small></div>
+              <i class="bi bi-arrow-right arch-arrow" aria-hidden="true"></i>
+              <div class="arch-box arch-checker"><i class="bi bi-clipboard-check"></i><strong>结构化风险判断</strong><small>允许 / 拒绝 / 不确定</small></div>
+            </div>
+          </div>
+          <div class="arch-connector"><i class="bi bi-arrow-down" aria-hidden="true"></i><span>审计提供风险判断，最终执行仍由原授权与监控器仲裁</span></div>
+          <div class="arch-lane" data-execution-infrastructure="monitor-ticket">
+            <span class="arch-lane-label">执行基础设施 · Monitor / 一次性票据</span>
+            <div class="arch-flow">
+              <div class="arch-box arch-monitor"><i class="bi bi-diagram-3"></i><strong>统一执行仲裁</strong><small>白名单、元数据、审计与动作状态</small></div>
+              <i class="bi bi-arrow-right arch-arrow" aria-hidden="true"></i>
+              <div class="arch-box arch-exec"><i class="bi bi-ticket-perforated"></i><strong>一次性执行许可</strong><small>绑定原调用 · 使用后失效</small></div>
+              <i class="bi bi-arrow-right arch-arrow" aria-hidden="true"></i>
+              <div class="arch-box arch-tool"><i class="bi bi-gear"></i><strong>真实工具执行</strong><small>结果返回主模型</small></div>
+            </div>
+          </div>
+          <div class="arch-recovery"><i class="bi bi-arrow-return-left"></i><span>错误或阻断反馈可触发主模型重规划；新候选仍经过原授权、审计和票据校验。对象与数据范围仍存在缺口。</span></div>
+          <div class="arch-details">
+            <div><span>已生效 · 授权</span><h6>按可信任务授权</h6><p>工具目录排序、温度 0；识别用户已提出的条件任务，必要准备读取与后续写入分别判断。授权错误默认拒绝。</p></div>
+            <div><span>已生效 · 审计输入</span><h6>补充有限任务上下文</h6><p>审计读取当前任务最近 4 条工具返回，每条最多 2,048 字符，明确标为不可信；仅提供候选工具的宿主描述，最多 512 字符。</p></div>
+            <div><span>已生效 · 读取判断</span><h6>准备读取与外传分开</h6><p>允许查询尚未知的任务事实；具体目标与目的地需要任务证据。已授权且无输出目的地的只读来源，语义拒绝可按元数据放行；后续发送、支付仍单独审核。无效或不确定审计默认阻断。</p></div>
+            <div><span>当前能力边界</span><h6>工具级约束</h6><p>对象、目的地、参数与数据权限尚未强制约束。三层架构、授权对照校准均未实施；执行提示候选已撤回。</p></div>
+          </div>
+        </div>
+      </div>
     </div></div>
   </div>
 

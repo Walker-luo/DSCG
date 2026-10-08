@@ -9,7 +9,7 @@
       <a class="page-nav-link{% if active_page == 'history' %} is-active{% endif %}" href="/history" data-testid="tab-history-analysis"{% if active_page == 'history' %} aria-current="page"{% endif %}><i class="bi bi-graph-up"></i><span>历史分析</span></a>
     </nav>
     {% if active_page == 'experiment' %}
-    <button class="btn btn-sm btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#architecture-modal"><i class="bi bi-diagram-3"></i><span>防御架构</span></button>
+    <button class="btn btn-sm btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#architecture-modal" aria-label="防御架构" title="查看当前防御结构"><i class="bi bi-diagram-3"></i><span>防御架构</span></button>
     <span id="status-indicator" class="run-status idle" role="status"><span class="status-dot"></span><span>就绪</span></span>
     {% endif %}
     <button class="btn btn-sm icon-button" onclick="location.reload()" aria-label="刷新页面" title="刷新页面"><i class="bi bi-arrow-clockwise"></i></button>
