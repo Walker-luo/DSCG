@@ -26,6 +26,8 @@ DSCG 是一个面向工具使用型 LLM Agent 的间接提示词注入（IPI）�
 
 ## 本轮框架优化
 
+方案、调研、报告和诊断证据统一维护在 [workshop/](./workshop/README.md)，原始评测结果保留在 `results/`。
+
 当前 V2 保持两层防御，无需新增配置文件或参数：
 
 | 层 | 本次优化 |
@@ -42,11 +44,11 @@ Reference Monitor 和一次性 ticket 沿用；默认每批一次审计，重审
 | 无防御 `baseline_v2p1` | 11/12 | 30/36 | 1/36 | 431,370 |
 | V2 + 本轮补修 `workshop_v2p1_audit` | 11/12 | 31/36 | 1/36 | 549,648 |
 
-这是单轮小样本观察：补修组比 baseline 多完成 1 条任务，原生 ASR 持平，攻击运行 Token 增加 27.42%（包含每组额外 12 条攻击能力预检）。**执行提示候选已撤回**：虽完成 32/36，但原生 ASR 增至 2/36，clean 效用未变、Token 高于补修组；不加入默认框架。详情、失败案例和评分复核见[后续优化记录](./docs/framework_v2_followup_report.md)。
+这是单轮小样本观察：补修组比 baseline 多完成 1 条任务，原生 ASR 持平，攻击运行 Token 增加 27.42%（包含每组额外 12 条攻击能力预检）。**执行提示候选已撤回**：虽完成 32/36，但原生 ASR 增至 2/36，clean 效用未变、Token 高于补修组；不加入默认框架。详情、失败案例和评分复核见[后续优化记录](./workshop/framework_v2_followup_report.md)。
 
-用户提供的[此前历史导出](./download/dscg-history-analysis-20261007T153203Z/analysis.json)中 V2 为 TSR122/144、ASR5/144，是本轮补修前的结果，不能混作新对照。原生 ASR 的酒店名称警告命中保留；当前结果不代替独立 E0 判定或重复验证。I3 仍为 `partial`（24 条有效样例中 8 个范围缺口），对象/数据权限与 I2 未实现；历史试验和哈希保留在 [V2 实施记录](./docs/framework_v2_report.md) 与 [I3 报告](./docs/i3_p0_stress_report.md)。
+用户提供的[此前历史导出](./download/dscg-history-analysis-20261007T153203Z/analysis.json)中 V2 为 TSR122/144、ASR5/144，是本轮补修前的结果，不能混作新对照。原生 ASR 的酒店名称警告命中保留；当前结果不代替独立 E0 判定或重复验证。I3 仍为 `partial`（24 条有效样例中 8 个范围缺口），对象/数据权限与 I2 未实现；历史试验和哈希保留在 [V2 实施记录](./workshop/framework_v2_report.md) 与 [I3 报告](./docs/i3_p0_stress_report.md)。
 
-三层优化的[调研与候选方案](../research/paper/3_layer_opt.md)比较工具返回来源标记、任务条件化局部净化、最终交付核验。建议优先研究“工具授权 → 返回处理 → 动作审计”，先做零额外模型调用的来源标记对照，再评估一次调用的局部净化；最终交付核验另行选择。方案尚未实现，当前默认仍是上述两层；E0 与研究路线选择是后续试验前提。
+三层优化的[调研与候选方案](./workshop/3_layer_opt.md)比较工具返回来源标记、任务条件化局部净化、最终交付核验。建议优先研究“工具授权 → 返回处理 → 动作审计”，先做零额外模型调用的来源标记对照，再评估一次调用的局部净化；最终交付核验另行选择。方案尚未实现，当前默认仍是上述两层；E0 与研究路线选择是后续试验前提。
 
 ### 对比测试命令
 
@@ -233,6 +235,6 @@ python -m dashboard.app
 | `results/`、`archive/` | 被 Git 忽略的运行结果、历史实现 |
 | [`AGENTS.md`](./AGENTS.md) | 工程协作规则与当前状态 |
 
-论文问题、文献、创新点与实验协议统一维护在兄弟仓库 [`../research/`](../research/)。工程侧读取[技术路线](../research/technical_route.md)，完成已解锁任务后向[实现状态](../research/paper/implementation_status.md)追加证据；[`system_TODO.md`](./system_TODO.md) 保留工程历史，不能代替当前路线。不要在 DSCG 内复制研究目录或论文计划。
+正式论文问题、创新点与实验协议维护在兄弟仓库 [`../research/`](../research/)。工程侧读取[技术路线](../research/technical_route.md)，完成已解锁任务后向[实现状态](../research/paper/implementation_status.md)追加证据。Workshop 优化的方案、调研和诊断材料按用户要求统一在 [workshop/](./workshop/README.md)，不改变研究路线或代替论文机制筛选。
 
 项目介绍：[Word](./docs/DSCG项目介绍.docx) · [可编辑文本](./docs/DSCG项目介绍.md)。

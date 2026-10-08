@@ -8,3 +8,4 @@ config/*.local.toml
 config/tools.local.toml
 /examples/
 /download/
+/workshop/results/
