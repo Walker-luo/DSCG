@@ -13,6 +13,7 @@ PROJECT = ROOT.parent
 WORKSHOP = ROOT / "workshop"
 OUT = WORKSHOP / "results/materials_migration_20261008"
 STRUCTURE_MANIFEST = WORKSHOP / "artifacts/20261008_project_structure/structure_manifest.json"
+REORGANIZATION_MANIFEST = WORKSHOP / "artifacts/20261008_workshop_cleanup/relocation_manifest.json"
 
 
 def sha(path):
@@ -36,19 +37,39 @@ def main():
         parser.error("--output must be a new file under workshop/artifacts/; historical reports cannot be overwritten")
     manifest = json.loads((OUT / "migration_manifest.json").read_text())
     cleanup = json.loads(STRUCTURE_MANIFEST.read_text())
+    reorganization = json.loads(REORGANIZATION_MANIFEST.read_text())
+    relocated = {e["old_path"]: e for e in reorganization["entries"]}
+    for entry in reorganization["entries"]:
+        current = ROOT / entry["new_path"]
+        original = ROOT / entry["original_storage"]
+        assert current.is_file() and not current.is_symlink(), current
+        assert original.is_file() and not original.is_symlink(), original
+        assert sha(current) == entry["sha256_after"], current
+        assert sha(original) == entry["sha256_before"], original
+        assert not (ROOT / entry["old_path"]).exists(), entry["old_path"]
+    for entry in reorganization["updated_documents"]:
+        assert sha(ROOT / entry["path"]) == entry["sha256_after"]
+        assert sha(ROOT / entry["original_storage"]) == entry["sha256_before"]
+
+    def historical_path(name):
+        return ROOT / (relocated[name]["original_storage"] if name in relocated else name)
+
+    def current_path(name):
+        return ROOT / (relocated[name]["new_path"] if name in relocated else name)
+
     retired = {e["legacy_read_path"]: e for e in cleanup["retired_aliases"]}
     entries = manifest["entries"]
     assert len(entries) == manifest["document_count"] + manifest["artifact_count"] == 293
     assert len({e["new_path"] for e in entries}) == len(entries)
     checked_links, old_missing, roots_checked, python_files = [], [], [], []
     for entry in entries:
-        new = ROOT / entry["new_path"]
+        new = current_path(entry["new_path"])
         old = PROJECT / entry["legacy_read_path"]
-        original = ROOT / entry["original_storage"]
+        original = historical_path(entry["original_storage"])
         assert new.is_file() and not new.is_symlink(), new
         assert new.resolve().is_relative_to(WORKSHOP), new
         assert original.resolve().is_relative_to(WORKSHOP), original
-        assert sha(new) == entry["sha256_after"], new
+        assert sha(historical_path(entry["new_path"])) == entry["sha256_after"], new
         assert sha(original) == entry["sha256_before"], original
         if entry["legacy_read_path"] in retired:
             record = retired[entry["legacy_read_path"]]
@@ -61,9 +82,9 @@ def main():
         if entry["kind"] == "document":
             assert old.is_symlink() or entry["legacy_read_path"] in retired, old
             if new.suffix == ".md":
-                previous = {(label, target) for label, target, dest in local_links(old, original.read_text()) if not dest.exists()}
+                previous = {(label, str(dest)) for label, target, dest in local_links(old, original.read_text()) if not dest.exists()}
                 for label, target, dest in local_links(new):
-                    if not dest.exists() and (label, target) in previous:
+                    if not dest.exists() and (label, str(dest)) in previous:
                         old_missing.append({"document": entry["new_path"], "target": target})
                     else:
                         assert dest.exists(), (new, target)
@@ -78,6 +99,7 @@ def main():
     alias = ROOT / manifest["compatibility_directory"]["old"]
     assert alias.is_symlink() and alias.resolve() == ROOT / manifest["compatibility_directory"]["new"]
     for path in [ROOT / "README.md", ROOT / "RESEARCH_STATUS.md", WORKSHOP / "README.md",
+                 WORKSHOP / "completed/README.md", WORKSHOP / "original_framework_direction_20261008.md",
                  *sorted((ROOT / "docs").rglob("*.md")),
                  WORKSHOP / "archive/project_structure_20261008/README.md"]:
         if path.is_symlink():
@@ -103,6 +125,9 @@ def main():
         "document_count": manifest["document_count"], "artifact_count": manifest["artifact_count"],
         "moved_file_hashes_checked": len(entries), "original_bytes_and_legacy_hashes_checked": len(entries),
         "retired_legacy_aliases_checked": len(retired),
+        "workshop_materials_reorganized": len(relocated),
+        "completed_stage_documents": len([e for e in relocated.values() if e["kind"] == "completed_material"]),
+        "reorganization_manifest_sha256": sha(REORGANIZATION_MANIFEST),
         "structure_manifest_sha256": sha(STRUCTURE_MANIFEST),
         "historical_documents_archived": manifest["historical_documents_archived_before_link_edits"],
         "local_links_checked": len(checked_links), "preexisting_missing_document_links": old_missing,
@@ -126,7 +151,7 @@ def main():
             stream.write(json.dumps(result, ensure_ascii=False, indent=2) + "\n")
     print(json.dumps({key: value for key, value in result.items() if key in {
         "status", "document_count", "artifact_count", "moved_file_hashes_checked",
-        "historical_documents_archived", "retired_legacy_aliases_checked", "local_links_checked", "python_artifact_syntax_checked",
+        "historical_documents_archived", "retired_legacy_aliases_checked", "workshop_materials_reorganized", "completed_stage_documents", "local_links_checked", "python_artifact_syntax_checked",
         "script_root_depths_checked", "runtime_changed", "raw_result_roots_moved"}}, ensure_ascii=False))
 
 

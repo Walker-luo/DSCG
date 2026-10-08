@@ -15,6 +15,6 @@
 | 冗余论文指针 | [Paper_TODO.md](./Paper_TODO.md)；当前正式入口在兄弟 research 仓库 |
 | 整理前的入口与验证工具 | [before/](./before/) |
 
-根目录早期 workshop 工作稿已移到 [workshop/ALMML_sub.md](../../ALMML_sub.md)，CFP 原附件在 [references/](../../references/)。
+根目录早期 workshop 工作稿已移到 [早期投稿工作稿](../legacy_submission/ALMML_sub.md)，CFP 原附件在 [CFP 归档](../legacy_submission/)。
 
 [本次清理清单](../../artifacts/20261008_project_structure/structure_manifest.json)保存21个材料文件、6份修改前快照和4个退役别名的原哈希；历史正文仍保留原来的路径/命令上下文，部分相对引用不再适合直接点击或运行。当前入口见 [docs 索引](../../../docs/README.md)和[workshop 索引](../../README.md)。

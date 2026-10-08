@@ -96,7 +96,8 @@ python -m experiments.harness_audit \
 | `experiments/`、`tests/` | 评测入口、fixture 定义与测试源码 |
 | `dashboard/` | 实验配置与历史分析界面 |
 | [docs/](./docs/README.md) | 当前使用指南及 I3 状态报告 |
-| [workshop/](./workshop/README.md) | 所有优化计划、调研、报告与历史归档 |
+| [workshop/](./workshop/README.md) | 顶层仅保留待优化方案与相关来源 |
+| [workshop/completed/](./workshop/completed/README.md) | 已完成阶段的方案、报告与撤回记录 |
 | `workshop/artifacts/<YYYYMMDD>_<task>/` | **新 agent 测试产物的固定位置**，包括日志、fixture 输出、探针、临时模型评测和图表 |
 | `results/`、`download/` | 用户正式实验原始结果与历史分析导出 |
 | `examples/`、`workshop/results/`、`archive/` | 保留的历史证据、示例与旧实现 |

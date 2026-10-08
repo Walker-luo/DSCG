@@ -11,6 +11,6 @@
 
 阶段验收报告、旧版项目介绍、旧图表及提示词草稿已移至 [历史归档](../workshop/archive/project_structure_20261008/README.md)。归档保留原始字节，不作为当前框架说明。
 
-`framework_v2_followup_report.md` 仅保留为兼容链接，供已有三层调研引用原版本；当前阅读使用 [workshop 中的报告](../workshop/framework_v2_followup_report.md)。其余旧入口退役情况与原哈希见[清理清单](../workshop/artifacts/20261008_project_structure/structure_manifest.json)。
+`framework_v2_followup_report.md` 仅保留为兼容链接，供已有三层调研引用原版本；当前阅读使用 [workshop 中的报告](../workshop/completed/framework_v2_followup_report.md)。其余旧入口退役情况与原哈希见[清理清单](../workshop/artifacts/20261008_project_structure/structure_manifest.json)。
 
 本目录不存优化计划或 agent 测试产物；测试源码在 `tests/`，新产物固定在 `workshop/artifacts/<YYYYMMDD>_<task>/`。
