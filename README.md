@@ -23,6 +23,8 @@ DSCG 是工具使用型 LLM Agent 的间接提示词注入（IPI）防御研究�
 
 实现见 [defended.py](./dscg/pipelines/defended.py)；当前优化与候选见 [workshop 索引](./workshop/README.md)，能力边界见 [I3 报告](./docs/i3_p0_stress_report.md)。论文贡献与路线由兄弟仓库 [research](../research/technical_route.md) 维护。
 
+新的[两层重构候选](./workshop/original_framework_direction_20261008.md)研究授权对照校准：检验审计器对可信许可/禁止变化的响应；尚未实现，也未通过新颖性验收。
+
 ## 安装与配置
 
 在 `DSCG/` 执行：

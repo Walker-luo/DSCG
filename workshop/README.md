@@ -7,6 +7,7 @@
 | [V2 后续报告](./framework_v2_followup_report.md) | 当前保留的补修及对照；执行提示候选已撤回 |
 | [V2 实施记录](./framework_v2_report.md) | 两层优化、探针和历史对照 |
 | [三层候选](./3_layer_opt.md) · [来源目录](./3_layer_sources_20261008.json) | 来源标记、局部净化、最终交付核验；研究候选 |
+| [授权对照校准候选](./original_framework_direction_20261008.md) | 新的两层重构假设；审计正/负授权边界，新颖性与收益待验证 |
 | [本次结构整理计划](./project_structure_20261008.md) | 文档分工、产物规则和整理验收 |
 
 ## 存放规则
