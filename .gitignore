@@ -9,3 +9,5 @@ config/tools.local.toml
 /examples/
 /download/
 /workshop/results/
+/workshop/artifacts/
+/docs/figures/benchmarks/

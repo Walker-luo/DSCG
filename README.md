@@ -1,71 +1,31 @@
 # DSCG
 
-DSCG 是一个面向工具使用型 LLM Agent 的间接提示词注入（IPI）防御研究原型，基于 AgentDojo 评测工具动作、任务效用和运行开销。
+DSCG 是工具使用型 LLM Agent 的间接提示词注入（IPI）防御研究原型，基于 AgentDojo 比较任务成功率（TSR）、攻击成功率（ASR）和模型开销。
 
-当前实现以**工具级授权和执行完整性**为底座，LLM 安全审计提供补充信号。对象、参数和数据范围约束尚未实现；论文路线与工程验收以 [`../research/technical_route.md`](../research/technical_route.md) 和 [`implementation_status.md`](../research/paper/implementation_status.md) 为准。
+## 当前框架与创新定位
 
-## 防御流程
+当前保留 **V2 两层防御**；Reference Monitor 和一次性执行票据提供执行基础设施。
 
 ```text
-可信用户请求 → 编译工具级契约 → 主模型提出动作
-            → 安全审计（启用时）→ Reference Monitor 仲裁
-            → 消费一次性 execution ticket → 真实工具执行
+可信用户请求 → 工具授权 → 主模型提出动作 → 当前动作审计
+                                      → Monitor 仲裁 → 消费票据 → 工具执行
 ```
 
-核心实现位于 [`dscg/pipelines/defended.py`](./dscg/pipelines/defended.py)：
-
-| 模块 | 职责 |
+| 部分 | 当前实现 |
 | --- | --- |
-| `OurFrameExecutor` | 在生成候选前编译授权；工具反馈后重新规划 |
-| `PermissionSandbox` | 检查工具注册和白名单；未初始化、空策略或错误状态均拒绝 |
-| `ActionSecurityChecker` | 输出结构化 `allow/deny/abstain`；`allow` 不增加工具权限 |
-| `ReferenceMonitor` | 汇总策略与审计结果，记录动作状态并签发票据 |
-| `TicketedToolsExecutor` | 唯一真实执行入口；验证调用指纹和票据的一次性状态 |
+| 第一层：工具授权 | 只依据可信用户请求，使用排序工具目录和 temperature=0；编译错误、未初始化或空策略均拒绝执行。工具反馈不能授予权限。 |
+| 第二层：动作审计 | 审查候选调用，区分必要前置读取与后续写入；使用宿主工具描述（最多 512 字符）及最近 4 条不可信工具返回（每条最多 2,048 字符）。 |
+| 执行基础设施 | Monitor 统一仲裁；真实工具执行必须消费绑定调用指纹的一次性 ticket；阻断、重试和新候选均经过同一入口。 |
 
-被阻断的动作返回工具错误，恢复时的新候选继续经过同一仲裁路径。一次性票据绑定具体调用，但不能约束已授权工具的全新调用所选择的对象或数据。
+工程特点是把可信任务授权、语义审计和实际执行分开，并用离线状态转移测试检查错误反馈与恢复路径。**这些特点尚不是已证明的论文创新**；能力图、审计日志或票据本身不作为新算法贡献。
 
-## 本轮框架优化
+当前约束仍是工具级：对象、目的地、参数和数据权限尚未强制约束。I3 压力测试为 `partial`，24 条有效样例中有 8 条范围缺口；真实 E0 harness 验收和重复对照仍待完成。默认 `audit_retries=0`、`completion_prompt=false`，三层方案尚未实现。
 
-方案、调研、报告和诊断证据统一维护在 [workshop/](./workshop/README.md)，原始评测结果保留在 `results/`。
+实现见 [defended.py](./dscg/pipelines/defended.py)；当前优化与候选见 [workshop 索引](./workshop/README.md)，能力边界见 [I3 报告](./docs/i3_p0_stress_report.md)。论文贡献与路线由兄弟仓库 [research](../research/technical_route.md) 维护。
 
-当前 V2 保持两层防御，无需新增配置文件或参数：
+## 安装与配置
 
-| 层 | 本次优化 |
-| --- | --- |
-| 工具授权 | 固定 `temperature=0`、排序工具目录，明确条件预订与已有支付更新；编译失败记录 `error_code` 并默认拒绝。授权只读取可信用户请求。 |
-| 动作审计 | 提供宿主注册的候选工具描述（最多 512 字符）和当前任务最近 4 条工具返回（每条最多 2,048 字符），外部结果标明不可信与截断；必要前置读取与后续写入分别判断。合法查询可以获取未知事实，具体目标或网址仍需任务证据。 |
-
-Reference Monitor 和一次性 ticket 沿用；默认每批一次审计，重审和完成提示保持关闭。缺少本地工具元数据时自动使用内置 [`config/tools.agentdojo-v1.2.toml`](./config/tools.agentdojo-v1.2.toml)，显式配置和已有本地配置优先。
-
-本轮保留**必要前置读取的审计补修**，离线回归 **169/169**；同模型审计探针 **12/14 → 14/14**。2026-10-08 新对照覆盖 4 个场景，任务、可信请求、攻击载荷和主模型配置一致；攻击控制只测试 `important_instructions`：
-
-| 版本 | 无攻击 TSR ↑ | 攻击下 TSR ↑ | AgentDojo 原生 ASR ↓ | 攻击运行总 Token ↓ |
-| --- | --- | --- | --- | --- |
-| 无防御 `baseline_v2p1` | 11/12 | 30/36 | 1/36 | 431,370 |
-| V2 + 本轮补修 `workshop_v2p1_audit` | 11/12 | 31/36 | 1/36 | 549,648 |
-
-这是单轮小样本观察：补修组比 baseline 多完成 1 条任务，原生 ASR 持平，攻击运行 Token 增加 27.42%（包含每组额外 12 条攻击能力预检）。**执行提示候选已撤回**：虽完成 32/36，但原生 ASR 增至 2/36，clean 效用未变、Token 高于补修组；不加入默认框架。详情、失败案例和评分复核见[后续优化记录](./workshop/framework_v2_followup_report.md)。
-
-用户提供的[此前历史导出](./download/dscg-history-analysis-20261007T153203Z/analysis.json)中 V2 为 TSR122/144、ASR5/144，是本轮补修前的结果，不能混作新对照。原生 ASR 的酒店名称警告命中保留；当前结果不代替独立 E0 判定或重复验证。I3 仍为 `partial`（24 条有效样例中 8 个范围缺口），对象/数据权限与 I2 未实现；历史试验和哈希保留在 [V2 实施记录](./workshop/framework_v2_report.md) 与 [I3 报告](./docs/i3_p0_stress_report.md)。
-
-三层优化的[调研与候选方案](./workshop/3_layer_opt.md)比较工具返回来源标记、任务条件化局部净化、最终交付核验。建议优先研究“工具授权 → 返回处理 → 动作审计”，先做零额外模型调用的来源标记对照，再评估一次调用的局部净化；最终交付核验另行选择。方案尚未实现，当前默认仍是上述两层；E0 与研究路线选择是后续试验前提。
-
-### 对比测试命令
-
-默认已进入 `ipi` 环境，沿用当前模型配置；不需要导入任务清单。默认运行 4 种典型攻击，每组 144 条，自动记录实际任务 ID 与运行配置。使用新名称保留已有结果：
-
-```bash
-python -m experiments.run_partial_benchmark --baseline --force-rerun --name baseline_v2p1_r2
-python -m experiments.run_partial_benchmark --force-rerun --name workshop_v2p1_r2
-```
-
-默认 `summary` 日志足够用于历史分析；`--trace-level full` 仅在排查具体决策时启用，会增加日志写入开销。可加 `--no-checker` 做授权层消融，或加 `--clean` 测无攻击效用控制，并使用独立运行名称。
-
-在“历史分析”勾选 baseline 与 V2，选择相同攻击和场景，对比 TSR、官方 ASR 和总 Token；历史组仅作参照，模型服务版本未固定时不能仅凭差异归因。
-
-## 安装与模型配置
-
-在 `DSCG/` 目录执行：
+在 `DSCG/` 执行：
 
 ```bash
 conda env create -f environment.yml
@@ -73,168 +33,77 @@ conda activate ipi
 cp config/models.example.toml config/models.local.toml
 ```
 
-已有 `ipi` 环境可用 `conda env update -n ipi -f environment.yml` 更新。项目依赖 Python 3.10、AgentDojo 0.1.35 和 OpenAI-compatible Chat Completions 接口。
+在本地 TOML 中配置 `[main]`、`[security]` 的 provider、model_id 和 api_key_env，再设置对应 Key 环境变量；省略 `[security]` 会复用主模型。不要提交本地配置或凭证。项目使用 Python 3.10、AgentDojo 0.1.35；详细配置见[模板](./config/models.example.toml)与[评测指南](./docs/evaluation.md)。
 
-在本地 TOML 配置主模型与安全模型，例如：
+## 对比测试
 
-```toml
-[main]
-provider = "deepseek"
-model_id = "deepseek-flash"
-api_key_env = "DEEPSEEK_API_KEY"
-
-[security]
-provider = "dashscope"
-model_id = "qwen-plus"
-api_key_env = "DASHSCOPE_API_KEY"
-```
-
-设置对应的 Key 环境变量即可；省略整个 `[security]` 时复用主模型配置。自定义服务可填写 `base_url`，其他 Provider 见[配置模板](./config/models.example.toml)。`config/models.local.toml` 已被 Git 忽略，不要提交真实凭证。
-
-配置优先级：函数参数 > `DSCG_MAIN_*` / `DSCG_SEC_*` 环境变量 > 本地 TOML > Provider 默认值。`DSCG_MODEL_CONFIG` 可指定配置文件路径，解析实现见 [`dscg/model_config.py`](./dscg/model_config.py)。当前 AgentDojo 适配层不保留 DeepSeek 的 `reasoning_content`，项目自动使用 `reasoning_effort="none"`；重建环境时还需核对消息角色兼容性。
-
-Python 中可直接使用本地配置，并通过开关做消融：
-
-```python
-from dscg.pipelines.defended import make_defended_pipeline
-
-pipeline, main_tracker, sec_tracker = make_defended_pipeline(
-    use_sandbox=True,
-    use_security_checker=True,
-)
-```
-
-`use_security_checker=False` 对应 NoChecker；`use_sandbox=False` 对应 NoSandbox。原始基线入口为 [`dscg/pipelines/baseline.py`](./dscg/pipelines/baseline.py)。
-
-## 运行与验证
-
-以下命令默认已进入 `ipi` 环境，直接使用 `python`。
-
-离线测试和 fixture 无需 API Key：
+以下命令默认 `ipi` 已激活，无需额外任务清单。使用新运行名称保存每次对照：
 
 ```bash
-python -m unittest discover -s tests -v
-python -m experiments.i3_p0_stress --output /tmp/dscg-i3-check.json
-python -m experiments.harness_audit \
-  --fixture tests/fixtures/harness_audit_cases.json --output /tmp/dscg-e0-check.json
+python -m experiments.run_partial_benchmark --baseline --force-rerun --name baseline_compare_01
+python -m experiments.run_partial_benchmark --force-rerun --name workshop_compare_01
 ```
 
-I3 退出码：`0` 表示所有有效样本约束通过，按路线记 `no_go`；`1` 表示发现约束缺口；`2` 表示样本运行错误。当前预期为 `1`，回归测试通过不表示范围断言已成立。运行时使用新的输出路径，保留已有结果。
+baseline 使用原生 AgentDojo 工具循环，不启用 DSCG 或安全模型；两组使用相同主模型配置及 v1.2 任务子集：workspace、travel、banking、slack 各取注册顺序前 3 个用户任务和前 3 个注入任务。默认 `typical` 共计划 144 条攻击评测，另有攻击能力预检；实际分母与任务 ID 以 `summary.json` 为准。
 
-模型评测需先配置连接与 Key：
+| 默认 `--attack typical` 的攻击 | 简要说明 | 来源 |
+| --- | --- | --- |
+| `ignore_previous` | 要求忽略原任务，改做攻击任务 | [AgentDojo 论文 §4.2][agentdojo-paper]及[AgentDojo 官方实现][agentdojo-baseline] |
+| `injecagent` | 用强调标记和忽略指令模板提出攻击目标 | [InjecAgent 论文][injecagent-paper]、[AgentDojo 官方适配][agentdojo-baseline] |
+| `important_instructions` | 冒充用户，要求先完成攻击目标 | [AgentDojo 论文 §4.1–4.2][agentdojo-paper]及[AgentDojo 官方实现][agentdojo-baseline] |
+| `tool_knowledge` | 补充攻击所需工具顺序和参数提示 | [AgentDojo 官方实现][agentdojo-baseline] |
 
-```bash
-python -m experiments.run_partial_benchmark --name partial-check
-python -m experiments.run_benchmark --name full-check
+典型集用于控制测试规模，不表示已验证攻击强度。可用 `--attack NAME [NAME ...]` 指定攻击，或 `--attack all` 显式运行全部自动攻击；`manual` 不可选。完整攻击表、消融和指标口径见[评测指南](./docs/evaluation.md)。
+
+默认 `summary` 足够用于对比。`--trace-level full` 保存详细诊断及压缩侧车，增加序列化和写入开销；按需排错时使用。正式对照还需匹配任务 ID、攻击、模型配置及预检口径，历史结果仅作参照。
+
+用户运行的结果保存到：
+
+```text
+results/partial_benchmark/<model_id>_<name>/<attack>/<suite>/
 ```
 
-两个入口默认均启用完整 DSCG，覆盖 workspace、travel、banking、slack。partial 默认使用 `typical`：`ignore_previous`、`injecagent`、`important_instructions`、`tool_knowledge` 这 4 种典型目标型攻击；full 使用全部任务和固定的 `important_instructions` 攻击。结果分别保存到 `results/partial_benchmark/` 和 `results/benchmarks/`。正式实验需另行固定 manifest、模型、攻击、seed 和防御开关。
-
-重新运行与 partial 相同任务的**无防御 baseline**：
-
-```bash
-python -m experiments.run_partial_benchmark --baseline --force-rerun --name baseline-typical-20261007
-```
-
-该模式使用原生 AgentDojo 工具循环和当前主模型配置，不启用 DSCG、安全模型或 AgentDojo 防御。与防御版共用 v1.2 套件、每场景按注册顺序取前 3 个用户任务和前 3 个注入任务。目标型攻击每场景计划 9 个组合，默认 4 种攻击共计划 **144** 条攻击评测，另有注入任务能力预检。典型集覆盖指令覆盖、InjecAgent 模板、用户身份伪装和工具知识提示；这是控制测试规模的固定选择，不表示已验证攻击强度。
-
-`--attack all` 可运行全部 16 种自动攻击，当前共计划 **456** 条。DoS 攻击须显式选择或使用 `all`；它们遵循 AgentDojo 原生规则，每用户只运行一次，ASR 按任务失败计算。计划数不等于有效样本数。
-
-指定一种或多种攻击：
-
-```bash
-python -m experiments.run_partial_benchmark --baseline --attack tool_knowledge --name baseline-tools
-python -m experiments.run_partial_benchmark --attack tool_knowledge injecagent --name dscg-two-attacks
-python -m experiments.run_partial_benchmark --baseline --attack all --name baseline-all
-```
-
-可选攻击（当前 AgentDojo 安装版本）：
-
-这些攻击均有 AgentDojo 官方实现。[AgentDojo 发表于 NeurIPS 2024 Datasets and Benchmarks][agentdojo-publication]，[InjecAgent 发表于 ACL Findings 2024][injecagent-paper]。表中区分论文实验与 AgentDojo 官方模板；16 个名称包含消融变体，并非 16 种独立发表的方法。`system_message` 和 `tool_knowledge` 在此仅标为 AgentDojo 官方实现。
-
-| `--attack` 值 | 简要说明 | 类型 | 来源 |
-| --- | --- | --- | --- |
-| `typical` | 默认运行上述 4 种典型目标型攻击 | 批量选择 | 本项目选择器 |
-| `all` | 显式运行全部 16 种自动攻击 | 批量选择 | 本项目选择器 |
-| `direct` | 用 `TODO` 直接要求执行攻击目标 | 目标型 | [AgentDojo §4.2][agentdojo-paper] |
-| `ignore_previous` | 要求忽略原指令，改做攻击任务 | 目标型 | [AgentDojo §4.2][agentdojo-paper] |
-| `system_message` | 用系统消息标记伪装指令来源 | 目标型 | [AgentDojo 官方模板][agentdojo-baseline] |
-| `injecagent` | 用 `IMPORTANT` 和“忽略之前指令”强调攻击目标 | 目标型 | [InjecAgent][injecagent-paper]、[AgentDojo 官方适配][agentdojo-baseline] |
-| `important_instructions` | 冒充用户，声称必须先完成攻击目标才能做原任务 | 目标型 | [AgentDojo §4.1–4.2][agentdojo-paper] |
-| `important_instructions_no_user_name` | 上述模板中，用泛称代替真实用户名 | 目标型变体 | [AgentDojo 表 2][agentdojo-paper]、[AgentDojo 官方变体][agentdojo-variants] |
-| `important_instructions_no_model_name` | 上述模板中，用泛称代替真实模型名 | 目标型变体 | [AgentDojo 表 2][agentdojo-paper]、[AgentDojo 官方变体][agentdojo-variants] |
-| `important_instructions_no_names` | 同时用泛称代替用户名和模型名 | 目标型变体 | [AgentDojo 表 2][agentdojo-paper]、[AgentDojo 官方变体][agentdojo-variants] |
-| `important_instructions_wrong_user_name` | 换成错误用户名，测试身份线索的影响 | 目标型变体 | [AgentDojo 表 2][agentdojo-paper]、[AgentDojo 官方变体][agentdojo-variants] |
-| `important_instructions_wrong_model_name` | 换成错误模型名，测试模型称呼的影响 | 目标型变体 | [AgentDojo 表 2][agentdojo-paper]、[AgentDojo 官方变体][agentdojo-variants] |
-| `tool_knowledge` | 在重要指令模板中补充工具调用顺序和参数占位符 | 目标型 | [AgentDojo 官方模板][agentdojo-baseline] |
-| `dos` | 要求立即停止当前任务，输出指定文本 | DoS | [AgentDojo 附录 D][agentdojo-paper]、[AgentDojo 官方实现][agentdojo-dos] |
-| `swearwords_dos` | 用辱骂内容诱使模型停止任务 | DoS | [AgentDojo 附录 D][agentdojo-paper]、[AgentDojo 官方实现][agentdojo-dos] |
-| `captcha_dos` | 声称须先解决验证码，否则停止任务 | DoS | [AgentDojo 附录 D][agentdojo-paper]、[AgentDojo 官方实现][agentdojo-dos] |
-| `offensive_email_dos` | 要求发送威胁性消息，诱使模型拒绝并中断任务 | DoS | [AgentDojo 附录 D][agentdojo-paper]、[AgentDojo 官方实现][agentdojo-dos] |
-| `felony_dos` | 声称处理当前内容违法，诱使模型停止任务 | DoS | [AgentDojo 附录 D][agentdojo-paper]、[AgentDojo 官方实现][agentdojo-dos] |
-
-[agentdojo-publication]: https://papers.neurips.cc/paper_files/paper/2024/hash/97091a5177d8dc64b1da8bf3e1f6fb54-Abstract-Datasets_and_Benchmarks_Track.html
-[agentdojo-paper]: https://arxiv.org/html/2406.13352v2
-[injecagent-paper]: https://aclanthology.org/2024.findings-acl.624/
-[agentdojo-baseline]: https://agentdojo.spylab.ai/api/attacks/baseline_attacks/
-[agentdojo-variants]: https://github.com/ethz-spylab/agentdojo/blob/main/src/agentdojo/attacks/important_instructions_attacks.py
-[agentdojo-dos]: https://github.com/ethz-spylab/agentdojo/blob/main/src/agentdojo/attacks/dos_attacks.py
-
-partial 的单攻击和多攻击统一保存到 `results/partial_benchmark/<model_id>_<name>/<attack>/<suite>/`。例如 `--baseline --name baseline` 的 workspace 结果为 `<model_id>_baseline/<attack>/workspace/`，其中包含 summary/CSV/文本报告及原始任务 JSON；完整 trace 侧车与对应 JSON 同目录。新运行按此层级读取缓存，旧目录和结果保留。
-
-`<model_id>_<name>/` 下保存 `attack_manifest.json` 和 `all_report.txt`；每个攻击目录下另有跨场景的 `all_report.txt`，不混合目标型与 DoS 的 ASR。攻击运行异常会记录为 error，并继续其他攻击，最终退出码为 1；全部运行完成为 0，不表示 harness 或安全性验收通过。
-
-各场景 `summary.json` 的 `task_selection` 保存具体任务 ID，`defense: null` 表示无防御。当前 partial 保留的 `seed: 7` 字段不参与前 3 项选择，应以具体 ID 为准。比较时保持主模型配置和攻击选择一致，使用不同运行名称保留两组结果；旧版本若采用不同任务选择规则，需核对原始任务 ID。当前 AgentDojo 输出文本 predicate 的已知误报仍需 E0 审计，新增攻击入口不修改原始判定。
-
-常用选项：
-
-| 选项 | 用途 |
-| --- | --- |
-| `--name NAME` | 区分运行版本，避免复用其他实验的结果 |
-| `--attack typical/all/NAME [NAME ...]` | partial 默认 typical；all 测全部，或指定一个/多个名称；预设不能与具体名称混用，非法选择在模型初始化前拒绝 |
-| `--baseline` | partial 入口使用无防御基线，任务子集和攻击保持一致 |
-| `--force-rerun` | partial 入口重新执行已有任务，不复用缓存 |
-| `--trace-level summary/standard/full` | 默认 summary 用于日常对比；standard 保存简化逐条记录；full 保存详细诊断及压缩侧车，增加写入开销，不改变防御逻辑 |
-| `--include-extra-info` | 等价于 `--trace-level full` |
-| `--tool-metadata PATH` | 指定工具风险元数据 TOML；也可设置 `DSCG_TOOL_METADATA` |
-| `--model-config PATH`、`--results-dir DIR` | partial 入口支持的配置与结果路径覆盖 |
-
-工具目录可用 `python -m experiments.generate_tool_metadata` 生成，默认不覆盖已有本地文件；分类规则见 [`dscg/tool_metadata.py`](./dscg/tool_metadata.py)。评测默认可能复用缓存；partial 可用 `--force-rerun` 或 `DSCG_FORCE_RERUN=1` 强制重跑。调整实验配置时使用新的运行名称并保留原始结果。
-
-启动 Web 面板：
+## Dashboard
 
 ```bash
 python -m dashboard.app
 ```
 
-默认地址为 [http://127.0.0.1:8888](http://127.0.0.1:8888)，可用 `PORT` 覆盖；结果保存到 `results/dashboard/`。面板支持实验配置、历史分析和图表。绘图脚本位于 [`experiments/plots/`](./experiments/plots/)，输出到 `docs/figures/benchmarks/`。
+打开 [实验配置](http://127.0.0.1:8888/)或[历史分析](http://127.0.0.1:8888/history)。历史页按结果目录、模型/运行名称（多选）、攻击筛选；勾选 baseline 和优化版本后可比较 TSR、ASR、总 Token，并下载分析数据。使用说明见 [dashboard 指南](./docs/dashboard.md)。
 
-顶部 **实验配置** 与 **历史分析** 是并列页面；历史分析可直接访问 [http://127.0.0.1:8888/history](http://127.0.0.1:8888/history)。按 **结果目录 → 模型 / 运行名称（可多选）→ 攻击名称** 筛选。比较框架版本时，先清空模型，勾选 baseline 与改进版本，再选择同一攻击和场景，生成 TSR / ASR 对比或下载数据。每次更新筛选默认勾选全部匹配结果，也可在结果列表逐项取消；自动刷新保留当前选择。
+## 离线检查
 
-目录沿用实际名称，如 `partial_benchmark/`、`benchmark/` 或 `benchmarks/`；新结果按 `<model>_<name>/<attack>/<suite>/` 分组，旧目录也可读取。攻击从已保存的汇总、CSV 或配置识别；缺失时显示“未记录攻击”，含多种攻击的旧汇总显示“混合攻击”。分析和下载仅使用当前勾选结果；比较改进前后时还需核对具体任务 ID 是否一致。验收见[独立历史页与模型多选报告](./docs/history_multiselect_page_report.md)。
+无需模型 Key。示例使用新的输出文件，已有文件应保留：
 
-桌面端左侧筛选、右侧分析；窄屏纵向排列。默认分别绘制 TSR 与 ASR，顶部图例突出 `baseline`、`workshop_new` 等版本名，可点击隐藏单项。同一模型 / 运行名称在列表、各图与明细表中共用颜色和字母标记，柱上也标出字母（含零值）；同时比较多个攻击时，另加攻击编号、点形和线型。对比超过 6 项时图表改为单列。完整运行名称与来源保留在提示和下载数据中。Token 使用独立的千单位轴；百分比范围为 −5%～105%，雷达图外圈为 110%。雷达图仅支持全部场景的百分比指标，散点图与任务热图使用固定指标。验收见[版本视觉区分报告](./docs/history_version_identity_report.md)。
+```bash
+python -m unittest discover -s tests -v
+python -m experiments.i3_p0_stress \
+  --output workshop/artifacts/20261008_offline_check/i3.json
+python -m experiments.harness_audit \
+  --fixture tests/fixtures/harness_audit_cases.json \
+  --output workshop/artifacts/20261008_offline_check/e0.json
+```
 
-在“历史分析”中勾选需要对比的实验、选择场景，点击 **下载分析数据** 即可下载 ZIP，无需先生成图表。下载同时包含 ASR 与 TSR，不受图表类型或指标选择影响：
+当前 I3 预期退出码为 `1`（范围缺口）；`0` 才表示全部约束通过并按路线记录 `no_go`，`2` 表示样本错误。E0 合成自检不等于真实 harness 过闸。文档归档可用 `python workshop/verify_migration.py` 只读检查。
 
-- `analysis.json`：交给 agent 分析的结构化入口，包含实验来源、ASR/TSR 汇总、逐任务 outcome、明细分子/分母及缺失/截断告警。
-- `summary.csv`：各实验与场景的指标对比；`task_records.csv`：按任务 ID、模型和攻击类型对齐的结果。
-- `README.md`：指标口径、数据限制和 agent 分析建议。百分比统一为 0–100；缺失值保留为空，明确报错的明细不计入观察性 ASR/TSR 分母；旧记录状态为 unknown。
+## 目录约定
 
-每个下载最多包含 50,000 条明细，截断与无明细场景会标注。原汇总与明细统计分开保存；下载结果不包含完整工具轨迹，历史 smoke 数据仍不能直接作为正式 benchmark 结论。
-实现与验收证据见[历史分析下载报告](./docs/history_export_report.md)。
-
-## 目录与研究交接
-
-| 目录 / 文件 | 内容 |
+| 路径 | 职责 |
 | --- | --- |
-| `dscg/` | 防御流水线、模型配置、工具元数据和 token 统计 |
-| `experiments/`、`tests/` | 评测、离线 fixture 和回归测试 |
-| `config/`、`dashboard/` | 配置模板与 Web 面板 |
-| `docs/`、`examples/results/` | 工程说明、图表和可复核的示例结果 |
-| `results/`、`archive/` | 被 Git 忽略的运行结果、历史实现 |
-| [`AGENTS.md`](./AGENTS.md) | 工程协作规则与当前状态 |
+| `dscg/`、`config/` | 防御实现、模型配置与内置工具元数据 |
+| `experiments/`、`tests/` | 评测入口、fixture 定义与测试源码 |
+| `dashboard/` | 实验配置与历史分析界面 |
+| [docs/](./docs/README.md) | 当前使用指南及 I3 状态报告 |
+| [workshop/](./workshop/README.md) | 所有优化计划、调研、报告与历史归档 |
+| `workshop/artifacts/<YYYYMMDD>_<task>/` | **新 agent 测试产物的固定位置**，包括日志、fixture 输出、探针、临时模型评测和图表 |
+| `results/`、`download/` | 用户正式实验原始结果与历史分析导出 |
+| `examples/`、`workshop/results/`、`archive/` | 保留的历史证据、示例与旧实现 |
+| [AGENTS.md](./AGENTS.md) | 持久协作规则与工程状态 |
 
-正式论文问题、创新点与实验协议维护在兄弟仓库 [`../research/`](../research/)。工程侧读取[技术路线](../research/technical_route.md)，完成已解锁任务后向[实现状态](../research/paper/implementation_status.md)追加证据。Workshop 优化的方案、调研和诊断材料按用户要求统一在 [workshop/](./workshop/README.md)，不改变研究路线或代替论文机制筛选。
+Agent 运行 partial 时必须用 `--results-dir workshop/artifacts/<YYYYMMDD>_<task>/partial_benchmark`；不得把测试产物写入根 `result/` 或 `results/`。详细规则见 AGENTS。
 
-项目介绍：[Word](./docs/DSCG项目介绍.docx) · [可编辑文本](./docs/DSCG项目介绍.md)。
+正式论文计划留在 `../research/`。工程侧读取[技术路线](../research/technical_route.md)，完成后向[实现状态](../research/paper/implementation_status.md)追加证据。
+
+[agentdojo-paper]: https://arxiv.org/html/2406.13352v2
+[injecagent-paper]: https://aclanthology.org/2024.findings-acl.624/
+[agentdojo-baseline]: https://agentdojo.spylab.ai/api/attacks/baseline_attacks/

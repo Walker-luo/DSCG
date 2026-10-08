@@ -1,1 +1,0 @@
-../../../workshop/2026-10-05-workshop-engineering-optimization.md
