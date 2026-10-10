@@ -98,6 +98,30 @@ full tracing 不改变防御逻辑。用户此前中断的 full 运行没有确�
 
 用户完整评测入口为 `python -m experiments.run_benchmark --name full_compare_01`：全部任务、固定 important_instructions、默认输出 `results/benchmarks/`。该入口目前没有 `--results-dir`；agent 不应直接用它生成临时测试，需先具备显式隔离输出的入口。没有新增环境变量或自动重定向行为。
 
+## 结果文件
+
+`run_partial_benchmark.py` 自动生成以下文件，无需额外参数：
+
+```text
+results/partial_benchmark/<model_id>_<name>/
+├── summary.md                    # 每个 attack × 场景的指标与失败位置
+├── failure_cases.jsonl           # 每行一个失败/缺失案例，含相关片段
+├── attack_manifest.json
+└── <attack>/<suite>/
+    ├── summary.json             # 原有场景统计、配置、成本范围
+    ├── report.txt
+    ├── detailed_results.csv
+    └── <user_task>/<attack>/<injection_task>.json
+```
+
+先读 `summary.md`：指标显示百分比及成功数/分母，Token 区分主模型、审计模型和合计，并标出各场景的成本统计范围。失败索引给出任务 ID、原始 JSON 的相对路径及 `failure_cases.jsonl` 的行号。TSR 失败是 `utility=false`，防御失败是 AgentDojo 原生 `security=true`（ASR 成功）；两者可同时出现，也可单独出现。DoS 使用独立的 `not utility` 口径，不与 targeted ASR 合并。
+
+`failure_cases.jsonl` 使用 `dscg.partial-failure.v1`：`failure_types` 区分 `tsr_failure`、`asr_success`、`asr_unavailable`、`result_missing`、`task_error` 和 `run_error`；记录 `trace_path`、`trace_exists`、原生标签与 `excerpt_status`。每例最多保存 6 个片段、每片最多 800 字符，优先选取错误、最后的助手文本、最近的工具调用和能精确匹配注入内容的工具返回；任务描述/攻击目标各最多 400 字符。`source_pointer` 定位原 JSON，字符范围针对文本块拼接或序列化工具调用；`truncated` 显式记录截断。片段是排查线索，不是失败原因证明，也不重新判断攻击成功。
+
+缺失/非布尔安全结果不计入 ASR 分母；缺失的计划任务保留位置及空标签，不伪造 TSR/ASR 结果。运行异常显示 N/A 与异常类型，保留本次中断前已经完成场景的统计，不读取未完成场景的旧 `summary.json`。正常无失败时仍生成空的 JSONL。无攻击轨迹位于 `none/<suite>/<user_task>/none/none.json`。
+
+这两个新文件在本次运行结束时更新，也支持正常缓存读取；不会复制完整轨迹或改写原生任务 JSON。强制终止进程可能尚未生成它们。历史目录不自动补写，使用新运行名称；现有配置绑定仍生效。Agent 测试输出继续显式使用 `--results-dir workshop/artifacts/<YYYYMMDD>_<task>/partial_benchmark`。
+
 ## 指标与证据
 
 同时报告 TSR、AgentDojo 原生 ASR、总 Token 与全部有效/错误/跳过分母，预检成本单列或明确包含。输出文本 predicate 的误报仍需独立 E0 审计，保留原始结果；历史 smoke 或单轮小样本不能支持通用防御结论。

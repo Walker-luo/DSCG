@@ -15,6 +15,7 @@ from dscg.pipelines.baseline import make_openai_compatible_pipeline
 from dscg.pipelines.defended import make_defended_pipeline
 from dscg.tool_metadata import ToolMetadataError, load_tool_metadata
 from experiments.harness_audit import rank_ids, security_result_fields
+from experiments.partial_reporting import collect_suite_report, write_run_overview
 from experiments.partial_controls import (validate_controls, make_task_manifest, load_task_manifest,
                                           select_tasks, guard_run, source_revision, preserve_cached_cost)
 
@@ -139,6 +140,7 @@ def main(
         print(f"本次攻击 ({len(attack_names)}): {', '.join(attack_names)}")
 
     for attack_name in attack_names:
+        context["active_suite"] = None
         try:
             output_dir = _run_single_attack(
                 model_id, sec_model_id, suites, run_attack, origin, defense,
@@ -156,7 +158,8 @@ def main(
         except Exception as exc:
             # Keep the other attacks runnable without turning a failed attack
             # into a zero-ASR result. Avoid persisting raw provider exceptions.
-            run_records.append({"attack": attack_name, "status": "error", "error_type": type(exc).__name__})
+            run_records.append({"attack": attack_name, "status": "error", "error_type": type(exc).__name__,
+                                "failed_suite": context.get("active_suite")})
             print(f"❌ [{attack_name}] 运行失败: {type(exc).__name__}；保留已有结果并继续其他攻击。")
         else:
             run_records.append({
@@ -187,6 +190,12 @@ def main(
                 report_sources.append((record["attack"], error_path))
     if report_sources:
         _write_combined_report(batch_dir, report_sources)
+    overview_path, failures_path = write_run_overview(
+        batch_dir, attack_names, suites, run_records, context.get("suite_reports", []),
+        model_id=context.get("model_id", model_id),
+    )
+    print(f"📝 紧凑摘要: {overview_path}")
+    print(f"🔎 失败片段: {failures_path}")
     print(f"📋 攻击执行清单: {manifest_path}")
     return 1 if any(record["status"] == "error" for record in run_records) else 0
 
@@ -245,6 +254,8 @@ def _run_single_attack(
     print(f"开始实验 - 模型: {model_id or '本地/环境配置'}, 攻击: {attack_name if run_attack else '无'}, 防御: {active_defense or '无（baseline）'}")
 
     for suite_name in suites:
+        if report_context is not None:
+            report_context["active_suite"] = suite_name
         print(f"\n正在测试套件: {suite_name}...")
         sec_tracker = None
         
@@ -549,6 +560,11 @@ def _run_single_attack(
         # 4.3 保存聚合数据的 JSON (方便后续写脚本对比多模型的表现)
         with open(summary_file_path, "w", encoding="utf-8") as f:
             json.dump(summary_data, f, indent=4, ensure_ascii=False)
+
+        if report_context is not None:
+            report_context.setdefault("suite_reports", []).append(collect_suite_report(
+                base_output_dir, suite_output_dir, summary_data, structured_records, suite,
+            ))
 
         report_sources.append((suite_name, report_file_path))
 

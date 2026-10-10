@@ -4,6 +4,7 @@
 
 | 材料 | 实际状态 |
 | --- | --- |
+| [Partial 结果摘要与失败片段](./partial_reporting_20261010.md) | 运行级摘要/定位与有界片段已实施；原生指标不重评分，无模型调用 |
 | [V2 后续报告](./framework_v2_followup_report.md) | stage1 审计补修保留；stage2 执行提示已评估并撤回 |
 | [V2 实施记录](./framework_v2_report.md) | 两层优化已实施；历史试验参数不等于当前默认 |
 | [V2 提案](./framework_optimization_v2_proposal_20261007.md) · [简化约束](./framework_optimization_direction_20261007.md) | 当时的设计依据，以后续报告记录的实现/撤回状态为准 |

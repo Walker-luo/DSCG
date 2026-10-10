@@ -67,6 +67,8 @@ baseline 使用原生 AgentDojo 工具循环，不启用 DSCG 或安全模型；
 results/partial_benchmark/<model_id>_<name>/<attack>/<suite>/
 ```
 
+每次 partial 运行还会在 `<model_id>_<name>/` 下生成 `summary.md`（attack × 场景指标、分母、Token 和失败案例位置）与 `failure_cases.jsonl`（逐例的失败标签、原始路径与有界片段）。TSR=false 和 ASR=true 分别记录；指标缺失/运行错误单列。详见[结果文件说明](./docs/evaluation.md#结果文件)。
+
 ## Dashboard
 
 ```bash
