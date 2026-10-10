@@ -1,10 +1,22 @@
 # L3 Checker 优化候选：校准驱动的选择性审计
 
-日期：2026-10-09。状态：**详细实现设计，未实现、未训练、未校准、未运行模型实验**。本文件响应用户对 L3 每动作审计成本的优化要求，配合 [三层框架候选](./3_layer_opt.md) 使用。当前运行时仍为 retained V2 stage1 两层，`audit_retries=0`、`completion_prompt=false`；此处 L3 指候选架构中的动作审计，代码中仍叫 `ActionSecurityChecker`。
+日期：2026-10-09。状态：**详细实现设计，未实现、未训练、未校准、未运行模型实验**。本文件响应用户对 L3 每动作审计成本的优化要求，配合 [已实施三层基础方案](./completed/3_layer_opt.md) 使用。当前运行时已按用户后续指令实施 three-layer-v1 基础方案（2026-10-10），`audit_retries=0`、`completion_prompt=false`；L3 动作审计仍叫 `ActionSecurityChecker`。本文件的学习免审扩展仍未实现，以下“当前 V2”对照表示保留的旧策略参考。
 
 **目标：用零 API Token 的本地路由器筛出部分可免审读取，让昂贵安全模型只处理剩余候选。** 授权、最终 Monitor 和一次性 ticket 继续完整执行。先只研究内部读取；个人数据读取是后续独立扩展，秘密数据读取、状态改变和外部 sink 不进入学习免审。路由器属于 L3 内部，不再增加框架层数。
 
 本文件是 DSCG/workshop 的待优化方案，不是正式论文计划、技术路线解锁或安全证明。实施须由 [research/technical_route.md](../../research/technical_route.md) 另行选择有界任务；阶段名称均为建议，不是当前工程队列。I3 仍 `partial`（24 valid / 8 scope violation），真实 E0 待通过，I2 仍 locked；闭合的来源/字段 provenance、I1、I4、exactly-once 路线不重开。
+
+## 未实施项清单（2026-10-10核对）
+
+| 模块 | 当前状态 |
+| --- | --- |
+| 本地特征提取与风险评分模型 | 未实现；没有已部署权重 |
+| 独立安全标签、训练集、分组校准阈值 | 未构建/训练/校准；不能把原审计allow或读取deny放行当真值 |
+| off / shadow / selective 配置与接线 | 未实现；factory、CLI、网页均没有这些模式开关 |
+| RouterReceiptVerifier 与学习免审交接 | 未实现；当前L2前置结果不是本设计的CSA路由凭据 |
+| 内部读取学习免审和收益验收 | 未启用、未完成；私有读取仍沿用基础框架审计 |
+
+当前已有的 public read 免审与 L2 确定性拒绝是基础能力，**不代表此 CSA 方案已部分实现**。本文件完整设计继续留在 workshop 顶层，等待独立选择和验收。
 
 ## 1. 当前代码事实与必须区分的三个判定
 
@@ -12,7 +24,7 @@
 
 在 [defended.py](../dscg/pipelines/defended.py) 中：
 
-- `ActionSecurityChecker.query()` 收到含工具调用的 assistant 消息后，为整个候选批次构造审计包。
+- 当前基础框架先由 L2 检查含工具调用的 assistant 候选；确定性拒绝批次不请求审计。其余批次由 `ActionSecurityChecker.query()` 构造审计包。
 - 若全部工具属于已注册的公共、无 sink 读取，返回 `READ_AUDIT_BYPASS`，不调用安全模型。这是已有机制。
 - 其余批次通常调用一次 `_request_audit()`；默认没有语义重试。之后 `ReferenceMonitor` 才检查工具授权并签发 ticket。
 - `_batch_fingerprint()` 包含工具名、原参数和调用 ID；候选改变会使审计记录失效。

@@ -330,6 +330,9 @@ def _run_single_attack(
             "audit_retries": audit_retries, "completion_prompt": completion_prompt,
             "trace_level": None if origin else trace_level,
             "tool_metadata": tool_metadata, "source": source_revision(),
+            "defense_version": None if origin else "three-layer-v1",
+            "input_isolation": not origin,
+            "authorization_precheck": not origin,
         }
         guard_run(output_dir / suite_name / "run_manifest.json", run_binding)
 

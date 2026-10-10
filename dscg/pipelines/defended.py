@@ -28,6 +28,7 @@ from agentdojo.benchmark import TaskResults
 
 #! 统计token消耗
 from dscg.token_tracking import TokenTrackerClient
+from dscg.input_isolation import FRAMEWORK_VERSION, build_isolated_view
 from dscg.model_config import (
     ModelConfig,
     create_openai_client,
@@ -666,6 +667,9 @@ def _sync_trace_context(extra_args: dict) -> None:
         "dscg_audit_summary": _audit_summary(audits),
         "dscg_action_summary": _action_summary(actions),
     }
+    for key in ("dscg_input_isolation", "dscg_layer_routing", "dscg_framework"):
+        if key in extra_args:
+            context[key] = deepcopy(extra_args[key])
     if level == "standard":
         context["dscg_audit_decisions"] = [_compact_audit_record(record) for record in audits]
         context["dscg_action_ledger"] = [_compact_action_record(record) for record in actions]
@@ -1068,6 +1072,7 @@ class OurFrameExecutor(agent_pipeline.BasePipelineElement):
         sandbox=None,
         trace_level: str = DEFAULT_TRACE_LEVEL,
         tool_metadata=None,
+        input_isolation: bool = True,
     ):
         self.llm = llm
         self.sandbox = sandbox
@@ -1075,9 +1080,12 @@ class OurFrameExecutor(agent_pipeline.BasePipelineElement):
         self.trace_level = _normalise_trace_level(trace_level)
         self._authorization_cache_key = None
         self._authorization_cache_contract = None
+        self.input_isolation = input_isolation
 
     def query(self, query, runtime, env, messages, extra_args):
         extra_args.setdefault("_dscg_trace_level", self.trace_level)
+        if hasattr(self, "framework_config"):
+            extra_args["dscg_framework"] = deepcopy(self.framework_config)
         last_input = messages[-1] if messages else None
         role = (last_input.get("role") if isinstance(last_input, dict)
                 else getattr(last_input, "role", None))
@@ -1135,7 +1143,20 @@ class OurFrameExecutor(agent_pipeline.BasePipelineElement):
             _publish_authorization_record(extra_args, record)
 
         # FunctionCall candidates can never be fed back into authorization.
-        _, _, _, [*_, response_msg], _ = self.llm.query(query, runtime, env, messages, extra_args)
+        model_messages = messages
+        if self.input_isolation:
+            model_messages, stats = build_isolated_view(messages, runtime)
+            accumulated = extra_args.setdefault("dscg_input_isolation", {
+                "schema_version": stats["schema_version"], "model_requests": 0,
+                "tool_results_rendered": 0, "escaped_results_rendered": 0,
+                "added_characters_total": 0,
+            })
+            accumulated["model_requests"] += 1
+            accumulated["tool_results_rendered"] += stats["tool_results"]
+            accumulated["escaped_results_rendered"] += stats["escaped_results"]
+            accumulated["added_characters_total"] += stats["added_characters"]
+            _sync_trace_context(extra_args)
+        _, _, _, [*_, response_msg], _ = self.llm.query(query, runtime, env, model_messages, extra_args)
         return query, runtime, env, [*messages, response_msg], extra_args
 
 
@@ -1335,12 +1356,96 @@ class PermissionSandbox(agent_pipeline.BasePipelineElement):
         return query, runtime, env, [*messages[:-1], safe_tool_msg], extra_args
 
 
+@dataclass(frozen=True)
+class BatchAuthorizationResult:
+    batch_fingerprint: str
+    state_sha256: str
+    denial_reasons: tuple[str | None, ...]
+
+    @property
+    def rejected(self):
+        return any(reason is not None for reason in self.denial_reasons)
+
+
+def _routing_count(extra_args, key):
+    counts = extra_args.setdefault("dscg_layer_routing", {})
+    counts[key] = counts.get(key, 0) + 1
+
+
+class ToolAuthorizationPrecheck(agent_pipeline.BasePipelineElement):
+    """Tool-level, atomic permission gate before paying for semantic audit."""
+
+    def __init__(self, sandbox: PermissionSandbox):
+        self.sandbox = sandbox
+
+    def check(self, calls, runtime):
+        metadata = metadata_for_runtime(runtime)
+        state_hash = _hash_json({
+            "policy_state": self.sandbox.policy_state.value,
+            "allowlist": sorted(self.sandbox.allowed_tools),
+            "contract": self.sandbox.contract.contract_version if self.sandbox.contract else None,
+            "catalog": metadata_catalog_hash(metadata),
+            "runtime_catalog": {
+                name: {
+                    "identity": id(spec), "name": spec.name,
+                    "description": spec.description,
+                    "schema": spec.parameters.model_json_schema(),
+                    "run_identity": id(spec.run),
+                    "dependencies": {
+                        key: (id(dep), id(dep.env_dependency) if callable(dep.env_dependency)
+                              else dep.env_dependency)
+                        for key, dep in sorted(spec.dependencies.items())},
+                } for name, spec in sorted(runtime.functions.items())},
+        })
+        reasons = []
+        for call in calls:
+            name = _tool_call_name(call)
+            allowed, reason = self.sandbox.assess(name, runtime)
+            status = metadata.get(name)
+            if not allowed:
+                reasons.append(reason)
+            elif status is None or not status.registered:
+                reasons.append(status.error_code if status else "METADATA_MISSING")
+            else:
+                reasons.append(None)
+        return BatchAuthorizationResult(_batch_fingerprint(calls), state_hash, tuple(reasons))
+
+    def resolve(self, calls, runtime, extra_args):
+        current = self.check(calls, runtime)
+        receipt = extra_args.get("_dscg_precheck_result")
+        if (not isinstance(receipt, BatchAuthorizationResult)
+                or receipt.batch_fingerprint != current.batch_fingerprint
+                or receipt.state_sha256 != current.state_sha256):
+            return BatchAuthorizationResult(current.batch_fingerprint, current.state_sha256,
+                                            tuple("PRECHECK_MISSING_OR_STALE" for _ in calls))
+        return current
+
+    def query(self, query, runtime, env, messages, extra_args):
+        extra_args.pop("_dscg_precheck_result", None)
+        extra_args.pop("_dscg_audit_decision", None)
+        last = messages[-1] if messages else {}
+        if last.get("role") != "assistant" or not last.get("tool_calls"):
+            return query, runtime, env, messages, extra_args
+        result = self.check(last["tool_calls"], runtime)
+        extra_args["_dscg_precheck_result"] = result
+        _routing_count(extra_args, "candidate_batches")
+        _routing_count(extra_args, "precheck_rejected_batches" if result.rejected else "precheck_allowed_batches")
+        _append_full_trace(extra_args, "authorization_precheck", {
+            "batch_fingerprint": result.batch_fingerprint,
+            "state_sha256": result.state_sha256, "denial_reasons": result.denial_reasons,
+        })
+        _sync_trace_context(extra_args)
+        return query, runtime, env, messages, extra_args
+
+
 class ReferenceMonitor(agent_pipeline.BasePipelineElement):
     """The sole issuer of one-shot execution tickets in the defended pipeline."""
 
-    def __init__(self, sandbox: PermissionSandbox | None, require_audit: bool):
+    def __init__(self, sandbox: PermissionSandbox | None, require_audit: bool,
+                 precheck: ToolAuthorizationPrecheck | None = None):
         self.sandbox = sandbox
         self.require_audit = require_audit
+        self.precheck = precheck
         self._secret = secrets.token_bytes(32)
         self._issued: dict[str, ExecutionTicket] = {}
         self._ticket_lock = Lock()
@@ -1416,6 +1521,8 @@ class ReferenceMonitor(agent_pipeline.BasePipelineElement):
         audit = extra_args.pop("_dscg_audit_decision", None)
         audit_valid = _is_valid_audit_record(audit, fingerprint)
         metadata = metadata_for_runtime(runtime)
+        precheck_result = self.precheck.resolve(tool_calls, runtime, extra_args) if self.precheck else None
+        extra_args.pop("_dscg_precheck_result", None)
 
         # Register every proposal before deciding any member of the batch.
         proposed = [
@@ -1431,8 +1538,12 @@ class ReferenceMonitor(agent_pipeline.BasePipelineElement):
             for call in tool_calls
         ]
         decisions: list[tuple[str, Any, bool, str]] = []
-        for action_id, call in proposed:
+        for index, (action_id, call) in enumerate(proposed):
             tool_name = _tool_call_name(call)
+            if precheck_result is not None and precheck_result.rejected:
+                reason = precheck_result.denial_reasons[index] or "BATCH_AUTHORIZATION_DENY"
+                decisions.append((action_id, call, False, reason))
+                continue
             if tool_name not in runtime.functions:
                 decisions.append((action_id, call, False, "UNKNOWN_TOOL"))
                 continue
@@ -1750,6 +1861,7 @@ class ActionSecurityChecker(agent_pipeline.BasePipelineElement):
         sandbox: PermissionSandbox | None = None,
         timeout_seconds: float = AUDIT_TIMEOUT_SECONDS,
         max_semantic_retries: int = 0,
+        precheck: ToolAuthorizationPrecheck | None = None,
     ):
         self.small_llm = small_llm
         self.intention = user_intention
@@ -1759,6 +1871,7 @@ class ActionSecurityChecker(agent_pipeline.BasePipelineElement):
         if max_semantic_retries not in (0, 1):
             raise ValueError("semantic audit retries must be 0 or 1")
         self.max_semantic_retries = max_semantic_retries
+        self.precheck = precheck
 
     def _recent_tool_results(self, messages):
         """A small untrusted fact window, scoped to the last actual user turn.
@@ -1952,6 +2065,24 @@ class ActionSecurityChecker(agent_pipeline.BasePipelineElement):
             return query, runtime, env, messages, extra_args
 
         batch_fingerprint = _batch_fingerprint(tool_calls)
+        if self.precheck is not None:
+            precheck_result = self.precheck.resolve(tool_calls, runtime, extra_args)
+            if precheck_result.rejected:
+                decision = AuditDecision(
+                    batch_fingerprint=batch_fingerprint, decision="deny",
+                    violations=tuple(sorted(set(r for r in precheck_result.denial_reasons if r))),
+                    confidence=1.0, reason_code="L2_PRECHECK_DENY",
+                    audit_input_sha256=_hash_json(precheck_result.__dict__),
+                    raw_response_sha256=_hash_json("host-permission-rejection"),
+                    model_version="deterministic-authorization-precheck", latency_ms=0.0,
+                    parser_status="deterministic_bypass",
+                )
+                record = decision.public_dict()
+                record["semantic_attempt"] = 0
+                record["route_source"] = "authorization_precheck"
+                _publish_audit_record(extra_args, record)
+                extra_args["_dscg_audit_decision"] = record
+                return query, runtime, env, messages, extra_args
         packet = self._audit_packet(query, runtime, tool_calls, extra_args, messages=messages)
         _append_full_trace(extra_args, "audit_input", packet)
         input_hash = _hash_json(packet)
@@ -1965,6 +2096,7 @@ class ActionSecurityChecker(agent_pipeline.BasePipelineElement):
         # Explicitly classified public reads use a deterministic cost-saving
         # signal. Missing or invalid metadata always takes the audited path.
         if not has_high_risk:
+            _routing_count(extra_args, "public_read_bypass_batches")
             decision = AuditDecision(
                 batch_fingerprint=batch_fingerprint,
                 decision="allow",
@@ -1984,6 +2116,7 @@ class ActionSecurityChecker(agent_pipeline.BasePipelineElement):
             return query, runtime, env, messages, extra_args
 
         for attempt in range(self.max_semantic_retries + 1):
+            _routing_count(extra_args, "semantic_audit_calls")
             started = time.perf_counter()
             content = None
             raw_hash = _hash_json("missing-audit-response")
@@ -2059,6 +2192,8 @@ def make_qwen_newFrame_pipeline(
     tool_metadata=None,
     audit_retries: int = 0,
     completion_prompt: bool = False,
+    input_isolation: bool = True,
+    authorization_precheck: bool = True,
     *,
     api_key: str | None = None,
     base_url: str | None = None,
@@ -2084,6 +2219,8 @@ def make_qwen_newFrame_pipeline(
     :param tool_metadata: 可选的工具名到显式风险元数据的映射
     """
     trace_level = _normalise_trace_level(trace_level)
+    input_isolation = bool(input_isolation and (use_sandbox or use_security_checker))
+    authorization_precheck = bool(authorization_precheck and use_sandbox)
     main_config = model_config or resolve_model_config(
         model_id,
         api_key=api_key,
@@ -2120,7 +2257,10 @@ def make_qwen_newFrame_pipeline(
         sandbox=my_sandbox,
         trace_level=trace_level,
         tool_metadata=tool_metadata,
+        input_isolation=input_isolation,
     )
+
+    precheck = ToolAuthorizationPrecheck(my_sandbox) if authorization_precheck else None
 
     security_checker = None
     if use_security_checker:
@@ -2151,12 +2291,15 @@ def make_qwen_newFrame_pipeline(
             llm=llm,
             sandbox=my_sandbox,
             max_semantic_retries=audit_retries,
+            precheck=precheck,
         )
 
     # 3. Every candidate batch passes through the same monitor and ticketed executor.
-    reference_monitor = ReferenceMonitor(my_sandbox, require_audit=use_security_checker)
+    reference_monitor = ReferenceMonitor(my_sandbox, require_audit=use_security_checker, precheck=precheck)
     ticketed_executor = TicketedToolsExecutor(reference_monitor)
     loop_components = []
+    if precheck is not None:
+        loop_components.append(precheck)
     if use_security_checker:
         loop_components.append(security_checker)
     loop_components.extend([
@@ -2185,13 +2328,20 @@ def make_qwen_newFrame_pipeline(
     elif not use_security_checker:
         ablation_suffix = "-NoChecker"
     else:
-        ablation_suffix = "-OursFull" # 完整双层漏斗
+        ablation_suffix = "-OursFull"
 
-    pipeline.name = f"{llm.name}-newFrame{ablation_suffix}"
+    # Native full-run caches are keyed by this name. Keep new views/gates
+    # separate from historical V2 and from each other's API ablations.
+    version_suffix = (f"-{FRAMEWORK_VERSION}-L1{int(input_isolation)}-L2{int(authorization_precheck)}"
+                      if input_isolation or authorization_precheck else "")
+    pipeline.name = f"{llm.name}-newFrame{ablation_suffix}{version_suffix}"
     pipeline.dscg_optimization_config = {
+        "framework_version": FRAMEWORK_VERSION,
+        "input_isolation": input_isolation, "authorization_precheck": authorization_precheck,
         "task_isolation": True, "audit_retries": audit_retries,
         "completion_prompt": completion_prompt, "use_security_checker": use_security_checker,
     }
+    new_executor.framework_config = pipeline.dscg_optimization_config
     pipeline.dscg_model_config = main_config.public_dict()
     if use_security_checker:
         pipeline.dscg_security_model_config = sec_config.public_dict()
