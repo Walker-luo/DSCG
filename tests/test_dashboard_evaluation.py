@@ -1,0 +1,174 @@
+import json
+from pathlib import Path
+import tempfile
+import unittest
+from types import SimpleNamespace
+from unittest.mock import patch
+
+from dashboard import evaluation
+from dashboard.app import app, runs_store, run_test_thread
+
+
+ARTIFACT_ROOT = Path(__file__).resolve().parents[1] / "workshop/artifacts/20261010_dashboard_framework_ui"
+
+
+class DashboardEvaluationTests(unittest.TestCase):
+    def test_layer_dependencies_and_v2_control_are_recorded_as_effective_config(self):
+        config = evaluation.normalize_config({"suites": ["workspace"], "input_isolation": False,
+                                              "authorization_precheck": False})
+        self.assertFalse(config["input_isolation"])
+        self.assertFalse(config["authorization_precheck"])
+        disabled = evaluation.normalize_config({"suites": ["workspace"], "use_sandbox": False,
+                                                "use_security_checker": False})
+        self.assertFalse(disabled["input_isolation"])
+        self.assertFalse(disabled["authorization_precheck"])
+
+    def test_baseline_has_no_dscg_layers_or_security_connection(self):
+        config = evaluation.normalize_config({"suites": ["workspace"], "origin": True,
+                                              "sec_api_key": "unused", "sec_model_id": "unused"})
+        for key in ("input_isolation", "authorization_precheck", "use_sandbox", "use_security_checker"):
+            self.assertFalse(config[key])
+        self.assertIsNone(config["sec_model_id"])
+        self.assertIsNone(config["sec_api_key"])
+
+    def test_invalid_values_are_rejected_before_a_run_starts(self):
+        for invalid in ({"input_isolation": "false"}, {"trace_level": "verbose"},
+                        {"max_user_tasks": -1}, {"max_injection_tasks": 1.5},
+                        {"suites": []}, {"suites": ["unknown"]}):
+            with self.subTest(invalid=invalid), self.assertRaises(ValueError):
+                evaluation.normalize_config({"suites": ["workspace"], **invalid})
+
+    def test_aggregate_uses_task_denominators_and_includes_security_cost(self):
+        summaries = [
+            {"metrics": {"utility_rate": 100, "attack_success_rate": 50},
+             "task_counts": {"total_tasks": 2, "utility_passed": 2, "security_valid": 2, "attack_successes": 1, "security_missing": 0},
+             "overhead": {"prompt_tokens": 80, "completion_tokens": 20, "total_tokens": 100},
+             "sec_overhead": {"prompt_tokens": 30, "completion_tokens": 10, "total_tokens": 40}},
+            {"metrics": {"utility_rate": 0, "attack_success_rate": 0},
+             "task_counts": {"total_tasks": 8, "utility_passed": 0, "security_valid": 7, "attack_successes": 0,
+                             "security_missing": 1}, "overhead": {"total_tokens": 60}},
+        ]
+        aggregate = evaluation.aggregate(summaries)
+        self.assertEqual(aggregate["avg_utility_rate"], 20)
+        self.assertEqual(aggregate["avg_attack_success_rate"], 11.11)
+        self.assertEqual(aggregate["security_denominator"], 9)
+        self.assertEqual(aggregate["security_missing"], 1)
+        self.assertEqual(aggregate["total_tokens"], 200)
+        self.assertEqual(aggregate["main_total_tokens"], 160)
+        self.assertEqual(aggregate["security_total_tokens"], 40)
+
+    def test_clean_or_missing_security_is_not_zero_asr(self):
+        aggregate = evaluation.aggregate([{"metrics": {"utility_rate": 100, "attack_success_rate": None},
+                                          "task_counts": {"total_tasks": 1, "utility_passed": 1,
+                                                          "security_valid": 0}, "overhead": {}}])
+        self.assertIsNone(aggregate["avg_attack_success_rate"])
+        self.assertIsNone(aggregate["avg_defense_success_rate"])
+
+    def test_clean_report_supports_nonapplicable_security_metrics(self):
+        runs_store["clean-report"] = {"config": {"run_attack": False}, "suites": [],
+                                      "aggregate_metrics": {"avg_utility_rate": 100,
+                                                            "avg_attack_success_rate": None,
+                                                            "avg_defense_success_rate": None}}
+        try:
+            response = app.test_client().get("/api/report/clean-report")
+            self.assertEqual(response.status_code, 200)
+            self.assertIn("N/A", response.get_data(as_text=True))
+        finally:
+            runs_store.pop("clean-report", None)
+
+    def test_legacy_asr_without_valid_counts_remains_unknown(self):
+        summary = {"metrics": {"attack_success_rate": 50},
+                   "task_counts": {"total_tasks": 3, "attacked_tasks": 3}, "overhead": {}}
+        result = evaluation.aggregate([summary])
+        self.assertIsNone(result["avg_attack_success_rate"])
+        self.assertIsNone(result["security_denominator"])
+        self.assertIsNone(result["security_missing"])
+
+    def test_legacy_records_restore_valid_denominator_without_mutating_history(self):
+        run = {"config": {"run_attack": True}, "suites": [
+            {"suite_name": "workspace", "metrics": {"attack_success_rate": 50},
+             "task_counts": {"total_tasks": 3, "utility_passed": 2, "attacked_tasks": 3}, "overhead": {}},
+            {"suite_name": "travel", "metrics": {"attack_success_rate": 0},
+             "task_counts": {"total_tasks": 1, "utility_passed": 1, "attacked_tasks": 1}, "overhead": {}}],
+            "structured_records": [
+                {"suite_name": "workspace", "user_task_id": "u1", "injection_task_id": "i1", "attack_success": True},
+                {"suite_name": "workspace", "user_task_id": "u2", "injection_task_id": "i1", "attack_success": False},
+                {"suite_name": "workspace", "user_task_id": "u3", "injection_task_id": "i1", "attack_success": None},
+                {"suite_name": "travel", "user_task_id": "u1", "injection_task_id": "i1", "attack_success": False}]}
+        result = evaluation.display_metrics(run)
+        self.assertEqual(result["avg_attack_success_rate"], 33.33)
+        self.assertEqual(result["security_denominator"], 3)
+        self.assertEqual(result["security_missing"], 1)
+        self.assertNotIn("security_valid", run["suites"][0]["task_counts"])
+
+    def test_legacy_cost_is_consistent_in_overview_comparison_and_report(self):
+        run = {"run_id": "cost-check", "config": {"origin": True, "run_attack": False},
+               "suites": [{"suite_name": "workspace", "metrics": {"utility_rate": 100,
+                          "attack_success_rate": 0, "defense_success_rate": 100},
+                           "task_counts": {"total_tasks": 1, "utility_passed": 1},
+                           "overhead": {"prompt_tokens": 80, "completion_tokens": 20, "total_tokens": 100},
+                           "sec_overhead": {"prompt_tokens": 30, "completion_tokens": 10, "total_tokens": 40}}],
+               "aggregate_metrics": {"total_tokens": 100}}
+        runs_store["cost-check"] = run
+        try:
+            client = app.test_client()
+            self.assertEqual(client.get("/api/runs/cost-check").get_json()["display_metrics"]["total_tokens"], 140)
+            self.assertEqual(client.post("/api/compare", json={"run_ids": ["cost-check"]}).get_json()["token_metrics"]["total_tokens"], [140])
+            self.assertEqual(client.post("/api/compare", json={"run_ids": ["cost-check"]}).get_json()["per_suite"]["workspace"]["attack_rates"], [None])
+            report = client.get("/api/report/cost-check").get_data(as_text=True)
+            self.assertIn("Total=140", report)
+            self.assertIn("ASR: N/A", report)
+            self.assertEqual(run["aggregate_metrics"]["total_tokens"], 100)
+        finally:
+            runs_store.pop("cost-check", None)
+
+    def test_worker_saves_real_config_and_both_cost_roles_without_a_model_run(self):
+        ARTIFACT_ROOT.mkdir(parents=True, exist_ok=True)
+        config = evaluation.normalize_config({"suites": ["workspace"], "run_attack": False,
+                                               "input_isolation": False, "authorization_precheck": False,
+                                               "trace_level": "standard"})
+        def factory(*args, **kwargs):
+            self.assertFalse(kwargs["input_isolation"])
+            self.assertFalse(kwargs["authorization_precheck"])
+            self.assertEqual(kwargs["trace_level"], "standard")
+            pipeline = SimpleNamespace(name="test-pipeline", dscg_optimization_config={
+                "framework_version": "three-layer-v1", "input_isolation": False,
+                "authorization_precheck": False, "use_security_checker": True})
+            main = SimpleNamespace(total_prompt_tokens=80, total_completion_tokens=20, get_total_tokens=lambda:100)
+            sec = SimpleNamespace(total_prompt_tokens=30, total_completion_tokens=10, get_total_tokens=lambda:40)
+            return pipeline, main, sec
+        with tempfile.TemporaryDirectory(dir=ARTIFACT_ROOT) as directory, \
+             patch("dashboard.app.DASHBOARD_RESULTS_DIR", Path(directory)), \
+             patch("dashboard.app.make_defended_pipeline", side_effect=factory), \
+             patch("dashboard.app.get_suite", return_value=SimpleNamespace(user_tasks={"u1":None}, injection_tasks={"i1":None})), \
+             patch("dashboard.app.benchmark.benchmark_suite_without_injections", return_value={"utility_results":{("u1",None):True}}), \
+             patch("dashboard.app.threading.Thread"):
+            try:
+                run_test_thread("worker-test", config)
+                saved = json.loads((Path(directory)/"worker-test/overall_results.json").read_text())
+                self.assertEqual(saved["aggregate_metrics"]["total_tokens"], 140)
+                self.assertIsNone(saved["aggregate_metrics"]["avg_attack_success_rate"])
+                self.assertFalse(saved["suites"][0]["framework"]["input_isolation"])
+            finally:
+                runs_store.pop("worker-test", None)
+
+    def test_trace_stats_exclude_preflights_and_report_missing_coverage(self):
+        ARTIFACT_ROOT.mkdir(parents=True, exist_ok=True)
+        with tempfile.TemporaryDirectory(dir=ARTIFACT_ROOT) as directory:
+            root = Path(directory)
+            task = root / "pipeline/workspace/user_task_0/important_instructions/injection_task_0.json"
+            task.parent.mkdir(parents=True)
+            task.write_text(json.dumps({"dscg_layer_routing": {"precheck_rejected_batches": 2},
+                                        "dscg_input_isolation": {"added_characters_total": 120}}))
+            (task.parent / "none.json").write_text(json.dumps({"dscg_layer_routing": {"semantic_audit_calls": 99}}))
+            stats = evaluation.trace_stats(root, "pipeline", "workspace", "important_instructions",
+                                           [("user_task_0", "injection_task_0"), ("user_task_1", "injection_task_0")])
+            self.assertEqual(stats["expected_records"], 2)
+            self.assertEqual(stats["routing_records"], 1)
+            self.assertEqual(stats["routing"]["precheck_rejected_batches"], 2)
+            self.assertEqual(stats["routing"]["semantic_audit_calls"], 0)
+            self.assertEqual(stats["isolation"]["added_characters_total"], 120)
+
+
+if __name__ == "__main__":
+    unittest.main()

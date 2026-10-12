@@ -56,9 +56,9 @@ Monitor 与一次性 ticket 不是第四层。ActionLedger 保留 PROPOSED → A
 | `completion_prompt` | false | 历史 Stage2 提示仍撤回 |
 | `trace_level` | summary | full 仅诊断，增加序列化/写盘 |
 
-页面两个已有开关控制 L2/L3；保留任一防御时 L1 默认启用，两者全关时 L1 也关闭。NoSandbox 不启用 L2，NoChecker 保留 L2；原生 baseline 始终用 AgentDojo 原工具循环，不带 DSCG 运行元数据。
+页面现支持 L1/L2/L3 与 L2 前置检查配置及三层消融 / V2 对照预设；L2/L3 两者全关时 L1 也关闭。NoSandbox 不启用 L2，NoChecker 保留 L2；原生 baseline 始终用 AgentDojo 原工具循环，不带 DSCG 运行元数据。
 
-运行 trace 记录 `dscg_framework` 的实际开关/version；`dscg_layer_routing`记录候选批次、L2允许/拒绝、既有公开读取免审和语义模型调用数。partial run manifest 写明新版本/L1/L2，并继续绑定任务、模型、攻击和源码 SHA；新旧配置不能复用同名缓存。全量跑批默认 pipeline 名包含版本与实际 L1/L2 开关，避免复用 V2 或其他消融缓存；显式 --name 会覆盖默认名，仍须用新名称。factory 的两个 API 参数可建立 V2 对照；它们尚未暴露为 partial CLI 或网页独立开关，不使用不存在的 flags。
+运行 trace 记录 `dscg_framework` 的实际开关/version；`dscg_layer_routing`记录候选批次、L2允许/拒绝、既有公开读取免审和语义模型调用数。partial run manifest 写明新版本/L1/L2，并继续绑定任务、模型、攻击和源码 SHA；新旧配置不能复用同名缓存。全量跑批默认 pipeline 名包含版本与实际 L1/L2 开关，避免复用 V2 或其他消融缓存；显式 --name 会覆盖默认名，仍须用新名称。factory 的两个 API 参数可建立 V2 对照，现也已暴露为网页控件；它们尚未暴露为 partial CLI，不使用不存在的 flags。
 
 ## 平台交接核查（2026-10-10）
 
@@ -72,7 +72,7 @@ Monitor 与一次性 ticket 不是第四层。ActionLedger 保留 PROPOSED → A
 | 多指标独立成图、实验身份与颜色映射 | 已交付 | [history_charts.js](../dashboard/static/js/history_charts.js)、[history.js](../dashboard/static/js/history.js)，既有Node检查本次重跑21/21 |
 | 使用说明与运行状态同步 | 已交付 | README、AGENTS、[dashboard.md](./dashboard.md)、本文件和workshop两级索引 |
 
-三层新增的路由/封装统计目前在trace中保存，页面没有独立可视化。factory支持L1/L2 API消融，但**独立L1网页开关、CSA模式、路由统计图和失败片段浏览器均未实施**；它们不是此前平台交付的默认功能，也不在本次文档整理中自动扩展。partial命令的注册顺序前缀选择与网页有限子集的seed排序是不同入口，跨入口对照需核对实际task IDs。
+上述表格是文档交接阶段的核查；随后的用户授权 UI 更新已补齐**独立 L1 网页开关、前置检查开关、配置预设和三层统计面板**，详见[工作台实施报告](../workshop/completed/dashboard_framework_ui_20261010.md)。统计显示已计分 trace 覆盖与重复呈现字符，不是安全增益或 Token 节省的证据。**网页CSA模式、专门路由统计图和独立失败片段浏览器仍未实施**。partial 命令的注册顺序前缀选择与网页有限子集的 seed 排序是不同入口，跨入口对照需核对实际 task IDs。
 
 当前源码已更新，运行中的旧服务若未重载，需重启面板并刷新才显示当前版本；本次不重启用户服务或启动模型评测。历史结果不迁移、不重算，也不重新标为三层。交接详情、原文归档与本次检查命令见 [文档归档/交接报告](../workshop/completed/framework_docs_cleanup_20261010.md)。
 
@@ -92,4 +92,8 @@ python -m experiments.run_partial_benchmark --force-rerun --name three_layer_01
 
 真实 E0 仍 pending；I3 已有24 valid/8 scope violations，仍 partial；I2 locked，旧 provenance/I1/I4/exactly-once 路线关闭。本次显式 workshop 工程实施不修改 [technical_route](../../research/technical_route.md)。按 [implementation_status](../../research/paper/implementation_status.md)追加证据，不自行宣布论文贡献或研究闸门通过。
 
-后续先用新名字做匹配的原 V2、L1、L2前置、完整三层消融，报告真实终态、native ASR、TSR、总/分阶段Tokens与延迟；L1文本增量和混合批次整拒是主要待测代价。[L3 学习免审](../workshop/L3_checker_opt.md)、DRV、恢复回路、动态扩权仍未实施。
+后续先用新名字做匹配的原 V2、L1、L2前置、完整三层消融，报告真实终态、native ASR、TSR、总/分阶段Tokens与延迟；L1文本增量和混合批次整拒是主要待测代价。[L3纯算法路由](../workshop/L3_checker_opt.md)已接入API/partial CLI和原生trace/summary，默认off；网页专门模式/artifact控件、真实校准与端到端收益未验收。DRV、恢复回路、动态扩权未实施。
+
+## L3纯算法交接（2026-10-10）
+
+引擎新增 `audit_router_mode` 与 `audit_router_artifact`，partial CLI对应 `--audit-router-mode` / `--audit-router-artifact`；公共读取与L2拒绝不计作新增免审。summary.json的audit_router包含实际/潜在免审、有效覆盖、已知/未知审计成本和本地延迟。当前网页尚未暴露CSA专门控制，网页现有基础三层预设仍沿用off；不要将旧数据或普通路由面板当作已启用CSA。需要后续网页接线时沿用同一factory绑定，不能绕过校准条件。独立真实标签/部署artifact和匹配selective模型试验待完成。见 [实现报告](../workshop/completed/l3_algorithm_implementation_20261010.md)。

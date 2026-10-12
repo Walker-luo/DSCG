@@ -1,0 +1,98 @@
+{
+  "schema_version": "dscg.l3-algorithm-revision.v1",
+  "base_revision": "7d1e1ed27791cc87685bc512ba1b8fb5c1182d25",
+  "previous_documentation_manifest_sha256": "45ae5742c61a5a61bb5d49b952b75ccf6bd191ad2fe33e793d6b73691501b861",
+  "entries": [
+    {
+      "path": "workshop/L3_checker_opt.md",
+      "original_storage": "workshop/archive/l3_selective_impl_20261010/originals/workshop/L3_checker_opt.md",
+      "sha256_before": "d333977d9dbbe6724fbc7b0ddb16f2fd0dc2cc60514ba929e595bc9b218161f8",
+      "sha256_after": "e6a875eef148cf5c2d360ed02befa3b5fff4ee2a035111fc326b2e87aaf8014b"
+    },
+    {
+      "path": "README.md",
+      "original_storage": "workshop/archive/l3_selective_impl_20261010/originals/README.md",
+      "sha256_before": "0858e8ce2709e68dd4624b57f419704d74d497fdf663686ab21bcbb8be5062fe",
+      "sha256_after": "128307bf4a9c9d3f7979f253fcfbb5c9be1c736614a7e6ffd1967f0c6c22b187"
+    },
+    {
+      "path": "AGENTS.md",
+      "original_storage": "workshop/archive/l3_selective_impl_20261010/originals/AGENTS.md",
+      "sha256_before": "65a701ef9e9392429126fc359ea13e562a408145b744304550fba83c029a2da2",
+      "sha256_after": "72c98c029b485289a1753436178845f7b0d394e6f9a21ce95c657a0594a23fae"
+    },
+    {
+      "path": "docs/framework_updates.md",
+      "original_storage": "workshop/archive/l3_selective_impl_20261010/originals/docs/framework_updates.md",
+      "sha256_before": "729a459fdeba3ec43bc01f9fd234a9543d66dd86249d4192e22120228dc95e10",
+      "sha256_after": "5156d9655e8c595a68d22eda33a2064c07aee526113502b5b1614cc5d67d48bf"
+    },
+    {
+      "path": "workshop/README.md",
+      "original_storage": "workshop/archive/l3_selective_impl_20261010/originals/workshop/README.md",
+      "sha256_before": "cc5ccdd13b67a813e4160744f656c3308483f0d049bf124b5e3b0aecbf148d9b",
+      "sha256_after": "69ae9a9021f436f3b0a41b8c5ce635abe296ebbb36a10e0ded45d8e6316477ae"
+    },
+    {
+      "path": "workshop/completed/README.md",
+      "original_storage": "workshop/archive/l3_selective_impl_20261010/originals/workshop/completed/README.md",
+      "sha256_before": "76a3479cd2d85e0986802ccb8e54aa013db55990d2950cd4559ff0ea9a4898c4",
+      "sha256_after": "c73373111d5d658aea368c3c4da315384f71869e3fd374a9c70d8e32ba66ed0c"
+    },
+    {
+      "path": "workshop/verify_migration.py",
+      "original_storage": "workshop/archive/l3_selective_impl_20261010/originals/workshop/verify_migration.py",
+      "sha256_before": "7fa11a10bee613395f9c3d2e70e9998a733bab30781443507034582e82619692",
+      "sha256_after": "3326e6eefe4795e582d9ad1523f8eb4c986301f22c1dd730065d57ddaf3f7a5f"
+    },
+    {
+      "path": "dscg/pipelines/defended.py",
+      "original_storage": "workshop/archive/l3_selective_impl_20261010/originals/dscg/pipelines/defended.py",
+      "sha256_before": "d0517b32771acb7dc2a9c153fdfa21b6dc71a411af8b466926401518ace03711",
+      "sha256_after": "d8524cb9a22dd1e0c3357455ab5b14f0db437f7f01f7f9aaac821ec190769b83"
+    },
+    {
+      "path": "experiments/run_partial_benchmark.py",
+      "original_storage": "workshop/archive/l3_selective_impl_20261010/originals/experiments/run_partial_benchmark.py",
+      "sha256_before": "a13a979625f4880a56e254572f7a7b1eaceb277e0b59006164588652265dc04a",
+      "sha256_after": "e6c383746f0a6287cca259fc4b7e17b11a535aba9dc9c3a294edf445b7c8e9a6"
+    },
+    {
+      "path": "workshop/completed/README.md",
+      "original_storage": "workshop/archive/l3_selective_impl_20261010/originals/workshop/completed/README.md",
+      "sha256_before": "76a3479cd2d85e0986802ccb8e54aa013db55990d2950cd4559ff0ea9a4898c4",
+      "sha256_after": "c73373111d5d658aea368c3c4da315384f71869e3fd374a9c70d8e32ba66ed0c"
+    },
+    {
+      "path": "tests/test_three_layer_pipeline.py",
+      "original_storage": "workshop/archive/l3_selective_impl_20261010/originals/tests/test_three_layer_pipeline.py",
+      "sha256_before": "c3e20e82a086950924045825d9c3f8055b539de16badc4324d8abbfbea4745d6",
+      "sha256_after": "ea00d3c7e67f7e62a443d1eb53e09bc1a557242985ec66ca5e9b826e0f9c28c9"
+    }
+  ],
+  "created_files": {
+    "dscg/audit_router.py": "df8fd8ccd63098876d377559e745433e67612d91ad7d6bcdfc50eed559d8aad4",
+    "experiments/l3_router_dataset.py": "8c503725e6faea95eb419a020069e6c46774dce1c1df07f2dc4f5defecf6f66d",
+    "experiments/calibrate_l3_router.py": "f53ab2a8ba450e6c7b10714880adcb98cbed53639aa69cc94764f9bdf470af7c",
+    "tests/test_audit_router.py": "7a2654ba7c70becfc6d7c1ab439c6914019373e6e682d9459ea7b03862784467",
+    "tests/test_selective_audit.py": "49d1a653020d86eb28ea382edd43e2e8c1b577208bb43058cd75ab40412a70c0",
+    "tests/test_l3_router_dataset.py": "6cc7932f08eb1075477d28fc479ac78b115bc8093a8cb1b257b78abb443a4be4",
+    "tests/test_partial_router.py": "05b3196554c99da4a177b77538f4dfc093da1264c7d3db38148e6fa67fb82deb",
+    "workshop/completed/l3_algorithm_implementation_20261010.md": "590edb4efd68af19a8e51a8247de4b222837dcc3d048f91b93e7928b516fbe27",
+    "workshop/completed/l3_algorithm_implementation_plan_20261010.md": "8efa3b555aa7ca497175012005ec8622821150892246f83e0ecdabdaa417c612"
+  },
+  "current_documents": [
+    "README.md",
+    "AGENTS.md",
+    "docs/framework_updates.md",
+    "workshop/README.md",
+    "workshop/completed/README.md",
+    "workshop/L3_checker_opt.md",
+    "workshop/completed/l3_algorithm_implementation_20261010.md",
+    "workshop/completed/l3_algorithm_implementation_plan_20261010.md"
+  ],
+  "limitations": [
+    "Current revision validation only; historical hashes/manifests remain unchanged.",
+    "Beginning dirty dashboard work is outside algorithm change scope."
+  ]
+}

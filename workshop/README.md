@@ -10,19 +10,24 @@
 | [Partial报告优化](./completed/partial_reporting_20261010.md) | Markdown运行摘要、逐场景指标与有界失败片段 | 不改变原生评分，不提供新的安全oracle；尚未在平台增加独立失败片段浏览器 |
 | [V2与其他历史阶段](./completed/README.md) | 各阶段已完成项及证据已归档 | Stage2执行提示撤回；旧方案里的重审/恢复、LLM净化等不能当作当前默认能力 |
 | [本次文档与交接核查](./completed/framework_docs_cleanup_20261010.md) | README解释、方案归属和平台交付清单 | 真实实验结论仍由原始结果/独立核查决定 |
+| [L3纯算法实现](./completed/l3_algorithm_implementation_20261010.md) | 固定评分、硬条件、分组校准工具、一次性路由交接和CLI成本账 | 独立真实数据、部署阈值、selective收益验收及网页专门控件 |
+| [实验配置与工作台更新](./completed/dashboard_framework_ui_20261010.md) | 三层控件与预设、响应式布局、有效分母与两类模型成本、trace 统计覆盖 | 无新模型评测；CSA 与独立失败片段浏览器未实施 |
+| [框架与平台汇报材料](../report/report.md) | 用户指定 report/ 目录；10页主线介绍架构、各层实现/例子、优缺点和平台；README 列出 L3 待决定项 | 截图待用户补入；尚未生成实际幻灯片，不新增实验结论 |
 
-## 待实施方案
+## 待完成验收的方案
 
 | 方案 | 已落实的关联基础 | 未实施内容 / 当前决定 |
 | --- | --- | --- |
-| [L3 Checker优化](./L3_checker_opt.md) | 三层基础、公开读取免审、确定性权限前置 | CSA本地模型、标签/训练/分组校准、off/shadow/selective、受信路由交接与内部读取学习免审均未实现 |
-| [授权对照校准](./original_framework_direction_20261008.md) | 原可信任务授权和当前动作审计 | 正/负对照、差分校准与触发调度未实现；当前暂停推进，不叠加到三层默认 |
+| [L1结构化投影候选](./L1_opt.md) | 当前 Spotlighting 风格来源封装、原文审计与日志保留 | 有限任务/profile/输出适配、字段投影与四臂保真/安全/成本评估均未实施；不适用自由文本时沿用当前 L1 |
+| [L2授权优化候选](./L2_opt.md) | 当前任务级授权、整批前置检查与 Monitor/ticket | 授权工具视图、正负约束与必要读取补全均未实施；先单独评估工具视图，批次策略保持；不新增对象/参数/数据授权 |
+| [L3 Checker优化](./L3_checker_opt.md) | 三层基础、公开读取免审、确定性权限前置 | 纯算法路由、分组校准工具、off/shadow/selective、受信交接已实现；真实独立数据/部署阈值与端到端验收仍待完成，不训练分类器 |
+| [授权对照校准（历史归档）](./archive/framework_docs_cleanup_20261010/originals/workshop/original_framework_direction_20261008.md) | 原可信任务授权和当前动作审计 | 原候选入口已不在当前树；按保留归档阅读。机制未实施且暂停，不叠加到三层默认 |
 
 [21篇来源目录](./3_layer_sources_20261008.json)保留在顶层供待优化项引用。旧 [DRV方案](./archive/3_layer_low_cost_20261009/originals/workshop/3_layer_opt.md)及[更早三层方案](./archive/3_layer_redesign_20261008/originals/workshop/3_layer_opt.md)仅作历史参考。方案中的样本数、成本算例和验收目标属于设计，不能当成已经运行的结果。
 
 ## 平台交接
 
-[docs/framework_updates.md](../docs/framework_updates.md)列出逐项核查：三层架构展示、现有L2/L3开关接线、历史分析下载与多指标分图已交付。独立L1网页开关、CSA模式和失败片段浏览器是未实施扩展，不列作此前交接的已完成功能。
+[docs/framework_updates.md](../docs/framework_updates.md)列出逐项核查：三层架构展示、历史分析下载与多指标分图已交付。后续工作台更新补齐独立 L1 与 L2 前置控件、三层消融 / V2 对照和统计面板；CSA API/partial CLI模式已接入；网页CSA专门控件与独立失败片段浏览器仍未实施。
 
 ## 存放规则
 

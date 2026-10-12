@@ -80,3 +80,20 @@ class ThreeLayerPipelineTests(unittest.TestCase):
             if l1 or l2:self.assertIn('three-layer-v1',pipeline.name)
         self.assertEqual(len(set(names)),4)
         self.assertNotEqual(names[0],'offline-newFrame-OursFull')
+
+    def test_router_modes_are_bound_to_pipeline_identity_and_configuration(self):
+        names=[]
+        for mode in ('off','shadow','selective'):
+            pipeline,_=self.build(FunctionCall(function='read_data',args={},id='1'),audit_router_mode=mode)
+            names.append(pipeline.name)
+            self.assertEqual(pipeline.dscg_optimization_config['audit_router_mode'],mode)
+        self.assertEqual(len(set(names)),3)
+        for flags in ({'use_sandbox':False},{'use_security_checker':False}):
+            with self.assertRaises(ValueError):self.build(FunctionCall(function='read_data',args={},id='1'),audit_router_mode='selective',**flags)
+
+    def test_calibration_configuration_binds_execution_switches(self):
+        hashes=[]
+        for flags in ({},{'input_isolation':False},{'authorization_precheck':False},{'audit_retries':1},{'completion_prompt':True}):
+            p,_=self.build(FunctionCall(function='read_data',args={},id='1'),audit_router_mode='shadow',**flags)
+            hashes.append(p.dscg_optimization_config['audit_router_config_sha256'])
+        self.assertEqual(len(set(hashes)),len(hashes))

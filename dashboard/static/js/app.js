@@ -15,6 +15,8 @@ const state = {
   eventSource: null,
   isRunning: false,
   dashboardConfig: null,
+  overviewLoaded: false,
+  overviewRequest: 0,
 };
 
 // DOM 引用缓存
@@ -42,11 +44,6 @@ document.addEventListener("DOMContentLoaded", () => {
 function initConfigListeners() {
   // 框架类型切换
   $("#pipeline-type").addEventListener("change", (e) => {
-    const isOrigin = e.target.value === "origin";
-    $("#sec-model-group").style.display = isOrigin ? "none" : "block";
-    $("#sec-connection-group").style.display = isOrigin ? "none" : "block";
-    $("#defense-group").style.display = isOrigin ? "block" : "none";
-    $("#ablation-group").style.display = isOrigin ? "none" : "block";
     updateRunPreview();
   });
 
@@ -54,6 +51,7 @@ function initConfigListeners() {
   $("#run-attack").addEventListener("change", (e) => {
     const isAttack = e.target.value === "true";
     $("#attack-type-group").style.display = isAttack ? "block" : "none";
+    $("#injection-limit-group").style.display = isAttack ? "block" : "none";
     updateRunPreview();
   });
 
@@ -63,12 +61,24 @@ function initConfigListeners() {
 
   // 日志过滤
   $("#filter-errors").addEventListener("change", toggleLogFilter);
+  $("#defense-preset").addEventListener("change", e => applyDefensePreset(e.target.value));
+  $("#workspace-run").addEventListener("change", e => {
+    ["chart-data-source", "detail-data-source", "report-data-source"].forEach(id => $("#" + id).value = e.target.value);
+    if (e.target.value) loadOverview(e.target.value);
+  });
+  ["use-input-isolation", "use-sandbox", "use-security-checker", "authorization-precheck"].forEach(id => {
+    $("#" + id).addEventListener("change", () => {
+      $("#defense-preset").value = "custom";
+      updateRunPreview();
+    });
+  });
 
   [
     "#model-id", "#sec-model-id", "#defense", "#use-sandbox",
     "#use-security-checker", "#max-user-tasks", "#max-injection-tasks",
     "#api-key", "#base-url", "#sec-api-key", "#sec-base-url",
     "#tool-metadata-path",
+    "#trace-level", "#selection-seed",
   ].forEach((selector) => {
     const element = $(selector);
     if (!element) return;
@@ -84,6 +94,7 @@ function getSelectedConfig() {
 
   const pipelineType = $("#pipeline-type").value;
   const isOrigin = pipelineType === "origin";
+  const withChecker = !isOrigin && $("#use-security-checker").checked;
   const mainOption = $("#model-id").selectedOptions[0];
   const secOption = $("#sec-model-id").selectedOptions[0];
   const customApiKey = $("#api-key").value.trim();
@@ -97,10 +108,10 @@ function getSelectedConfig() {
     provider: mainOption?.dataset.provider || null,
     api_key: customApiKey || null,
     base_url: customBaseUrl || null,
-    sec_model_id: isOrigin ? null : ($("#sec-model-id").value || null),
-    sec_provider: isOrigin ? null : (secOption?.dataset.provider || null),
-    sec_api_key: isOrigin ? null : (customSecApiKey || null),
-    sec_base_url: isOrigin ? null : (customSecBaseUrl || null),
+    sec_model_id: withChecker ? ($("#sec-model-id").value || null) : null,
+    sec_provider: withChecker ? (secOption?.dataset.provider || null) : null,
+    sec_api_key: withChecker ? (customSecApiKey || null) : null,
+    sec_base_url: withChecker ? (customSecBaseUrl || null) : null,
     suites: suites,
     run_attack: $("#run-attack").value === "true",
     origin: isOrigin,
@@ -108,11 +119,36 @@ function getSelectedConfig() {
     attack_name: $("#attack-name").value,
     use_sandbox: !isOrigin && $("#use-sandbox").checked,
     use_security_checker: !isOrigin && $("#use-security-checker").checked,
-    max_user_tasks: parseInt($("#max-user-tasks").value) || 0,
-    max_injection_tasks: parseInt($("#max-injection-tasks").value) || 0,
+    input_isolation: !isOrigin && ($("#use-sandbox").checked || $("#use-security-checker").checked) && $("#use-input-isolation").checked,
+    authorization_precheck: !isOrigin && $("#use-sandbox").checked && $("#authorization-precheck").checked,
+    trace_level: $("#trace-level").value,
+    selection_seed: Number($("#selection-seed").value),
+    max_user_tasks: Number($("#max-user-tasks").value),
+    max_injection_tasks: Number($("#max-injection-tasks").value),
     tool_metadata_path: $("#tool-metadata-path").value.trim() || null,
   };
 }
+
+function applyDefensePreset(preset) {
+  if (preset === "custom") return;
+  $("#use-input-isolation").checked = !["no-l1", "v2"].includes(preset);
+  $("#use-sandbox").checked = preset !== "no-l2";
+  $("#use-security-checker").checked = preset !== "no-l3";
+  $("#authorization-precheck").checked = !["no-l2", "v2"].includes(preset);
+  updateRunPreview();
+}
+
+function showConfigError(message) {
+  $("#config-error").textContent = message || "";
+  $("#config-error").hidden = !message;
+}
+
+function escapeHtml(value) {
+  return String(value ?? "").replace(/[&<>"']/g, char => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[char]));
+}
+
+const formatRate = value => typeof value === "number" && Number.isFinite(value) ? `${value.toFixed(1)}%` : "—";
+const formatCount = value => typeof value === "number" && Number.isFinite(value) ? value.toLocaleString("zh-CN") : "未记录";
 
 function toggleSecretVisibility(inputId, button) {
   const input = $("#" + inputId);
@@ -133,6 +169,7 @@ async function loadDashboardConfig() {
     state.dashboardConfig = config;
     populateModelSelect("model-id", config.models || []);
     populateModelSelect("sec-model-id", config.sec_models || []);
+    populateModelSelect("attack-name", config.attacks || []);
     (config.suites || []).forEach((suite) => {
       const count = document.querySelector(`[data-suite-count="${suite.id}"]`);
       if (count) count.textContent = `${suite.user_tasks} × ${suite.injection_tasks}`;
@@ -166,18 +203,39 @@ function updateRunPreview() {
     }, 0);
 
   const isOrigin = $("#pipeline-type")?.value === "origin";
+  const sandbox = !isOrigin && $("#use-sandbox").checked;
+  const checker = !isOrigin && $("#use-security-checker").checked;
+  const isolation = !isOrigin && (sandbox || checker) && $("#use-input-isolation").checked;
+  const precheck = sandbox && $("#authorization-precheck").checked;
+  $("#use-input-isolation").disabled = isOrigin || !(sandbox || checker);
+  $("#authorization-precheck").disabled = !sandbox;
+  $("#sec-model-group").style.display = checker ? "block" : "none";
+  $("#sec-connection-group").style.display = checker ? "block" : "none";
+  $("#defense-group").style.display = isOrigin ? "block" : "none";
+  $("#ablation-group").style.display = isOrigin ? "none" : "grid";
+  $("#trace-level-group").style.display = isOrigin ? "none" : "block";
+  $("#config-defense .framework-version").textContent = isOrigin ? "AgentDojo" : "three-layer-v1";
+  $(".metadata-path-group").style.display = isOrigin ? "none" : "block";
   let defenseLabel = "Baseline";
   if (isOrigin) {
     defenseLabel = $("#defense")?.selectedOptions[0]?.textContent || "Baseline";
-  } else if ($("#use-sandbox")?.checked && $("#use-security-checker")?.checked) {
-    defenseLabel = "完整防御";
-  } else if ($("#use-sandbox")?.checked) {
-    defenseLabel = "仅沙箱";
-  } else if ($("#use-security-checker")?.checked) {
-    defenseLabel = "仅审计";
   } else {
-    defenseLabel = "无防御";
+    defenseLabel = [isolation && "L1", sandbox && "L2", checker && "L3"].filter(Boolean).join(" + ") || "关闭防御";
   }
+  $("#layer-config-note").textContent = !(sandbox || checker)
+    ? "L2/L3 全关时 L1 随之关闭；该 DSCG 消融仍使用 Monitor，与原生 Baseline 的工具循环不同。"
+    : sandbox && !precheck ? "已关闭候选前置检查；工具授权仍由 Monitor 检查。重审 0 次，完成提示关闭。"
+    : "Monitor 与一次性票据负责执行。重审 0 次，完成提示关闭；学习免审尚未实施。";
+  [["l1", isolation], ["l2", sandbox], ["l3", checker]].forEach(([id, enabled]) => {
+    const layer = $("#preview-layer-" + id);
+    layer.classList.toggle("is-disabled", !enabled);
+    layer.querySelector("b").textContent = enabled ? "启用" : "关闭";
+  });
+  $("#workspace-framework").textContent = isOrigin ? "AgentDojo 原生循环" : "three-layer-v1";
+  $("#workspace-mode").textContent = withAttack ? "对抗评测" : "良性效用评测";
+  $("#framework-flow").textContent = isOrigin
+    ? "原生 AgentDojo 规划与工具执行；DSCG 三层不参与运行。"
+    : `${sandbox ? "任务授权 → " : ""}主模型规划${isolation ? "（返回经 L1）" : ""} → ${precheck ? "L2 前置检查 → " : ""}${checker ? "L3 路由 → " : ""}Monitor 执行`;
 
   if ($("#preview-suites")) $("#preview-suites").textContent = `${selectedSuites.length} / ${allSuites.length}`;
   if ($("#preview-tasks")) $("#preview-tasks").textContent = estimatedTasks.toLocaleString("zh-CN");
@@ -210,9 +268,14 @@ function populateModelSelect(selectorId, models) {
 // =============================================
 async function startRun() {
   const config = getSelectedConfig();
+  showConfigError("");
 
   if (config.suites.length === 0) {
-    alert("请至少选择一个测试场景！");
+    showConfigError("请至少选择一个测试场景。");
+    return;
+  }
+  if ([config.max_user_tasks, config.max_injection_tasks, config.selection_seed].some(value => !Number.isSafeInteger(value) || value < 0)) {
+    showConfigError("任务上限和 seed 必须为非负整数。");
     return;
   }
 
@@ -236,6 +299,7 @@ async function startRun() {
       body: JSON.stringify(config),
     });
     const data = await resp.json();
+    if (!resp.ok || !data.run_id) throw new Error(data.error || "服务端未返回运行 ID");
     state.currentRunId = data.run_id;
 
     // 更新 UI
@@ -251,14 +315,16 @@ async function startRun() {
 
     // 清空日志并启动 SSE
     clearLogs();
+    $("#run-progress").hidden = false;
+    updateProgress({phase: "setup", completed_suites: 0, total_suites: config.suites.length});
     connectSSE(data.run_id);
 
   } catch (err) {
     console.error("启动测试失败:", err);
-    alert("启动测试失败: " + err.message);
+    showConfigError(err.message);
     state.isRunning = false;
     $("#btn-run").disabled = false;
-    $("#btn-run").innerHTML = '<i class="bi bi-play-fill"></i> 开始测试';
+    $("#btn-run").innerHTML = '<i class="bi bi-play-fill"></i> 开始评测';
     $("#btn-stop").style.display = "none";
     updateStatus("idle", "就绪");
   }
@@ -271,7 +337,7 @@ function stopRun() {
   }
   state.isRunning = false;
   $("#btn-run").disabled = false;
-  $("#btn-run").innerHTML = '<i class="bi bi-play-fill"></i> 开始测试';
+  $("#btn-run").innerHTML = '<i class="bi bi-play-fill"></i> 开始评测';
   $("#btn-stop").style.display = "none";
   updateStatus("idle", "日志已断开");
   if ($("#live-context")) $("#live-context").textContent = "实时连接已断开";
@@ -286,7 +352,7 @@ function connectSSE(runId) {
     state.eventSource.close();
   }
 
-  const es = new EventSource(`/api/stream/${runId}`);
+  const es = new EventSource(`/api/stream/${escapeHtml(runId)}`);
   state.eventSource = es;
 
   es.onmessage = (event) => {
@@ -400,6 +466,13 @@ function toggleLogFilter() {
 }
 
 function updateProgress(progress) {
+  const phase = {setup: "准备场景", benchmark: "执行评测", analysis: "场景完成"}[progress.phase] || "运行中";
+  $("#progress-phase").textContent = `${progress.current_suite || ""} ${phase}`;
+  if (Number.isInteger(progress.completed_suites)) {
+    $("#suite-progress").max = progress.total_suites || 1;
+    $("#suite-progress").value = progress.completed_suites;
+    $("#progress-count").textContent = `${progress.completed_suites} / ${progress.total_suites} 个场景完成`;
+  }
   // 可以在日志中显示进度
   if (progress.current_suite && progress.phase) {
     const phaseLabels = {
@@ -415,7 +488,7 @@ function updateProgress(progress) {
 function updateStatus(status, text) {
   const indicator = $("#status-indicator");
   indicator.className = `run-status ${status}`;
-  indicator.innerHTML = `<span class="status-dot"></span><span>${text}</span>`;
+  indicator.innerHTML = `<span class="status-dot"></span><span>${escapeHtml(text)}</span>`;
 }
 
 // =============================================
@@ -424,10 +497,11 @@ function updateStatus(status, text) {
 function onRunComplete(msg) {
   state.isRunning = false;
   $("#btn-run").disabled = false;
-  $("#btn-run").innerHTML = '<i class="bi bi-play-fill"></i> 开始测试';
+  $("#btn-run").innerHTML = '<i class="bi bi-play-fill"></i> 开始评测';
   $("#btn-stop").style.display = "none";
-  updateStatus("completed", "已完成");
-  if ($("#live-context")) $("#live-context").textContent = "运行已完成";
+  updateStatus(msg.summary?.error ? "failed" : "completed", msg.summary?.error ? "运行失败" : "已完成");
+  if ($("#live-context")) $("#live-context").textContent = msg.summary?.error ? "运行失败，查看错误日志" : "运行已完成";
+  $("#progress-phase").textContent = msg.summary?.error ? "运行失败" : "评测完成";
 
   if (msg.summary && msg.summary.error) {
     pushLogEntry("error", `测试异常结束: ${msg.summary.error}`);
@@ -453,7 +527,7 @@ function onRunComplete(msg) {
   refreshDataSources();
 
   // 自动切换到概览面板
-  setTimeout(() => {
+  if (!msg.summary?.error) setTimeout(() => {
     const overviewTab = new bootstrap.Tab($("#tab-overview"));
     overviewTab.show();
     loadOverview(state.currentRunId);
@@ -467,18 +541,23 @@ async function loadAllRuns() {
   try {
     const resp = await fetch("/api/runs");
     const runs = await resp.json();
-    state.allRuns = runs.sort((left, right) => {
+    state.allRuns = runs.filter(run => run.completed_at).sort((left, right) => {
       const rightTime = Date.parse(right.completed_at || "") || 0;
       const leftTime = Date.parse(left.completed_at || "") || 0;
       return rightTime - leftTime;
     });
     refreshDataSources();
+    if (!state.overviewLoaded && state.allRuns.length && !state.isRunning) {
+      state.overviewLoaded = true;
+      loadOverview(state.allRuns[0].run_id);
+    }
   } catch (err) {
     console.error("加载运行列表失败:", err);
   }
 }
 
 function refreshDataSources() {
+  updateRunSelector("workspace-run");
   // 更新图表数据源
   updateRunSelector("chart-data-source");
   // 更新详细结果数据源
@@ -497,7 +576,7 @@ function updateRunSelector(selectorId) {
   state.allRuns.forEach(r => {
     const label = r.config?.label || r.run_id?.slice(0, 12) || "Unknown";
     const ts = r.completed_at ? new Date(r.completed_at).toLocaleString("zh-CN") : "";
-    sel.innerHTML += `<option value="${r.run_id}">${label} (${ts})</option>`;
+    sel.innerHTML += `<option value="${escapeHtml(r.run_id)}">${escapeHtml(label)} (${escapeHtml(ts)})</option>`;
   });
   const preferred = currentVal || state.currentRunId || state.allRuns[0]?.run_id;
   if (preferred && state.allRuns.some(r => r.run_id === preferred)) sel.value = preferred;
@@ -506,13 +585,14 @@ function updateRunSelector(selectorId) {
 function updateCompareCheckboxes() {
   const container = $("#compare-run-checkboxes");
   if (!container) return;
+  const selected = new Set(Array.from($$(".compare-cb:checked"), cb => cb.value));
   container.innerHTML = state.allRuns.map(r => {
     const label = r.config?.label || r.run_id?.slice(0, 12) || "Unknown";
     return `
       <div class="form-check form-check-inline">
         <input class="form-check-input compare-cb" type="checkbox"
-               value="${r.run_id}" id="cmp-${r.run_id}">
-        <label class="form-check-label" for="cmp-${r.run_id}">${label}</label>
+               value="${escapeHtml(r.run_id)}" id="cmp-${escapeHtml(r.run_id)}" ${selected.has(r.run_id) ? 'checked' : ''}>
+        <label class="form-check-label" for="cmp-${escapeHtml(r.run_id)}">${escapeHtml(label)}</label>
       </div>
     `;
   }).join("");
@@ -522,84 +602,55 @@ function updateCompareCheckboxes() {
 // 概览仪表盘
 // =============================================
 async function loadOverview(runId) {
-  if (!runId) {
-    runId = $("#chart-data-source").value;
-  }
-  if (!runId) {
-    alert("请先选择一个运行结果！");
-    return;
-  }
-
+  runId ||= $("#workspace-run").value;
+  if (!runId) return;
+  const request = ++state.overviewRequest;
   try {
-    const resp = await fetch(`/api/runs/${runId}`);
+    const resp = await fetch(`/api/runs/${encodeURIComponent(runId)}`);
     const run = await resp.json();
-    const agg = run.aggregate_metrics || {};
-
-    const container = $("#overview-content");
-    container.innerHTML = `
-      <div class="d-flex justify-content-between align-items-center gap-3 mb-3">
-        <div><span class="section-kicker">Run summary</span><h5 class="mb-0">测试概览</h5></div>
-        <code class="text-muted small">${runId}</code>
-      </div>
+    if (!resp.ok) throw new Error(run.error || "读取运行失败");
+    if (request !== state.overviewRequest) return;
+    const agg = run.display_metrics || run.aggregate_metrics || {};
+    const config = run.config || {};
+    const suites = run.suites || [];
+    const framework = suites.find(s => s.framework)?.framework;
+    const layerFlag = key => typeof framework?.[key] === "boolean" ? framework[key] :
+      typeof config[key] === "boolean" ? config[key] : null;
+    const layerBadge = (name, value) => `<span class="effective-layer ${value === true ? 'enabled' : ''}">${name} · ${value === null ? '未记录' : value ? '启用' : '关闭'}</span>`;
+    const stats = suites.map(s => s.layer_stats).filter(Boolean);
+    const sum = (group, key) => stats.reduce((total, s) => total + (s[group]?.[key] || 0), 0);
+    const coverage = key => stats.reduce((total, s) => total + (s[key] || 0), 0);
+    const statValue = (group, key) => coverage(group + '_records') ? formatCount(sum(group, key)) : '未记录';
+    const statRows = [
+      ['L1 工具结果呈现次数', statValue('isolation', 'tool_results_rendered')],
+      ['L1 累计新增字符', statValue('isolation', 'added_characters_total')],
+      ['L2 前置允许批次', statValue('routing', 'precheck_allowed_batches')],
+      ['L2 前置拒绝批次', statValue('routing', 'precheck_rejected_batches')],
+      ['L3 公开读取免审批次', statValue('routing', 'public_read_bypass_batches')],
+      ['L3 实际语义调用', statValue('routing', 'semantic_audit_calls')],
+    ];
+    const totalTokens = s => (s.overhead?.total_tokens || 0) + (s.sec_overhead?.total_tokens || 0);
+    $("#overview-content").innerHTML = `
+      <div class="result-heading"><div><h3>${escapeHtml(config.label || '运行结果')}</h3><p>${escapeHtml(runId)} · ${escapeHtml(run.completed_at ? new Date(run.completed_at).toLocaleString('zh-CN') : '未完成')}</p></div><span class="result-version">${escapeHtml(config.origin ? 'AgentDojo 原生' : framework?.framework_version || config.framework_version || '历史版本 · 未记录')}</span></div>
+      <div class="effective-config"><strong>本次实际配置</strong>${config.origin ? '<span>原生工具循环 · 无 DSCG 层</span>' :
+        layerBadge('L1 返回隔离', layerFlag('input_isolation')) + layerBadge('L2 工具授权', layerFlag('use_sandbox')) +
+        layerBadge('L2 前置检查', layerFlag('authorization_precheck')) + layerBadge('L3 动作审计', layerFlag('use_security_checker'))}</div>
       <div class="overview-cards">
-        <div class="metric-card tsr">
-          <div class="metric-icon"><i class="bi bi-check-circle"></i></div>
-          <div class="metric-value">${agg.avg_utility_rate ?? "N/A"}%</div>
-          <div class="metric-label">平均可用性 (TSR)</div>
-        </div>
-        <div class="metric-card asr">
-          <div class="metric-icon"><i class="bi bi-shield-exclamation"></i></div>
-          <div class="metric-value">${agg.avg_attack_success_rate ?? "N/A"}%</div>
-          <div class="metric-label">平均攻击成功率 (ASR)</div>
-        </div>
-        <div class="metric-card defense">
-          <div class="metric-icon"><i class="bi bi-shield-check"></i></div>
-          <div class="metric-value">${agg.avg_defense_success_rate ?? "N/A"}%</div>
-          <div class="metric-label">平均防御成功率</div>
-        </div>
-        <div class="metric-card tokens">
-          <div class="metric-icon"><i class="bi bi-coin"></i></div>
-          <div class="metric-value">${((agg.total_tokens || 0) / 1000000).toFixed(2)}M</div>
-          <div class="metric-label">总 Token 消耗</div>
-        </div>
+        <div class="metric-card tsr"><div class="metric-label">任务成功率 TSR</div><div class="metric-value">${formatRate(agg.avg_utility_rate)}</div><small>${formatCount(agg.utility_passed)} / ${formatCount(agg.total_tasks)} 个任务成功</small></div>
+        <div class="metric-card asr"><div class="metric-label">攻击成功率 ASR</div><div class="metric-value">${formatRate(agg.avg_attack_success_rate)}</div><small>${config.run_attack === false ? '良性评测不适用' : `${agg.security_denominator === null ? "有效分母未记录" : `${formatCount(agg.security_denominator)} 条原生安全判定`} · 越低越好`}</small></div>
+        <div class="metric-card tokens"><div class="metric-label">${agg.security_cost_complete || config.origin || config.use_security_checker === false ? "总 Token 消耗" : "已记录 Token（审计缺失）"}</div><div class="metric-value">${formatCount(agg.total_tokens)}</div><small>主模型（含授权）${formatCount(agg.main_total_tokens)} + 审计 ${formatCount(agg.security_cost_complete || config.origin || config.use_security_checker === false ? agg.security_total_tokens : null)}</small></div>
+        <div class="metric-card quality"><div class="metric-label">缺失 / 无效安全判定</div><div class="metric-value">${formatCount(agg.security_missing)}</div><small>不计为零 ASR；需核对原始结果</small></div>
       </div>
-
-      <h6 class="mt-3 mb-2">各场景详情</h6>
-      <div class="table-responsive">
-        <table class="table table-dark table-hover">
-          <thead>
-            <tr>
-              <th>场景</th>
-              <th>Pipeline</th>
-              <th>TSR (%)</th>
-              <th>ASR (%)</th>
-              <th>Defense (%)</th>
-              <th>任务数</th>
-              <th>Tokens</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${(run.suites || []).map(s => `
-              <tr>
-                <td><strong>${s.suite_name}</strong></td>
-                <td><small>${s.pipeline_name || "-"}</small></td>
-                <td class="text-info">${s.metrics.utility_rate.toFixed(1)}</td>
-                <td class="text-danger">${s.metrics.attack_success_rate.toFixed(1)}</td>
-                <td class="text-success">${s.metrics.defense_success_rate.toFixed(1)}</td>
-                <td>${s.task_counts.total_tasks}</td>
-                <td>${(s.overhead.total_tokens / 1000).toFixed(1)}K</td>
-              </tr>
-            `).join("")}
-          </tbody>
-        </table>
-      </div>
+      <div class="result-section-heading"><h4>各场景结果</h4><span>TSR 按任务加权；ASR 按有效安全判定加权</span></div>
+      <div class="table-responsive"><table class="table table-dark table-hover evaluation-suite-table"><thead><tr><th>场景</th><th>TSR</th><th>ASR</th><th>任务数</th><th>已记录总 Tokens</th><th>审计 Tokens</th></tr></thead><tbody>${suites.map(s => `<tr><td><strong>${escapeHtml(s.suite_name)}</strong></td><td class="text-info">${formatRate(s.metrics?.utility_rate)}</td><td class="text-danger">${formatRate(config.run_attack === false ? null : s.metrics?.attack_success_rate)}</td><td>${formatCount(s.task_counts?.total_tasks)}</td><td>${formatCount(totalTokens(s))}</td><td>${formatCount(s.sec_overhead?.total_tokens ?? (config.origin || config.use_security_checker === false ? 0 : null))}</td></tr>`).join('')}</tbody></table></div>
+      ${config.origin ? '' : `<section class="layer-observations"><div class="result-section-heading"><h4>三层运行记录</h4><span>路由 ${coverage('routing_records')} / ${formatCount(agg.total_tasks)} · 隔离 ${coverage('isolation_records')} / ${formatCount(agg.total_tasks)} 条 trace</span></div><dl>${statRows.map(([label, value]) => `<div><dt>${label}</dt><dd>${value}</dd></div>`).join('')}</dl><p>仅统计已计分任务，排除攻击生成预检；覆盖不全时为已记录部分。L1 字符与呈现次数含重复历史，字符数不等于 Tokens。</p></section>`}
+      <div class="result-footnote"><i class="bi bi-info-circle"></i><span>ASR 使用 AgentDojo 原生判定；工具级约束与路由统计不代表独立安全验证。任务 ID、模型、攻击一致后再作比较。</span></div>
     `;
-
-    // 切换到概览面板
-    const overviewTab = new bootstrap.Tab($("#tab-overview"));
-    overviewTab.show();
+    $("#workspace-run").value = runId;
+    ["chart-data-source", "detail-data-source", "report-data-source"].forEach(id => $("#" + id).value = runId);
+    new bootstrap.Tab($("#tab-overview")).show();
   } catch (err) {
-    console.error("加载概览失败:", err);
+    if (request === state.overviewRequest) $("#overview-content").innerHTML = `<div class="empty-state"><strong>读取运行结果失败</strong><span>${escapeHtml(err.message)}</span></div>`;
   }
 }
 
@@ -614,7 +665,7 @@ async function refreshCharts() {
   }
 
   try {
-    const resp = await fetch(`/api/runs/${runId}`);
+    const resp = await fetch(`/api/runs/${escapeHtml(runId)}`);
     const run = await resp.json();
     // 先显示面板，再创建 Chart.js 实例，避免隐藏容器导致首次宽度计算为 0。
     const chartsTab = new bootstrap.Tab($("#tab-charts"));
@@ -658,7 +709,7 @@ function renderSuiteCharts(run) {
   let tokenHtml = `
     <div class="col-lg-6">
       <div class="chart-container">
-        <h6>各场景 Token 消耗</h6>
+        <h6>各场景已记录 Token（主 + 审计）</h6>
         <canvas id="chart-tokens"></canvas>
       </div>
     </div>
@@ -673,10 +724,10 @@ function renderSuiteCharts(run) {
 
   const labels = suites.map(s => s.suite_name);
   const tsrData = suites.map(s => s.metrics.utility_rate);
-  const defenseData = suites.map(s => s.metrics.defense_success_rate);
-  const asrData = suites.map(s => s.metrics.attack_success_rate);
-  const promptTokens = suites.map(s => s.overhead.prompt_tokens);
-  const completionTokens = suites.map(s => s.overhead.completion_tokens);
+  const defenseData = suites.map(s => run.config?.run_attack === false ? null : s.metrics.defense_success_rate);
+  const asrData = suites.map(s => run.config?.run_attack === false ? null : s.metrics.attack_success_rate);
+  const promptTokens = suites.map(s => (s.overhead?.prompt_tokens || 0) + (s.sec_overhead?.prompt_tokens || 0));
+  const completionTokens = suites.map(s => (s.overhead?.completion_tokens || 0) + (s.sec_overhead?.completion_tokens || 0));
   const totalTasks = suites.map(s => s.task_counts.total_tasks);
   const passedTasks = suites.map(s => s.task_counts.utility_passed);
 
@@ -726,7 +777,7 @@ function renderSuiteCharts(run) {
         borderWidth: 2,
         pointRadius: 3,
         pointHoverRadius: 5,
-        pointBackgroundColor: asrData.map(v => v > 30 ? "#ed7474" : "#e9b35f"),
+        pointBackgroundColor: "#ed7474",
         tension: 0.32,
         fill: true,
       }],
@@ -741,7 +792,7 @@ function renderSuiteCharts(run) {
       labels: labels,
       datasets: [
         {
-          label: "Prompt Tokens (K)",
+          label: "已记录 Prompt（主 + 审计，K）",
           data: promptTokens.map(v => v / 1000),
           backgroundColor: "rgba(176, 147, 229, 0.68)",
           borderColor: "#b093e5",
@@ -750,7 +801,7 @@ function renderSuiteCharts(run) {
           maxBarThickness: 24,
         },
         {
-          label: "Completion Tokens (K)",
+          label: "已记录 Completion（主 + 审计，K）",
           data: completionTokens.map(v => v / 1000),
           backgroundColor: "rgba(117, 167, 238, 0.68)",
           borderColor: "#75a7ee",
@@ -838,8 +889,8 @@ function getMetricOptions(yLabel) {
       x: getXScale(),
       y: {
         beginAtZero: true,
-        max: 100,
-        ticks: { color: "#a7b1ae", maxTicksLimit: 6, callback: value => `${value}%` },
+        min: -5, max: 105,
+        ticks: { color: "#a7b1ae", maxTicksLimit: 6, stepSize: 20, callback: value => value >= 0 && value <= 100 ? `${value}%` : "" },
         grid: { color: "rgba(70, 80, 77, 0.32)" },
         title: { display: true, text: yLabel, color: "#74817d", font: { size: 10 } },
       },
@@ -867,7 +918,7 @@ async function refreshDetailTable() {
   }
 
   try {
-    const resp = await fetch(`/api/runs/${runId}`);
+    const resp = await fetch(`/api/runs/${escapeHtml(runId)}`);
     const run = await resp.json();
     const records = run.structured_records || [];
 
@@ -907,9 +958,9 @@ async function refreshDetailTable() {
         <tbody>
           ${filtered.map(r => `
             <tr>
-              <td>${r.suite_name}</td>
-              <td><code>${r.user_task_id}</code></td>
-              <td><code>${r.injection_task_id}</code></td>
+              <td>${escapeHtml(r.suite_name)}</td>
+              <td><code>${escapeHtml(r.user_task_id)}</code></td>
+              <td><code>${escapeHtml(r.injection_task_id)}</code></td>
               <td><span class="result-badge ${r.utility_success ? 'pass' : 'fail'}">${r.utility_success ? '成功' : '失败'}</span></td>
               <td>${r.attack_success === null ? '<span class="result-badge neutral">N/A</span>' : (r.attack_success ? '<span class="result-badge fail">被攻破</span>' : '<span class="result-badge pass">安全</span>')}</td>
               <td>${r.defense_success === null ? '<span class="result-badge neutral">N/A</span>' : (r.defense_success ? '<span class="result-badge pass">成功</span>' : '<span class="result-badge fail">失败</span>')}</td>
@@ -978,7 +1029,7 @@ function renderComparison(data) {
       </div>
       <div class="col-lg-4">
         <div class="chart-container">
-          <h6>Token 消耗对比 (M)</h6>
+          <h6>已记录 Token 对比 (M)</h6>
           <canvas id="cmp-tokens"></canvas>
         </div>
       </div>
@@ -1059,7 +1110,7 @@ function renderComparison(data) {
     data: {
       labels: labels,
       datasets: [{
-        label: "Total Tokens (M)",
+        label: "已记录总 Tokens (M)",
         data: (tokenData.total_tokens || []).map(v => v / 1000000),
         backgroundColor: "rgba(245, 158, 11, 0.7)",
         borderColor: "#f59e0b",
@@ -1125,17 +1176,22 @@ async function loadReport() {
   }
 
   try {
-    const resp = await fetch(`/api/runs/${runId}`);
+    const resp = await fetch(`/api/runs/${escapeHtml(runId)}`);
     const run = await resp.json();
 
     // 设置下载链接
     const downloadBtn = $("#btn-download-report");
     downloadBtn.style.display = "inline-block";
-    downloadBtn.href = `/api/report/${runId}`;
+    downloadBtn.href = `/api/report/${escapeHtml(runId)}`;
 
     // 渲染 HTML 报告
-    const agg = run.aggregate_metrics || {};
+    const agg = run.display_metrics || run.aggregate_metrics || {};
     const config = run.config || {};
+    const auditModel = config.origin || config.use_security_checker === false
+      ? '未使用'
+      : config.use_security_checker === true
+        ? config.resolved_security_model?.model_id || config.sec_model_id || 'Local/Env 配置'
+        : '未记录';
 
     const container = $("#report-content");
     container.innerHTML = `
@@ -1145,38 +1201,38 @@ async function loadReport() {
 
         <h6>测试配置</h6>
         <table class="table table-dark table-sm w-auto">
-          <tr><td class="text-muted">运行 ID</td><td>${runId}</td></tr>
+          <tr><td class="text-muted">运行 ID</td><td>${escapeHtml(runId)}</td></tr>
           <tr><td class="text-muted">完成时间</td><td>${run.completed_at || "N/A"}</td></tr>
-          <tr><td class="text-muted">主模型</td><td>${config.model_id || "N/A"}</td></tr>
-          <tr><td class="text-muted">审计模型</td><td>${config.sec_model_id || "无"}</td></tr>
-          <tr><td class="text-muted">测试套件</td><td>${(config.suites || []).join(", ")}</td></tr>
+          <tr><td class="text-muted">主模型</td><td>${escapeHtml(config.resolved_main_model?.model_id || config.model_id || "Local/Env 配置")}</td></tr>
+          <tr><td class="text-muted">审计模型</td><td>${escapeHtml(auditModel)}</td></tr>
+          <tr><td class="text-muted">测试套件</td><td>${escapeHtml((config.suites || []).join(", "))}</td></tr>
           <tr><td class="text-muted">攻击模式</td><td>${config.run_attack ? "启用" : "禁用"}</td></tr>
-          <tr><td class="text-muted">攻击类型</td><td>${config.attack_name || "N/A"}</td></tr>
+          <tr><td class="text-muted">攻击类型</td><td>${escapeHtml(config.run_attack === false ? "不适用" : config.attack_name || "未记录")}</td></tr>
           <tr><td class="text-muted">框架</td><td>${config.origin ? "原始模型" : "DSCG"}</td></tr>
-          ${config.defense ? `<tr><td class="text-muted">AgentDojo 防御</td><td>${config.defense}</td></tr>` : ""}
+          ${config.defense ? `<tr><td class="text-muted">AgentDojo 防御</td><td>${escapeHtml(config.defense)}</td></tr>` : ""}
           ${!config.origin ? `
-            <tr><td class="text-muted">沙箱</td><td>${config.use_sandbox !== false ? "启用" : "禁用"}</td></tr>
-            <tr><td class="text-muted">安全校验器</td><td>${config.use_security_checker !== false ? "启用" : "禁用"}</td></tr>
+            <tr><td class="text-muted">框架版本</td><td>${escapeHtml(config.framework_version || '未记录')}</td></tr>
+            ${[['input_isolation','L1 工具返回隔离'],['use_sandbox','L2 工具授权'],['authorization_precheck','L2 前置检查'],['use_security_checker','L3 动作审计']].map(([key,label]) => `<tr><td class="text-muted">${label}</td><td>${typeof config[key] === 'boolean' ? config[key] ? '启用' : '关闭' : '未记录'}</td></tr>`).join('')}
           ` : ""}
         </table>
 
         <h6 class="mt-3">聚合指标</h6>
         <div class="overview-cards">
           <div class="metric-card tsr">
-            <div class="metric-value">${agg.avg_utility_rate ?? "N/A"}%</div>
+            <div class="metric-value">${formatRate(agg.avg_utility_rate)}</div>
             <div class="metric-label">平均可用性 (TSR)</div>
           </div>
           <div class="metric-card asr">
-            <div class="metric-value">${agg.avg_attack_success_rate ?? "N/A"}%</div>
+            <div class="metric-value">${formatRate(agg.avg_attack_success_rate)}</div>
             <div class="metric-label">平均攻击成功率 (ASR)</div>
           </div>
           <div class="metric-card defense">
-            <div class="metric-value">${agg.avg_defense_success_rate ?? "N/A"}%</div>
+            <div class="metric-value">${formatRate(agg.avg_defense_success_rate)}</div>
             <div class="metric-label">平均防御成功率</div>
           </div>
           <div class="metric-card tokens">
-            <div class="metric-value">${((agg.total_tokens || 0) / 1000000).toFixed(2)}M</div>
-            <div class="metric-label">总 Token 消耗</div>
+            <div class="metric-value">${formatCount(agg.total_tokens)}</div>
+            <div class="metric-label">已记录总 Token（主 + 审计）</div>
           </div>
         </div>
 
@@ -1185,18 +1241,18 @@ async function loadReport() {
           <table class="table table-dark table-hover">
             <thead>
               <tr><th>场景</th><th>TSR (%)</th><th>ASR (%)</th><th>Defense (%)</th>
-                  <th>任务数</th><th>Prompt Tokens</th><th>Completion Tokens</th></tr>
+                  <th>任务数</th><th>已记录 Prompt</th><th>已记录 Completion</th></tr>
             </thead>
             <tbody>
               ${(run.suites || []).map(s => `
                 <tr>
-                  <td><strong>${s.suite_name}</strong></td>
-                  <td class="text-info">${s.metrics.utility_rate.toFixed(1)}</td>
-                  <td class="text-danger">${s.metrics.attack_success_rate.toFixed(1)}</td>
-                  <td class="text-success">${s.metrics.defense_success_rate.toFixed(1)}</td>
+                  <td><strong>${escapeHtml(s.suite_name)}</strong></td>
+                  <td class="text-info">${formatRate(s.metrics.utility_rate)}</td>
+                  <td class="text-danger">${formatRate(config.run_attack === false ? null : s.metrics.attack_success_rate)}</td>
+                  <td class="text-success">${formatRate(config.run_attack === false ? null : s.metrics.defense_success_rate)}</td>
                   <td>${s.task_counts.total_tasks}</td>
-                  <td>${(s.overhead.prompt_tokens / 1000).toFixed(1)}K</td>
-                  <td>${(s.overhead.completion_tokens / 1000).toFixed(1)}K</td>
+                  <td>${formatCount((s.overhead?.prompt_tokens || 0) + (s.sec_overhead?.prompt_tokens || 0))}</td>
+                  <td>${formatCount((s.overhead?.completion_tokens || 0) + (s.sec_overhead?.completion_tokens || 0))}</td>
                 </tr>
               `).join("")}
             </tbody>
@@ -1279,7 +1335,7 @@ async function quickCompare(template) {
 // =============================================
 document.addEventListener("click", (e) => {
   if (e.target.matches("#tab-overview, #tab-overview *")) {
-    const runId = state.currentRunId || $("#chart-data-source").value;
+    const runId = $("#workspace-run").value || state.currentRunId;
     if (runId) loadOverview(runId);
   }
   if (e.target.matches("#tab-charts, #tab-charts *")) {

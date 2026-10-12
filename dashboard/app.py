@@ -23,6 +23,7 @@ from flask import (
 )
 
 from agentdojo import logging as ad_logging, benchmark, attacks
+from agentdojo.attacks.attack_registry import ATTACKS
 from agentdojo.task_suite import get_suite
 from dscg.model_config import DEEPSEEK_MODEL_IDS
 from dscg.harness_records import SampleStatus
@@ -32,6 +33,7 @@ from dscg.pipelines.defended import make_defended_pipeline
 from dscg.tool_metadata import load_tool_metadata
 from experiments.harness_audit import rank_ids, security_result_fields
 from dashboard.history_export import build_history_export
+from dashboard.evaluation import aggregate, display_metrics, normalize_config, trace_stats
 
 app = Flask(__name__)
 app.secret_key = "newframe_dashboard_2024"
@@ -114,6 +116,15 @@ AVAILABLE_ATTACKS = [
     {"id": "ignore_previous", "label": "忽略前文指令"},
     {"id": "malicious_sandbox", "label": "恶意沙箱"},
 ]
+
+# Only targeted automatic attacks are supported by this dashboard's task grid.
+# DoS presets have a different scorer/denominator in the partial runner.
+_ATTACK_LABELS = {"important_instructions": "重要指令注入", "ignore_previous": "忽略前文指令",
+                  "injecagent": "InjecAgent", "tool_knowledge": "工具知识注入"}
+AVAILABLE_ATTACKS = [{"id": name, "label": f"{_ATTACK_LABELS.get(name, name)} · {name}"}
+                     for name in dict.fromkeys(["important_instructions", "ignore_previous", "injecagent",
+                                                "tool_knowledge", *sorted(ATTACKS)])
+                     if name in ATTACKS and name != "manual" and name != "dos" and not name.endswith("_dos")]
 
 AVAILABLE_DEFENSES = [
     {"id": None, "label": "无防御 (Baseline)"},
@@ -220,7 +231,7 @@ def run_test_thread(run_id: str, config: dict):
         max_injection_tasks = config.get("max_injection_tasks", 0)
         selection_seed = int(config.get("selection_seed", 20260927))
         tool_metadata_path = config.get("tool_metadata_path") or None
-        tool_metadata = load_tool_metadata(tool_metadata_path)
+        tool_metadata = None if is_origin else load_tool_metadata(tool_metadata_path)
         if tool_metadata_path:
             push_log(
                 run_id,
@@ -241,12 +252,13 @@ def run_test_thread(run_id: str, config: dict):
         all_structured_records = []
 
         try:
-            for suite_name in suites:
+            for suite_index, suite_name in enumerate(suites):
                 push_log(run_id, "info", f"\n📂 正在测试套件: {suite_name}")
                 push_progress(run_id, {
                     "current_suite": suite_name,
                     "status": "running",
-                    "phase": "setup"
+                    "phase": "setup",
+                    "completed_suites": suite_index, "total_suites": len(suites)
                 })
 
                 # ---- 构建 Pipeline ----
@@ -271,6 +283,9 @@ def run_test_thread(run_id: str, config: dict):
                         model_id, sec_model_id,
                         use_sandbox=use_sandbox,
                         use_security_checker=use_security_checker,
+                        input_isolation=config.get("input_isolation", True),
+                        authorization_precheck=config.get("authorization_precheck", True),
+                        trace_level=config.get("trace_level", "summary"),
                         api_key=api_key,
                         provider=provider,
                         base_url=base_url,
@@ -316,7 +331,7 @@ def run_test_thread(run_id: str, config: dict):
                     f"{len(selected_injections)} 个注入任务")
 
                 # ---- 加载攻击 ----
-                attack = attacks.load_attack(attack_name, suite, pipeline)
+                attack = attacks.load_attack(attack_name, suite, pipeline) if run_attack else None
 
                 # ---- 运行基准测试 ----
                 push_progress(run_id, {
@@ -378,9 +393,9 @@ def run_test_thread(run_id: str, config: dict):
                 ]
                 security_score = (
                     sum(valid_security_results) / len(valid_security_results)
-                    if run_attack and valid_security_results else 0
+                    if run_attack and valid_security_results else None
                 )
-                defense_score = 1.0 - security_score if run_attack else 1.0
+                defense_score = 1.0 - security_score if security_score is not None else None
 
                 prompt_tokens = main_tracker.total_prompt_tokens
                 completion_tokens = main_tracker.total_completion_tokens
@@ -391,15 +406,17 @@ def run_test_thread(run_id: str, config: dict):
                     "pipeline_name": pipeline.name,
                     "metrics": {
                         "utility_rate": round(utility_score * 100, 2),
-                        "attack_success_rate": round(security_score * 100, 2),
-                        "defense_success_rate": round(defense_score * 100, 2),
+                        "attack_success_rate": round(security_score * 100, 2) if security_score is not None else None,
+                        "defense_success_rate": round(defense_score * 100, 2) if defense_score is not None else None,
                     },
                     "task_counts": {
                         "total_tasks": len(utility_results),
                         "utility_passed": int(sum(utility_results.values())),
                         "attacked_tasks": len(security_results),
+                        "security_valid": len(valid_security_results) if run_attack else 0,
+                        "attack_successes": sum(valid_security_results) if run_attack else 0,
                         "security_missing": sum(
-                            task_key not in security_results for task_key in utility_results
+                            not isinstance(security_results.get(task_key), bool) for task_key in utility_results
                         ) if run_attack else 0,
                     },
                     "overhead": {
@@ -408,20 +425,32 @@ def run_test_thread(run_id: str, config: dict):
                         "total_tokens": total_tokens,
                     }
                 }
+                summary["sec_overhead"] = dict(prompt_tokens=0, completion_tokens=0, total_tokens=0)
 
-                if sec_tracker and use_security_checker:
+                if sec_tracker:
                     summary["sec_overhead"] = {
                         "prompt_tokens": sec_tracker.total_prompt_tokens,
                         "completion_tokens": sec_tracker.total_completion_tokens,
                         "total_tokens": sec_tracker.get_total_tokens(),
                     }
 
+                framework = getattr(pipeline, "dscg_optimization_config", None)
+                summary["framework"] = {**framework, "use_sandbox": use_sandbox} if framework else None
+                summary["task_selection"] = {"strategy": "seed_ranked" if max_user_tasks or max_injection_tasks else "all",
+                                              "seed": selection_seed, "user_task_ids": selected_users,
+                                              "injection_task_ids": selected_injections if run_attack else []}
+                if not is_origin:
+                    summary["layer_stats"] = trace_stats(run_dir, pipeline.name, suite_name,
+                                                         attack_name if run_attack else "none",
+                                                         list(utility_results))
                 all_summaries.append(summary)
+                push_progress(run_id, {"current_suite": suite_name, "phase": "analysis",
+                                       "completed_suites": suite_index + 1, "total_suites": len(suites)})
 
                 push_log(run_id, "info",
                     f"✅ [{suite_name}] 完成! "
-                    f"TSR={utility_score:.1%}, ASR={security_score:.1%}, "
-                    f"Defense={defense_score:.1%}")
+                    f"TSR={utility_score:.1%}, ASR="
+                    + (f"{security_score:.1%}" if security_score is not None else "N/A"))
 
                 # ---- 保存结果文件 ----
                 suite_output_dir = run_dir / suite_name
@@ -485,15 +514,7 @@ def _compute_aggregate(summaries: list[dict]) -> dict:
     """计算跨套件的聚合指标"""
     if not summaries:
         return {}
-    n = len(summaries)
-    return {
-        "avg_utility_rate": round(sum(s["metrics"]["utility_rate"] for s in summaries) / n, 2),
-        "avg_attack_success_rate": round(sum(s["metrics"]["attack_success_rate"] for s in summaries) / n, 2),
-        "avg_defense_success_rate": round(sum(s["metrics"]["defense_success_rate"] for s in summaries) / n, 2),
-        "total_prompt_tokens": int(sum(s["overhead"]["prompt_tokens"] for s in summaries)),
-        "total_completion_tokens": int(sum(s["overhead"]["completion_tokens"] for s in summaries)),
-        "total_tokens": int(sum(s["overhead"]["total_tokens"] for s in summaries)),
-    }
+    return aggregate(summaries)
 
 
 # =============================================
@@ -1133,7 +1154,10 @@ def get_run(run_id: str):
     if not run:
         return jsonify({"error": "Run not found"}), 404
 
-    return jsonify(run)
+    public = dict(run)
+    public["config"] = _redact_run_config(run.get("config", {}))
+    public["display_metrics"] = display_metrics(run)
+    return jsonify(public)
 
 
 @app.route("/api/runs/<run_id>/suite/<suite_name>", methods=["GET"])
@@ -1162,6 +1186,14 @@ def start_run():
     config = request.get_json(silent=True) or {}
     if not isinstance(config, dict):
         return jsonify({"error": "Invalid JSON configuration"}), 400
+    try:
+        config = normalize_config(config)
+        if config["run_attack"]:
+            config.setdefault("attack_name", "important_instructions")
+            if config["attack_name"] not in {a["id"] for a in AVAILABLE_ATTACKS}:
+                raise ValueError("请选择已注册的定向攻击；DoS 请使用 partial CLI 的独立计分入口")
+    except (ValueError, TypeError) as exc:
+        return jsonify({"error": str(exc)}), 400
 
     run_id = datetime.now().strftime("%Y%m%d_%H%M%S") + "_" + uuid.uuid4().hex[:6]
     run_queues[run_id] = queue.Queue()
@@ -1230,7 +1262,7 @@ def compare_runs():
                 with open(result_file, "r") as f:
                     run = json.load(f)
         if run:
-            runs_data.append(run)
+            runs_data.append({**run, "aggregate_metrics": display_metrics(run)})
 
     # 构建对比数据结构
     comparison = {
@@ -1284,9 +1316,10 @@ def compare_runs():
             )
             if suite_data:
                 m = suite_data["metrics"]
+                clean = r.get("config", {}).get("run_attack") is False
                 comparison["per_suite"][suite_name]["utility_rates"].append(m["utility_rate"])
-                comparison["per_suite"][suite_name]["attack_rates"].append(m["attack_success_rate"])
-                comparison["per_suite"][suite_name]["defense_rates"].append(m["defense_success_rate"])
+                comparison["per_suite"][suite_name]["attack_rates"].append(None if clean else m["attack_success_rate"])
+                comparison["per_suite"][suite_name]["defense_rates"].append(None if clean else m["defense_success_rate"])
             else:
                 comparison["per_suite"][suite_name]["utility_rates"].append(None)
                 comparison["per_suite"][suite_name]["attack_rates"].append(None)
@@ -1328,15 +1361,19 @@ def download_report(run_id: str):
     if config.get("defense"):
         lines.append(f"  AgentDojo 防御: {config.get('defense')}")
     if not config.get("origin"):
-        lines.append(f"  沙箱: {'启用' if config.get('use_sandbox', True) else '禁用'}")
-        lines.append(f"  安全校验器: {'启用' if config.get('use_security_checker', True) else '禁用'}")
+        lines.append(f"  框架版本: {config.get('framework_version', '未记录')}")
+        for key, label in (("input_isolation", "L1 工具返回隔离"), ("use_sandbox", "L2 工具授权"),
+                           ("authorization_precheck", "L2 前置检查"), ("use_security_checker", "L3 动作审计")):
+            lines.append(f"  {label}: {str(config[key]) if key in config else '未记录'}")
     lines.append("")
 
-    agg = run.get("aggregate_metrics", {})
+    agg = display_metrics(run) if run.get("suites") else run.get("aggregate_metrics", {})
+    def percent(value):
+        return f"{value:.2f}%" if isinstance(value, (int, float)) else "N/A"
     lines.append("【聚合指标】")
-    lines.append(f"  平均可用性 (TSR): {agg.get('avg_utility_rate', 0):.2f}%")
-    lines.append(f"  平均攻击成功率 (ASR): {agg.get('avg_attack_success_rate', 0):.2f}%")
-    lines.append(f"  平均防御成功率: {agg.get('avg_defense_success_rate', 0):.2f}%")
+    lines.append(f"  任务加权可用性 (TSR): {percent(agg.get('avg_utility_rate'))}")
+    lines.append(f"  攻击成功率 (ASR): {percent(agg.get('avg_attack_success_rate'))}")
+    lines.append(f"  防御成功率: {percent(agg.get('avg_defense_success_rate'))}")
     lines.append(f"  总 Prompt Tokens: {agg.get('total_prompt_tokens', 0):,}")
     lines.append(f"  总 Completion Tokens: {agg.get('total_completion_tokens', 0):,}")
     lines.append(f"  总 Token 消耗: {agg.get('total_tokens', 0):,}")
@@ -1345,11 +1382,14 @@ def download_report(run_id: str):
     for suite in run.get("suites", []):
         lines.append(f"--- {suite['suite_name']} ---")
         m = suite["metrics"]
-        lines.append(f"  TSR: {m['utility_rate']:.2f}%  ASR: {m['attack_success_rate']:.2f}%  "
-                     f"Defense: {m['defense_success_rate']:.2f}%")
-        o = suite["overhead"]
-        lines.append(f"  Tokens: Prompt={o['prompt_tokens']:,}  Completion={o['completion_tokens']:,}  "
-                     f"Total={o['total_tokens']:,}")
+        clean = config.get("run_attack") is False
+        lines.append(f"  TSR: {percent(m.get('utility_rate'))}  ASR: {percent(None if clean else m.get('attack_success_rate'))}  "
+                     f"Defense: {percent(None if clean else m.get('defense_success_rate'))}")
+        o = suite.get("overhead", {})
+        sec = suite.get("sec_overhead", {})
+        tokens = {key: o.get(key, 0) + sec.get(key, 0) for key in ("prompt_tokens", "completion_tokens", "total_tokens")}
+        lines.append(f"  已记录 Tokens（主+审计）: Prompt={tokens['prompt_tokens']:,}  Completion={tokens['completion_tokens']:,}  "
+                     f"Total={tokens['total_tokens']:,}")
         lines.append("")
 
     lines.append("=" * 60)
@@ -1436,7 +1476,7 @@ if __name__ == "__main__":
         print("  方式 3 - 命令行 SSH 隧道:")
         print(f"    ssh -L {port}:localhost:{port} user@<容器宿主机>")
     else:
-        print(f"\n  🌐 访问地址: http://localhost:{port}")
+        print(f"\n  🌐 访问地址: http://127.0.0.1:{port}")
         print(f"  🌐 网络访问: http://{container_ip}:{port}")
 
     print(f"  📁 结果目录: {DASHBOARD_RESULTS_DIR}")

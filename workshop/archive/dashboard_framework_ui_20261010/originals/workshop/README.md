@@ -1,0 +1,39 @@
+# Workshop 优化状态索引
+
+当前运行框架为 **three-layer-v1**。目录按工程落实状态管理：基础方案已实施的文件归入 completed；仍需实现的新机制留在顶层。完成工程不等于实验目标或研究闸门全部通过。
+
+## 已完成与归档
+
+| 方案 / 阶段 | 已完成 | 尚未完成或未采用 |
+| --- | --- | --- |
+| [三层基础方案](./completed/3_layer_opt.md) · [实施报告](./completed/three_layer_implementation_20261010.md) | L1来源视图、L2整批前置、原L3与平台架构同步 | 匹配四臂消融、总成本目标、引用保真和独立终态验证；CSA/DRV不在已实施范围 |
+| [Partial报告优化](./completed/partial_reporting_20261010.md) | Markdown运行摘要、逐场景指标与有界失败片段 | 不改变原生评分，不提供新的安全oracle；尚未在平台增加独立失败片段浏览器 |
+| [V2与其他历史阶段](./completed/README.md) | 各阶段已完成项及证据已归档 | Stage2执行提示撤回；旧方案里的重审/恢复、LLM净化等不能当作当前默认能力 |
+| [本次文档与交接核查](./completed/framework_docs_cleanup_20261010.md) | README解释、方案归属和平台交付清单 | 真实实验结论仍由原始结果/独立核查决定 |
+
+## 待实施方案
+
+| 方案 | 已落实的关联基础 | 未实施内容 / 当前决定 |
+| --- | --- | --- |
+| [L3 Checker优化](./L3_checker_opt.md) | 三层基础、公开读取免审、确定性权限前置 | CSA本地模型、标签/训练/分组校准、off/shadow/selective、受信路由交接与内部读取学习免审均未实现 |
+| [授权对照校准](./original_framework_direction_20261008.md) | 原可信任务授权和当前动作审计 | 正/负对照、差分校准与触发调度未实现；当前暂停推进，不叠加到三层默认 |
+
+[21篇来源目录](./3_layer_sources_20261008.json)保留在顶层供待优化项引用。旧 [DRV方案](./archive/3_layer_low_cost_20261009/originals/workshop/3_layer_opt.md)及[更早三层方案](./archive/3_layer_redesign_20261008/originals/workshop/3_layer_opt.md)仅作历史参考。方案中的样本数、成本算例和验收目标属于设计，不能当成已经运行的结果。
+
+## 平台交接
+
+[docs/framework_updates.md](../docs/framework_updates.md)列出逐项核查：三层架构展示、现有L2/L3开关接线、历史分析下载与多指标分图已交付。独立L1网页开关、CSA模式和失败片段浏览器是未实施扩展，不列作此前交接的已完成功能。
+
+## 存放规则
+
+| 路径 | 内容 |
+| --- | --- |
+| `workshop/*.md` | 待实施机制方案；README为索引 |
+| [completed/](./completed/README.md) | 已完成工程/评估阶段的方案与报告，明确剩余项/撤回项 |
+| `artifacts/<YYYYMMDD>_<task>/` | 所有新agent测试产物，日志与诊断固定放在此处 |
+| `archive/` | 历史方案、原始字节及日期化迁移/修订清单 |
+| [results/](./results/framework_optimization/) | 已有历史证据与脚本，不新增运行输出 |
+
+正式论文路线/计划在兄弟 [research](../../research/technical_route.md)。测试源码在tests，用户正式结果/导出留在 [results/](../results/) 和 [download/](../download/)。Agent partial实验必须显式传新 `--results-dir workshop/artifacts/<YYYYMMDD>_<task>/partial_benchmark`。其余规则见 [AGENTS.md](../AGENTS.md)。
+
+`python workshop/verify_migration.py` 默认只读，不改旧证据。完整历史检查仍受研究侧既有兼容路径删除影响；本次当前文件、原字节和链接检查记录于本次阶段报告，不能把局部通过称为完整迁移通过。

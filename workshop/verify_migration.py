@@ -20,6 +20,7 @@ LOW_COST_REVISION_MANIFEST = WORKSHOP / "archive/3_layer_low_cost_20261009/revis
 L3_CHECKER_REVISION_MANIFEST = WORKSHOP / "archive/l3_checker_design_20261009/revision_manifest.json"
 IMPLEMENTATION_REVISION_MANIFEST = WORKSHOP / "archive/three_layer_impl_20261010/revision_manifest.json"
 DOCUMENTATION_REVISION_MANIFEST = WORKSHOP / "archive/framework_docs_cleanup_20261010/revision_manifest.json"
+L3_ALGORITHM_MANIFEST = WORKSHOP / "archive/l3_selective_impl_20261010/revision_manifest.json"
 
 
 def sha(path):
@@ -37,10 +38,32 @@ def local_links(path, text=None):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output", type=Path, help="Optional new JSON under workshop/artifacts/; default is read-only.")
+    parser.add_argument("--l3-current", action="store_true", help="Validate the explicit L3 algorithm revision only; does not certify historical migration.")
     args = parser.parse_args()
     output = args.output.resolve() if args.output else None
     if output and (not output.is_relative_to(WORKSHOP / "artifacts") or output.exists()):
         parser.error("--output must be a new file under workshop/artifacts/; historical reports cannot be overwritten")
+    if args.l3_current:
+        revision=json.loads(L3_ALGORITHM_MANIFEST.read_text())
+        assert revision["previous_documentation_manifest_sha256"] == sha(DOCUMENTATION_REVISION_MANIFEST)
+        for entry in revision["entries"]:
+            original=ROOT/entry["original_storage"]
+            assert original.resolve().is_relative_to(WORKSHOP/"archive") and sha(original)==entry["sha256_before"],entry["path"]
+            assert sha(ROOT/entry["path"])==entry["sha256_after"],entry["path"]
+        for name,digest in revision["created_files"].items():
+            assert sha(ROOT/name)==digest,name
+        links=0
+        for name in revision["current_documents"]:
+            for label,target,path in local_links(ROOT/name):
+                assert path.exists(),(name,target)
+                links+=1
+        result={"scope":"L3 current revision only; historical migration not certified", "entries":len(revision["entries"]),
+                "created_files":len(revision["created_files"]),"links":links,"manifest_sha256":sha(L3_ALGORITHM_MANIFEST)}
+        if output:
+            output.parent.mkdir(parents=True,exist_ok=True)
+            with output.open('x') as stream:stream.write(json.dumps(result,ensure_ascii=False,indent=2)+'\n')
+        print(json.dumps(result,ensure_ascii=False))
+        return
     manifest = json.loads((OUT / "migration_manifest.json").read_text())
     cleanup = json.loads(STRUCTURE_MANIFEST.read_text())
     reorganization = json.loads(REORGANIZATION_MANIFEST.read_text())

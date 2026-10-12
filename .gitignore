@@ -11,3 +11,4 @@ config/tools.local.toml
 /workshop/results/
 /workshop/artifacts/
 /docs/figures/benchmarks/
+/report/

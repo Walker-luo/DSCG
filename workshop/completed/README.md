@@ -5,7 +5,10 @@
 | 材料 | 已完成 / 当前保留 | 未完成、撤回或仅为设计 |
 | --- | --- | --- |
 | [三层基础方案](./3_layer_opt.md) · [实施报告](./three_layer_implementation_20261010.md) · [实施计划](./three_layer_implementation_plan_20261010.md) | L1来源视图、L2整批前置、原L3、平台架构；离线实施验收完成 | §5总成本目标与§7匹配模型消融尚未正式验收；CSA、DRV、LLM净化、自动恢复未启用 |
+| [L3纯算法实现](./l3_algorithm_implementation_20261010.md) · [计划](./l3_algorithm_implementation_plan_20261010.md) | 工具/模式/校准/凭据工程接入，默认off | 真实独立数据、部署阈值和模型匹配收益尚未验收 |
+| [框架与平台介绍](../../report/report.md) | 按用户要求放在 report/；10页主线与备份资料，供后续 LaTeX Beamer 制作 | 平台截图留白；实际幻灯片和真实收益实验待后续制作/验证 |
 | [本次文档与交接核查](./framework_docs_cleanup_20261010.md) | README流程/例子、归档状态和平台交付核对 | 文档核查不证明ASR/TSR改善 |
+| [实验配置与工作台](./dashboard_framework_ui_20261010.md) | 三层配置/预设、实际配置与路由统计、有效分母/成本口径、响应式验收 | 无新模型实验、CSA 或失败片段浏览器；旧 trace 缺失不重建 |
 | [Partial结果报告](./partial_reporting_20261010.md) | 运行级摘要、位置索引、有界失败片段 | 无新评分oracle；平台独立失败片段浏览器未实施 |
 | [V2后续报告](./framework_v2_followup_report.md) | Stage1宿主描述与准备读取判断保留；重放方法已纠正 | Stage2执行提示已评估并撤回，completion_prompt默认false；重复控制和真实E0仍待完成 |
 | [V2实施记录](./framework_v2_report.md) | 任务隔离、授权简化、有限工具上下文等保留 | 当时试验参数不等于当前默认；不认定动态扩权/完整scope已实现 |
@@ -14,7 +17,7 @@
 | [早期工程计划](./2026-10-05-workshop-engineering-optimization.md) · [报告](./workshop_optimization_report.md) | harness bookkeeping、紧凑trace与I3 fixtures | E0合成自检不等于真实闸门；旧八例I3 no_go被24valid/8scope的partial证据取代 |
 | [项目结构整理](./project_structure_20261008.md) | 文档分工、路径与产物规则 | 既有历史输入缺失不重建，完整迁移存在已记录限制 |
 
-仍待实现的 [L3 Checker](../L3_checker_opt.md) 与 [授权对照校准](../original_framework_direction_20261008.md) 留在 [顶层索引](../README.md)。正式E0/I3/I2状态以 [研究路线](../../../research/technical_route.md) 和 [I3报告](../../docs/i3_p0_stress_report.md) 为准。
+仍待真实数据与收益验收的 [L3 Checker](../L3_checker_opt.md) 与 [授权对照校准（历史归档）](../archive/framework_docs_cleanup_20261010/originals/workshop/original_framework_direction_20261008.md) 留在 [顶层索引](../README.md)。正式E0/I3/I2状态以 [研究路线](../../../research/technical_route.md) 和 [I3报告](../../docs/i3_p0_stress_report.md) 为准。
 
 旧稿件与CFP：[投稿草案](../archive/legacy_submission/ALMML_sub.md)、[原附件](<../archive/legacy_submission/AIMLL WS.pdf>)；旧docs/图表见 [归档索引](../archive/project_structure_20261008/README.md)。旧证据位于 [workshop/results/](../results/framework_optimization/)，所有新输出放 `workshop/artifacts/`。
 

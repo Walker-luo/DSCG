@@ -53,6 +53,18 @@ class DashboardConfigTests(unittest.TestCase):
         push_log(run_id, "error", "provider rejected main-secret")
         self.assertNotIn("main-secret", run_queues[run_id].get()["message"])
 
+    def test_invalid_layer_switch_does_not_create_a_run(self):
+        response = app.test_client().post("/api/run", json={"suites": ["workspace"], "input_isolation": "false"})
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(runs_store, {})
+
+    def test_layer_config_is_normalized_before_worker_and_public_storage(self):
+        with patch("dashboard.app.threading.Thread"):
+            response = app.test_client().post("/api/run", json={"suites": ["workspace"], "use_sandbox": False})
+        config = runs_store[response.get_json()["run_id"]]["config"]
+        self.assertFalse(config["authorization_precheck"])
+        self.assertTrue(config["input_isolation"])
+
 
 if __name__ == "__main__":
     unittest.main()

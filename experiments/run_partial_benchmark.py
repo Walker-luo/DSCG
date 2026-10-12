@@ -11,6 +11,7 @@ import json
 
 from dscg.model_config import ModelConfigurationError
 from dscg.paths import RESULTS_DIR
+from dscg.audit_router import summarize_events
 from dscg.pipelines.baseline import make_openai_compatible_pipeline
 from dscg.pipelines.defended import make_defended_pipeline
 from dscg.tool_metadata import ToolMetadataError, load_tool_metadata
@@ -99,6 +100,29 @@ def resolve_attack_names(selection: str | list[str] = "typical") -> list[str]:
     return list(dict.fromkeys(names))
 
 
+def _validate_router_controls(origin, use_security_checker, mode):
+    if mode not in {"off","shadow","selective"}:
+        raise ValueError("unknown audit-router mode")
+    if mode != "off" and (origin or not use_security_checker):
+        raise ValueError("audit routing requires the defended pipeline with checker")
+
+
+def _router_trace_summary(suite_dir, task_keys, attack_name, run_attack):
+    events=[];recorded=0
+    for key in task_keys:
+        injection=key[1] if len(key)>1 and run_attack else "none"
+        path=suite_dir/str(key[0])/attack_name/f"{injection}.json"
+        try:
+            if not path.resolve().is_relative_to(suite_dir.resolve()):continue
+            trace=json.loads(path.read_text())
+            value=trace.get("dscg_router_events")
+            if isinstance(value,list) and all(isinstance(e,dict) for e in value):
+                recorded+=1;events.extend(value)
+        except (OSError,ValueError,AttributeError):continue
+    return {**summarize_events(events),"expected_task_traces":len(task_keys),"recorded_task_traces":recorded,
+            "scope":"recorded scored traces only; missing routing traces are unknown"}
+
+
 def main(
     model_id: str | None = None,
     sec_model_id: str | None = None,
@@ -126,7 +150,10 @@ def main(
     task_manifest_path: str | Path | None = None,
     results_dir: str | Path | None = None,
     attack: str | list[str] = "typical",
+    audit_router_mode: str = "off",
+    audit_router_artifact: str | Path | None = None,
 ) -> int:
+    _validate_router_controls(origin,use_security_checker,audit_router_mode)
     validate_controls(origin=origin, use_security_checker=use_security_checker,
                       audit_retries=audit_retries, completion_prompt=completion_prompt)
     load_task_manifest(task_manifest_path)
@@ -152,6 +179,7 @@ def main(
                 report_context=context, use_security_checker=use_security_checker,
                 audit_retries=audit_retries, completion_prompt=completion_prompt,
                 task_manifest_path=task_manifest_path,
+                audit_router_mode=audit_router_mode,audit_router_artifact=audit_router_artifact,
             )
         except (ModelConfigurationError, ToolMetadataError):
             raise
@@ -228,6 +256,8 @@ def _run_single_attack(
     results_dir: str | Path | None = None,
     attack_name: str = "important_instructions",
     report_context: dict | None = None,
+    audit_router_mode: str = "off",
+    audit_router_artifact: str | Path | None = None,
 ):
     """
         model_id: 执行的llm的id
@@ -240,6 +270,7 @@ def _run_single_attack(
 
 
 
+    _validate_router_controls(origin,use_security_checker,audit_router_mode)
     validate_controls(origin=origin, use_security_checker=use_security_checker,
                       audit_retries=audit_retries, completion_prompt=completion_prompt)
     frozen_tasks = load_task_manifest(task_manifest_path)
@@ -287,6 +318,7 @@ def _run_single_attack(
                 tool_metadata=tool_metadata,
                 use_security_checker=use_security_checker,
                 audit_retries=audit_retries, completion_prompt=completion_prompt,
+                audit_router_mode=audit_router_mode,audit_router_artifact=audit_router_artifact,
             )
 
         main_model_config = getattr(pipeline, "dscg_model_config", {})
@@ -333,6 +365,9 @@ def _run_single_attack(
             "defense_version": None if origin else "three-layer-v1",
             "input_isolation": not origin,
             "authorization_precheck": not origin,
+            "audit_router_mode": audit_router_mode,
+            "audit_router_artifact_sha256": getattr(pipeline,"dscg_optimization_config",{}).get("audit_router_artifact_sha256"),
+            "audit_router_config_sha256": getattr(pipeline,"dscg_optimization_config",{}).get("audit_router_config_sha256"),
         }
         guard_run(output_dir / suite_name / "run_manifest.json", run_binding)
 
@@ -452,6 +487,8 @@ def _run_single_attack(
             "model_id": resolved_model_id,
             "defense": active_defense,
             "run_manifest": run_binding,
+            "audit_router": _router_trace_summary(suite_output_dir,utility_results,attack_name if run_attack else "none",run_attack)
+                            if audit_router_mode != "off" else None,
             "api_accounting": {"main": main_tracker.snapshot() if hasattr(main_tracker, "snapshot") else {},
                                "security": sec_tracker.snapshot() if sec_tracker and hasattr(sec_tracker, "snapshot") else {}},
             "attack_kind": "dos" if is_dos_attack else "targeted" if run_attack else "none",
@@ -645,6 +682,8 @@ def cli(argv: list[str] | None = None) -> int:
         help="结果根目录；缺省使用 results/partial_benchmark/。",
     )
     parser.add_argument("--no-checker", action="store_true", help="P0 消融：保留授权/monitor/ticket，关闭语义审计。")
+    parser.add_argument("--audit-router-mode",choices=("off","shadow","selective"),default="off",help="L3纯算法路由；默认off。")
+    parser.add_argument("--audit-router-artifact",help="冻结的独立分组校准JSON；缺失/无效时保留完整审计。")
     parser.add_argument("--audit-retries", type=int, choices=(0, 1), default=0, help="语义 abstain 有界重审次数；默认 0。")
     parser.add_argument("--completion-prompt", action="store_true", help="启用通用任务完成提示；默认关闭。")
     parser.add_argument("--clean", action="store_true", help="用相同用户任务运行无攻击效用控制。")
@@ -654,6 +693,7 @@ def cli(argv: list[str] | None = None) -> int:
     try:
         validate_controls(origin=args.baseline, use_security_checker=not args.no_checker,
                           audit_retries=args.audit_retries, completion_prompt=args.completion_prompt)
+        _validate_router_controls(args.baseline,not args.no_checker,args.audit_router_mode)
         if args.write_task_manifest:
             path = Path(args.write_task_manifest)
             if path.exists(): parser.error("task manifest already exists; preserve old evidence")
@@ -688,6 +728,7 @@ def cli(argv: list[str] | None = None) -> int:
             attack=selected_attacks,
             use_security_checker=not args.no_checker, audit_retries=args.audit_retries,
             completion_prompt=args.completion_prompt, task_manifest_path=args.task_manifest_path,
+            audit_router_mode=args.audit_router_mode,audit_router_artifact=args.audit_router_artifact,
         )
     except (ModelConfigurationError, ToolMetadataError, ValueError) as exc:
         print(f"模型配置错误: {exc}")

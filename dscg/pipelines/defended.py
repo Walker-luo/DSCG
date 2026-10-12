@@ -28,7 +28,10 @@ from agentdojo.benchmark import TaskResults
 
 #! 统计token消耗
 from dscg.token_tracking import TokenTrackerClient
-from dscg.input_isolation import FRAMEWORK_VERSION, build_isolated_view
+from dscg.input_isolation import FRAMEWORK_VERSION, ISOLATION_RULE, build_isolated_view
+from dscg.audit_router import (LocalAuditRouter, RouterReceiptVerifier, argument_flags,
+                               normalized as router_normalized, digest as router_digest,
+                               catalog_snapshot as router_catalog_snapshot)
 from dscg.model_config import (
     ModelConfig,
     create_openai_client,
@@ -667,7 +670,7 @@ def _sync_trace_context(extra_args: dict) -> None:
         "dscg_audit_summary": _audit_summary(audits),
         "dscg_action_summary": _action_summary(actions),
     }
-    for key in ("dscg_input_isolation", "dscg_layer_routing", "dscg_framework"):
+    for key in ("dscg_input_isolation", "dscg_layer_routing", "dscg_framework", "dscg_router_events"):
         if key in extra_args:
             context[key] = deepcopy(extra_args[key])
     if level == "standard":
@@ -1372,6 +1375,34 @@ def _routing_count(extra_args, key):
     counts[key] = counts.get(key, 0) + 1
 
 
+def _host_router_binding(query, runtime, calls, sandbox, router, messages, extra_args):
+    if sandbox is None or router is None:
+        return None
+    state = ToolAuthorizationPrecheck(sandbox).check(calls, runtime)
+    catalog, _ = router_catalog_snapshot(runtime)
+    return {"task_sha256": _hash_json(query), "batch_fingerprint": _batch_fingerprint(calls),
+            "authorization_state_sha256": state.state_sha256, "catalog_sha256": catalog,
+            "context_sha256": _hash_json(messages), "mode": router.mode,
+            "action_history_sha256": _hash_json(extra_args.get("dscg_action_ledger",[])),
+            "source_ids_sha256": _hash_json(extra_args.get("dscg_source_ids",{})),
+            "artifact_sha256": router.artifact_sha256,
+            "artifact_content_sha256": router_digest(router.artifact),
+            "model_config_sha256": router.model_config_sha256}
+
+
+def _publish_router_event(extra_args, event):
+    extra_args.setdefault("dscg_router_events", []).append(deepcopy(event))
+    _routing_count(extra_args, "router_candidate_batches")
+    if event.get("eligible"):
+        _routing_count(extra_args, "router_eligible_batches")
+    if event.get("would_bypass"):
+        _routing_count(extra_args, "router_would_bypass_batches")
+    if event.get("actual_bypass"):
+        _routing_count(extra_args, "selective_read_bypass_batches")
+    _append_full_trace(extra_args, "audit_router", event)
+    _sync_trace_context(extra_args)
+
+
 class ToolAuthorizationPrecheck(agent_pipeline.BasePipelineElement):
     """Tool-level, atomic permission gate before paying for semantic audit."""
 
@@ -1442,10 +1473,14 @@ class ReferenceMonitor(agent_pipeline.BasePipelineElement):
     """The sole issuer of one-shot execution tickets in the defended pipeline."""
 
     def __init__(self, sandbox: PermissionSandbox | None, require_audit: bool,
-                 precheck: ToolAuthorizationPrecheck | None = None):
+                 precheck: ToolAuthorizationPrecheck | None = None,
+                 audit_router=None, router_verifier=None):
         self.sandbox = sandbox
         self.require_audit = require_audit
         self.precheck = precheck
+        self.audit_router = audit_router
+        self.router_verifier = router_verifier
+        self._router_handoff_required = audit_router is not None and audit_router.mode != "off"
         self._secret = secrets.token_bytes(32)
         self._issued: dict[str, ExecutionTicket] = {}
         self._ticket_lock = Lock()
@@ -1520,6 +1555,19 @@ class ReferenceMonitor(agent_pipeline.BasePipelineElement):
         )
         audit = extra_args.pop("_dscg_audit_decision", None)
         audit_valid = _is_valid_audit_record(audit, fingerprint)
+        router_token = extra_args.pop("_dscg_router_receipt", None)
+        if self._router_handoff_required or (isinstance(audit, dict) and (audit.get("reason_code") == "SELECTIVE_READ_BYPASS"
+                                      or audit.get("route_source") == "local_calibrated_algorithm"
+                                      or router_token is not None)):
+            try:
+                binding = _host_router_binding(query, runtime, tool_calls, self.sandbox, self.audit_router, messages, extra_args)
+                audit_valid = bool(audit_valid and self.require_audit and self.audit_router is not None
+                                   and self.audit_router.mode != "off" and self.router_verifier is not None
+                                   and self.router_verifier.consume(router_token, binding, audit))
+            except Exception:
+                audit_valid = False
+        if self.router_verifier is not None:
+            self.router_verifier.discard(router_token)
         metadata = metadata_for_runtime(runtime)
         precheck_result = self.precheck.resolve(tool_calls, runtime, extra_args) if self.precheck else None
         extra_args.pop("_dscg_precheck_result", None)
@@ -1641,6 +1689,12 @@ class ReferenceMonitor(agent_pipeline.BasePipelineElement):
                 "blocked_actions": len(pending_actions) - approved_count,
             }
             _publish_final_audit_record(extra_args, invalid_record)
+        events = extra_args.get("dscg_router_events", [])
+        if events and events[-1].get("candidate_fingerprint") == fingerprint:
+            events[-1].update(final_monitor_decision="allow" if approved_count == len(pending_actions) else "deny",
+                              final_monitor_reason=(pending_actions[0].reason_code if len(pending_actions)==1 else
+                                                    "POLICY_ALLOW" if approved_count==len(pending_actions) else "BATCH_DENY"))
+            _sync_trace_context(extra_args)
         print(
             f"[DSCG MEDIATION] batch={batch_id} proposed={len(pending_actions)} "
             f"approved={approved_count} blocked={len(pending_actions) - approved_count}"
@@ -1862,6 +1916,8 @@ class ActionSecurityChecker(agent_pipeline.BasePipelineElement):
         timeout_seconds: float = AUDIT_TIMEOUT_SECONDS,
         max_semantic_retries: int = 0,
         precheck: ToolAuthorizationPrecheck | None = None,
+        audit_router=None,
+        router_verifier=None,
     ):
         self.small_llm = small_llm
         self.intention = user_intention
@@ -1872,6 +1928,35 @@ class ActionSecurityChecker(agent_pipeline.BasePipelineElement):
             raise ValueError("semantic audit retries must be 0 or 1")
         self.max_semantic_retries = max_semantic_retries
         self.precheck = precheck
+        self.audit_router = audit_router
+        self.router_verifier = router_verifier
+
+    def _handoff_record(self,query,runtime,calls,messages,extra_args,record):
+        # Active routing authenticates every checker outcome, so a public
+        # selective record cannot be relabeled as an ordinary allow.
+        if self.audit_router is not None and self.audit_router.mode != "off" and self.router_verifier is not None:
+            self.router_verifier.discard(extra_args.pop("_dscg_router_receipt",None))
+            try:
+                binding=_host_router_binding(query,runtime,calls,self.sandbox,self.audit_router,messages,extra_args)
+                extra_args["_dscg_router_receipt"]=self.router_verifier.issue(binding,record)
+            except Exception:
+                pass  # Monitor fails closed if the host handoff is unavailable.
+        _publish_audit_record(extra_args,record)
+        extra_args["_dscg_audit_decision"]=record
+
+    def _router_flags(self, query, runtime, calls, packet):
+        flags = {"request_truncated": len(router_normalized(query)) > AUDIT_MAX_REQUEST_LENGTH,
+                 "description_truncated": any(len(router_normalized(getattr(runtime.functions.get(_tool_call_name(c)),"description","")))>AUDIT_MAX_TOOL_DESCRIPTION_LENGTH for c in calls),
+                 "history_truncated": packet["history_truncated"],
+                 "tool_results_window_truncated": packet["tool_results_window_truncated"],
+                 "content_truncated": any(r["content_truncated"] for r in packet["recent_tool_results"]),
+                 "tool_result_error": any(r["error"] for r in packet["recent_tool_results"]),
+                 "arguments_truncated": False, "arguments_nonfinite_or_unsupported": False}
+        for c in calls:
+            raw = getattr(c,"args",None) if not isinstance(c,dict) else c.get("args")
+            if not isinstance(raw,dict): flags["arguments_nonfinite_or_unsupported"]=True
+            for k,v in argument_flags(raw).items(): flags[k] |= v
+        return flags
 
     def _recent_tool_results(self, messages):
         """A small untrusted fact window, scoped to the last actual user turn.
@@ -2052,6 +2137,9 @@ class ActionSecurityChecker(agent_pipeline.BasePipelineElement):
 
     def query(self, query, runtime, env, messages, extra_args):
         extra_args.pop("_dscg_audit_decision", None)
+        old_token = extra_args.pop("_dscg_router_receipt", None)
+        if self.router_verifier is not None:
+            self.router_verifier.discard(old_token)
         if not messages:
             return query, runtime, env, messages, extra_args
 
@@ -2080,8 +2168,12 @@ class ActionSecurityChecker(agent_pipeline.BasePipelineElement):
                 record = decision.public_dict()
                 record["semantic_attempt"] = 0
                 record["route_source"] = "authorization_precheck"
-                _publish_audit_record(extra_args, record)
-                extra_args["_dscg_audit_decision"] = record
+                self._handoff_record(query,runtime,tool_calls,messages,extra_args,record)
+                if self.audit_router is not None and self.audit_router.mode != "off":
+                    _publish_router_event(extra_args, {"mode": self.audit_router.mode, "candidate_fingerprint": batch_fingerprint,
+                                          "route_reason": "L2_PRECHECK_DENY", "eligible": False, "would_bypass": False,
+                                          "actual_bypass": False, "score": None, "semantic_audit_calls": 0, "semantic_audit_tokens": 0,
+                                          "raw_audit_decision": "deny", "original_public_bypass": False})
                 return query, runtime, env, messages, extra_args
         packet = self._audit_packet(query, runtime, tool_calls, extra_args, messages=messages)
         _append_full_trace(extra_args, "audit_input", packet)
@@ -2111,10 +2203,50 @@ class ActionSecurityChecker(agent_pipeline.BasePipelineElement):
             )
             record = decision.public_dict()
             record["semantic_attempt"] = 0
-            _publish_audit_record(extra_args, record)
-            extra_args["_dscg_audit_decision"] = record
+            self._handoff_record(query,runtime,tool_calls,messages,extra_args,record)
+            if self.audit_router is not None and self.audit_router.mode != "off":
+                _publish_router_event(extra_args, {"mode": self.audit_router.mode, "candidate_fingerprint": batch_fingerprint,
+                                      "route_reason": "READ_AUDIT_BYPASS", "eligible": False, "would_bypass": False,
+                                      "actual_bypass": False, "score": None, "semantic_audit_calls": 0, "semantic_audit_tokens": 0,
+                                      "raw_audit_decision": None, "original_public_bypass": True})
             return query, runtime, env, messages, extra_args
 
+        router_event = None
+        if self.audit_router is not None and self.audit_router.mode != "off":
+            router_event = self.audit_router.assess(packet, self._router_flags(query,runtime,tool_calls,packet),
+                                                   runtime,tool_calls,self.sandbox)
+            router_event.update(candidate_fingerprint=batch_fingerprint, trusted_task_sha256=_hash_json(query),
+                                audit_input_sha256=input_hash,router_input_sha256=router_digest(packet),original_public_bypass=False)
+            try:
+                catalog, tools = router_catalog_snapshot(runtime)
+                router_event.update(catalog_sha256=catalog,model_config_sha256=self.audit_router.model_config_sha256,
+                                    tool_schema_hash=tools.get(_tool_call_name(tool_calls[0])) if len(tool_calls)==1 else None,
+                                    contract_version=self.sandbox.contract.contract_version if self.sandbox and self.sandbox.contract else None,
+                                    schema_valid=router_event["eligible"])
+            except Exception:
+                router_event.update(would_bypass=False,route_reason="SNAPSHOT_ERROR")
+            if router_event["would_bypass"] and self.audit_router.mode == "selective" and self.router_verifier is not None:
+                try:
+                    binding = _host_router_binding(query,runtime,tool_calls,self.sandbox,self.audit_router,messages,extra_args)
+                    decision = AuditDecision(batch_fingerprint=batch_fingerprint,decision="allow",violations=(),confidence=0.0,
+                                             reason_code="SELECTIVE_READ_BYPASS",audit_input_sha256=input_hash,
+                                             raw_response_sha256=_hash_json(router_event),
+                                             model_version="local-router:"+self.audit_router.artifact_sha256[:16],
+                                             latency_ms=round(router_event["router_total_latency_ms"],2),parser_status="deterministic_bypass")
+                    record = decision.public_dict();record.update(semantic_attempt=0,route_source="local_calibrated_algorithm")
+                    token = self.router_verifier.issue(binding,record)
+                    if binding != _host_router_binding(query,runtime,tool_calls,self.sandbox,self.audit_router,messages,extra_args):
+                        self.router_verifier.discard(token)
+                        raise ValueError("router snapshot changed")
+                    router_event.update(actual_bypass=True,raw_audit_decision=None)
+                    _publish_audit_record(extra_args,record);extra_args["_dscg_audit_decision"]=record
+                    extra_args["_dscg_router_receipt"]=token
+                    _publish_router_event(extra_args,router_event)
+                    return query,runtime,env,messages,extra_args
+                except Exception as exc:
+                    router_event.update(would_bypass=False,route_reason="RECEIPT_ERROR",error_type=type(exc).__name__)
+        audit_tracker = getattr(self.small_llm,"client",None)
+        cost_before = audit_tracker.snapshot() if isinstance(audit_tracker,TokenTrackerClient) else None
         for attempt in range(self.max_semantic_retries + 1):
             _routing_count(extra_args, "semantic_audit_calls")
             started = time.perf_counter()
@@ -2153,10 +2285,7 @@ class ActionSecurityChecker(agent_pipeline.BasePipelineElement):
                 )
             record = decision.public_dict()
             record["semantic_attempt"] = attempt + 1
-            _publish_audit_record(extra_args, record)
-            # Internal key is consumed by ReferenceMonitor; the public redacted
-            # copy remains available to tracegers and offline callers.
-            extra_args["_dscg_audit_decision"] = record
+            self._handoff_record(query,runtime,tool_calls,messages,extra_args,record)
             if (attempt >= self.max_semantic_retries
                     or decision.decision != "abstain"
                     or decision.parser_status != "ok"
@@ -2171,6 +2300,15 @@ class ActionSecurityChecker(agent_pipeline.BasePipelineElement):
             )}
             _append_full_trace(extra_args, "audit_retry_input", packet)
             input_hash = _hash_json(packet)
+        if router_event is not None:
+            tokens = None
+            if cost_before is not None:
+                after = audit_tracker.snapshot()
+                missing = sum(r.get("missing_usage_calls",0) for r in after.values())-sum(r.get("missing_usage_calls",0) for r in cost_before.values())
+                failed = sum(r.get("failed_calls",0) for r in after.values())-sum(r.get("failed_calls",0) for r in cost_before.values())
+                tokens = (sum(r.get("total_tokens",0) for r in after.values())-sum(r.get("total_tokens",0) for r in cost_before.values())) if missing==0 and failed==0 else None
+            router_event.update(semantic_audit_calls=attempt+1,semantic_audit_tokens=tokens,raw_audit_decision=decision.decision)
+            _publish_router_event(extra_args,router_event)
         return query, runtime, env, messages, extra_args
 
 
@@ -2194,6 +2332,8 @@ def make_qwen_newFrame_pipeline(
     completion_prompt: bool = False,
     input_isolation: bool = True,
     authorization_precheck: bool = True,
+    audit_router_mode: str = "off",
+    audit_router_artifact: str | Path | None = None,
     *,
     api_key: str | None = None,
     base_url: str | None = None,
@@ -2218,6 +2358,10 @@ def make_qwen_newFrame_pipeline(
     :param trace_level: 任务 JSON 中 DSCG 记录级别：summary、standard 或 full
     :param tool_metadata: 可选的工具名到显式风险元数据的映射
     """
+    if audit_router_mode not in {"off", "shadow", "selective"}:
+        raise ValueError("audit_router_mode must be off/shadow/selective")
+    if audit_router_mode != "off" and (not use_sandbox or not use_security_checker):
+        raise ValueError("audit routing requires both sandbox and checker")
     trace_level = _normalise_trace_level(trace_level)
     input_isolation = bool(input_isolation and (use_sandbox or use_security_checker))
     authorization_precheck = bool(authorization_precheck and use_sandbox)
@@ -2263,6 +2407,9 @@ def make_qwen_newFrame_pipeline(
     precheck = ToolAuthorizationPrecheck(my_sandbox) if authorization_precheck else None
 
     security_checker = None
+    audit_router = None
+    router_verifier = RouterReceiptVerifier() if audit_router_mode != "off" else None
+    router_config_hash = None
     if use_security_checker:
         # Omitting sec_model_id intentionally reuses the primary model config.
         # Supplying a different ID resolves its provider independently.
@@ -2286,16 +2433,35 @@ def make_qwen_newFrame_pipeline(
             reasoning_effort=reasoning_effort_for_config(sec_config),
         )
         sec_llm.name = sec_config.model_id
+        router_config_hash = router_digest({"main": main_config.public_dict(), "audit": sec_config.public_dict(),
+                                           "temperature": 0.0,
+                                           "reasoning_effort": [reasoning_effort_for_config(main_config),reasoning_effort_for_config(sec_config)],
+                                           "main_system_prompt_sha256": _hash_json(load_system_message(None)),
+                                           "audit_policy_sha256": _hash_json(ActionSecurityChecker.SYSTEM_POLICY),
+                                           "authorization_policy_sha256": _hash_json(ToolAuthorizationCompiler.SYSTEM_POLICY),
+                                           "isolation_rule_sha256": _hash_json(ISOLATION_RULE),
+                                           "completion_rule_sha256": _hash_json(TASK_COMPLETION_PROMPT),
+                                           "framework_version": FRAMEWORK_VERSION,
+                                           "input_isolation": input_isolation,"authorization_precheck": authorization_precheck,
+                                           "audit_retries": audit_retries,"completion_prompt": completion_prompt,
+                                           "audit_timeout_seconds": AUDIT_TIMEOUT_SECONDS,
+                                           "input_bounds": [AUDIT_MAX_REQUEST_LENGTH,AUDIT_MAX_TOOL_DESCRIPTION_LENGTH,
+                                                            AUDIT_MAX_STRING_LENGTH,AUDIT_MAX_ARGUMENT_DEPTH,
+                                                            AUDIT_MAX_HISTORY_RECORDS,AUDIT_MAX_TOOL_RESULTS,AUDIT_MAX_TOOL_RESULT_LENGTH]})
+        if audit_router_mode != "off":
+            audit_router = LocalAuditRouter(audit_router_mode, audit_router_artifact, router_config_hash)
         security_checker = ActionSecurityChecker(
             small_llm=sec_llm,
             llm=llm,
             sandbox=my_sandbox,
             max_semantic_retries=audit_retries,
             precheck=precheck,
+            audit_router=audit_router, router_verifier=router_verifier,
         )
 
     # 3. Every candidate batch passes through the same monitor and ticketed executor.
-    reference_monitor = ReferenceMonitor(my_sandbox, require_audit=use_security_checker, precheck=precheck)
+    reference_monitor = ReferenceMonitor(my_sandbox, require_audit=use_security_checker, precheck=precheck,
+                                         audit_router=audit_router,router_verifier=router_verifier)
     ticketed_executor = TicketedToolsExecutor(reference_monitor)
     loop_components = []
     if precheck is not None:
@@ -2335,11 +2501,17 @@ def make_qwen_newFrame_pipeline(
     version_suffix = (f"-{FRAMEWORK_VERSION}-L1{int(input_isolation)}-L2{int(authorization_precheck)}"
                       if input_isolation or authorization_precheck else "")
     pipeline.name = f"{llm.name}-newFrame{ablation_suffix}{version_suffix}"
+    if audit_router_mode != "off":
+        pipeline.name += f"-CSA-{audit_router_mode}-{(audit_router.artifact_sha256 or 'uncalibrated')[:16]}-{router_config_hash[:16]}"
     pipeline.dscg_optimization_config = {
         "framework_version": FRAMEWORK_VERSION,
         "input_isolation": input_isolation, "authorization_precheck": authorization_precheck,
         "task_isolation": True, "audit_retries": audit_retries,
         "completion_prompt": completion_prompt, "use_security_checker": use_security_checker,
+        "audit_router_mode": audit_router_mode,
+        "audit_router_artifact_sha256": audit_router.artifact_sha256 if audit_router else None,
+        "audit_router_config_sha256": router_config_hash,
+        "audit_router_load_error": audit_router.error if audit_router else None,
     }
     new_executor.framework_config = pipeline.dscg_optimization_config
     pipeline.dscg_model_config = main_config.public_dict()
