@@ -4,6 +4,7 @@ import unittest
 from unittest.mock import Mock, patch
 from agentdojo.functions_runtime import FunctionsRuntime, FunctionCall
 from dscg.model_config import ModelConfig
+from dscg.input_isolation import FRAMEWORK_VERSION
 from dscg.pipelines.defended import make_defended_pipeline
 
 
@@ -77,7 +78,7 @@ class ThreeLayerPipelineTests(unittest.TestCase):
         for l1,l2 in ((True,True),(False,True),(True,False),(False,False)):
             pipeline,_=self.build(call,input_isolation=l1,authorization_precheck=l2)
             names.append(pipeline.name)
-            if l1 or l2:self.assertIn('three-layer-v1',pipeline.name)
+            self.assertIn(FRAMEWORK_VERSION, pipeline.name)
         self.assertEqual(len(set(names)),4)
         self.assertNotEqual(names[0],'offline-newFrame-OursFull')
 

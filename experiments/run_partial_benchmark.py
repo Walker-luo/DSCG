@@ -12,6 +12,7 @@ import json
 from dscg.model_config import ModelConfigurationError
 from dscg.paths import RESULTS_DIR
 from dscg.audit_router import summarize_events
+from dscg.input_isolation import FRAMEWORK_VERSION
 from dscg.pipelines.baseline import make_openai_compatible_pipeline
 from dscg.pipelines.defended import make_defended_pipeline
 from dscg.tool_metadata import ToolMetadataError, load_tool_metadata
@@ -152,6 +153,8 @@ def main(
     attack: str | list[str] = "typical",
     audit_router_mode: str = "off",
     audit_router_artifact: str | Path | None = None,
+    planning_tool_view: bool = True,
+    delegated_tasks: bool = True,
 ) -> int:
     _validate_router_controls(origin,use_security_checker,audit_router_mode)
     validate_controls(origin=origin, use_security_checker=use_security_checker,
@@ -180,6 +183,8 @@ def main(
                 audit_retries=audit_retries, completion_prompt=completion_prompt,
                 task_manifest_path=task_manifest_path,
                 audit_router_mode=audit_router_mode,audit_router_artifact=audit_router_artifact,
+                planning_tool_view=planning_tool_view and not origin,
+                delegated_tasks=delegated_tasks and not origin,
             )
         except (ModelConfigurationError, ToolMetadataError):
             raise
@@ -258,6 +263,8 @@ def _run_single_attack(
     report_context: dict | None = None,
     audit_router_mode: str = "off",
     audit_router_artifact: str | Path | None = None,
+    planning_tool_view: bool = True,
+    delegated_tasks: bool = True,
 ):
     """
         model_id: 执行的llm的id
@@ -319,6 +326,7 @@ def _run_single_attack(
                 use_security_checker=use_security_checker,
                 audit_retries=audit_retries, completion_prompt=completion_prompt,
                 audit_router_mode=audit_router_mode,audit_router_artifact=audit_router_artifact,
+                planning_tool_view=planning_tool_view, delegated_tasks=delegated_tasks,
             )
 
         main_model_config = getattr(pipeline, "dscg_model_config", {})
@@ -362,9 +370,11 @@ def _run_single_attack(
             "audit_retries": audit_retries, "completion_prompt": completion_prompt,
             "trace_level": None if origin else trace_level,
             "tool_metadata": tool_metadata, "source": source_revision(),
-            "defense_version": None if origin else "three-layer-v1",
+            "defense_version": None if origin else FRAMEWORK_VERSION,
             "input_isolation": not origin,
             "authorization_precheck": not origin,
+            'planning_tool_view': bool(planning_tool_view and not origin),
+            'delegated_tasks': bool(delegated_tasks and not origin),
             "audit_router_mode": audit_router_mode,
             "audit_router_artifact_sha256": getattr(pipeline,"dscg_optimization_config",{}).get("audit_router_artifact_sha256"),
             "audit_router_config_sha256": getattr(pipeline,"dscg_optimization_config",{}).get("audit_router_config_sha256"),
@@ -682,6 +692,8 @@ def cli(argv: list[str] | None = None) -> int:
         help="结果根目录；缺省使用 results/partial_benchmark/。",
     )
     parser.add_argument("--no-checker", action="store_true", help="P0 消融：保留授权/monitor/ticket，关闭语义审计。")
+    parser.add_argument('--no-tool-view', action='store_true', help='L2 对照：规划器展示完整工具目录，保留执行权限检查。')
+    parser.add_argument('--no-delegated-tasks', action='store_true', help='关闭显式任务文件展开，用于原任务编译对照。')
     parser.add_argument("--audit-router-mode",choices=("off","shadow","selective"),default="off",help="L3纯算法路由；默认off。")
     parser.add_argument("--audit-router-artifact",help="冻结的独立分组校准JSON；缺失/无效时保留完整审计。")
     parser.add_argument("--audit-retries", type=int, choices=(0, 1), default=0, help="语义 abstain 有界重审次数；默认 0。")
@@ -729,6 +741,8 @@ def cli(argv: list[str] | None = None) -> int:
             use_security_checker=not args.no_checker, audit_retries=args.audit_retries,
             completion_prompt=args.completion_prompt, task_manifest_path=args.task_manifest_path,
             audit_router_mode=args.audit_router_mode,audit_router_artifact=args.audit_router_artifact,
+            planning_tool_view=not args.no_tool_view and not args.baseline,
+            delegated_tasks=not args.no_delegated_tasks and not args.baseline,
         )
     except (ModelConfigurationError, ToolMetadataError, ValueError) as exc:
         print(f"模型配置错误: {exc}")

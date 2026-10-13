@@ -11,6 +11,9 @@ ROUTING_KEYS = ("candidate_batches", "precheck_allowed_batches", "precheck_rejec
                 "public_read_bypass_batches", "semantic_audit_calls")
 ISOLATION_KEYS = ("model_requests", "tool_results_rendered", "escaped_results_rendered",
                   "added_characters_total")
+L2_KEYS = ('planning_requests', 'catalog_tools_total', 'visible_tools_total',
+           'authorization_compilations', 'bootstrap_reads', 'delegated_tasks_expanded',
+           'catalog_change_denials', 'effective_task_added_characters_total')
 
 
 def normalize_config(payload):
@@ -21,7 +24,8 @@ def normalize_config(payload):
     config["suites"] = list(dict.fromkeys(suites))
     for key, default in (("origin", False), ("run_attack", True), ("use_sandbox", True),
                          ("use_security_checker", True), ("input_isolation", True),
-                         ("authorization_precheck", True)):
+                         ("authorization_precheck", True), ('planning_tool_view', True),
+                         ('delegated_tasks', True)):
         value = config.get(key, default)
         if not isinstance(value, bool):
             raise ValueError(f"{key} 必须为布尔值")
@@ -35,7 +39,7 @@ def normalize_config(payload):
     if config["trace_level"] not in ("summary", "standard", "full"):
         raise ValueError("请选择有效的日志级别")
     if config["origin"]:
-        for key in ("use_sandbox", "use_security_checker", "input_isolation", "authorization_precheck"):
+        for key in ("use_sandbox", "use_security_checker", "input_isolation", "authorization_precheck", 'planning_tool_view', 'delegated_tasks'):
             config[key] = False
         for key in ("sec_model_id", "sec_provider", "sec_api_key", "sec_base_url", "tool_metadata_path"):
             config[key] = None
@@ -44,6 +48,8 @@ def normalize_config(payload):
             config[key] = None
     config["input_isolation"] &= config["use_sandbox"] or config["use_security_checker"]
     config["authorization_precheck"] &= config["use_sandbox"]
+    config['planning_tool_view'] &= config['use_sandbox']
+    config['delegated_tasks'] &= config['use_sandbox']
     config["framework_version"] = None if config["origin"] else FRAMEWORK_VERSION
     return config
 
@@ -110,7 +116,8 @@ def trace_stats(root, pipeline_name, suite, attack, task_keys):
     root = Path(root).resolve()
     stats = {"expected_records": len(task_keys), "trace_records": 0, "routing_records": 0,
              "isolation_records": 0, "routing": dict.fromkeys(ROUTING_KEYS, 0),
-             "isolation": dict.fromkeys(ISOLATION_KEYS, 0)}
+             "isolation": dict.fromkeys(ISOLATION_KEYS, 0), 'l2_records': 0,
+             'l2': dict.fromkeys(L2_KEYS, 0)}
     for task_key in task_keys:
         injection = task_key[1] if len(task_key) > 1 else None
         path = root / pipeline_name.replace("/", "_") / suite / task_key[0] / attack / f"{injection or 'none'}.json"
@@ -123,7 +130,8 @@ def trace_stats(root, pipeline_name, suite, attack, task_keys):
             continue
         stats["trace_records"] += 1
         for source, target, coverage in (("dscg_layer_routing", "routing", "routing_records"),
-                                          ("dscg_input_isolation", "isolation", "isolation_records")):
+                                          ("dscg_input_isolation", "isolation", "isolation_records"),
+                                          ('dscg_l2', 'l2', 'l2_records')):
             recorded = trace.get(source)
             if not isinstance(recorded, dict):
                 continue

@@ -12,7 +12,7 @@ function dashboard(fetch = async () => ({ok: true, json: async () => []})) {
       setAttribute() {}, addEventListener() {}});
     return nodes.get(selector);
   };
-  for (const id of ['#use-input-isolation', '#use-sandbox', '#use-security-checker', '#authorization-precheck']) node(id).checked = true;
+  for (const id of ['#use-input-isolation', '#use-sandbox', '#use-security-checker', '#authorization-precheck', '#planning-tool-view', '#delegated-tasks']) node(id).checked = true;
   node('#pipeline-type').value = 'newframe';
   node('#run-attack').value = 'true';
   node('#trace-level').value = 'summary';
@@ -55,6 +55,29 @@ test('V2 control removes L1 and candidate precheck but keeps authorization and a
   assert.equal(config.authorization_precheck, false);
   assert.equal(config.use_sandbox, true);
   assert.equal(config.use_security_checker, true);
+  assert.equal(config.planning_tool_view, false);
+  assert.equal(config.delegated_tasks, false);
+});
+
+test('full preset uses authorized views and explicit delegation, while no L2 disables both', () => {
+  const ui = dashboard();
+  ui.run("applyDefensePreset('full')");
+  assert.equal(ui.run('getSelectedConfig()').planning_tool_view, true);
+  assert.equal(ui.run('getSelectedConfig()').delegated_tasks, true);
+  ui.run("applyDefensePreset('no-l2')");
+  assert.equal(ui.run('getSelectedConfig()').planning_tool_view, false);
+  assert.equal(ui.run('getSelectedConfig()').delegated_tasks, false);
+});
+
+test('report shows saved effective L2 controls independently from the current draft', async () => {
+  const ui = dashboard(async () => ({ok: true, json: async () => ({suites: ['workspace'],
+    config: {origin: false, use_sandbox: true, use_security_checker: true,
+    planning_tool_view: false, delegated_tasks: false}, suites: []})}));
+  ui.node('#report-data-source').value = 'fixture';
+  await ui.run('loadReport()');
+  assert.equal(ui.run('getSelectedConfig()').planning_tool_view, true);
+  assert.match(ui.node('#report-content').innerHTML, /L2 授权工具视图<\/td><td>关闭/);
+  assert.match(ui.node('#report-content').innerHTML, /显式任务文件展开<\/td><td>关闭/);
 });
 
 test('failed submission shows the server error and restores run state', async () => {

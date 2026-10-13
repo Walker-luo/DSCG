@@ -47,12 +47,14 @@
         </section>
 
         <section class="config-section" aria-labelledby="config-defense">
-          <h2 id="config-defense">防御组合 <span class="framework-version">three-layer-v1</span></h2>
+          <h2 id="config-defense">防御组合 <span class="framework-version">three-layer-l2-v2</span></h2>
           <div id="ablation-group" class="toggle-list">
-            <div class="field-group"><label class="form-label" for="defense-preset">配置预设</label><select id="defense-preset" class="form-select form-select-sm"><option value="full">完整三层</option><option value="no-l1">移除 L1 · 工具返回隔离</option><option value="no-l2">移除 L2 · 工具授权</option><option value="no-l3">移除 L3 · 动作审计</option><option value="v2">V2 对照 · 关闭 L1 与前置检查</option><option value="custom">自定义组合</option></select></div>
+            <div class="field-group"><label class="form-label" for="defense-preset">配置预设</label><select id="defense-preset" class="form-select form-select-sm"><option value="full">完整三层</option><option value="no-l1">移除 L1 · 工具返回隔离</option><option value="no-l2">移除 L2 · 工具授权</option><option value="no-l3">移除 L3 · 动作审计</option><option value="v2">V2 风格对照 · 关闭新增入口</option><option value="custom">自定义组合</option></select></div>
             <label class="toggle-row layer-one" for="use-input-isolation"><span><i class="bi bi-braces"></i><strong>L1 · 工具返回隔离</strong><small>宿主来源封装，无独立模型调用</small></span><input class="form-check-input" type="checkbox" id="use-input-isolation" checked></label>
             <label class="toggle-row layer-two" for="use-sandbox"><span><i class="bi bi-key"></i><strong>L2 · 可信任务工具授权</strong><small>按任务编译可用工具，默认整批前置检查</small></span><input class="form-check-input" type="checkbox" id="use-sandbox" checked></label>
             <label class="precheck-option" for="authorization-precheck"><input class="form-check-input" type="checkbox" id="authorization-precheck" checked><span>候选批次在 L3 前校验权限</span></label>
+            <label class="precheck-option" for="planning-tool-view"><input class="form-check-input" type="checkbox" id="planning-tool-view" checked><span>规划器仅展示已授权工具</span></label>
+            <label class="precheck-option" for="delegated-tasks"><input class="form-check-input" type="checkbox" id="delegated-tasks" checked><span>展开明确授权的任务文件</span></label>
             <label class="toggle-row layer-three" for="use-security-checker"><span><i class="bi bi-shield-check"></i><strong>L3 · 当前动作语义审计</strong><small>审计需要检查的候选，公开无外发读取免审</small></span><input class="form-check-input" type="checkbox" id="use-security-checker" checked></label>
             <p class="config-note" id="layer-config-note">执行仍由 Monitor 与一次性票据控制。默认不重审，完成提示关闭。</p>
           </div>
@@ -176,9 +178,9 @@
 
   <div class="modal fade" id="architecture-modal" tabindex="-1" aria-labelledby="architecture-title" aria-hidden="true">
     <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable"><div class="modal-content">
-      <div class="modal-header"><div><span class="section-kicker">当前已实施 · three-layer-v1</span><h5 class="modal-title" id="architecture-title">DSCG 三层防御结构</h5></div><button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="关闭"></button></div>
+      <div class="modal-header"><div><span class="section-kicker">当前已实施 · three-layer-l2-v2</span><h5 class="modal-title" id="architecture-title">DSCG 三层防御结构</h5></div><button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="关闭"></button></div>
       <div class="modal-body">
-        <p class="arch-status">完整防御默认启用以下三层；L1 不新增模型调用，审计重试为 0，完成提示关闭。L2 在任务开始编译、候选执行前复核；L1 在每次工具反馈进入主模型前生效。页面可独立关闭 L1，也可消融 L2/L3；L2/L3 全关时 L1 随之关闭。</p>
+        <p class="arch-status">完整防御默认启用以下三层；L1 不新增模型调用，审计重试为 0，完成提示关闭。L2 编译权限后只向规划器展示已授权工具，候选执行前仍复核。明确要求执行任务文件时，先经监控读取，再编译完整有效任务；普通返回不能扩权。网页可关闭工具视图与任务文件展开；宿主任务 profile 仅通过 API 配置，未配置时沿用原授权策略。</p>
         <div class="architecture-diagram">
           <div class="arch-lane" data-defense-layer="input-isolation">
             <span class="arch-lane-label">第一层 · 工具返回隔离</span>
@@ -194,14 +196,14 @@
           <div class="arch-lane" data-defense-layer="authorization">
             <span class="arch-lane-label">第二层 · 可信任务工具授权</span>
             <div class="arch-flow">
-              <div class="arch-box arch-input"><i class="bi bi-person-check"></i><strong>可信用户请求</strong><small>任务与固定宿主策略</small></div>
+              <div class="arch-box arch-input"><i class="bi bi-person-check"></i><strong>有效用户任务</strong><small>明确委托的文件先准备读取</small></div>
               <i class="bi bi-arrow-right arch-arrow" aria-hidden="true"></i>
-              <div class="arch-box arch-compiler"><i class="bi bi-list-check"></i><strong>任务级授权判断</strong><small>注册工具与风险元数据</small></div>
+              <div class="arch-box arch-compiler"><i class="bi bi-list-check"></i><strong>编译授权与工具视图</strong><small>冻结目录 · 新用户任务替换授权</small></div>
               <i class="bi bi-arrow-right arch-arrow" aria-hidden="true"></i>
               <div class="arch-box arch-sandbox"><i class="bi bi-funnel"></i><strong>候选权限前置检查</strong><small>非法混合批次整体拒绝</small></div>
             </div>
           </div>
-          <div class="arch-connector"><i class="bi bi-arrow-down" aria-hidden="true"></i><span>任务授权先于首次候选生成；L2 拒绝不花审计 Token，合法候选才进入 L3 路由</span></div>
+          <div class="arch-connector"><i class="bi bi-arrow-down" aria-hidden="true"></i><span>规划和 L3 使用同一有效任务；未授权工具即使被模型编造仍拒绝，目录变化不自动扩权</span></div>
           <div class="arch-lane" data-defense-layer="audit">
             <span class="arch-lane-label">第三层 · 当前动作语义审计</span>
             <div class="arch-flow">
