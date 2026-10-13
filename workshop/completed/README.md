@@ -7,6 +7,7 @@
 | [Dashboard v2.2显示同步](./dashboard_v22_20261013.md) | 动态引擎版本、L1/L3规则、有效流程预览、历史版本/路由/成本状态、桌面与窄屏验收 | 无新模型评测或运行机制；网页CSA控制和失败片段浏览器仍未实施 |
 | [防御下降诊断与修复](./defense_regression_analysis_20261012.md) · [后续复核](./l2_docs_sync_20261013.md) | 定向验证保留；当前已记录144条v2.2：TSR130/144、nativeASR0/144 | 原报告是2026-10-12快照；当前重复控制、独立终态与因果/成本验收仍待完成，旧哈希不改写 |
 | [L2文档/平台交接复核](./l2_docs_sync_20261013.md) | 当前源码/保留产物审查、完整144条现有记录核对、README/workshop/指南同步；当时的显示待办由后续Dashboard阶段完成 | 不新增运行机制或模型评测；原报告保留当时状态 |
+| [模型/工具配置文档](../../docs/model_tool_configuration.md) · [报告](./configuration_docs_20261013.md) | evaluation配置节扩写、README入口、TOML/离线代码示例与字段/控制核对 | 无runtime/默认值/配置改动，不运行真实模型或任务 |
 | [L2优化实施](./l2_implementation_20261012.md) · [计划](./L2_implementation_plan_20261012.md) | 授权视图、host profile API/只读闭包、有界文件展开、新任务替换/目录复核、平台控件 | 真实profile/标签、匹配成本与效用/安全验证待完成；通用跨轮语义、按需展示、热目录与部分执行未实施 |
 | [三层基础方案](./3_layer_opt.md) · [实施报告](./three_layer_implementation_20261010.md) · [实施计划](./three_layer_implementation_plan_20261010.md) | L1来源视图、L2整批前置、原L3、平台架构；离线实施验收完成 | §5总成本目标与§7匹配模型消融尚未正式验收；CSA、DRV、LLM净化、自动恢复未启用 |
 | [L3纯算法实现](./l3_algorithm_implementation_20261010.md) · [计划](./l3_algorithm_implementation_plan_20261010.md) | 工具/模式/校准/凭据工程接入，默认off | 真实独立数据、部署阈值和模型匹配收益尚未验收 |

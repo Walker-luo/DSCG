@@ -4,11 +4,57 @@
 
 ## 模型与工具配置
 
-使用 [config/models.example.toml](../config/models.example.toml) 创建被 Git 忽略的 `config/models.local.toml`，配置 `[main]` 和 `[security]` 的 provider、model_id、api_key_env，可选 base_url。省略 `[security]` 时复用主模型。配置优先级为函数参数 > `DSCG_MAIN_*` / `DSCG_SEC_*` 环境变量 > 本地 TOML > Provider 默认值；`DSCG_MODEL_CONFIG` 可覆盖路径。
+完整的字段、获取方式、schema查看命令、优先级及排错见 [模型、工具与运行参数详解](./model_tool_configuration.md)。首次标准测试需要准备模型服务连接；AgentDojo v1.2工具定义/参数/模拟环境和仓库风险目录已提供，不需要手工编写每个工具的参数或申请真实邮箱/银行账号。
 
-当前 AgentDojo 适配层不保留 DeepSeek reasoning_content，项目使用 reasoning_effort="none"；重建环境时仍需核对消息角色兼容性。实现见 [model_config.py](../dscg/model_config.py)。
+### 模型角色与连接字段
 
-工具风险元数据缺省回退到内置 [tools.agentdojo-v1.2.toml](../config/tools.agentdojo-v1.2.toml)。显式路径、`DSCG_TOOL_METADATA` 和已有本地配置优先；未知或无效工具保持 critical。`python -m experiments.generate_tool_metadata` 可生成本地目录，默认不覆盖已有文件。
+`[main]`用于规划/最终回答和L2授权编译，`[security]`用于L3当前动作审计。两者可以共用服务，也可用不同模型/provider；纯算法L3路由不是训练小模型。baseline/NoChecker不建立审计客户端。主模型需支持Chat Completions工具调用及JSON输出，审计模型需支持当前JSON协议，不能仅凭聊天成功确认兼容。
+
+| TOML字段 | 作用 | 测试者如何获得/填写 |
+| --- | --- | --- |
+| provider | 选择连接预设和兼容处理，如deepseek/dashscope；自定义兼容服务可用custom | 按实际API服务，不只按模型品牌猜测 |
+| model_id | 请求里的真实模型ID，区别于运行name | 从服务方API模型列表复制并确认账号可用 |
+| base_url | OpenAI兼容根地址，含服务要求的v1等路径 | 从官方接入文档复制；不是网页地址或完整/chat/completions路径 |
+| api_key_env | 保存Key的环境变量**名称**，例如DEEPSEEK_API_KEY | 在启动评测/网页服务前设置该变量；这里不填Key本身 |
+| api_key | 实际Key，可选直接设置 | 优先用环境变量；公共记录只保留api_key_env，不输出Key |
+
+复制 [models.example.toml](../config/models.example.toml)到config/models.local.toml后，核对main/security的五个字段并设置所需变量。模板main为DeepSeek、security为DashScope，若使用这份双服务配置，两个服务分别要有可用Key：
+
+```bash
+export DEEPSEEK_API_KEY='自己的DeepSeek API Key'
+export DASHSCOPE_API_KEY='自己的百炼API Key'
+```
+
+DeepSeek Key入口见 [官方认证说明](https://api-docs.deepseek.com/api/deepseek-api/)；百炼见 [获取API Key](https://help.aliyun.com/zh/model-studio/get-api-key)。模型和endpoint也须从同服务官方文档取得；百炼需匹配地域/业务空间。具体入口和单/双模型TOML示例见 [连接详解](./model_tool_configuration.md#2-主模型和审计模型)。
+
+省略security角色且没有DSCG_SEC_*覆盖时，通过main fallback复用主模型。**复制模板后只留空security的Key不等于省略security**，它仍选择模板的独立模型。已有环境变量也可能覆盖TOML，需检查最终解析值。
+
+普通连接字段优先级：显式函数参数（网页输入属于此层）→DSCG_MAIN_*/DSCG_SEC_*→角色TOML→provider共享设置/预设。实际Key依次取显式api_key、角色API_KEY变量、api_key_env所指变量、TOML Key及适用fallback。模型文件路径是--model-config/config_path→DSCG_MODEL_CONFIG→config/models.local.toml；相对路径按项目根解析。
+
+可离线调用resolve_model_config并只打印public_dict检查main/security，不联网、不验证服务鉴权；现成代码见详解。当前temperature=0；DeepSeek reasoning_effort="none"是代码设置，因为AgentDojo0.1.35不保留reasoning_content的完整工具回合，不是TOML新增参数。实现见 [model_config.py](../dscg/model_config.py)。
+
+### 工具参数与风险目录
+
+工具参数schema来自实际注册函数，描述类型、required/default/枚举，供规划器和运行时使用；风险目录描述真实effect/source/sink等，供L2/L3决定权限/检查路径。风险TOML不会注册工具或建立真实服务连接。通过get_suite("v1.2", "workspace").tools及tool.parameters.model_json_schema()查看当前send_email等定义；完整只读示例见 [工具参数获取](./model_tool_configuration.md#3-工具参数查看什么在哪里获取)。
+
+标准runner加载风险目录顺序是显式--tool-metadata/网页路径→DSCG_TOOL_METADATA→已有config/tools.local.toml→内置 [tools.agentdojo-v1.2.toml](../config/tools.agentdojo-v1.2.toml)。显式文件不存在报错；本地目录缺项不自动合并内置分类，缺失/非法工具按critical并在默认L2阻断。直接factory API使用者需传tool_metadata=load_tool_metadata()或在runtime注册分类。
+
+| 风险字段 | 允许值 / 用途 |
+| --- | --- |
+| effect | read/write/delete/financial/external_send；按实现副作用填写，不按函数名猜测 |
+| source | calendar/email/cloud/web/local；来源类别，不认证事实 |
+| sink | none/external_recipient/public_output；有外部sink不能当普通公开读取 |
+| sensitivity | public/internal/personal/secret；影响审计与免审资格 |
+| idempotent | TOML true/false；L3新增内部读取路由的资格之一，不保证只执行一次 |
+| reversible | TOML true/false；记录可逆性，不触发自动撤销 |
+
+schema_version可选且默认dscg.tool-risk.v1；risk_level等派生字段不要手填。比如get_unread_emails会标记已读，内置effect=write；send_email为external_send。完整约束、TOML例子和自定义注册顺序见 [风险目录详解](./model_tool_configuration.md#4-工具风险元数据作用字段及覆盖)。
+
+普通比较无需生成新目录。`python -m experiments.generate_tool_metadata`核对AgentDojo0.1.35/v1.2覆盖后复制审核目录到config/tools.local.toml，默认不覆盖已有文件；它不会调用模型、训练或自动推断风险。只读覆盖检查可用validate_catalog，见详解；分类存在仍不等于用户授权。
+
+### 哪些是可选参数
+
+默认L1/L2/L3开启、planning_tool_view/delegated_tasks=true、routeroff、audit_retries=0、completion_prompt=false、summary日志；routeroff仍保留原L3。普通测试不需要host授权profile、reader、自填tau或外部task manifest。独立L3校准artifact及host profile仅按对应支持域选择，不能为节省预算临时制造免审。各API/CLI/网页入口、固定审计窗口和参数含义见 [运行控制表](./model_tool_configuration.md#5-运行控制默认值用途及设置入口)。
 
 ## 对照与输出
 

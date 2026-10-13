@@ -14,6 +14,7 @@
 | [本次文档与交接核查](./completed/framework_docs_cleanup_20261010.md) | README解释、方案归属和平台交付清单 | 真实实验结论仍由原始结果/独立核查决定 |
 | [L3纯算法实现](./completed/l3_algorithm_implementation_20261010.md) | 固定评分、硬条件、分组校准工具、一次性路由交接和CLI成本账 | 独立真实数据、部署阈值、selective收益验收及网页专门控件 |
 | [实验配置与工作台更新](./completed/dashboard_framework_ui_20261010.md) | 三层控件与预设、响应式布局、有效分母与两类模型成本、trace 统计覆盖 | 无新模型评测；CSA 与独立失败片段浏览器未实施 |
+| [模型/工具配置文档](../docs/model_tool_configuration.md) · [阶段报告](./completed/configuration_docs_20261013.md) | 模型角色/字段/获取方式、工具schema与风险元数据、加载顺序/自检/可选参数已说明 | 文档与离线解析检查，不证明服务鉴权、模型工具能力或新的实验收益 |
 | [L2优化实施](./completed/l2_implementation_20261012.md) · [当前状态](./completed/l2_docs_sync_20261013.md) | 默认视图/有界任务文件、host profile API、目录复核、控件/trace均保留；当前源码重新审查 | 真实profile/独立标签与L2视图单变量控制待完成，当前成本标记不可直接比较；L2_opt.md保留余项 |
 | [框架与平台汇报材料](../report/report.md) | 用户指定 report/ 目录；10页主线介绍架构、各层实现/例子、优缺点和平台；README 列出 L3 待决定项 | 截图待用户补入；尚未生成实际幻灯片，不新增实验结论 |
 

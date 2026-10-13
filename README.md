@@ -134,7 +134,7 @@ conda activate ipi
 cp config/models.example.toml config/models.local.toml
 ```
 
-在本地 TOML 中配置 `[main]`、`[security]` 的 provider、model_id 和 api_key_env，再设置对应 Key 环境变量；省略 `[security]` 会复用主模型。不要提交本地配置或凭证。项目使用 Python 3.10、AgentDojo 0.1.35；详细配置见[模板](./config/models.example.toml)与[评测指南](./docs/evaluation.md)。
+在本地 TOML 中配置 `[main]`、`[security]` 的 provider、model_id 和 api_key_env，再设置对应 Key 环境变量；省略 `[security]` 会复用主模型。不要提交本地配置或凭证。项目使用 Python 3.10、AgentDojo 0.1.35；详细配置见[模型、工具与运行参数详解](./docs/model_tool_configuration.md)：解释模型字段/API Key获取、工具参数schema查看、六项风险元数据的作用、可选运行参数及离线检查；评测步骤见[评测指南](./docs/evaluation.md)。
 
 ## 对比测试
 
