@@ -133,6 +133,7 @@ function getSelectedConfig() {
 
 function applyDefensePreset(preset) {
   if (preset === "custom") return;
+  $('#defense-preset').value = preset;
   $("#use-input-isolation").checked = !["no-l1", "v2"].includes(preset);
   $("#use-sandbox").checked = preset !== "no-l2";
   $("#use-security-checker").checked = preset !== "no-l3";
@@ -211,6 +212,9 @@ function updateRunPreview() {
   const checker = !isOrigin && $("#use-security-checker").checked;
   const isolation = !isOrigin && (sandbox || checker) && $("#use-input-isolation").checked;
   const precheck = sandbox && $("#authorization-precheck").checked;
+  const toolView = sandbox && $('#planning-tool-view').checked;
+  const delegated = sandbox && $('#delegated-tasks').checked;
+  const frameworkVersion = state.dashboardConfig?.framework_version || document.body?.dataset.frameworkVersion || '版本未记录';
   $("#use-input-isolation").disabled = isOrigin || !(sandbox || checker);
   $("#authorization-precheck").disabled = !sandbox;
   $("#sec-model-group").style.display = checker ? "block" : "none";
@@ -218,7 +222,7 @@ function updateRunPreview() {
   $("#defense-group").style.display = isOrigin ? "block" : "none";
   $("#ablation-group").style.display = isOrigin ? "none" : "grid";
   $("#trace-level-group").style.display = isOrigin ? "none" : "block";
-  $("#config-defense .framework-version").textContent = isOrigin ? "AgentDojo" : "three-layer-l2-v2";
+  $("#config-defense .framework-version").textContent = isOrigin ? "AgentDojo" : frameworkVersion;
   $('#planning-tool-view').disabled = !sandbox;
   $('#delegated-tasks').disabled = !sandbox;
   $(".metadata-path-group").style.display = isOrigin ? "none" : "block";
@@ -232,16 +236,25 @@ function updateRunPreview() {
     ? "L2/L3 全关时 L1 随之关闭；该 DSCG 消融仍使用 Monitor，与原生 Baseline 的工具循环不同。"
     : sandbox && !precheck ? "已关闭候选前置检查；工具授权仍由 Monitor 检查。重审 0 次，完成提示关闭。"
     : "Monitor 与一次性票据负责执行。L2 支持授权工具视图与显式任务文件展开；重审 0 次，完成提示关闭。";
+  if (!isOrigin && $('#defense-preset').value === 'v2') {
+    $('#layer-config-note').textContent = 'V2 风格关闭 L1、前置检查、工具视图和任务展开，保留新版目录复核；不是历史 V2 的精确复现。';
+  }
   [["l1", isolation], ["l2", sandbox], ["l3", checker]].forEach(([id, enabled]) => {
     const layer = $("#preview-layer-" + id);
     layer.classList.toggle("is-disabled", !enabled);
     layer.querySelector("b").textContent = enabled ? "启用" : "关闭";
   });
-  $("#workspace-framework").textContent = isOrigin ? "AgentDojo 原生循环" : "three-layer-v1";
+  $("#workspace-framework").textContent = isOrigin ? "AgentDojo 原生循环" : frameworkVersion;
   $("#workspace-mode").textContent = withAttack ? "对抗评测" : "良性效用评测";
   $("#framework-flow").textContent = isOrigin
     ? "原生 AgentDojo 规划与工具执行；DSCG 三层不参与运行。"
-    : `${sandbox ? "任务授权 → " : ""}主模型规划${isolation ? "（返回经 L1）" : ""} → ${precheck ? "L2 前置检查 → " : ""}${checker ? "L3 路由 → " : ""}Monitor 执行`;
+    : `${sandbox ? "任务授权 → " : ""}${toolView ? "已授权工具视图 → " : ""}主模型规划${isolation ? "（返回经 L1）" : ""} → ${precheck ? "L2 整批前置 → " : ""}${checker ? "L3 动作审计 → " : ""}Monitor / 票据执行`;
+  $('#delegation-flow').hidden = !delegated;
+  $('#preview-layer-l2 small').textContent = `${toolView ? '仅展示已授权工具' : '完整工具目录'}；${precheck ? '非法批次整体拒绝' : '执行前复核权限'}`;
+  $('#workspace-audit-note').textContent = isOrigin
+    ? 'DSCG 控件不参与原生评测。'
+    : checker ? '选择性路由默认 off，L3 仍启用；公开无外发读取沿用免审。'
+    : '本配置关闭 L3；工具执行仍由 Monitor 与票据控制。';
 
   if ($("#preview-suites")) $("#preview-suites").textContent = `${selectedSuites.length} / ${allSuites.length}`;
   if ($("#preview-tasks")) $("#preview-tasks").textContent = estimatedTasks.toLocaleString("zh-CN");
@@ -623,6 +636,15 @@ async function loadOverview(runId) {
     const layerFlag = key => typeof framework?.[key] === "boolean" ? framework[key] :
       typeof config[key] === "boolean" ? config[key] : null;
     const layerBadge = (name, value) => `<span class="effective-layer ${value === true ? 'enabled' : ''}">${name} · ${value === null ? '未记录' : value ? '启用' : '关闭'}</span>`;
+    const routerMode = framework?.audit_router_mode ?? config.audit_router_mode;
+    const auditNote = layerFlag('use_security_checker') === false ? 'L3 已关闭，选择性路由不使用。' :
+      layerFlag('use_security_checker') !== true ? 'L3 开关未记录；选择性路由状态未确认。' :
+      routerMode === 'off' ? '选择性路由 off；仍启用 L3，公开无外发读取沿用免审。' :
+      routerMode === 'shadow' ? '选择性路由 shadow；仅观察分数，保留 L3 审计。' :
+      routerMode === 'selective' ? '选择性路由 selective；符合硬条件且校准兼容时才免审，其余保留 L3。' :
+      'L3 已启用；选择性路由模式未记录。';
+    const costUnready = suites.some(s => s.cost_comparison_ready === false);
+    const costScopes = [...new Set(suites.map(s => s.cost_scope).filter(s => typeof s === 'string'))];
     const stats = suites.map(s => s.layer_stats).filter(Boolean);
     const sum = (group, key) => stats.reduce((total, s) => total + (s[group]?.[key] || 0), 0);
     const coverage = key => stats.reduce((total, s) => total + (s[key] || 0), 0);
@@ -647,15 +669,17 @@ async function loadOverview(runId) {
         layerBadge('L2 前置检查', layerFlag('authorization_precheck')) +
         layerBadge('L2 工具视图', layerFlag('planning_tool_view')) +
         layerBadge('任务文件展开', layerFlag('delegated_tasks')) + layerBadge('L3 动作审计', layerFlag('use_security_checker'))}</div>
+      ${config.origin ? '' : `<p class="audit-routing-note">${escapeHtml(auditNote)}</p>`}
       <div class="overview-cards">
         <div class="metric-card tsr"><div class="metric-label">任务成功率 TSR</div><div class="metric-value">${formatRate(agg.avg_utility_rate)}</div><small>${formatCount(agg.utility_passed)} / ${formatCount(agg.total_tasks)} 个任务成功</small></div>
         <div class="metric-card asr"><div class="metric-label">攻击成功率 ASR</div><div class="metric-value">${formatRate(agg.avg_attack_success_rate)}</div><small>${config.run_attack === false ? '良性评测不适用' : `${agg.security_denominator === null ? "有效分母未记录" : `${formatCount(agg.security_denominator)} 条原生安全判定`} · 越低越好`}</small></div>
         <div class="metric-card tokens"><div class="metric-label">${agg.security_cost_complete || config.origin || config.use_security_checker === false ? "总 Token 消耗" : "已记录 Token（审计缺失）"}</div><div class="metric-value">${formatCount(agg.total_tokens)}</div><small>主模型（含授权）${formatCount(agg.main_total_tokens)} + 审计 ${formatCount(agg.security_cost_complete || config.origin || config.use_security_checker === false ? agg.security_total_tokens : null)}</small></div>
         <div class="metric-card quality"><div class="metric-label">缺失 / 无效安全判定</div><div class="metric-value">${formatCount(agg.security_missing)}</div><small>不计为零 ASR；需核对原始结果</small></div>
       </div>
+      ${costUnready ? `<p class="cost-context">成本未标为可比较${costScopes.length ? `（${escapeHtml(costScopes.join(' / '))}）` : ''}；已记录用量不能直接作为全程成本或节省比例。</p>` : ''}
       <div class="result-section-heading"><h4>各场景结果</h4><span>TSR 按任务加权；ASR 按有效安全判定加权</span></div>
       <div class="table-responsive"><table class="table table-dark table-hover evaluation-suite-table"><thead><tr><th>场景</th><th>TSR</th><th>ASR</th><th>任务数</th><th>已记录总 Tokens</th><th>审计 Tokens</th></tr></thead><tbody>${suites.map(s => `<tr><td><strong>${escapeHtml(s.suite_name)}</strong></td><td class="text-info">${formatRate(s.metrics?.utility_rate)}</td><td class="text-danger">${formatRate(config.run_attack === false ? null : s.metrics?.attack_success_rate)}</td><td>${formatCount(s.task_counts?.total_tasks)}</td><td>${formatCount(totalTokens(s))}</td><td>${formatCount(s.sec_overhead?.total_tokens ?? (config.origin || config.use_security_checker === false ? 0 : null))}</td></tr>`).join('')}</tbody></table></div>
-      ${config.origin ? '' : `<section class="layer-observations"><div class="result-section-heading"><h4>三层运行记录</h4><span>路由 ${coverage('routing_records')} / ${formatCount(agg.total_tasks)} · 隔离 ${coverage('isolation_records')} / ${formatCount(agg.total_tasks)} 条 trace</span></div><dl>${statRows.map(([label, value]) => `<div><dt>${label}</dt><dd>${value}</dd></div>`).join('')}</dl><p>仅统计已计分任务，排除攻击生成预检；覆盖不全时为已记录部分。L1 字符与呈现次数含重复历史，字符数不等于 Tokens。</p></section>`}
+      ${config.origin ? '' : `<section class="layer-observations"><div class="result-section-heading"><h4>三层运行记录</h4><span>L1 ${coverage('isolation_records')} / ${formatCount(agg.total_tasks)} · L2 ${coverage('l2_records')} / ${formatCount(agg.total_tasks)} · 路由 ${coverage('routing_records')} / ${formatCount(agg.total_tasks)} 条 trace</span></div><dl>${statRows.map(([label, value]) => `<div><dt>${label}</dt><dd>${value}</dd></div>`).join('')}</dl><p>仅统计已计分任务，排除攻击生成预检；覆盖不全时为已记录部分。编译次数不等于模型调用，累计工具定义与字符数不等于 Tokens。</p></section>`}
       <div class="result-footnote"><i class="bi bi-info-circle"></i><span>ASR 使用 AgentDojo 原生判定；工具级约束与路由统计不代表独立安全验证。任务 ID、模型、攻击一致后再作比较。</span></div>
     `;
     $("#workspace-run").value = runId;

@@ -4,7 +4,9 @@
 
 | 材料 | 已完成 / 当前保留 | 未完成、撤回或仅为设计 |
 | --- | --- | --- |
-| [防御下降诊断与修复](./defense_regression_analysis_20261012.md) | 配对144条原始结果；L1报告/外发规则与L3正文审查，19/19探针、12攻击回归+3干净任务通过 | 完整144条新对照及因果/成本验收未完成；不改变原生ASR或正式研究闸门 |
+| [Dashboard v2.2显示同步](./dashboard_v22_20261013.md) | 动态引擎版本、L1/L3规则、有效流程预览、历史版本/路由/成本状态、桌面与窄屏验收 | 无新模型评测或运行机制；网页CSA控制和失败片段浏览器仍未实施 |
+| [防御下降诊断与修复](./defense_regression_analysis_20261012.md) · [后续复核](./l2_docs_sync_20261013.md) | 定向验证保留；当前已记录144条v2.2：TSR130/144、nativeASR0/144 | 原报告是2026-10-12快照；当前重复控制、独立终态与因果/成本验收仍待完成，旧哈希不改写 |
+| [L2文档/平台交接复核](./l2_docs_sync_20261013.md) | 当前源码/保留产物审查、完整144条现有记录核对、README/workshop/指南同步；当时的显示待办由后续Dashboard阶段完成 | 不新增运行机制或模型评测；原报告保留当时状态 |
 | [L2优化实施](./l2_implementation_20261012.md) · [计划](./L2_implementation_plan_20261012.md) | 授权视图、host profile API/只读闭包、有界文件展开、新任务替换/目录复核、平台控件 | 真实profile/标签、匹配成本与效用/安全验证待完成；通用跨轮语义、按需展示、热目录与部分执行未实施 |
 | [三层基础方案](./3_layer_opt.md) · [实施报告](./three_layer_implementation_20261010.md) · [实施计划](./three_layer_implementation_plan_20261010.md) | L1来源视图、L2整批前置、原L3、平台架构；离线实施验收完成 | §5总成本目标与§7匹配模型消融尚未正式验收；CSA、DRV、LLM净化、自动恢复未启用 |
 | [L3纯算法实现](./l3_algorithm_implementation_20261010.md) · [计划](./l3_algorithm_implementation_plan_20261010.md) | 工具/模式/校准/凭据工程接入，默认off | 真实独立数据、部署阈值和模型匹配收益尚未验收 |
@@ -18,6 +20,8 @@
 | [初轮方案](./framework_optimization_20261007.md) · [报告](./framework_optimization_report.md) · [复核](./framework_optimization_review_20261007.md) | 任务隔离、风险元数据与误拒问题已进入后续V2修正 | 有界重审/完成提示不作为默认；原重复模型验证矩阵不是全已执行清单 |
 | [早期工程计划](./2026-10-05-workshop-engineering-optimization.md) · [报告](./workshop_optimization_report.md) | harness bookkeeping、紧凑trace与I3 fixtures | E0合成自检不等于真实闸门；旧八例I3 no_go被24valid/8scope的partial证据取代 |
 | [项目结构整理](./project_structure_20261008.md) | 文档分工、路径与产物规则 | 既有历史输入缺失不重建，完整迁移存在已记录限制 |
+
+L2原始工程报告和计划保留为当时v2的实施记录，当前v2.2状态读 [后续复核](./l2_docs_sync_20261013.md)；未验收的 [L2方案](../L2_opt.md)仍在顶层。
 
 仍待真实数据与收益验收的 [L3 Checker](../L3_checker_opt.md) 与 [授权对照校准（历史归档）](../archive/framework_docs_cleanup_20261010/originals/workshop/original_framework_direction_20261008.md) 留在 [顶层索引](../README.md)。正式E0/I3/I2状态以 [研究路线](../../../research/technical_route.md) 和 [I3报告](../../docs/i3_p0_stress_report.md) 为准。
 

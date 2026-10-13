@@ -126,4 +126,6 @@ results/partial_benchmark/<model_id>_<name>/
 
 同时报告 TSR、AgentDojo 原生 ASR、总 Token 与全部有效/错误/跳过分母，预检成本单列或明确包含。输出文本 predicate 的误报仍需独立 E0 审计，保留原始结果；历史 smoke 或单轮小样本不能支持通用防御结论。
 
-当前 I3 为 partial（有效24，范围缺口8，工具边界缺口0），E0 合成自检并未证明真实 harness 通过；I2 与三层机制尚未解锁。离线命令见[项目 README](../README.md)，详细证据见 [I3 报告](./i3_p0_stress_report.md)与 [V2 后续报告](../workshop/completed/framework_v2_followup_report.md)。
+当前 I3 为 partial（有效24，范围缺口8，工具边界缺口0），E0 合成自检并未证明真实 harness 通过；I2尚未解锁；当前三层及L2优化是用户授权的workshop工程，不代表正式研究路线解锁。离线命令见[项目 README](../README.md)，详细证据见 [I3 报告](./i3_p0_stress_report.md)与 [V2 后续报告](../workshop/completed/framework_v2_followup_report.md)。
+
+2026-10-13当前结果核查：v2.2的144条现有记录TSR130/144、nativeASR0/144、轨迹错误0；只是单次源记录观察。16份成本汇总均标记cost_comparison_ready=false，保留1,685,825 Tokens记录量，不计算可比节省。旧导出的同名L2opt目录对应先前144条字节，不能用现在的trace重新认证旧export。详见 [复核报告](../workshop/completed/l2_docs_sync_20261013.md)。

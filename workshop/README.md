@@ -6,17 +6,20 @@
 
 | 方案 / 阶段 | 已完成 | 尚未完成或未采用 |
 | --- | --- | --- |
-| [防御下降诊断与修复](./completed/defense_regression_analysis_20261012.md) | 配对144条原始结果；L1报告/外发规则与L3正文审查，19/19探针、12攻击回归+3干净任务通过 | 完整144条新对照及因果/成本验收未完成；不改变原生ASR或正式研究闸门 |
+| [Dashboard v2.2显示同步](./completed/dashboard_v22_20261013.md) | 引擎版本动态读取、L1/L3规则、普通/委托流程预览、路由与成本状态、窄屏验收 | 无新防御机制、模型评测、网页CSA控件或失败片段浏览器 |
+| [防御下降诊断与修复](./completed/defense_regression_analysis_20261012.md) · [最新复核](./completed/l2_docs_sync_20261013.md) | L1概述/外发规则与L3正文审查；19/19探针、12攻击+3干净任务；当前已记录144条v2.2：TSR130/144、nativeASR0/144 | 单次观察；重复匹配、独立终态与因果/成本验收未完成；原144条历史诊断不改写 |
 | [三层基础方案](./completed/3_layer_opt.md) · [实施报告](./completed/three_layer_implementation_20261010.md) | L1来源视图、L2整批前置、原L3与平台架构同步 | 匹配四臂消融、总成本目标、引用保真和独立终态验证；CSA/DRV不在已实施范围 |
 | [Partial报告优化](./completed/partial_reporting_20261010.md) | Markdown运行摘要、逐场景指标与有界失败片段 | 不改变原生评分，不提供新的安全oracle；尚未在平台增加独立失败片段浏览器 |
 | [V2与其他历史阶段](./completed/README.md) | 各阶段已完成项及证据已归档 | Stage2执行提示撤回；旧方案里的重审/恢复、LLM净化等不能当作当前默认能力 |
 | [本次文档与交接核查](./completed/framework_docs_cleanup_20261010.md) | README解释、方案归属和平台交付清单 | 真实实验结论仍由原始结果/独立核查决定 |
 | [L3纯算法实现](./completed/l3_algorithm_implementation_20261010.md) | 固定评分、硬条件、分组校准工具、一次性路由交接和CLI成本账 | 独立真实数据、部署阈值、selective收益验收及网页专门控件 |
 | [实验配置与工作台更新](./completed/dashboard_framework_ui_20261010.md) | 三层控件与预设、响应式布局、有效分母与两类模型成本、trace 统计覆盖 | 无新模型评测；CSA 与独立失败片段浏览器未实施 |
-| [L2优化实施](./completed/l2_implementation_20261012.md) | 默认授权工具视图、有界任务文件、宿主profile API、目录复核、网页/CLI控件与trace | 尚无真实成本/安全收益；候选余项留在顶层L2_opt.md |
+| [L2优化实施](./completed/l2_implementation_20261012.md) · [当前状态](./completed/l2_docs_sync_20261013.md) | 默认视图/有界任务文件、host profile API、目录复核、控件/trace均保留；当前源码重新审查 | 真实profile/独立标签与L2视图单变量控制待完成，当前成本标记不可直接比较；L2_opt.md保留余项 |
 | [框架与平台汇报材料](../report/report.md) | 用户指定 report/ 目录；10页主线介绍架构、各层实现/例子、优缺点和平台；README 列出 L3 待决定项 | 截图待用户补入；尚未生成实际幻灯片，不新增实验结论 |
 
 ## 待完成验收的方案
+
+2026-10-13文档复核已完成，见 [报告](./completed/l2_docs_sync_20261013.md)。只修改文档并保护运行源码、旧报告/原字节与用户results/download；最新观察不等于所有方案都已通过验收。
 
 | 方案 | 已落实的关联基础 | 未实施内容 / 当前决定 |
 | --- | --- | --- |
@@ -29,7 +32,7 @@
 
 ## 平台交接
 
-[docs/framework_updates.md](../docs/framework_updates.md)列出逐项核查：三层架构展示、历史分析下载与多指标分图已交付。后续工作台更新补齐独立 L1 与 L2 前置控件、三层消融 / V2 风格对照和统计面板；2026-10-12补齐L2工具视图/任务文件控件及实际trace统计；CSA API/partial CLI模式已接入；网页CSA专门控件与独立失败片段浏览器仍未实施。
+[docs/framework_updates.md](../docs/framework_updates.md)列出逐项核查：三层架构展示、历史分析下载与多指标分图已交付。后续工作台更新补齐独立 L1 与 L2 前置控件、三层消融 / V2 风格对照和统计面板；2026-10-12补齐L2工具视图/任务文件控件及实际trace统计；2026-10-13已完成v2.2动态版本与L1/L3新增说明同步；CSA API/partial CLI模式已接入，网页CSA专门控件与独立失败片段浏览器仍未实施。
 
 ## 存放规则
 

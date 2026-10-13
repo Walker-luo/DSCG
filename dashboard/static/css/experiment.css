@@ -10,6 +10,7 @@
   font-size: 14px;
 }
 .experiment-page .app-header { background: var(--surface); }
+.experiment-page #architecture-modal .section-kicker { text-transform: none; letter-spacing: normal; }
 .experiment-page .sidebar { display: flex; flex-direction: column; overflow: hidden; }
 .experiment-page .sidebar-heading { flex-shrink: 0; align-items: center; padding: 20px; }
 .experiment-page .sidebar-heading h1, .experiment-page .workspace-heading h2 { font-size: 21px; }
@@ -26,6 +27,8 @@
 .experiment-page .suite-option small { font-size: 10px; }
 .experiment-page .limit-grid .form-label { min-height: auto; }
 .experiment-page .framework-version { font-family: inherit; color: var(--text-muted); float: right; margin: 0; font-size: 10px; font-weight: 500; }
+.experiment-page #config-defense { display: flex; justify-content: space-between; gap: 12px; align-items: baseline; }
+.experiment-page #config-defense .framework-version { float: none; text-align: right; overflow-wrap: anywhere; max-width: 65%; }
 .experiment-page .toggle-row { padding: 12px; border-left-width: 3px; }
 .experiment-page .toggle-row strong { font-size: 12px; }
 .experiment-page .toggle-row small { font-size: 10px; margin-top: 4px; line-height: 1.5; }
@@ -38,6 +41,7 @@
 .precheck-option { display: flex; gap: 8px; align-items: center; font-size: 11px; color: var(--text-secondary); padding: 2px 8px 6px; cursor: pointer; }
 .precheck-option:has(input:disabled) { opacity: .5; }
 .config-note { margin: 0; color: var(--text-muted); font-size: 11px; line-height: 1.6; }
+.delegation-help { padding: 0 8px 5px; }
 .advanced-fields { padding-top: 16px; }
 .connection-section summary { color: var(--text); cursor: pointer; font-size: 13px; font-weight: 600; }
 .connection-section summary span { float: right; font-size: 10px; color: var(--text-muted); font-weight: 400; }
@@ -64,6 +68,12 @@
 .framework-layer b { margin-left: auto; font-size: 10px; font-weight: 500; color: var(--layer-color); white-space: nowrap; }
 .framework-layer.is-disabled { opacity: .48; }
 .framework-strip > p { margin: 0; padding: 10px 16px; font-size: 11px; line-height: 1.6; color: var(--text-muted); border-top: 1px solid var(--border); }
+.framework-strip .delegation-flow { display: flex; gap: 16px; background: rgba(185,160,231,.05); }
+.delegation-flow strong { flex-shrink: 0; color: #b9a0e7; font-weight: 500; }
+.delegation-flow[hidden] { display: none; }
+.framework-strip .workspace-audit-note { border-top: 0; padding-top: 0; }
+.audit-routing-note, .cost-context { color: var(--text-muted); font-size: 11px; line-height: 1.6; margin: -8px 0 16px; }
+.cost-context { margin: 10px 0 0; padding-left: 10px; border-left: 2px solid var(--border-strong); }
 .workspace-controls { display: flex; align-items: center; gap: 10px; margin: 0 28px 20px; }
 .workspace-controls label { font-size: 12px; color: var(--text-secondary); white-space: nowrap; }
 .workspace-controls .form-select { max-width: 400px; }
@@ -138,6 +148,9 @@
   .experiment-page .panel-body { padding: 20px; }
 }
 @media (max-width: 600px) {
+  .framework-strip-heading { flex-wrap: wrap; gap: 8px; }
+  .framework-strip-heading strong { overflow-wrap: anywhere; }
+  .framework-strip .delegation-flow { flex-direction: column; gap: 4px; }
   .experiment-page .brand-copy, .experiment-page #status-indicator { display: none; }
   .experiment-page .app-header { gap: 10px; }
   .framework-layer-grid { grid-template-columns: 1fr; }

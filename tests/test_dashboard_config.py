@@ -65,6 +65,12 @@ class DashboardConfigTests(unittest.TestCase):
         self.assertFalse(config["authorization_precheck"])
         self.assertTrue(config["input_isolation"])
 
+    def test_page_and_config_follow_the_engine_version_instead_of_fixed_labels(self):
+        with patch("dashboard.app.FRAMEWORK_VERSION", "future-engine-version", create=True):
+            client = app.test_client()
+            self.assertEqual(client.get("/api/config").get_json().get("framework_version"), "future-engine-version")
+            self.assertIn('data-framework-version="future-engine-version"', client.get("/").get_data(as_text=True))
+
 
 if __name__ == "__main__":
     unittest.main()

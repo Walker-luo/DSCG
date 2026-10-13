@@ -33,7 +33,7 @@ from dscg.pipelines.defended import make_defended_pipeline
 from dscg.tool_metadata import load_tool_metadata
 from experiments.harness_audit import rank_ids, security_result_fields
 from dashboard.history_export import build_history_export
-from dashboard.evaluation import aggregate, display_metrics, normalize_config, trace_stats
+from dashboard.evaluation import FRAMEWORK_VERSION, aggregate, display_metrics, normalize_config, trace_stats
 
 app = Flask(__name__)
 app.secret_key = "newframe_dashboard_2024"
@@ -966,7 +966,7 @@ def _load_history_task_records(
 @app.route("/")
 def index():
     """主页面"""
-    return render_template("index.html", active_page="experiment")
+    return render_template("index.html", active_page="experiment", framework_version=FRAMEWORK_VERSION)
 
 
 @app.route("/history")
@@ -979,6 +979,7 @@ def history_page():
 def get_config():
     """返回所有可用的配置选项"""
     return jsonify({
+        "framework_version": FRAMEWORK_VERSION,
         "models": AVAILABLE_MODELS,
         "sec_models": AVAILABLE_SEC_MODELS,
         "suites": AVAILABLE_SUITES,

@@ -2,8 +2,9 @@
 
 | 入口 | 内容 |
 | --- | --- |
-| [项目 README](../README.md) | 当前两层框架、使用命令和能力边界 |
+| [项目 README](../README.md) | 当前three-layer-l2-v2.2三层框架、使用命令和能力边界 |
 | [评测指南](./evaluation.md) | 模型配置、全部可选攻击、对照与日志口径 |
+| [框架与平台交接](./framework_updates.md) | 当前L2默认/可选能力、L1/L3后续修订、网页已接线与待办 |
 | [Dashboard 指南](./dashboard.md) | 历史筛选、多版本对比及分析导出 |
 | [I3 P0 压力测试报告](./i3_p0_stress_report.md) | 当前 `partial` 证据；未实现对象/数据范围约束 |
 | [图表目录说明](./figures/README.md) | 用户绘图的默认位置与历史图表归属 |

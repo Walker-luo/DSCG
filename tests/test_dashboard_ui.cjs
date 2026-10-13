@@ -103,3 +103,38 @@ test('reports distinguish an unused auditor from unknown historical configuratio
       new RegExp(`审计模型</td><td>${expected}</td>`));
   }
 });
+
+test('draft version follows server metadata and switches to the native loop for baseline', () => {
+  const ui = dashboard();
+  ui.run("state.dashboardConfig = {framework_version: 'future-engine-version'}; updateRunPreview()");
+  assert.equal(ui.node('#workspace-framework').textContent, 'future-engine-version');
+  assert.equal(ui.node('#config-defense .framework-version').textContent, 'future-engine-version');
+  ui.node('#pipeline-type').value = 'origin';
+  ui.run('updateRunPreview()');
+  assert.equal(ui.node('#workspace-framework').textContent, 'AgentDojo 原生循环');
+});
+
+test('draft flow follows the effective tool view and delegation switches', () => {
+  const ui = dashboard();
+  ui.run("applyDefensePreset('full')");
+  assert.equal(ui.node('#delegation-flow').hidden, false);
+  assert.match(ui.node('#framework-flow').textContent, /已授权工具视图/);
+  ui.run("applyDefensePreset('v2')");
+  assert.equal(ui.node('#delegation-flow').hidden, true);
+  assert.doesNotMatch(ui.node('#framework-flow').textContent, /已授权工具视图/);
+  assert.match(ui.node('#layer-config-note').textContent, /不是历史 V2/);
+});
+
+test('saved run keeps its own version and distinguishes router off from disabled L3', async () => {
+  const ui = dashboard(async () => ({ok: true, json: async () => ({config: {
+    framework_version: 'three-layer-v1', use_security_checker: true, audit_router_mode: 'off'},
+    suites: [{suite_name: 'workspace', layer_stats: {l2_records: 1}, cost_comparison_ready: false}],
+    display_metrics: {total_tasks: 2}})}));
+  ui.run("state.dashboardConfig = {framework_version: 'future-engine-version'}; updateRunPreview()");
+  await ui.run("loadOverview('historical-run')");
+  assert.match(ui.node('#overview-content').innerHTML, /result-version">three-layer-v1/);
+  assert.match(ui.node('#overview-content').innerHTML, /off[^<]*仍启用 L3/);
+  assert.match(ui.node('#overview-content').innerHTML, /L2 1 \/ 2/);
+  assert.match(ui.node('#overview-content').innerHTML, /成本未标为可比较/);
+  assert.equal(ui.node('#workspace-framework').textContent, 'future-engine-version');
+});
