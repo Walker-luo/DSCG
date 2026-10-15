@@ -84,23 +84,71 @@ test("architecture identity shares a stable badge and style across attacks witho
   const panels = charts.metricConfigs(runs.slice(0, 2), {...selection, view: "bar", theme: {experimentStyles: styles}});
   assert.deepEqual(panels[0].config.data.datasets.map(d=>d.label), ["workshop_new", "baseline"]);
   assert.deepEqual(panels[0].config.data.datasets.map(d=>d.identityBadge), ["A", "B"]);
-  assert.equal(panels[0].config.plugins[0].id, "historyIdentityLabels");
+  assert.equal(panels[0].config.plugins[0].id, "historyBarPatterns");
   assert.deepEqual(charts.createExperimentStyles([runs[1]], undefined, styles)["base/a"], styles["base/a"]);
 });
 
-test("bar identity labels include zero values and skip hidden or missing observations", () => {
-  const config = charts.metricConfigs(experiments, {...selection, view: "bar"})[0].config;
-  const drawn = [];
-  const ctx = {save(){}, restore(){}, fillText(text,x,y){drawn.push({text,x,y});}};
-  config.data.datasets[0].data = [0, null];
-  config.plugins[0].afterDatasetsDraw({
-    config: {type: "bar"}, ctx, data: config.data, chartArea: {top: 0, bottom: 100},
-    isDatasetVisible: index=>index === 0,
-    getDatasetMeta: ()=>({data: [{x: 20,y: 100}, {x: 50,y: 100}]}),
-  });
-  assert.deepEqual(drawn.map(d=>d.text), ["A"]);
-  assert.equal(drawn[0].x, 20);
-  assert.ok(drawn[0].y < 100);
+test('bar textures identify attacks consistently across versions, metrics and filtered selections', () => {
+  const attacks=['ignore_previous','important_instructions','injecagent','tool_knowledge'];
+  const runs=['model_v1','model_v2'].flatMap(model=>attacks.map(attack=>({...experiments[0],
+    id:model+'/'+attack,model_group:model,attack_name:attack})));
+  const theme={attackNames:attacks,experimentStyles:charts.createExperimentStyles(runs)};
+  const panels=charts.metricConfigs(runs,{...selection,view:'bar',theme});
+  const rows=panels[0].config.data.datasets;
+  assert.equal(new Set(rows.slice(0,4).map(row=>JSON.stringify(row.fillPattern))).size,4);
+  assert.equal(new Set(rows.slice(0,4).map(row=>row.borderColor)).size,1);
+  assert.notEqual(rows[0].borderColor,rows[4].borderColor);
+  for(let i=0;i<4;i++) {
+    assert.deepEqual(rows[i].fillPattern,rows[i+4].fillPattern);
+    assert.deepEqual(rows[i].fillPattern,panels[1].config.data.datasets[i].fillPattern);
+  }
+  const subset=charts.metricConfigs([runs[3]],{...selection,view:'bar',theme})[0].config.data.datasets[0];
+  assert.deepEqual(subset.fillPattern,rows[3].fillPattern);
+});
+
+test('bar lifecycle paints textures without text labels and preserves exact zero/missing data', () => {
+  const runs=['a','b','c','d'].map(attack=>({...experiments[0],id:attack,attack_name:attack}));
+  const config=charts.metricConfigs(runs,{...selection,view:'bar'})[0].config;
+  config.data.datasets[0].data=[0,null];
+  const text=[];
+  const document={createElement(){
+    const ops=[];const tile={ops,width:0,height:0};
+    tile.getContext=()=>Object.fromEntries(['fillRect','beginPath','moveTo','lineTo','stroke','arc','fill'].map(
+      key=>[key,(...args)=>ops.push([key,...args])]));
+    return tile;
+  }};
+  const ctx={canvas:{ownerDocument:document},createPattern(tile){return {tile};},
+    save(){},restore(){},measureText(value){return {width:value.length*7};},fillRect(){},
+    beginPath(){},moveTo(){},lineTo(){},stroke(){},fillText(value){text.push(value);}};
+  const chart={config:{type:'bar'},ctx,data:config.data,options:config.options,
+    chartArea:{left:0,right:240,top:0,bottom:200},isDatasetVisible:()=>true,
+    getDatasetMeta:()=>({data:[{x:30,y:200},{x:60,y:0}]})};
+  for(const plugin of config.plugins) {
+    plugin.beforeUpdate?.(chart);
+    plugin.afterDatasetsDraw?.(chart);
+  }
+  assert.deepEqual(text,[]);
+  assert.deepEqual(config.data.datasets[0].data,[0,null]);
+  assert.ok(config.data.datasets.every(row=>row.minBarLength>0));
+  const fills=config.data.datasets.map(row=>row.backgroundColor);
+  assert.equal(typeof fills[0],'string');
+  assert.ok(fills[1].tile.ops.some(op=>op[0]==='lineTo'));
+  assert.ok(fills[2].tile.ops.some(op=>op[0]==='arc'));
+  assert.notDeepEqual(fills[1].tile.ops,fills[3].tile.ops);
+  const row=config.data.datasets[2];
+  const swatch=charts.createBarFill(ctx,row.fillPattern,row.borderColor,'#171d19');
+  assert.deepEqual(swatch.tile.ops,fills[2].tile.ops);
+});
+
+test('legend subtitle shows only the attack while hover identity keeps the full source', () => {
+  const run={...experiments[0],id:'run/attack',model_group:'deepseek-flash_3layer_L2opt',
+    attack_name:'tool_knowledge',source:'partial_benchmark/original/source'};
+  const dataset=charts.metricConfigs([run],selection)[0].config.data.datasets[0];
+  assert.equal(dataset.legendLabel,'3layer_L2opt');
+  assert.equal(dataset.legendSubtitle,'tool_knowledge');
+  assert.match(dataset.fullLabel,/partial_benchmark\/original\/source/);
+  const unknown={...run,attack_name:null};
+  assert.equal(charts.describeExperiment(unknown).subtitle,'未记录攻击');
 });
 
 test("multiple attacks keep the model color while exposing distinct attack badges and line styles", () => {

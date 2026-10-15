@@ -5,6 +5,7 @@ from copy import deepcopy
 from pathlib import Path
 
 from dscg.input_isolation import FRAMEWORK_VERSION
+from dscg.l1_projection import MODES as L1_PROJECTION_MODES
 
 SUITES = {"workspace", "travel", "banking", "slack"}
 ROUTING_KEYS = ("candidate_batches", "precheck_allowed_batches", "precheck_rejected_batches",
@@ -50,6 +51,10 @@ def normalize_config(payload):
     config["authorization_precheck"] &= config["use_sandbox"]
     config['planning_tool_view'] &= config['use_sandbox']
     config['delegated_tasks'] &= config['use_sandbox']
+    mode = config.get('l1_projection_mode', 'projected')
+    if not isinstance(mode, str) or mode not in L1_PROJECTION_MODES:
+        raise ValueError('l1_projection_mode 必须为 off/shadow/projected')
+    config['l1_projection_mode'] = mode if config['input_isolation'] else 'off'
     config["framework_version"] = None if config["origin"] else FRAMEWORK_VERSION
     return config
 

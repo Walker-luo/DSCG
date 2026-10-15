@@ -276,6 +276,7 @@
     document.querySelector("#history-metric-hint").textContent = fixedMetrics
       ? (view.value === "scatter" ? "散点图固定比较 ASR 与 TSR。" : "热图固定展示逐任务效用结果。")
       : !metrics.length ? "请至少选择一个指标。"
+        : view.value === "bar" ? "颜色区分版本，填充纹理区分攻击；点击图例可隐藏单项，悬停查看数值。"
         : "同一模型 / 运行名称共用颜色与字母标记；点击图例可隐藏单项。雷达图仅支持全部场景的百分比指标。";
   }
 
@@ -388,15 +389,34 @@
     panel.setAttribute("aria-labelledby", heading.id);
     const plot = document.createElement("div");
     plot.className = "history-chart-plot";
+    const scroll = document.createElement("div");
+    scroll.className = "history-chart-scroll";
+    if (config.type === "bar") {
+      const grouped = config.data.datasets.some(dataset => dataset.grouped);
+      const slots = config.data.labels.length * (grouped ? config.data.datasets.length : 1);
+      // Keep enough bar width to read textures, with scrolling inside the card.
+      const width = Math.ceil(80 + slots * 14 / (grouped ? 0.66 : 1));
+      plot.style.minWidth = width + "px";
+      scroll.tabIndex = 0;
+      scroll.setAttribute("role", "region");
+      scroll.setAttribute("aria-label", title + "；密集柱状图可横向滚动");
+    }
     const canvas = document.createElement("canvas");
     canvas.id = "history-chart-" + key;
     canvas.setAttribute("role", "img");
     canvas.setAttribute("aria-label", description);
     plot.append(canvas);
+    scroll.append(plot);
     const legend = document.createElement("div");
     legend.className = "history-chart-legend";
     legend.setAttribute("aria-label", "实验图例；点击显示或隐藏对应实验");
-    panel.append(heading, legend, plot);
+    panel.append(heading, legend, scroll);
+    if (config.type === "bar") {
+      const hint = document.createElement("p");
+      hint.className = "history-fill-hint";
+      hint.textContent = "颜色区分版本，填充区分攻击；零值显示细基线，精确值见悬停。";
+      panel.append(hint);
+    }
     wrap.append(panel);
     config.options.plugins.legend.display = false;
     const chart = new Chart(canvas, config);
@@ -415,7 +435,23 @@
       detail.textContent = dataset.legendSubtitle;
       text.append(name, detail);
       button.style.borderLeftColor = dataset.borderColor;
-      button.append(versionBadge({badge: dataset.identityBadge, color: dataset.borderColor}), text);
+      if (config.type === "bar") {
+        const swatch = document.createElement("canvas");
+        swatch.className = "history-fill-swatch";
+        swatch.setAttribute("aria-hidden", "true");
+        const ratio = window.devicePixelRatio || 1;
+        swatch.width = swatch.height = 28 * ratio;
+        const ctx = swatch.getContext("2d");
+        ctx.scale(ratio, ratio);
+        ctx.fillStyle = historyCharts.createBarFill(ctx, dataset.fillPattern, dataset.borderColor, css("--surface"));
+        ctx.fillRect(0, 0, 28, 28);
+        ctx.strokeStyle = dataset.borderColor;
+        ctx.lineWidth = 1;
+        ctx.strokeRect(0.5, 0.5, 27, 27);
+        button.append(swatch, text);
+      } else {
+        button.append(versionBadge({badge: dataset.identityBadge, color: dataset.borderColor}), text);
+      }
       button.addEventListener("click", () => {
         const visible = !chart.isDatasetVisible(index);
         chart.setDatasetVisibility(index, visible);
@@ -432,6 +468,7 @@
       experimentStyles,
       attackNames: catalog.map(run => run.attack_name),
       text: css("--text-secondary"), muted: css("--text-muted"), border: css("--border"),
+      background: css("--surface"),
     };
   }
 

@@ -50,7 +50,7 @@
           <h2 id="config-defense">防御组合 <span class="framework-version">{{ framework_version }}</span></h2>
           <div id="ablation-group" class="toggle-list">
             <div class="field-group"><label class="form-label" for="defense-preset">配置预设</label><select id="defense-preset" class="form-select form-select-sm"><option value="full">完整三层</option><option value="no-l1">移除 L1 · 工具返回隔离</option><option value="no-l2">移除 L2 · 工具授权</option><option value="no-l3">移除 L3 · 动作审计</option><option value="v2">V2 风格对照 · 关闭新增入口</option><option value="custom">自定义组合</option></select></div>
-            <label class="toggle-row layer-one" for="use-input-isolation"><span><i class="bi bi-braces"></i><strong>L1 · 工具返回隔离</strong><small>日常提醒概述无关注入；必要分析与引用保留原文</small></span><input class="form-check-input" type="checkbox" id="use-input-isolation" checked></label>
+            <label class="toggle-row layer-one" for="use-input-isolation"><span><i class="bi bi-braces"></i><strong>L1 · 工具返回隔离</strong><small>月支出任务投影交易字段；其余保留来源封装</small></span><input class="form-check-input" type="checkbox" id="use-input-isolation" checked></label>
             <label class="toggle-row layer-two" for="use-sandbox"><span><i class="bi bi-key"></i><strong>L2 · 可信任务工具授权</strong><small>按任务编译可用工具，默认整批前置检查</small></span><input class="form-check-input" type="checkbox" id="use-sandbox" checked></label>
             <label class="precheck-option" for="authorization-precheck"><input class="form-check-input" type="checkbox" id="authorization-precheck" checked><span>候选批次在 L3 前校验权限</span></label>
             <label class="precheck-option" for="planning-tool-view"><input class="form-check-input" type="checkbox" id="planning-tool-view" checked><span>规划器仅展示已授权工具</span></label>
@@ -127,7 +127,7 @@
       <section class="framework-strip" aria-label="待启动防御配置">
         <div class="framework-strip-heading"><span>待启动配置</span><strong id="workspace-framework">{{ framework_version }}</strong><span id="workspace-mode">对抗评测</span></div>
         <div class="framework-layer-grid">
-          <div id="preview-layer-l1" class="framework-layer layer-one"><span>L1</span><div><strong>工具返回隔离</strong><small>日常无关注入用概述，必要引用保留</small></div><b>启用</b></div>
+          <div id="preview-layer-l1" class="framework-layer layer-one"><span>L1</span><div><strong>工具返回隔离</strong><small>有限交易投影，其他任务保留原文封装</small></div><b>启用</b></div>
           <div id="preview-layer-l2" class="framework-layer layer-two"><span>L2</span><div><strong>可信任务工具授权</strong><small>编译权限，检查候选批次</small></div><b>启用</b></div>
           <div id="preview-layer-l3" class="framework-layer layer-three"><span>L3</span><div><strong>当前动作语义审计</strong><small>核对外发正文与目的地</small></div><b>启用</b></div>
         </div>
@@ -190,12 +190,12 @@
             <div class="arch-flow">
               <div class="arch-box arch-input"><i class="bi bi-file-text"></i><strong>外部结果与错误正文</strong><small>原消息保留给日志与审计</small></div>
               <i class="bi bi-arrow-right arch-arrow" aria-hidden="true"></i>
-              <div class="arch-box arch-compiler"><i class="bi bi-braces"></i><strong>宿主来源封装</strong><small>短标记 · 可逆转义 · 零模型调用</small></div>
+              <div class="arch-box arch-compiler"><i class="bi bi-braces"></i><strong>有限字段投影 / 来源封装</strong><small>月支出省略交易备注；不适用则保留原文</small></div>
               <i class="bi bi-arrow-right arch-arrow" aria-hidden="true"></i>
               <div class="arch-box arch-model"><i class="bi bi-cpu"></i><strong>主模型规划视图</strong><small>无关注入用概述，必要引用保留</small></div>
             </div>
           </div>
-          <div class="arch-connector"><i class="bi bi-arrow-down" aria-hidden="true"></i><span>L1 是提示防护，不能认证事实；L2 授权只来自真实用户任务与宿主策略</span></div>
+          <div class="arch-connector"><i class="bi bi-arrow-down" aria-hidden="true"></i><span>L1 投影仅支持原生银行月支出任务，不认证事实；必要分析与引用保留原文。L2 授权只来自可信任务与宿主策略</span></div>
           <div class="arch-lane" data-defense-layer="authorization">
             <span class="arch-lane-label">第二层 · 可信任务工具授权</span>
             <div class="arch-flow">

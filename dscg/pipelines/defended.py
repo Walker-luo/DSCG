@@ -29,6 +29,8 @@ from agentdojo.benchmark import TaskResults
 #! 统计token消耗
 from dscg.token_tracking import TokenTrackerClient
 from dscg.input_isolation import FRAMEWORK_VERSION, ISOLATION_RULE, build_isolated_view
+from dscg.l1_projection import (MODES as L1_PROJECTION_MODES, PROFILE_SHA256 as L1_PROFILE_SHA256,
+                               PROFILE as L1_PROFILE, trusted_request_for_view)
 from dscg.l2_authorization import (catalog_fingerprint, planning_runtime_view,
                                   ToolAuthorizationProfile, L2AuthorizationError,
                                   validate_profile_decision, DelegatedTaskReader,
@@ -677,9 +679,11 @@ def _sync_trace_context(extra_args: dict) -> None:
         "dscg_audit_summary": _audit_summary(audits),
         "dscg_action_summary": _action_summary(actions),
     }
-    for key in ("dscg_input_isolation", "dscg_layer_routing", "dscg_framework", "dscg_router_events", "dscg_l2"):
+    for key in ("dscg_input_isolation", "dscg_l1_projection", "dscg_layer_routing", "dscg_framework", "dscg_router_events", "dscg_l2"):
         if key in extra_args:
             context[key] = deepcopy(extra_args[key])
+            if key == 'dscg_l1_projection' and level != 'full':
+                context[key].pop('profile_sha256', None)
     if level == "standard":
         context["dscg_audit_decisions"] = [_compact_audit_record(record) for record in audits]
         context["dscg_action_ledger"] = [_compact_action_record(record) for record in actions]
@@ -1164,6 +1168,7 @@ class OurFrameExecutor(agent_pipeline.BasePipelineElement):
         authorization_profile=None,
         delegated_tasks: bool = True,
         delegated_task_reader=None,
+        l1_projection_mode: str = 'projected',
     ):
         self.llm = llm
         self.sandbox = sandbox
@@ -1173,6 +1178,9 @@ class OurFrameExecutor(agent_pipeline.BasePipelineElement):
         self._authorization_cache_key = None
         self._authorization_cache_contract = None
         self.input_isolation = input_isolation
+        if not isinstance(l1_projection_mode, str) or l1_projection_mode not in L1_PROJECTION_MODES:
+            raise ValueError('invalid L1 projection mode')
+        self.l1_projection_mode = l1_projection_mode if input_isolation else 'off'
         self.planning_tool_view = planning_tool_view
         self.on_authority_replaced = None
         if delegated_task_reader is not None and not isinstance(delegated_task_reader, DelegatedTaskReader):
@@ -1354,7 +1362,9 @@ class OurFrameExecutor(agent_pipeline.BasePipelineElement):
         # FunctionCall candidates can never be fed back into authorization.
         model_messages = messages
         if self.input_isolation:
-            model_messages, stats = build_isolated_view(messages, runtime)
+            projection_request = trusted_request_for_view(messages, self._task_context)
+            model_messages, stats = build_isolated_view(messages, runtime, trusted_request=projection_request,
+                                                        projection_mode=self.l1_projection_mode)
             accumulated = extra_args.setdefault("dscg_input_isolation", {
                 "schema_version": stats["schema_version"], "model_requests": 0,
                 "tool_results_rendered": 0, "escaped_results_rendered": 0,
@@ -1364,6 +1374,16 @@ class OurFrameExecutor(agent_pipeline.BasePipelineElement):
             accumulated["tool_results_rendered"] += stats["tool_results"]
             accumulated["escaped_results_rendered"] += stats["escaped_results"]
             accumulated["added_characters_total"] += stats["added_characters"]
+            projected = extra_args.setdefault('dscg_l1_projection', {
+                'mode': self.l1_projection_mode, 'profile': L1_PROFILE, 'profile_sha256': L1_PROFILE_SHA256,
+                'fallback_reason_counts': {},
+            })
+            for key, value in stats['projection'].items():
+                if key == 'fallback_reason_counts':
+                    for reason, count in value.items():
+                        projected[key][reason] = projected[key].get(reason, 0) + count
+                elif isinstance(value, int):
+                    projected[key] = projected.get(key, 0) + value
             _sync_trace_context(extra_args)
         if self._task_context is not None and self._task_context.stage == 'execution':
             model_messages = deepcopy(model_messages)
@@ -2580,6 +2600,7 @@ def make_qwen_newFrame_pipeline(
     delegated_tasks: bool = True,
     delegated_task_reader=None,
     *,
+    l1_projection_mode: str = 'projected',
     api_key: str | None = None,
     base_url: str | None = None,
     provider: str | None = None,
@@ -2605,6 +2626,8 @@ def make_qwen_newFrame_pipeline(
     """
     if audit_router_mode not in {"off", "shadow", "selective"}:
         raise ValueError("audit_router_mode must be off/shadow/selective")
+    if not isinstance(l1_projection_mode, str) or l1_projection_mode not in L1_PROJECTION_MODES:
+        raise ValueError('l1_projection_mode must be off/shadow/projected')
     if audit_router_mode != "off" and (not use_sandbox or not use_security_checker):
         raise ValueError("audit routing requires both sandbox and checker")
     if not isinstance(planning_tool_view, bool) or not isinstance(delegated_tasks, bool):
@@ -2619,6 +2642,7 @@ def make_qwen_newFrame_pipeline(
     reader_hash = delegated_task_reader.identity() if isinstance(delegated_task_reader, DelegatedTaskReader) else None
     trace_level = _normalise_trace_level(trace_level)
     input_isolation = bool(input_isolation and (use_sandbox or use_security_checker))
+    l1_projection_mode = l1_projection_mode if input_isolation else 'off'
     authorization_precheck = bool(authorization_precheck and use_sandbox)
     main_config = model_config or resolve_model_config(
         model_id,
@@ -2657,6 +2681,7 @@ def make_qwen_newFrame_pipeline(
         trace_level=trace_level,
         tool_metadata=tool_metadata,
         input_isolation=input_isolation,
+        l1_projection_mode=l1_projection_mode,
         planning_tool_view=planning_tool_view, authorization_profile=authorization_profile,
         delegated_tasks=delegated_tasks, delegated_task_reader=delegated_task_reader,
     )
@@ -2700,6 +2725,8 @@ def make_qwen_newFrame_pipeline(
                                            "completion_rule_sha256": _hash_json(TASK_COMPLETION_PROMPT),
                                            "framework_version": FRAMEWORK_VERSION,
                                            "input_isolation": input_isolation,"authorization_precheck": authorization_precheck,
+                                           'l1_projection_mode': l1_projection_mode,
+                                           'l1_projection_profile_sha256': L1_PROFILE_SHA256,
                                            'planning_tool_view': planning_tool_view, 'delegated_tasks': delegated_tasks,
                                            'authorization_profile_sha256': profile_hash,
                                            'delegated_task_reader_sha256': reader_hash,
@@ -2762,6 +2789,7 @@ def make_qwen_newFrame_pipeline(
     # Native full-run caches are keyed by this name. Keep new views/gates
     # separate from historical V2 and from each other's API ablations.
     version_suffix = (f"-{FRAMEWORK_VERSION}-L1{int(input_isolation)}-L2{int(authorization_precheck)}"
+                      f'-Projection{l1_projection_mode}-{L1_PROFILE_SHA256[:16]}'
                       f'-View{int(planning_tool_view)}-Delegate{int(delegated_tasks)}')
     if profile_hash:
         version_suffix += '-Profile-' + profile_hash[:16]
@@ -2773,6 +2801,7 @@ def make_qwen_newFrame_pipeline(
     pipeline.dscg_optimization_config = {
         "framework_version": FRAMEWORK_VERSION,
         "input_isolation": input_isolation, "authorization_precheck": authorization_precheck,
+        'l1_projection_mode': l1_projection_mode, 'l1_projection_profile_sha256': L1_PROFILE_SHA256,
         'planning_tool_view': planning_tool_view, 'delegated_tasks': delegated_tasks,
         'authorization_profile_sha256': profile_hash, 'delegated_task_reader_sha256': reader_hash,
         'task_catalogue_guard': bool(use_sandbox),

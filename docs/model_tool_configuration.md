@@ -1,6 +1,6 @@
 # 模型、工具与运行参数详解
 
-本文供首次运行或更换模型/工具的测试者使用，对应当前three-layer-l2-v2.2。所有命令从DSCG/执行，默认ipi已激活。模型配置和工具风险目录是宿主输入；模型返回、网页正文或工具错误不能改写它们。
+本文供首次运行或更换模型/工具的测试者使用，对应当前three-layer-l1-v3。所有命令从DSCG/执行，默认ipi已激活。模型配置和工具风险目录是宿主输入；模型返回、网页正文或工具错误不能改写它们。
 
 ## 1. 测试者需要准备哪些信息
 
@@ -180,10 +180,13 @@ print("classified tools:", len(catalog))
 
 ## 5. 运行控制：默认值、用途及设置入口
 
+下表列出的 partial CLI 开关也适用于全量 `experiments.run_benchmark`；两者共用执行与报告流程，仅默认任务范围和输出根不同。完整框架/baseline 全量命令见 [全量测试指南](./full_benchmark.md)。`use_sandbox` 等仅 API/网页控制仍不因此新增同名 CLI。
+
 | 控制 | 默认 | 可设置入口 / 作用 |
 | --- | --- | --- |
 | use_sandbox | true | factory/API、网页；L2工具授权，关掉不创建任务文件授权；partial普通默认不提供同名CLI |
 | input_isolation | true | factory/API、网页；L1来源视图；partial普通默认开 |
+| l1_projection_mode | projected | factory/API、partial `--l1-projection-mode off/shadow/projected`；网页默认projected，无独立选择器；off保留原来源封装，关闭L1则有效off |
 | authorization_precheck | true | factory/API、网页；L3之前本地整批权限检查；NoL2无效 |
 | planning_tool_view | true | factory/API、网页、partial --no-tool-view；关掉展示完整目录，执行授权仍检查 |
 | delegated_tasks | true | factory/API、网页、partial --no-delegated-tasks；有界明确执行文件任务，不把普通返回变成任务 |
@@ -197,6 +200,8 @@ print("classified tools:", len(catalog))
 这些控制不会从模型连接TOML读取。NoL2同时关闭前置检查、授权工具视图与委托展开；L2/L3均关时L1也关闭。shadow/selective要求L2和L3同时开启，baseline使用原生循环。L3真实阈值/epsilon/delta/grid仍待独立数据与选择，见 [README待决定项](../README.md#l3-仍需确定什么)，不能用一个自填tau替代兼容artifact。authorization_profile/delegated_task_reader是受信host API对象，不是普通测试必填项或TOML新增段，详见 [L2方案](../workshop/L2_opt.md)。
 
 --model-config/--tool-metadata是输入配置路径；--name标识实验；--results-dir是输出根；--task-manifest仅用于显式冻结任务ID，默认无需导入。修改任何有效配置/策略后使用新name，--force-rerun不绕过旧manifest绑定。成本比较采用新name并force-rerun，仍核查API usage/样本分母，不能只凭flag保证可比。
+
+L1投影仅支持原生银行月支出请求与完整Transaction返回，最多32768 UTF-8字节、500行；原生callable/code/schema和元数据不兼容、错误/截断或未知字段均回退。无需额外模型、训练、TOML段或外部profile清单。模式/适配器身份影响缓存和L3 artifact兼容，切换用新run名；细节见 [L1说明](../README.md#l1-优化任务限定的结构化投影)。
 
 审计内部窗口固定为当前任务最近4条工具返回、每条2048字符，工具描述512字符、任务2048字符、动作历史32条，timeout30秒；任务文件正文1536字符、规范化T_eff2048字符、序列化返回16384字符。它们是当前源码边界，普通CLI没有--audit-window/--max-task-chars等参数，不在TOML虚构配置项。
 

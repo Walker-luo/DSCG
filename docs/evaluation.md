@@ -54,9 +54,11 @@ schema_version可选且默认dscg.tool-risk.v1；risk_level等派生字段不要
 
 ### 哪些是可选参数
 
-默认L1/L2/L3开启、planning_tool_view/delegated_tasks=true、routeroff、audit_retries=0、completion_prompt=false、summary日志；routeroff仍保留原L3。普通测试不需要host授权profile、reader、自填tau或外部task manifest。独立L3校准artifact及host profile仅按对应支持域选择，不能为节省预算临时制造免审。各API/CLI/网页入口、固定审计窗口和参数含义见 [运行控制表](./model_tool_configuration.md#5-运行控制默认值用途及设置入口)。
+默认L1/L2/L3开启、l1_projection_mode=projected、planning_tool_view/delegated_tasks=true、routeroff、audit_retries=0、completion_prompt=false、summary日志；routeroff仍保留原L3。普通测试不需要host授权profile、reader、自填tau或外部task manifest。独立L3校准artifact及host profile仅按对应支持域选择，不能为节省预算临时制造免审。各API/CLI/网页入口、固定审计窗口和参数含义见 [运行控制表](./model_tool_configuration.md#5-运行控制默认值用途及设置入口)。
 
 ## 对照与输出
+
+**全量正式测试请使用 `experiments.run_benchmark`。** 当前框架与无防御 baseline 的完整命令、全任务/全攻击区别、计划规模、缓存续跑和结果核对见 [全量测试指南](./full_benchmark.md)。以下 partial 命令仅用于小规模回归；两者复用执行流程，任务范围和默认输出根不同。
 
 ```bash
 python -m experiments.run_partial_benchmark --baseline --force-rerun --name baseline_compare_01
@@ -81,7 +83,7 @@ python -m experiments.run_partial_benchmark --baseline --force-rerun \
 
 ## 攻击选择
 
-默认 typical 为 4 种目标型攻击，共计划 144 条攻击评测，另有注入能力预检；all 为当前 16 种自动攻击，共计划 456 条。计划数不等于有效样本分母。预设不能与具体名称混用；missing typical 攻击会报错，manual 不可选。
+两个 runner 默认 typical 为 4 种目标型攻击；下列 144 条（typical）和 456 条（当前 all）是 **partial 前缀子集**的计划规模，另有注入能力预检。全量入口的规模见 [全量任务表](./full_benchmark.md#当前任务规模)。计划数不等于有效样本分母。预设不能与具体名称混用；missing typical 攻击会报错，manual 不可选。
 
 ```bash
 python -m experiments.run_partial_benchmark --baseline --attack tool_knowledge --name baseline_tools_01
@@ -128,7 +130,7 @@ DoS 显式选择或 all 才运行，按 AgentDojo 原生规则每个用户使用
 | 参数 | 用途 |
 | --- | --- |
 | `--name NAME` | 区分运行，保留历史结果 |
-| `--baseline` | 匹配子集的原生无防御控制 |
+| `--baseline` | 匹配当前入口任务范围的原生无防御控制 |
 | `--attack NAME [NAME ...]` | 具体攻击，可重复该选项；默认 typical，all 显式运行全部 |
 | `--force-rerun` | 重跑任务；也可设 DSCG_FORCE_RERUN=1 |
 | `--clean` | 相同用户任务的无攻击效用控制；使用独立运行名称 |
@@ -136,17 +138,17 @@ DoS 显式选择或 all 才运行，按 AgentDojo 原生规则每个用户使用
 | `--trace-level summary/standard/full` | 默认 summary；standard 简化逐条记录；full 详细诊断和压缩侧车，增加写入成本 |
 | `--include-extra-info` | full 的兼容快捷开关 |
 | `--model-config PATH`、`--tool-metadata PATH` | 覆盖本地模型配置、工具元数据 |
-| `--results-dir DIR` | partial 输出根目录；agent 必须指定 workshop/artifacts 下的新目录 |
+| `--results-dir DIR` | 两个入口均支持；agent 必须指定 workshop/artifacts 下的新目录 |
 
 当前优化没有新增必需参数。`audit_retries=0`、`completion_prompt=false` 保持默认；历史可选补救不叠加到当前框架。
 
 full tracing 不改变防御逻辑。用户此前中断的 full 运行没有确认根因，不能据此认定日志 bug。日常对比用 summary，具体排错才使用 full。
 
-用户完整评测入口为 `python -m experiments.run_benchmark --name full_compare_01`：全部任务、固定 important_instructions、默认输出 `results/benchmarks/`。该入口目前没有 `--results-dir`；agent 不应直接用它生成临时测试，需先具备显式隔离输出的入口。没有新增环境变量或自动重定向行为。
+用户完整评测入口为 `python -m experiments.run_benchmark --name full_compare_01`：全部注册任务，默认 typical 四攻击，默认输出 `results/benchmarks/`；支持 baseline、clean、攻击选择及 `--results-dir`。成对命令与隔离输出示例统一见 [全量测试指南](./full_benchmark.md)。
 
 ## 结果文件
 
-`run_partial_benchmark.py` 自动生成以下文件，无需额外参数：
+两个入口均自动生成以下文件，无需额外参数。下图展示 partial；全量的默认根替换为 `results/benchmarks/`：
 
 ```text
 results/partial_benchmark/<model_id>_<name>/
@@ -166,7 +168,7 @@ results/partial_benchmark/<model_id>_<name>/
 
 缺失/非布尔安全结果不计入 ASR 分母；缺失的计划任务保留位置及空标签，不伪造 TSR/ASR 结果。运行异常显示 N/A 与异常类型，保留本次中断前已经完成场景的统计，不读取未完成场景的旧 `summary.json`。正常无失败时仍生成空的 JSONL。无攻击轨迹位于 `none/<suite>/<user_task>/none/none.json`。
 
-这两个新文件在本次运行结束时更新，也支持正常缓存读取；不会复制完整轨迹或改写原生任务 JSON。强制终止进程可能尚未生成它们。历史目录不自动补写，使用新运行名称；现有配置绑定仍生效。Agent 测试输出继续显式使用 `--results-dir workshop/artifacts/<YYYYMMDD>_<task>/partial_benchmark`。
+这两个新文件在本次运行结束时更新，也支持正常缓存读取；不会复制完整轨迹或改写原生任务 JSON。强制终止进程可能尚未生成它们。历史目录不自动补写，使用新运行名称；现有配置绑定仍生效。Agent 测试输出继续显式使用新的 `--results-dir workshop/artifacts/<YYYYMMDD>_<task>/partial_benchmark` 或全量的 `benchmarks` 子目录。
 
 ## 指标与证据
 

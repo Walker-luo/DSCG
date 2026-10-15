@@ -10,16 +10,18 @@ from agentdojo.task_suite import get_suite
 import json
 
 from dscg.model_config import ModelConfigurationError
-from dscg.paths import RESULTS_DIR
+from dscg.paths import RESULTS_DIR, BENCHMARK_RESULTS_DIR
 from dscg.audit_router import summarize_events
 from dscg.input_isolation import FRAMEWORK_VERSION
+from dscg.l1_projection import MODES as L1_PROJECTION_MODES, PROFILE_SHA256 as L1_PROFILE_SHA256
 from dscg.pipelines.baseline import make_openai_compatible_pipeline
 from dscg.pipelines.defended import make_defended_pipeline
 from dscg.tool_metadata import ToolMetadataError, load_tool_metadata
 from experiments.harness_audit import rank_ids, security_result_fields
 from experiments.partial_reporting import collect_suite_report, write_run_overview
 from experiments.partial_controls import (validate_controls, make_task_manifest, load_task_manifest,
-                                          select_tasks, guard_run, source_revision, preserve_cached_cost)
+                                          select_tasks, guard_run, source_revision, preserve_cached_cost,
+                                          RunConfigurationError)
 
 
 TYPICAL_ATTACKS = (
@@ -60,7 +62,7 @@ def _write_combined_report(output_dir: Path, report_sources: list[tuple[str, Pat
 
     combined_report_path = output_dir / "all_report.txt"
     with combined_report_path.open("w", encoding="utf-8") as combined:
-        combined.write("DSCG 小批量评测总报告\n")
+        combined.write("DSCG 评测总报告\n")
         combined.write("=" * 70 + "\n")
         combined.write("本文件按攻击或场景合并报告，具体任务结果见对应标题下的内容。\n")
 
@@ -101,11 +103,11 @@ def resolve_attack_names(selection: str | list[str] = "typical") -> list[str]:
     return list(dict.fromkeys(names))
 
 
-def _validate_router_controls(origin, use_security_checker, mode):
+def _validate_router_controls(origin, use_security_checker, mode, use_sandbox=True):
     if mode not in {"off","shadow","selective"}:
         raise ValueError("unknown audit-router mode")
-    if mode != "off" and (origin or not use_security_checker):
-        raise ValueError("audit routing requires the defended pipeline with checker")
+    if mode != "off" and (origin or not use_security_checker or not use_sandbox):
+        raise ValueError("audit routing requires the defended pipeline with L2 and checker")
 
 
 def _router_trace_summary(suite_dir, task_keys, attack_name, run_attack):
@@ -155,13 +157,27 @@ def main(
     audit_router_artifact: str | Path | None = None,
     planning_tool_view: bool = True,
     delegated_tasks: bool = True,
+    l1_projection_mode: str = 'projected',
+    task_scope: str = 'partial',
+    use_sandbox: bool = True,
 ) -> int:
-    _validate_router_controls(origin,use_security_checker,audit_router_mode)
+    if task_scope not in {'partial', 'full'}:
+        raise ValueError('task scope must be partial or full')
+    if not isinstance(l1_projection_mode, str) or l1_projection_mode not in L1_PROJECTION_MODES:
+        raise ValueError('invalid L1 projection mode')
+    _validate_router_controls(origin,use_security_checker,audit_router_mode,use_sandbox)
     validate_controls(origin=origin, use_security_checker=use_security_checker,
                       audit_retries=audit_retries, completion_prompt=completion_prompt)
-    load_task_manifest(task_manifest_path)
+    frozen_tasks = load_task_manifest(task_manifest_path)
+    if task_scope == 'full' and frozen_tasks is not None:
+        # Validate the full catalogue before model/client construction. DoS later
+        # projects this complete catalogue to its native first-injection rule.
+        for suite_name in suites:
+            suite = get_suite('v1.2', suite_name)
+            select_tasks(frozen_tasks, suite_name, list(suite.user_tasks), list(suite.injection_tasks),
+                         run_attack, False, task_scope='full')
     attack_names = resolve_attack_names(attack) if run_attack else ["none"]
-    logdir = Path(results_dir) if results_dir is not None else RESULTS_DIR / "partial_benchmark"
+    logdir = Path(results_dir) if results_dir is not None else BENCHMARK_RESULTS_DIR if task_scope == 'full' else RESULTS_DIR / "partial_benchmark"
     multiple = len(attack_names) > 1
     context = {}
     run_records = []
@@ -183,9 +199,14 @@ def main(
                 audit_retries=audit_retries, completion_prompt=completion_prompt,
                 task_manifest_path=task_manifest_path,
                 audit_router_mode=audit_router_mode,audit_router_artifact=audit_router_artifact,
-                planning_tool_view=planning_tool_view and not origin,
-                delegated_tasks=delegated_tasks and not origin,
+                planning_tool_view=planning_tool_view and not origin and use_sandbox,
+                delegated_tasks=delegated_tasks and not origin and use_sandbox,
+                l1_projection_mode='off' if origin or not (use_sandbox or use_security_checker) else l1_projection_mode,
+                task_scope=task_scope, use_sandbox=use_sandbox,
             )
+        except RunConfigurationError as exc:
+            print(f"❌ 配置绑定冲突: {exc}")
+            return 1
         except (ModelConfigurationError, ToolMetadataError):
             raise
         except Exception as exc:
@@ -206,6 +227,7 @@ def main(
     batch_dir = context.get("base_output_dir", fallback)
     batch_dir.mkdir(parents=True, exist_ok=True)
     manifest = {
+        "task_scope": task_scope,
         "result_layout": "model_run/attack/suite",
         "pipeline_name": context.get("pipeline_name"),
         "model_id": context.get("model_id"),
@@ -265,6 +287,9 @@ def _run_single_attack(
     audit_router_artifact: str | Path | None = None,
     planning_tool_view: bool = True,
     delegated_tasks: bool = True,
+    l1_projection_mode: str = 'projected',
+    task_scope: str = 'partial',
+    use_sandbox: bool = True,
 ):
     """
         model_id: 执行的llm的id
@@ -277,14 +302,14 @@ def _run_single_attack(
 
 
 
-    _validate_router_controls(origin,use_security_checker,audit_router_mode)
+    _validate_router_controls(origin,use_security_checker,audit_router_mode,use_sandbox)
     validate_controls(origin=origin, use_security_checker=use_security_checker,
                       audit_retries=audit_retries, completion_prompt=completion_prompt)
     frozen_tasks = load_task_manifest(task_manifest_path)
-    selection_seed = frozen_tasks.get("seed", 7) if frozen_tasks else 7
+    selection_seed = None if task_scope == 'full' else frozen_tasks.get("seed", 7) if frozen_tasks else 7
     tool_metadata = None if origin else load_tool_metadata(tool_metadata_path)
     active_defense = defense if origin else "dscg"
-    logdir = Path(results_dir) if results_dir is not None else RESULTS_DIR / "partial_benchmark"
+    logdir = Path(results_dir) if results_dir is not None else BENCHMARK_RESULTS_DIR if task_scope == 'full' else RESULTS_DIR / "partial_benchmark"
     logdir.mkdir(parents=True, exist_ok=True)
     report_sources: list[tuple[str, Path]] = []
     output_dir: Path | None = None
@@ -324,9 +349,11 @@ def _run_single_attack(
                 trace_level=trace_level,
                 tool_metadata=tool_metadata,
                 use_security_checker=use_security_checker,
+                use_sandbox=use_sandbox,
                 audit_retries=audit_retries, completion_prompt=completion_prompt,
                 audit_router_mode=audit_router_mode,audit_router_artifact=audit_router_artifact,
                 planning_tool_view=planning_tool_view, delegated_tasks=delegated_tasks,
+                l1_projection_mode=l1_projection_mode,
             )
 
         main_model_config = getattr(pipeline, "dscg_model_config", {})
@@ -356,12 +383,14 @@ def _run_single_attack(
         attack = attacks.load_attack(attack_name, suite, pipeline) if run_attack else None
         is_dos_attack = run_attack and attack.is_dos_attack
 
-        # Share the same deterministic subset across baseline and DSCG runs.
+        # Share the same scope/IDs across baseline and DSCG; only partial is capped.
         selected_users, selected_injections = select_tasks(
             frozen_tasks, suite_name, user_task_ids, injection_task_ids, run_attack, is_dos_attack,
+            task_scope=task_scope,
         )
         run_binding = {
-            "schema_version": "dscg.partial-run.v1",
+            "schema_version": "dscg.full-run.v1" if task_scope == 'full' else "dscg.partial-run.v1",
+            "task_scope": task_scope,
             "task_selection": {"users": selected_users, "injections": selected_injections,
                                "suite_version": "v1.2", "seed": selection_seed},
             "attack": attack_name if run_attack else None,
@@ -371,8 +400,10 @@ def _run_single_attack(
             "trace_level": None if origin else trace_level,
             "tool_metadata": tool_metadata, "source": source_revision(),
             "defense_version": None if origin else FRAMEWORK_VERSION,
-            "input_isolation": not origin,
-            "authorization_precheck": not origin,
+            "input_isolation": bool(not origin and (use_sandbox or use_security_checker)),
+            'l1_projection_mode': 'off' if origin else l1_projection_mode,
+            'l1_projection_profile_sha256': None if origin else L1_PROFILE_SHA256,
+            "authorization_precheck": bool(not origin and use_sandbox),
             'planning_tool_view': bool(planning_tool_view and not origin),
             'delegated_tasks': bool(delegated_tasks and not origin),
             "audit_router_mode": audit_router_mode,
@@ -492,6 +523,7 @@ def _run_single_attack(
             sec_total_tokens = sec_tracker.get_total_tokens() 
 
         summary_data = {
+            "task_scope": task_scope,
             "suite_name": suite_name,
             "pipeline_name": f"{result_dir_name}/{attack_component}",
             "model_id": resolved_model_id,
@@ -634,9 +666,12 @@ def _run_single_attack(
 
 
 
-def cli(argv: list[str] | None = None) -> int:
+def cli(argv: list[str] | None = None, *, task_scope: str = 'partial') -> int:
+    if task_scope not in {'partial', 'full'}:
+        raise ValueError('task scope must be partial or full')
+    full = task_scope == 'full'
     parser = argparse.ArgumentParser(
-        description="运行 DSCG 的四场景小批量 AgentDojo 回归评测。"
+        description="运行 DSCG 的四场景全量 AgentDojo 评测（全部用户/注入任务）。" if full else "运行 DSCG 的四场景小批量 AgentDojo 回归评测。"
     )
     parser.add_argument(
         "--attack",
@@ -649,7 +684,7 @@ def cli(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--baseline",
         action="store_true",
-        help="运行无防御 AgentDojo 基线；与默认 DSCG 使用相同任务子集和注入攻击。",
+        help="运行无防御 AgentDojo 基线；与默认 DSCG 使用相同任务范围和注入攻击。",
     )
     parser.add_argument(
         "--force-rerun",
@@ -678,7 +713,7 @@ def cli(argv: list[str] | None = None) -> int:
         dest="tool_metadata_path",
         metavar="PATH",
         default=os.getenv("DSCG_TOOL_METADATA"),
-        help="显式工具风险元数据 TOML；缺省时未分类工具按 critical 处理。",
+        help="显式工具风险元数据 TOML；默认本地覆盖或内置 AgentDojo 分类，缺失/非法工具按 critical 处理。",
     )
     parser.add_argument(
         "--model-config",
@@ -689,17 +724,19 @@ def cli(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--results-dir",
         metavar="DIR",
-        help="结果根目录；缺省使用 results/partial_benchmark/。",
+        help="结果根目录；缺省使用 results/benchmarks/。" if full else "结果根目录；缺省使用 results/partial_benchmark/。",
     )
     parser.add_argument("--no-checker", action="store_true", help="P0 消融：保留授权/monitor/ticket，关闭语义审计。")
     parser.add_argument('--no-tool-view', action='store_true', help='L2 对照：规划器展示完整工具目录，保留执行权限检查。')
     parser.add_argument('--no-delegated-tasks', action='store_true', help='关闭显式任务文件展开，用于原任务编译对照。')
+    parser.add_argument('--l1-projection-mode', choices=('off','shadow','projected'), default='projected',
+                        help='L1有限交易投影，默认projected；off保留旧来源封装，shadow只观察。')
     parser.add_argument("--audit-router-mode",choices=("off","shadow","selective"),default="off",help="L3纯算法路由；默认off。")
     parser.add_argument("--audit-router-artifact",help="冻结的独立分组校准JSON；缺失/无效时保留完整审计。")
     parser.add_argument("--audit-retries", type=int, choices=(0, 1), default=0, help="语义 abstain 有界重审次数；默认 0。")
     parser.add_argument("--completion-prompt", action="store_true", help="启用通用任务完成提示；默认关闭。")
     parser.add_argument("--clean", action="store_true", help="用相同用户任务运行无攻击效用控制。")
-    parser.add_argument("--task-manifest", dest="task_manifest_path", help="读取冻结 v1.2 任务 ID 清单。")
+    parser.add_argument("--task-manifest", dest="task_manifest_path", help="读取冻结 v1.2 全量任务清单；拒绝缩小实际执行集合。" if full else "读取冻结 v1.2 任务 ID 清单。")
     parser.add_argument("--write-task-manifest", metavar="PATH", help="离线导出当前任务 ID 清单并退出，不调用模型。")
     args = parser.parse_args(argv)
     try:
@@ -710,7 +747,7 @@ def cli(argv: list[str] | None = None) -> int:
             path = Path(args.write_task_manifest)
             if path.exists(): parser.error("task manifest already exists; preserve old evidence")
             path.parent.mkdir(parents=True, exist_ok=True)
-            path.write_text(json.dumps(make_task_manifest(), ensure_ascii=False, indent=2) + "\n")
+            path.write_text(json.dumps(make_task_manifest(task_scope), ensure_ascii=False, indent=2) + "\n")
             print(f"任务清单: {path}")
             return 0
     except ValueError as exc:
@@ -736,13 +773,15 @@ def cli(argv: list[str] | None = None) -> int:
             trace_level="full" if args.include_extra_info else args.trace_level,
             tool_metadata_path=args.tool_metadata_path,
             config_path=args.config_path,
-            results_dir=args.results_dir,
+            results_dir=args.results_dir if args.results_dir is not None else BENCHMARK_RESULTS_DIR if full else None,
+            task_scope=task_scope,
             attack=selected_attacks,
             use_security_checker=not args.no_checker, audit_retries=args.audit_retries,
             completion_prompt=args.completion_prompt, task_manifest_path=args.task_manifest_path,
             audit_router_mode=args.audit_router_mode,audit_router_artifact=args.audit_router_artifact,
             planning_tool_view=not args.no_tool_view and not args.baseline,
             delegated_tasks=not args.no_delegated_tasks and not args.baseline,
+            l1_projection_mode='off' if args.baseline else args.l1_projection_mode,
         )
     except (ModelConfigurationError, ToolMetadataError, ValueError) as exc:
         print(f"模型配置错误: {exc}")

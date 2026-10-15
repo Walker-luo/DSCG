@@ -570,13 +570,17 @@ button, input, select { letter-spacing: 0; }
 .history-canvas-wrap.is-dense { grid-template-columns: minmax(0, 1fr); }
 .history-chart-card h3 { margin: 0 0 12px; color: var(--text); font-size: 13px; font-weight: 650; }
 .history-chart-plot { position: relative; height: 340px; }
+.history-chart-scroll { max-width: 100%; overflow-x: auto; }
+.history-chart-scroll:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
 .history-chart-plot canvas { height: 340px !important; max-height: 340px; }
 .history-chart-legend { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 8px; margin-bottom: 12px; }
 .history-legend-item { display: flex; align-items: center; gap: 9px; min-width: 0; max-width: 100%; padding: 8px; border: 1px solid var(--border); border-left-width: 3px; border-radius: 4px; background: var(--bg); color: var(--text-secondary); text-align: left; }
 .history-legend-item span { min-width: 0; overflow-wrap: anywhere; }
-.history-legend-item strong { display: block; color: var(--text); font-size: 14px; line-height: 1.3; }
-.history-legend-item small { display: block; margin-top: 3px; color: var(--text-muted); font-size: 10px; }
+.history-legend-item strong { display: block; color: var(--text); font-size: 15px; line-height: 1.3; }
+.history-legend-item small { display: block; margin-top: 3px; color: var(--text-secondary); font-size: 12px; line-height: 1.5; }
 .history-legend-item[aria-pressed="false"] { opacity: 0.45; text-decoration: line-through; }
+.history-chart-legend canvas.history-fill-swatch { width: 28px !important; height: 28px !important; max-height: 28px; flex-shrink: 0; border-radius: 3px; }
+.history-fill-hint { margin: 10px 0 0; color: var(--text-muted); font-size: 11px; line-height: 1.5; }
 .history-summary-table .history-version-badge, #history-summary-table .history-version-badge { margin-right: 7px; }
 .history-table-section .table-responsive { max-height: 380px; overflow: auto; }
 .history-table-section thead th, .history-heatmap-container thead th { position: sticky; top: 0; z-index: 1; background: var(--surface); }

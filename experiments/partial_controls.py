@@ -1,4 +1,4 @@
-"""Matched partial-run controls, frozen IDs and cache configuration binding."""
+"""Matched benchmark controls, explicit task scopes and cache configuration binding."""
 import hashlib
 import json
 import platform
@@ -10,6 +10,10 @@ from agentdojo.task_suite import get_suite
 SUITES=('workspace','travel','banking','slack')
 
 
+class RunConfigurationError(ValueError):
+    """A rejected cache binding must never rewrite the previous run reports."""
+
+
 def validate_controls(*, origin=False,use_security_checker=True,audit_retries=0,completion_prompt=False):
     if origin and (not use_security_checker or audit_retries or completion_prompt):
         raise ValueError('native baseline cannot use DSCG ablation options')
@@ -17,7 +21,14 @@ def validate_controls(*, origin=False,use_security_checker=True,audit_retries=0,
         raise ValueError('audit retries require checker and must be 0 or 1')
 
 
-def make_task_manifest():
+def make_task_manifest(task_scope='partial'):
+    if task_scope not in {'partial', 'full'}:
+        raise ValueError('task scope must be partial or full')
+    if task_scope == 'full':
+        return {'schema_version': 'dscg.full-tasks.v1', 'suite_version': 'v1.2', 'seed': None,
+                'selection_rule': 'all-registered-tasks (DoS uses first injection per user)',
+                'suites': {name: {'user_task_ids': list(get_suite('v1.2', name).user_tasks),
+                                  'injection_task_ids': list(get_suite('v1.2', name).injection_tasks)} for name in SUITES}}
     return {'schema_version':'dscg.partial-tasks.v1','suite_version':'v1.2','seed':7,
             'selection_rule':'registration-order-prefix (seed is metadata, not API determinism)',
             'suites':{name:{'user_task_ids':list(get_suite('v1.2',name).user_tasks)[:3],
@@ -32,8 +43,13 @@ def load_task_manifest(path):
     return result
 
 
-def select_tasks(manifest,suite_name,users,injections,run_attack,is_dos):
-    if manifest is None:return users[:3],injections[:1 if is_dos else 3] if run_attack else []
+def select_tasks(manifest,suite_name,users,injections,run_attack,is_dos,*,task_scope='partial'):
+    if task_scope not in {'partial', 'full'}:
+        raise ValueError('task scope must be partial or full')
+    if manifest is None:
+        selected_users = list(users) if task_scope == 'full' else users[:3]
+        selected_injections = injections[:1] if is_dos else list(injections) if task_scope == 'full' else injections[:3]
+        return selected_users, selected_injections if run_attack else []
     if manifest.get('suite_version')!='v1.2' or suite_name not in manifest.get('suites',{}):
         raise ValueError('frozen manifest lacks current v1.2 suite')
     entry=manifest['suites'][suite_name]
@@ -44,6 +60,10 @@ def select_tasks(manifest,suite_name,users,injections,run_attack,is_dos):
         return list(ids)
     selected_users=check('user_task_ids',users)
     selected_injections=check('injection_task_ids',injections) if run_attack else []
+    if task_scope == 'full':
+        if selected_users != list(users) or (run_attack and selected_injections != list(injections)):
+            raise ValueError('full benchmark requires all registered task IDs in registration order; partial manifests cannot reduce it')
+        return selected_users, selected_injections[:1] if is_dos and run_attack else selected_injections
     if is_dos and selected_injections!=injections[:1]:
         raise ValueError('AgentDojo DoS uses first injection ID; supply a separate matching manifest')
     return selected_users,selected_injections
@@ -53,7 +73,7 @@ def guard_run(path,manifest):
     path=Path(path)
     if path.exists():
         if json.loads(path.read_text())!=manifest:
-            raise ValueError('run configuration changed; use a new --name (old results preserved)')
+            raise RunConfigurationError('run configuration changed; use a new --name (old results preserved)')
         return
     # Historical traces without a binding cannot be certified as a matching cache.
     if path.parent.exists() and ((path.parent/'summary.json').exists() or any(path.parent.rglob('injection_task_*.json')) or any(path.parent.rglob('none.json'))):
@@ -64,7 +84,7 @@ def guard_run(path,manifest):
 
 def source_revision():
     root=Path(__file__).resolve().parents[1]
-    paths=sorted((root/'dscg').rglob('*.py'))+[Path(__file__),root/'experiments/run_partial_benchmark.py']
+    paths=sorted((root/'dscg').rglob('*.py'))+[Path(__file__),root/'experiments/run_partial_benchmark.py',root/'experiments/run_benchmark.py']
     hashes={str(p.relative_to(root)):hashlib.sha256(p.read_bytes()).hexdigest() for p in paths}
     try:commit=subprocess.check_output(['git','rev-parse','HEAD'],cwd=root,text=True).strip()
     except (OSError,subprocess.CalledProcessError):commit=None

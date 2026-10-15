@@ -74,30 +74,62 @@
     return {
       label: separator >= 0 ? model.slice(separator + 1) : model || run.label || experimentKey(run),
       fullLabel: run.label || [run.model_group || model || experimentKey(run), run.attack_name].filter(Boolean).join(" / "),
-      subtitle: [run.attack_name, run.model_group || model].filter(Boolean).join(" · "),
+      subtitle: run.attack_name || "未记录攻击",
     };
   }
 
-  const identityLabels = {
-    id: "historyIdentityLabels",
-    afterDatasetsDraw(chart) {
+  const patternCache = new WeakMap();
+  const patternKinds = ["diagonal", "dots", "horizontal", "crosshatch", "vertical", "reverse-diagonal"];
+
+  function createBarFill(ctx, pattern, color, background = "#171d19") {
+    if (!pattern || pattern.kind === "solid") return color;
+    let cache = patternCache.get(ctx);
+    if (!cache) { cache = new Map(); patternCache.set(ctx, cache); }
+    const key = [pattern.kind, pattern.size, color, background].join("|");
+    if (cache.has(key)) return cache.get(key);
+    const tile = ctx.canvas.ownerDocument.createElement("canvas");
+    const size = pattern.size;
+    tile.width = tile.height = size;
+    const ink = tile.getContext("2d");
+    ink.fillStyle = background;
+    ink.fillRect(0, 0, size, size);
+    ink.fillStyle = alpha(color, 0.2);
+    ink.fillRect(0, 0, size, size);
+    ink.strokeStyle = ink.fillStyle = color;
+    ink.lineWidth = 1.5;
+    ink.beginPath();
+    if (pattern.kind === "dots") {
+      for (const x of [size / 4, size * 3 / 4]) for (const y of [size / 4, size * 3 / 4]) {
+        ink.beginPath(); ink.arc(x, y, Math.max(0.8, size / 10), 0, Math.PI * 2); ink.fill();
+      }
+    } else {
+      if (["diagonal", "crosshatch"].includes(pattern.kind)) {
+        for (const x of [-size, 0, size]) { ink.moveTo(x, size); ink.lineTo(x + size, 0); }
+      }
+      if (["reverse-diagonal", "crosshatch"].includes(pattern.kind)) {
+        for (const x of [-size, 0, size]) { ink.moveTo(x, 0); ink.lineTo(x + size, size); }
+      }
+      if (pattern.kind === "horizontal") {
+        for (const y of [size / 3, size * 2 / 3]) { ink.moveTo(0, y); ink.lineTo(size, y); }
+      }
+      if (pattern.kind === "vertical") {
+        for (const x of [size / 3, size * 2 / 3]) { ink.moveTo(x, 0); ink.lineTo(x, size); }
+      }
+      ink.stroke();
+    }
+    const fill = ctx.createPattern(tile, "repeat") || color;
+    cache.set(key, fill);
+    return fill;
+  }
+
+  const barPatterns = {
+    id: "historyBarPatterns",
+    beforeUpdate(chart) {
       if (chart.config.type !== "bar") return;
-      const { ctx } = chart;
-      ctx.save();
-      ctx.font = "bold 11px sans-serif";
-      ctx.textAlign = "center";
-      ctx.textBaseline = "bottom";
-      chart.data.datasets.forEach((dataset, index) => {
-        if (!chart.isDatasetVisible(index)) return;
-        const bars = chart.getDatasetMeta(index).data;
-        ctx.fillStyle = dataset.borderColor;
-        dataset.data.forEach((value, position) => {
-          const bar = bars[position];
-          if (!Number.isFinite(value) || !bar || !Number.isFinite(bar.x) || !Number.isFinite(bar.y)) return;
-          ctx.fillText(dataset.identityBadge, bar.x, Math.max(chart.chartArea.top + 12, bar.y - 6));
-        });
+      const background = chart.options.plugins.historyBarPatterns?.backgroundColor;
+      chart.data.datasets.forEach(dataset => {
+        dataset.backgroundColor = createBarFill(chart.ctx, dataset.fillPattern, dataset.borderColor, background);
       });
-      ctx.restore();
     },
   };
 
@@ -126,6 +158,10 @@
       fullLabel: identity.fullLabel + (run.source ? " · " + run.source : ""),
       legendSubtitle: identity.subtitle,
       identityBadge: style.badge + (multiple ? String(attackIndex + 1) : ""),
+      fillPattern: attackIndex <= 0 ? {kind: "solid", size: 12} : {
+        kind: patternKinds[(attackIndex - 1) % patternKinds.length],
+        size: Math.max(4, 12 - Math.floor((attackIndex - 1) / patternKinds.length) * 4),
+      },
       pointStyle: multiple ? shapes[attackIndex % shapes.length] : style.pointStyle,
       borderDash: multiple ? dashes[attackIndex % dashes.length] : style.borderDash,
     };
@@ -165,13 +201,14 @@
       responsive: true, maintainAspectRatio: false,
       layout: { padding: 12 },
       plugins: {
+        historyBarPatterns: { backgroundColor: theme.background },
         legend: {
           position: "bottom",
           labels: {
             color: theme.text, boxWidth: 10, boxHeight: 10, padding: 14, usePointStyle: true,
             generateLabels(chart) {
               return chart.data.datasets.map((dataset, index) => ({
-                text: dataset.label, fillStyle: dataset.borderColor, strokeStyle: dataset.borderColor,
+                text: dataset.label, fillStyle: chart.config?.type === "bar" ? dataset.backgroundColor : dataset.borderColor, strokeStyle: dataset.borderColor,
                 fontColor: theme.text, lineWidth: dataset.borderWidth || 1,
                 pointStyle: dataset.pointStyle, lineDash: dataset.borderDash || [],
                 hidden: !chart.isDatasetVisible(index), datasetIndex: index,
@@ -225,7 +262,8 @@
       };
       if (view !== "radar") dataset.yAxisID = "y";
       if (view === "bar") {
-        Object.assign(dataset, { borderWidth: 0, borderRadius: 2, maxBarThickness: 24, grouped: byScenario });
+        Object.assign(dataset, { borderWidth: 1, borderSkipped: false, borderRadius: 1,
+          minBarLength: 2, maxBarThickness: 24, grouped: byScenario });
       } else {
         Object.assign(dataset, {
           pointRadius: 4, pointHoverRadius: 6, pointBackgroundColor: color,
@@ -272,7 +310,7 @@
         };
       }
     }
-    return { type: view, data: { labels, datasets }, options: chartOptions, plugins: view === "bar" ? [identityLabels] : [] };
+    return { type: view, data: { labels, datasets }, options: chartOptions, plugins: view === "bar" ? [barPatterns] : [] };
   }
 
   function scatterConfig(experiments, customTheme) {
@@ -302,7 +340,7 @@
     return { type: "scatter", data: { datasets }, options: chartOptions };
   }
 
-  const api = { metricInfo, metricConfigs, scatterConfig, canUseRadar, createExperimentStyles, describeExperiment };
+  const api = { metricInfo, metricConfigs, scatterConfig, canUseRadar, createExperimentStyles, describeExperiment, createBarFill };
   if (typeof module === "object" && module.exports) module.exports = api;
   else root.DSCGHistoryCharts = api;
 })(typeof window === "undefined" ? globalThis : window);
