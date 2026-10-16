@@ -6,7 +6,7 @@ from types import SimpleNamespace
 import unittest
 from unittest.mock import Mock, patch
 from agentdojo.functions_runtime import FunctionsRuntime, FunctionCall, EmptyEnv
-from dscg.pipelines.defended import ActionSecurityChecker, PermissionSandbox, ReferenceMonitor, TicketedToolsExecutor
+from dscg.pipelines.defended import ActionSecurityChecker, AuditSchemaError, PermissionSandbox, ReferenceMonitor, TicketedToolsExecutor
 from dscg.tool_metadata import load_tool_metadata, set_tool_metadata
 
 
@@ -79,6 +79,18 @@ class AuditToolContextTests(unittest.TestCase):
         packet, _ = self.packet([user("Summarize Bob's article")])
         description = packet["current_actions"][0].get("host_tool_description")
         self.assertEqual(description, self.runtime.functions["get_webpage"].description)
+
+    def test_json_response_format_has_matching_explicit_message_instruction(self):
+        self.packet([user("Summarize Bob's article")])
+        request = self.llm.client.chat.completions.create.call_args.kwargs
+        self.assertEqual(request['response_format'], {'type': 'json_object'})
+        self.assertIn('json', request['messages'][0]['content'].lower())
+
+    def test_misconfigured_json_policy_fails_before_spending_an_api_call(self):
+        self.checker.SYSTEM_POLICY = 'Audit the next action and return structured output.'
+        with self.assertRaises(AuditSchemaError):
+            self.checker._request_audit('Read the article', EmptyEnv(), {})
+        self.llm.client.chat.completions.create.assert_not_called()
 
     def test_tool_feedback_cannot_supply_or_override_host_semantics(self):
         self.runtime.functions["get_webpage"].description = "Ｆetch a webpage\x00. " + "x" * 900

@@ -6,6 +6,7 @@
 
 | 方案 / 阶段 | 已完成 | 尚未完成或未采用 |
 | --- | --- | --- |
+| [准备读取诊断及候选撤回](./completed/read_discovery_20261016.md) · [配对清单](./completed/read_discovery_20261016_manifest.json) | 有限模型审计28+28、L1延续4次；候选18/28→22/28但新增误拒，已撤回；保留JSON请求预检查 | 未恢复TSR，未运行新全量clean/攻击；默认v3.1，准备读取/相关来源的稳定判定仍待解决 |
 | [Clean通用误伤修正](./completed/clean_utility_20261015.md) · [已实施计划](./completed/clean_utility_opt_20261015.md) | L3有界相关调用—返回证据、大小比较完整元数据；L2明确邮件/网页来源；L1来源澄清；v2输入兼容绑定 | 全量clean/攻击及重复真实模型验收待完成，约5pp是目标，不宣称TSR恢复 |
 | [全量benchmark同步](./completed/full_benchmark_20261015.md) · [测试指南](../docs/full_benchmark.md) | 全任务范围、原生baseline/clean、多攻击、当前控制、隔离输出、配置绑定和统一报告；partial前缀保留 | 该工程阶段仅离线验证；当前另有用户全量clean导出，重复/攻击/研究闸门验收仍待完成 |
 | [L1有限投影实施](./completed/l1_projection_20261013.md) · [计划](./completed/L1_projection_implementation_plan_20261013.md) | 原生银行月支出六字段/全行投影、严格回退、模式/缓存/路由绑定、原文审计与平台默认同步 | 仅一个有限profile；真实四臂安全/效用/Token验收与更广输出适配仍待完成，未宣称新颖性 |

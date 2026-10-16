@@ -2330,6 +2330,11 @@ class ActionSecurityChecker(agent_pipeline.BasePipelineElement):
         return response_messages[-1] if response_messages else None
 
     def _request_audit(self, query, env, packet: dict):
+        # JSON response mode requires an explicit format instruction. Fail
+        # locally on a misconfigured policy instead of paying for rejected
+        # requests. This does not change any valid audit decision or policy.
+        if "json" not in self.SYSTEM_POLICY.casefold():
+            raise AuditSchemaError("JSON mode requires an explicit JSON instruction")
         prompt = json.dumps(packet, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
         request_kwargs = {
             "model": getattr(self.small_llm, "name", "unknown-model"),
