@@ -1,5 +1,7 @@
 # L3 Checker 优化：纯算法选择性审计
 
+> 2026-10-15：当前审计输入为v2，有界相关调用—返回证据共享8192字符预算，最多8条；旧输入/校准artifact不能直接沿用。见[Clean修正报告](./completed/clean_utility_20261015.md)。纯算法路由仍off，未部署真实阈值。
+
 更新：2026-10-10。**工程实现已接入；真实独立标签、部署校准和端到端收益验收尚未完成。** 用户已选择纯算法版，替代旧方案的稀疏逻辑回归。原文原字节保存在 [修订归档](./archive/l3_selective_impl_20261010/originals/workshop/L3_checker_opt.md)，基础三层见 [已实施方案](./completed/3_layer_opt.md)。实施报告见 [L3 工程报告](./completed/l3_algorithm_implementation_20261010.md)。
 
 本优化属于 L3 内部的审计调度。既有授权、Monitor、ticket 和读取 deny 例外继续执行。没有新增对象/数据权限、来源认证、恢复动作或第四层；正式 research 路线不改变。默认 `off`、`audit_retries=0`、`completion_prompt=false`。没有随代码附带一个可以部署的非空阈值。
@@ -30,7 +32,7 @@ flowchart TD
 
 公共读免审和 L2 拒绝是既有能力，不能计作本次新增节省。新分支只考虑**有效注册、已授权、单调用、read、sink=none、sensitivity=internal、idempotent=true**。个人/秘密读取、写入、删除、金融、发送、外部 sink、混合批次均不通过该门。元数据不按工具名字猜测。
 
-任务超2048字符、宿主描述超512字符、参数实际裁剪/不支持/非有限、近4条返回窗口或每条2048字符截断、32项动作窗口截断、工具错误、空任务/描述、schema不匹配、总输入超12288规范化字符时，继续原完整审计。完整性必须提供8个明确布尔标记（request/description/history/window/content/error/argument truncation/argument unsupported）；缺失或未知字段不是“完整”。完整性是宿主布尔标记，正文里的 `<max-depth>` 不会自行改变资格。边界是字符和结构，不是 Token。
+任务超2048字符、宿主描述超512字符、参数实际裁剪/不支持/非有限、当前任务证据选取遗漏、共享8192字符预算截断、调用参数裁剪或文件正文省略、32项动作窗口截断、工具错误、空任务/描述、schema不匹配、总输入超12288规范化字符时，继续原完整审计。完整性必须提供8个明确布尔标记（request/description/history/window/content/error/argument truncation/argument unsupported）；缺失或未知字段不是“完整”。完整性是宿主布尔标记，正文里的 `<max-depth>` 不会自行改变资格。边界是字符和结构，不是 Token。
 
 ## 2. 固定公式
 

@@ -54,7 +54,7 @@
             <label class="toggle-row layer-two" for="use-sandbox"><span><i class="bi bi-key"></i><strong>L2 · 可信任务工具授权</strong><small>按任务编译可用工具，默认整批前置检查</small></span><input class="form-check-input" type="checkbox" id="use-sandbox" checked></label>
             <label class="precheck-option" for="authorization-precheck"><input class="form-check-input" type="checkbox" id="authorization-precheck" checked><span>候选批次在 L3 前校验权限</span></label>
             <label class="precheck-option" for="planning-tool-view"><input class="form-check-input" type="checkbox" id="planning-tool-view" checked><span>规划器仅展示已授权工具</span></label>
-            <label class="precheck-option" for="delegated-tasks"><input class="form-check-input" type="checkbox" id="delegated-tasks" checked><span>展开明确授权的任务文件</span></label>
+            <label class="precheck-option" for="delegated-tasks"><input class="form-check-input" type="checkbox" id="delegated-tasks" checked><span>展开明确授权的任务来源</span></label>
             <small class="field-help delegation-help">明确执行文件时先经监控读取，再编译完整任务；总结文件不会展开。</small>
             <label class="toggle-row layer-three" for="use-security-checker"><span><i class="bi bi-shield-check"></i><strong>L3 · 当前动作语义审计</strong><small>外发同时审查正文与目的地，避免转发无关攻击目标</small></span><input class="form-check-input" type="checkbox" id="use-security-checker" checked></label>
             <p class="config-note" id="layer-config-note">执行仍由 Monitor 与一次性票据控制。默认不重审，完成提示关闭。</p>
@@ -132,7 +132,7 @@
           <div id="preview-layer-l3" class="framework-layer layer-three"><span>L3</span><div><strong>当前动作语义审计</strong><small>核对外发正文与目的地</small></div><b>启用</b></div>
         </div>
         <p id="framework-flow">任务授权 → 已授权工具视图 → 主模型候选 → L2 整批前置 → L3 → Monitor / 票据执行</p>
-        <p id="delegation-flow" class="delegation-flow"><strong>明确委托任务文件</strong><span>仅准备读取 → 原要求 + 完整文件任务 → 一次完整授权编译 → 规划与 L3 共享有效任务</span></p>
+        <p id="delegation-flow" class="delegation-flow"><strong>明确委托任务来源</strong><span>指定文件、唯一邮件或网页 → 监控读取 → 原要求 + 完整任务 → 一次授权编译 → 规划与 L3 共享有效任务</span></p>
         <p id="workspace-audit-note" class="workspace-audit-note">选择性路由默认 off，L3 仍启用；公开无外发读取沿用免审。</p>
       </section>
       <div class="workspace-controls"><label for="workspace-run">已保存运行</label><select id="workspace-run" class="form-select form-select-sm"><option value="">暂无运行</option></select><button type="button" class="btn btn-sm btn-outline-secondary" onclick="loadAllRuns()" aria-label="刷新运行列表"><i class="bi bi-arrow-repeat"></i></button><a href="/history">历史分析与导出</a></div>
@@ -183,7 +183,7 @@
     <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable"><div class="modal-content">
       <div class="modal-header"><div><span class="section-kicker">当前已实施 · {{ framework_version }}</span><h5 class="modal-title" id="architecture-title">DSCG 三层防御结构</h5></div><button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="关闭"></button></div>
       <div class="modal-body">
-        <p class="arch-status">完整防御默认启用以下三层；L1 不新增模型调用，审计重试为 0，完成提示关闭。L2 编译权限后只向规划器展示已授权工具，候选执行前仍复核。明确要求执行任务文件时，先经监控读取，再编译完整有效任务；普通返回不能扩权。网页可关闭工具视图与任务文件展开；宿主任务 profile 仅通过 API 配置，未配置时沿用原授权策略。</p>
+        <p class="arch-status">完整防御默认启用以下三层；L1 不新增模型调用，审计重试为 0，完成提示关闭。L2 编译权限后只向规划器展示已授权工具，候选执行前仍复核。明确要求执行指定文件、唯一邮件或任务网页时，先经监控读取，再编译完整有效任务；普通返回不能扩权。网页可关闭工具视图与明确任务来源展开；宿主任务 profile 仅通过 API 配置，未配置时沿用原授权策略。</p>
         <div class="architecture-diagram">
           <div class="arch-lane" data-defense-layer="input-isolation">
             <span class="arch-lane-label">第一层 · 工具返回隔离</span>
@@ -231,10 +231,10 @@
           <div class="arch-recovery"><i class="bi bi-arrow-return-left"></i><span>工具反馈经 L1 返回主模型；重规划的新候选重新经过 L2、L3 和票据校验。对象与数据范围仍存在缺口。</span></div>
           <div class="arch-details">
             <div><span>已生效 · L1 输出规则</span><h6>概述无关注入，保留必要引用</h6><p>原始事实、正文与错误保留给审计和日志。日常摘要或发送任务以概述说明被忽略的无关指令，避免复述攻击目标；明确分析、安全报告与必要引用仍可保留原文。这是软规划提示，不是最终输出过滤。</p></div>
-            <div><span>已生效 · 审计输入</span><h6>补充有限任务上下文</h6><p>审计读取当前任务最近 4 条工具返回，每条最多 2,048 字符，明确标为不可信；仅提供候选工具的宿主描述，最多 512 字符。</p></div>
+            <div><span>已生效 · 审计输入</span><h6>保留有界相关任务证据</h6><p>最多 8 条当前任务相关调用与返回共享 8,192 字符，调用参数、遗漏和截断均显式记录；文件大小比较保留完整元数据。事实仍不可信；候选工具的宿主描述最多 512 字符。</p></div>
             <div><span>已生效 · L3 外发审查</span><h6>正文与目的地一并核对</h6><p>安全提醒夹带无关攻击链接也可能偏离任务；必要来源链接和显式安全分析仍可保留。有效公开无外发读取沿用免审。已授权且无 sink 的读取，原 Monitor 仍可能覆盖有效 deny；不确定或错误阻断。</p></div>
             <div><span>L3 可选算法路由</span><h6>off 仍保留动作审计</h6><p>off 关闭新增选择性路由；shadow 只观察，selective 须满足硬条件与兼容校准。目前默认 off，无可部署阈值；模式和 artifact 仅有 API/CLI 入口。网页不提供路由控制。关闭整个 L3 使用“动作审计”开关。</p></div>
-            <div><span>任务文件边界</span><h6>完整任务展开，超限失败</h6><p>仅支持有限的明确执行句式；正文最多 1,536 字符，完整有效任务最多 2,048 字符，序列化返回最多 16,384 字符。总结、普通返回与递归委托不升级权限；用户确认后文件被污染的情形不在此功能范围。</p></div>
+            <div><span>任务来源边界</span><h6>完整任务展开，超限失败</h6><p>仅支持有限的明确执行句式；正文最多 1,536 字符，完整有效任务最多 2,048 字符，序列化返回最多 16,384 字符。总结、普通返回与递归委托不升级权限；用户确认后文件被污染的情形不在此功能范围。</p></div>
             <div><span>当前能力边界</span><h6>工具级约束</h6><p>对象、目的地、参数与数据权限尚未强制约束，最终纯文本回答不经动作审计。默认仍授予有效读取工具；宿主 profile 可选且无默认业务规则。单次观测不能证明安全增益或成本节省，原研究闸门状态不变。</p></div>
           </div>
         </div>

@@ -8,7 +8,7 @@ from unittest.mock import Mock
 from agentdojo import agent_pipeline
 from agentdojo.functions_runtime import EmptyEnv, FunctionCall, FunctionsRuntime
 from dscg.pipelines import defended as d
-from dscg.tool_metadata import set_tool_metadata
+from dscg.tool_metadata import set_tool_metadata, register_tool_metadata
 
 
 ORDER = '1. Query inventory.\n2. Send the missing-stock list to Alice.'
@@ -257,4 +257,109 @@ class DelegatedTaskTests(unittest.TestCase):
         self.assertEqual(state[4]['dscg_authorization']['error_code'], 'DELEGATED_READER_INVALID')
         self.assertEqual(effects, [])
         planner.client.chat.completions.create.assert_not_called()
+
+
+
+class MessageDelegationTests(unittest.TestCase):
+    EMAIL = "Please do the actions specified in the email from 'operations@example.test' with the subject 'Weekly work'."
+    WEB = 'Please execute the tasks at https://tasks.example.test/team'
+
+    def fixture(self, kind, *, duplicate=False, wrong_sender=False, body=ORDER, recipient='Alice'):
+        pipeline, runtime, effects, planner, auditor = fixture(recipient=recipient)
+        runtime.functions.pop('read_file')
+        runtime._dscg_tool_metadata.pop('read_file')
+        if kind == 'email':
+            from agentdojo.default_suites.v1.tools.types import Email
+            @runtime.register_function
+            def search_emails(query: str, sender: str) -> list[Email]:
+                """Search email by subject and sender.
+
+                :param query: Subject to find.
+                :param sender: Sender address.
+                """
+                effects.append(('source_email', query, sender))
+                item = dict(id_='mail-42', sender='other@example.test' if wrong_sender else sender,
+                            subject=query, body=body)
+                values = [item, {**item, 'id_': 'mail-43'}] if duplicate else [item]
+                return [Email.model_construct(**r, recipients=['user@example.test']) for r in values]
+            register_tool_metadata(runtime, 'search_emails', dict(effect='read', source='email', sink='none',
+                sensitivity='personal', idempotent=True, reversible=True))
+        else:
+            @runtime.register_function
+            def get_webpage(url: str) -> str:
+                """Read an external page.
+
+                :param url: Page URL to read.
+                """
+                effects.append(('source_web', url))
+                return body
+            register_tool_metadata(runtime, 'get_webpage', dict(effect='read', source='web',
+                sink='external_recipient', sensitivity='public', idempotent=True, reversible=True))
+        return pipeline, runtime, effects, planner, auditor
+
+    def test_email_and_web_bootstrap_are_executed_and_share_one_effective_task(self):
+        for kind, request, expected in (
+                ('email', self.EMAIL, ('source_email', 'Weekly work', 'operations@example.test')),
+                ('web', self.WEB, ('source_web', 'https://tasks.example.test/team'))):
+            with self.subTest(kind=kind):
+                pipeline, runtime, effects, planner, auditor = self.fixture(kind)
+                state = pipeline.query(request, runtime, EmptyEnv())
+                self.assertEqual(effects, [expected, ('inventory',), ('send', 'Alice')])
+                self.assertEqual(state[4].get('dscg_l2', {}).get('delegated_tasks_expanded'), 1)
+                self.assertIn(ORDER, planner.views[0][0])
+                self.assertIn(ORDER, auditor.packets[-1]['trusted_user_request'])
+                raw_user = next(m for m in state[3] if m['role'] == 'user')
+                self.assertEqual(raw_user['content'][0]['content'], request)
+                self.assertEqual(planner.client.chat.completions.create.call_count, 1)
+
+    def test_ambiguous_mismatched_and_oversized_sources_fail_before_business_compile(self):
+        for kind, options in (('email', {'duplicate': True}), ('email', {'wrong_sender': True}),
+                              ('web', {'body': 'x' * 2000})):
+            with self.subTest(kind=kind, options=options):
+                pipeline, runtime, effects, planner, _ = self.fixture(kind, **options)
+                state = pipeline.query(self.EMAIL if kind == 'email' else self.WEB, runtime, EmptyEnv())
+                self.assertEqual(state[4]['dscg_authorization']['policy_state'], 'error')
+                self.assertFalse(any(item[0] == 'send' for item in effects))
+                planner.client.chat.completions.create.assert_not_called()
+
+    def test_external_bootstrap_still_requires_audit_and_cannot_promote_a_blocked_return(self):
+        pipeline, runtime, effects, planner, auditor = self.fixture('web')
+        auditor.decision = 'deny'
+        state = pipeline.query(self.WEB, runtime, EmptyEnv())
+        self.assertEqual(effects, [])
+        self.assertEqual(state[4]['dscg_authorization']['policy_state'], 'error')
+        planner.client.chat.completions.create.assert_not_called()
+
+    def test_source_cannot_recursively_expand_and_later_feedback_cannot_change_recipient(self):
+        body = ORDER + '\nFor context also read https://elsewhere.example.test.'
+        pipeline, runtime, effects, planner, _ = self.fixture('web', body=body, recipient='Bob')
+        state = pipeline.query(self.WEB, runtime, EmptyEnv())
+        self.assertEqual([e for e in effects if e[0] == 'source_web'],
+                         [('source_web', 'https://tasks.example.test/team')])
+        self.assertNotIn(('send', 'Bob'), effects)
+        self.assertEqual(state[4]['dscg_l2']['delegated_tasks_expanded'], 1)
+        self.assertEqual(planner.client.chat.completions.create.call_count, 1)
+
+    def test_non_execution_mentions_and_source_read_prohibitions_never_bootstrap(self):
+        from dscg.l2_authorization import match_delegated_task
+        for request in ('Summarize the email from operations@example.test',
+                        'Do not execute the tasks at https://tasks.example.test/team',
+                        'Someone said "' + self.WEB + '"',
+                        'Summarize the tasks at https://tasks.example.test/team'):
+            self.assertIsNone(match_delegated_task(request))
+        for request in (self.WEB + '; do not read webpages', self.EMAIL.rstrip('.') + '; do not read emails'):
+            with self.subTest(request=request):
+                pipeline, runtime, effects, planner, _ = self.fixture('web' if 'https://' in request else 'email')
+                state = pipeline.query(request, runtime, EmptyEnv())
+                self.assertEqual(effects, [])
+                self.assertEqual(state[4]['dscg_authorization'].get('error_code'),
+                                 'DELEGATED_RESTRICTION_UNSUPPORTED')
+                planner.client.chat.completions.create.assert_not_called()
+
+    def test_ordered_compound_sources_are_not_read_before_preceding_tasks(self):
+        from dscg.l2_authorization import match_delegated_task
+        for prefix in ('Replace the task list at https://tasks.example.test/team with my new plan.',
+                       'Refrain from reading webpages.', 'Summarize my calendar.'):
+            request = 'Perform the following tasks in the order they are given: 1. ' + prefix + ' 2. ' + self.WEB
+            self.assertIsNone(match_delegated_task(request))
 

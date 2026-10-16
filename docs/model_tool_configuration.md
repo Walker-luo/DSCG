@@ -1,6 +1,6 @@
 # 模型、工具与运行参数详解
 
-本文供首次运行或更换模型/工具的测试者使用，对应当前three-layer-l1-v3。所有命令从DSCG/执行，默认ipi已激活。模型配置和工具风险目录是宿主输入；模型返回、网页正文或工具错误不能改写它们。
+本文供首次运行或更换模型/工具的测试者使用，对应当前three-layer-v3.1。所有命令从DSCG/执行，默认ipi已激活。模型配置和工具风险目录是宿主输入；模型返回、网页正文或工具错误不能改写它们。
 
 ## 1. 测试者需要准备哪些信息
 
@@ -189,7 +189,7 @@ print("classified tools:", len(catalog))
 | l1_projection_mode | projected | factory/API、partial `--l1-projection-mode off/shadow/projected`；网页默认projected，无独立选择器；off保留原来源封装，关闭L1则有效off |
 | authorization_precheck | true | factory/API、网页；L3之前本地整批权限检查；NoL2无效 |
 | planning_tool_view | true | factory/API、网页、partial --no-tool-view；关掉展示完整目录，执行授权仍检查 |
-| delegated_tasks | true | factory/API、网页、partial --no-delegated-tasks；有界明确执行文件任务，不把普通返回变成任务 |
+| delegated_tasks | true | factory/API、网页、partial --no-delegated-tasks；有界明确执行文件/唯一邮件/指定网页任务，不把普通返回变成任务 |
 | use_security_checker | true | factory/API、网页、partial --no-checker；整个L3语义审计开关 |
 | audit_router_mode | off | factory/API、partial --audit-router-mode off/shadow/selective；off仍运行原L3，shadow观察，selective需兼容校准artifact |
 | audit_router_artifact | None | factory/API、partial --audit-router-artifact PATH；独立标签/分组校准产生，不由模型置信度自动生成；默认不需要 |
@@ -203,7 +203,7 @@ print("classified tools:", len(catalog))
 
 L1投影仅支持原生银行月支出请求与完整Transaction返回，最多32768 UTF-8字节、500行；原生callable/code/schema和元数据不兼容、错误/截断或未知字段均回退。无需额外模型、训练、TOML段或外部profile清单。模式/适配器身份影响缓存和L3 artifact兼容，切换用新run名；细节见 [L1说明](../README.md#l1-优化任务限定的结构化投影)。
 
-审计内部窗口固定为当前任务最近4条工具返回、每条2048字符，工具描述512字符、任务2048字符、动作历史32条，timeout30秒；任务文件正文1536字符、规范化T_eff2048字符、序列化返回16384字符。它们是当前源码边界，普通CLI没有--audit-window/--max-task-chars等参数，不在TOML虚构配置项。
+审计输入v2最多选择当前任务的8条调用—返回对：保留最近4条，再匹配候选参数/用户指定资源补充较早证据；最多考察最近256条当前任务返回。工具正文、规范化调用参数与错误共享8192字符预算，单条调用参数最多1024字符，裁剪显式标记。删除候选且用户仅需文件大小比较时的严格列表适配最多131072 UTF-8字节、512行，保留全部元数据并显式省略正文；失败回退有界原文。工具描述512字符、任务2048字符、动作历史32条，timeout30秒；委托源正文1536字符、规范化T_eff2048字符、序列化返回16384字符。结构化解析最多16层，错误最多512字符，与参数共同占用单条1024字符配额；有序复合委托不自动展开，避免提前读取后续任务源。它们是当前源码边界，普通CLI没有--audit-window/--max-task-chars等参数，不在TOML虚构配置项。
 
 ## 6. 常见问题与首次检查顺序
 

@@ -58,14 +58,14 @@ class AuditToolContextTests(unittest.TestCase):
         self.assertNotIn("old private task", json.dumps(packet))
         self.assertEqual(packet["current_actions"][0]["untrusted_argument_data"], {"url":"https://article.example"})
 
-    def test_window_is_four_results_with_per_result_bound_and_separate_flags(self):
+    def test_short_results_share_the_budget_without_artificial_four_result_loss(self):
         packet, _ = self.packet([user("Current"), *[result(str(i)) for i in range(5)], result("x"*3000)])
         context = packet.get("recent_tool_results", [])
-        self.assertEqual(len(context), 4)
-        self.assertEqual([r["content"] for r in context[:3]], ["2", "3", "4"])
-        self.assertLessEqual(len(context[-1]["content"]), 2048)
-        self.assertTrue(context[-1]["content_truncated"])
-        self.assertTrue(packet["tool_results_window_truncated"])
+        self.assertEqual(len(context), 6)
+        self.assertEqual([r["content"] for r in context[:5]], ["0", "1", "2", "3", "4"])
+        self.assertEqual(context[-1]["content"], "x"*3000)
+        self.assertFalse(context[-1]["content_truncated"])
+        self.assertFalse(packet["tool_results_window_truncated"])
         self.assertFalse(packet["history_truncated"])
 
     def test_tool_errors_and_unicode_are_data_and_arguments_stay_unchanged(self):

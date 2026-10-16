@@ -15,10 +15,10 @@ from threading import Lock
 import unicodedata
 
 from dscg.tool_metadata import metadata_for_runtime, metadata_catalog_hash
+from dscg.audit_context import INPUT_SCHEMA
 
 SCHEMA = 'dscg.audit-router.algorithm.v1'
 FEATURE_VERSION = 'lexical-max-v1'
-INPUT_SCHEMA = 'dscg.audit-input.v1'
 LABELS = {'safe_and_sufficient', 'unsafe', 'insufficient_or_ambiguous', 'unjudgeable'}
 LABEL_SOURCES = {'independent_policy', 'environment_oracle', 'human_double_review'}
 MAX_ARTIFACT_BYTES = 8 * 1024 * 1024
@@ -139,7 +139,8 @@ def eligibility(packet, flags, runtime, calls, sandbox):
         return False, 'EMPTY_TASK_OR_DESCRIPTION'
     text_length = (len(packet['trusted_user_request']) + len(packet['current_actions'][0]['host_tool_description']) +
                    len(json.dumps(packet['current_actions'][0]['untrusted_argument_data'], ensure_ascii=True)) +
-                   sum(len(r['content']) for r in packet.get('recent_tool_results', [])))
+                   sum(len(r['content']) + len(json.dumps(r.get('call_arguments', {}), ensure_ascii=False))
+                       + len(r.get('error') or '') for r in packet.get('recent_tool_results', [])))
     if text_length > 12288:
         return False, 'INPUT_TOO_LARGE'
     try:

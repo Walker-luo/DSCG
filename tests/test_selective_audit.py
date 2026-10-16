@@ -51,6 +51,45 @@ class SelectiveAuditTests(unittest.TestCase):
         for element in chain:state=element.query(*state)
         return state
 
+    def test_legacy_input_artifact_cannot_bypass_new_evidence_audit(self):
+        path = self.artifact()
+        value = json.loads(path.read_text())
+        value['input_schema'] = 'dscg.audit-input.v1'
+        path.write_text(json.dumps(value))
+        chain = self.setup_chain(path=path)
+        self.run_chain(chain)
+        self.assertEqual(chain[1].requests, 1)
+
+    def test_historical_argument_loss_requires_semantic_audit(self):
+        for args in ({'a': {'b': {'c': {'id': 1}}}}, {'amount': float('nan')}):
+            chain = self.setup_chain()
+            q, r, e, m, x = self.state()
+            history = [{'role': 'user', 'content': [{'type': 'text', 'content': q}]},
+                {'role': 'tool', 'content': [{'type': 'text', 'content': '[]'}], 'tool_call_id': 'old',
+                 'tool_call': FunctionCall(function='read_data', args=args, id='old'), 'error': None}]
+            self.run_chain(chain, (q, r, e, [*history, m[-1]], x))
+            self.assertEqual(chain[1].requests, 1)
+
+    def test_router_total_input_bound_includes_historical_call_arguments(self):
+        runtime = FunctionsRuntime()
+        @runtime.register_function
+        def read_data(queries: list[str]) -> str:
+            """Read local records.
+
+            :param queries: Search terms.
+            """
+            return 'not executed'
+        set_tool_metadata(runtime, {'read_data': self.md})
+        args = {'queries': ['x' * 250] * 16}
+        call = FunctionCall(function='read_data', args=args, id='current')
+        packet = dict(trusted_user_request='q' * 2000,
+            current_actions=[dict(host_tool_description='d' * 500, untrusted_argument_data=args)],
+            recent_tool_results=[dict(content='c' * 256, call_arguments={'selector': 's' * 500}, error=None) for _ in range(8)])
+        eligible, reason = a.eligibility(packet, {k: False for k in a.COMPLETENESS_FLAGS},
+                                         runtime, [call], d.PermissionSandbox(['read_data']))
+        self.assertFalse(eligible)
+        self.assertEqual(reason, 'INPUT_TOO_LARGE')
+
     def test_selective_skips_api_but_requires_monitor_and_ticket(self):
         chain=self.setup_chain();state=self.run_chain(chain)
         self.assertEqual(self.effects,['read']);self.assertEqual(chain[1].requests,0)
@@ -100,7 +139,7 @@ class SelectiveAuditTests(unittest.TestCase):
 
     def test_truncated_window_and_literal_marker_are_distinguished(self):
         chain=self.setup_chain();q,r,e,m,x=self.state()
-        tools=[{'role':'tool','content':[{'type':'text','content':'<max-depth>'}],'error':None} for _ in range(5)]
+        tools=[{'role':'tool','content':[{'type':'text','content':'<max-depth>'}],'error':None} for _ in range(9)]
         messages=[{'role':'user','content':[]},*tools,m[-1]]
         state=self.run_chain(chain,(q,r,e,messages,x));self.assertEqual(chain[1].requests,1)
         self.assertTrue(state[4]['dscg_router_events'][0]['completeness_flags']['tool_results_window_truncated'])

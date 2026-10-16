@@ -1,12 +1,16 @@
 # 当前框架与平台展示交接
 
-更新时间：2026-10-13。当前默认版本 **three-layer-l1-v3**。本次用户授权实现有限L1结构化投影，沿用L2工具视图/任务文件与L3动作正文审查；默认投影已接入factory、partial和网页API，架构说明同步。Spotlighting风格来源封装仍是不适用输入的回退。正式研究路线和闸门不改变。
+更新时间：2026-10-15。当前默认版本 **three-layer-v3.1**。本次用户授权实现有限L1结构化投影，沿用L2工具视图/任务文件与L3动作正文审查；默认投影已接入factory、partial和网页API，架构说明同步。Spotlighting风格来源封装仍是不适用输入的回退。正式研究路线和闸门不改变。
+
+## v3.1增量交接
+
+L3使用最多8条当前任务相关调用—返回对，最近4条必留，再补相关旧证据，调用参数、正文与错误共享8192字符；删除候选的纯大小比较保留完整元数据，来源与省略/截断仍明确标记。输入v2与配置身份使旧路由artifact失效。L2新增有限的唯一邮件/指定网页来源，读取仍经原中介；有序复合委托不提前展开，保留原流程；L1只澄清用户请求不因工具数据而失去权威。默认模型、router off、重试0、completion false不变。新紧凑 `dscg_audit_evidence` 已写trace，网页尚无独立证据统计面板；full可诊断，不默认展示原始工具文本。模板/控件说明同步，旧结果不重标。约5pp clean目标与攻击/成本收益均待新线上验收；[工程报告](../workshop/completed/clean_utility_20261015.md)。
 
 ## 实际运行顺序
 
 ```text
 普通任务：真实 user → L2 编译 → 有效授权工具视图 → 主模型候选
-委托任务：明确执行文件 → 仅准备读取权限 → 原中介执行读取
+委托任务：明确执行文件/唯一邮件/指定网页 → 仅准备读取权限 → 原中介执行读取
                           → 原要求 + 完整文件任务 T_eff → L2 编译 → 主模型候选
 共同循环：候选 → L2 整批前置 → L3 → Monitor → 一次性 ticket → 执行
               ↑                                                ↓
@@ -33,7 +37,7 @@ L1不增加独立模型调用：明确的原生银行月支出任务保留全部
 | L2/use_sandbox | true，网页/API | 工具授权与最终权限检查 |
 | authorization_precheck | true，网页/API | L3前候选整批检查；NoL2关闭 |
 | planning_tool_view | true，网页/API/partial `--no-tool-view` | 授权工具展示；NoL2关闭 |
-| delegated_tasks | true，网页/API/partial `--no-delegated-tasks` | 有界明确任务文件展开；NoL2关闭 |
+| delegated_tasks | true，网页/API/partial `--no-delegated-tasks` | 有界明确任务来源展开；NoL2关闭 |
 | authorization_profile / delegated_task_reader | 默认None，仅宿主API | 受信配置，不由网页文本/工具返回创建 |
 | L3/use_security_checker | true，网页/API | 原动作审计 |
 | audit_router_mode/artifact | 默认off，API/partial CLI | CSA硬门/真实校准不变，网页专门控件仍待完成 |
@@ -81,7 +85,7 @@ L1不增加独立模型调用：明确的原生银行月支出任务保留全部
 
 下一项使用新run名做v3的projection off/projected匹配对照，另保留shadow覆盖与合法引用反例，核查独立终态及总模型成本。已有144条属于v2.2，不能重新标记成v3。归因L2时两组固定投影模式/L3规则并关闭delegation，再比较view开/关。Agent临时partial实验必须显式传新的 `--results-dir workshop/artifacts/<YYYYMMDD>_<task>/partial_benchmark`；原结果与导出不覆盖。
 
-真实E0仍pending、I3仍partial24valid/8scope/0tool-boundary、I2locked/closed路线不变。前序文档阶段未新跑I3/E0；本次L1工程复跑仍得到同一partial/合成分母。按 [implementation_status](../../research/paper/implementation_status.md)回报本轮文档/审查证据，不修改 [technical_route](../../research/technical_route.md)。
+真实E0仍pending、I3仍partial24valid/8scope/0tool-boundary、I2locked/closed路线不变。前序文档阶段未新跑I3/E0；本次L1工程复跑仍得到同一partial/合成分母。按 [implementation_status](../../research/Experiments/implementation_status.md)回报本轮文档/审查证据，不修改 [technical_route](../../research/technical_route.md)。
 
 
 ## L1 v3新增交接（2026-10-13）

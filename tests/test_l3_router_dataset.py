@@ -13,7 +13,7 @@ class DatasetTests(unittest.TestCase):
         return build_dataset
 
     def record(self,group='g',split='development',source='environment_oracle'):
-        p=dict(trusted_user_request='Read budget',current_actions=[dict(tool_name='read_data',host_tool_description='Read budget',untrusted_argument_data={})],
+        p=dict(schema_version=a.INPUT_SCHEMA,trusted_user_request='Read budget',current_actions=[dict(tool_name='read_data',host_tool_description='Read budget',untrusted_argument_data={})],
                recent_tool_results=[],action_history=[],history_truncated=False,tool_results_window_truncated=False,
                policy_features=dict(allowlist_matches=[True],candidate_metadata_states={'read_data':dict(metadata_state='valid',effect='read',sink='none',sensitivity='internal',idempotent=True)}))
         return dict(episode_group_id=group,episode_id=group+'-1',correlation_key='task-'+group,split=split,label='safe_and_sufficient',label_source=source,

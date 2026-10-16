@@ -192,6 +192,46 @@ def validate_profile_decision(data, request, runtime, profile):
 MAX_TASK_SOURCE_CHARS = 1536
 MAX_EFFECTIVE_TASK_CHARS = 2048
 MAX_SERIALIZED_TASK_SOURCE = 16384
+DELEGATION_VERSION = 'explicit-source-v2'
+
+
+@dataclass(frozen=True)
+class DelegatedTaskSource:
+    kind: str
+    locator: str
+    sender: str = ''
+
+
+def _validate_source_tail(restrictions):
+    if not restrictions:
+        return
+    allowed = (r'only (?:query|check) inventory|do not (?:send|pay|write|delete|book|transfer)'
+               r'(?: (?:emails?|messages?|payments?))?|'
+               r'仅(?:查询|检查)库存|(?:不要|禁止)(?:发送|付款|修改|删除|预订|转账)(?:邮件|消息)?')
+    clauses = re.split(r'[,;，；]', restrictions.rstrip('。.!！ ').strip())
+    if not clauses or any(not re.fullmatch(allowed, c.strip(), re.I) for c in clauses):
+        raise L2AuthorizationError('DELEGATED_RESTRICTION_UNSUPPORTED')
+
+
+def _match_message_source(request):
+    text = request.strip()
+    # Match the complete request. Do not eagerly resolve a later compound task.
+    text = re.sub(r'^Hey\s+this\s+is\s+[A-Za-z][A-Za-z -]{0,63}!\s*', '', text, flags=re.I)
+    verb = r'(?:please\s+)?(?:do|complete|execute|perform|carry out)\s+(?:all\s+)?(?:the\s+)?'
+    email = (verb + r'(?:actions|tasks|instructions)\s+(?:(?:specified|listed)\s+)?in\s+(?:the\s+)?email\s+from\s+'
+             r'''(?P<q1>['"])(?P<sender>[^'"\s<>]+@[^'"\s<>]+)(?P=q1)\s+with\s+(?:the\s+)?subject\s+'''
+             r'''(?P<q2>['"])(?P<subject>[^'"\n]+)(?P=q2)''')
+    web = (verb + r'(?:actions|tasks|instructions)(?:\s+i\s+have)?\s+(?:in|on|from|at)\s+'
+           r'(?:(?:my|the|our)\s+)?(?:(?:(?:todo|task)\s+list|webpage|page)\s+)?(?:at\s+)?'
+           r'''(?P<url>(?:https?://|www\.)[^\s<>"';,!]+?)''')
+    tail = r'(?:\s*[,;，；](?P<restrictions>.*))?\s*[。.!！]?\s*'
+    for kind, pattern in (('email', email), ('web', web)):
+        match = re.fullmatch(pattern + tail, text, re.I)
+        if match:
+            _validate_source_tail(match.group('restrictions'))
+            return (DelegatedTaskSource(kind, match.group('subject'), match.group('sender')) if kind == 'email'
+                    else DelegatedTaskSource(kind, match.group('url')))
+    return None
 
 
 def match_delegated_task(request):
@@ -210,18 +250,11 @@ def match_delegated_task(request):
             # Only finite downstream clauses are supported. An arbitrary tail
             # could revoke the preparation read; never postpone that check to
             # the business compiler or rely on a read-deny Monitor exception.
-            restrictions = match.group('restrictions')
-            if restrictions:
-                allowed_clause = (r'only (?:query|check) inventory|do not (?:send|pay|write|delete|book|transfer)'
-                                  r'(?: (?:emails?|messages?|payments?))?|'
-                                  r'仅(?:查询|检查)库存|(?:不要|禁止)(?:发送|付款|修改|删除|预订|转账)(?:邮件|消息)?')
-                clauses = re.split(r'[,;，；]', restrictions.rstrip('。.!！ ').strip())
-                if not clauses or any(not re.fullmatch(allowed_clause, c.strip(), re.I) for c in clauses):
-                    raise L2AuthorizationError('DELEGATED_RESTRICTION_UNSUPPORTED')
+            _validate_source_tail(match.group('restrictions'))
             name = match.group('source').strip('"\'')
             if name and all(c.isprintable() for c in name):
                 return name
-    return None
+    return _match_message_source(request)
 
 
 @dataclass(frozen=True)
@@ -256,17 +289,27 @@ class DelegatedTaskSpec:
         if not isinstance(serialized, str) or len(serialized) > MAX_SERIALIZED_TASK_SOURCE:
             raise L2AuthorizationError('DELEGATED_SOURCE_TOO_LONG')
         text = serialized
-        if self.output_format == 'yaml_file':
+        if self.output_format in {'yaml_file', 'yaml_email'}:
             import yaml
+            from dscg.audit_context import parse_structured
             try:
-                item = yaml.safe_load(serialized)
-            except yaml.YAMLError as exc:
+                item = parse_structured(serialized, MAX_SERIALIZED_TASK_SOURCE)
+            except (ValueError, yaml.YAMLError) as exc:
                 raise L2AuthorizationError('DELEGATED_SOURCE_INVALID') from exc
-            if (not isinstance(item, dict) or item.get('filename') != self.source_name
+            if self.output_format == 'yaml_email':
+                arguments = self.arguments
+                matches = [r for r in item if isinstance(r, dict)
+                           and r.get('sender') == arguments['sender']
+                           and r.get('subject') == arguments['query']] if isinstance(item, list) else []
+                if len(matches) != 1 or not isinstance(matches[0].get('body'), str):
+                    raise L2AuthorizationError('DELEGATED_SOURCE_INVALID')
+                text = matches[0]['body']
+            elif (not isinstance(item, dict) or item.get('filename') != self.source_name
                     or item.get('id_') != self.arguments.get('file_id')
                     or not isinstance(item.get('content'), str)):
                 raise L2AuthorizationError('DELEGATED_SOURCE_INVALID')
-            text = item['content']
+            else:
+                text = item['content']
         if not text.strip():
             raise L2AuthorizationError('DELEGATED_SOURCE_EMPTY')
         if len(text) > MAX_TASK_SOURCE_CHARS:
@@ -278,6 +321,27 @@ def resolve_delegated_task(source_name, runtime, env, reader=None):
     """Resolve metadata/arguments only; actual content must pass tool mediation."""
     if reader is not None and not isinstance(reader, DelegatedTaskReader):
         raise TypeError('delegated_task_reader must be a trusted adapter')
+    if isinstance(source_name, DelegatedTaskSource):
+        if reader is not None:
+            raise L2AuthorizationError('DELEGATED_READER_UNSUPPORTED')
+        source = source_name
+        if source.kind == 'email':
+            tool, arguments, output = 'search_emails', {'query': source.locator, 'sender': source.sender}, 'yaml_email'
+            label = 'email from ' + source.sender + ' with subject ' + source.locator
+        elif source.kind == 'web':
+            tool, arguments, output, label = 'get_webpage', {'url': source.locator}, 'text', source.locator
+        else:
+            raise L2AuthorizationError('DELEGATED_READER_UNSUPPORTED')
+        status = metadata_for_runtime(runtime).get(tool)
+        required_sink = 'external_recipient' if source.kind == 'web' else 'none'
+        if (tool not in runtime.functions or status is None or not status.registered
+                or status.metadata.effect != 'read' or status.metadata.sink != required_sink):
+            raise L2AuthorizationError('DELEGATED_READER_INVALID')
+        try:
+            runtime.functions[tool].parameters.model_validate(arguments)
+        except Exception as exc:
+            raise L2AuthorizationError('DELEGATED_READER_INVALID') from exc
+        return DelegatedTaskSpec(label, tool, json.dumps(arguments, sort_keys=True, ensure_ascii=False), output)
     if reader is None:
         spec = runtime.functions.get('read_file')
         fields = spec.parameters.model_fields if spec else {}

@@ -77,7 +77,7 @@ test('report shows saved effective L2 controls independently from the current dr
   await ui.run('loadReport()');
   assert.equal(ui.run('getSelectedConfig()').planning_tool_view, true);
   assert.match(ui.node('#report-content').innerHTML, /L2 授权工具视图<\/td><td>关闭/);
-  assert.match(ui.node('#report-content').innerHTML, /显式任务文件展开<\/td><td>关闭/);
+  assert.match(ui.node('#report-content').innerHTML, /显式任务来源展开<\/td><td>关闭/);
 });
 
 test('failed submission shows the server error and restores run state', async () => {

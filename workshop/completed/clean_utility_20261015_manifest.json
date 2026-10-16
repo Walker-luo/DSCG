@@ -1,0 +1,48 @@
+{
+  "revision": "852085d8ae2e0a00102826c4c0c649eb7449e262",
+  "framework_version": "three-layer-v3.1",
+  "real_model_calls": 0,
+  "benchmark_rollouts": 0,
+  "offline_tests": 340,
+  "node_tests": 33,
+  "protected_tracked_files": 506,
+  "protected_user_outputs": 1536,
+  "i3_counts": {
+    "total": 24,
+    "valid": 24,
+    "invalid": 0,
+    "error": 0,
+    "skipped": 0,
+    "scope_violations": 8,
+    "tool_boundary_violations": 0
+  },
+  "e0_counts": {
+    "valid": 1,
+    "model_error": 0,
+    "policy_error": 0,
+    "tool_error": 1,
+    "timeout": 0,
+    "infrastructure_error": 4,
+    "skipped": 0
+  },
+  "representation_tasks": 97,
+  "representation_candidates": 252,
+  "limitations": [
+    "Offline mocked execution is not model efficacy.",
+    "No new clean/attack TSR, ASR or total model cost measured.",
+    "Ordered compound delegation is not automatically expanded.",
+    "Bounded evidence remains untrusted and can omit facts."
+  ],
+  "next_action": "Run new-name full matched clean baseline/current controls, then repeated controls and attacks with independent end-state review.",
+  "evidence_root": "workshop/artifacts/20261015_clean_utility",
+  "validation_sha256": "ff2d433c58c4bd6acbf2cac4cf72e1ef0279fec63a871ed916b9c64ed22fcab9",
+  "commands_sha256": "e6f6efb821302455367d7fc5485a5c4d0c8b635f987f1b2a92ba3549c51df7f6",
+  "source_sha256": {
+    "dscg/audit_router.py": "750c718ad0bc951b291113a8da795e44a73fd6d23abb658c0b0bac53b718aa98",
+    "dscg/input_isolation.py": "3bfdd29882b7eb45f77705c0e68db653fae5b45914a3b89135a1c8af81b663e0",
+    "dscg/l2_authorization.py": "f1d11ce9abddd765bd76812904ccbc1e328604e13a356844400c75823b50686b",
+    "dscg/pipelines/defended.py": "66b302e87fd8ee65192344c61773e9ac7c6fb3cedcd919400c34e167147727a6",
+    "experiments/l3_router_dataset.py": "6e5bd43e8e4d28f8d4436f60dcbd23d2c1a6a6f79025023b05d737f9f41c7463",
+    "dscg/audit_context.py": "1a8cb9dd553963734dfba41cd8054cf0b0e1a0f8a6500ab0753694a306dd538b"
+  }
+}

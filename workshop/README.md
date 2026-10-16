@@ -1,12 +1,13 @@
 # Workshop 优化状态索引
 
-当前运行框架为 **three-layer-l1-v3**。目录按工程落实状态管理：基础方案已实施的文件归入 completed；仍需实现的新机制留在顶层。完成工程不等于实验目标或研究闸门全部通过。
+当前运行框架为 **three-layer-v3.1**。目录按工程落实状态管理：基础方案已实施的文件归入 completed；仍需实现的新机制留在顶层。完成工程不等于实验目标或研究闸门全部通过。
 
 ## 已完成与归档
 
 | 方案 / 阶段 | 已完成 | 尚未完成或未采用 |
 | --- | --- | --- |
-| [全量benchmark同步](./completed/full_benchmark_20261015.md) · [测试指南](../docs/full_benchmark.md) | 全任务范围、原生baseline/clean、多攻击、当前控制、隔离输出、配置绑定和统一报告；partial前缀保留 | 仅离线工程验证，尚未执行用户正式全量模型实验或研究闸门验收 |
+| [Clean通用误伤修正](./completed/clean_utility_20261015.md) · [已实施计划](./completed/clean_utility_opt_20261015.md) | L3有界相关调用—返回证据、大小比较完整元数据；L2明确邮件/网页来源；L1来源澄清；v2输入兼容绑定 | 全量clean/攻击及重复真实模型验收待完成，约5pp是目标，不宣称TSR恢复 |
+| [全量benchmark同步](./completed/full_benchmark_20261015.md) · [测试指南](../docs/full_benchmark.md) | 全任务范围、原生baseline/clean、多攻击、当前控制、隔离输出、配置绑定和统一报告；partial前缀保留 | 该工程阶段仅离线验证；当前另有用户全量clean导出，重复/攻击/研究闸门验收仍待完成 |
 | [L1有限投影实施](./completed/l1_projection_20261013.md) · [计划](./completed/L1_projection_implementation_plan_20261013.md) | 原生银行月支出六字段/全行投影、严格回退、模式/缓存/路由绑定、原文审计与平台默认同步 | 仅一个有限profile；真实四臂安全/效用/Token验收与更广输出适配仍待完成，未宣称新颖性 |
 | [Dashboard v2.2显示同步](./completed/dashboard_v22_20261013.md) | 引擎版本动态读取、L1/L3规则、普通/委托流程预览、路由与成本状态、窄屏验收 | 无新防御机制、模型评测、网页CSA控件或失败片段浏览器 |
 | [防御下降诊断与修复](./completed/defense_regression_analysis_20261012.md) · [最新复核](./completed/l2_docs_sync_20261013.md) | L1概述/外发规则与L3正文审查；19/19探针、12攻击+3干净任务；当前已记录144条v2.2：TSR130/144、nativeASR0/144 | 单次观察；重复匹配、独立终态与因果/成本验收未完成；原144条历史诊断不改写 |

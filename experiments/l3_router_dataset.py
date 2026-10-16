@@ -7,7 +7,8 @@ import argparse
 import json
 from hashlib import sha256
 from pathlib import Path
-from dscg.audit_router import (LABELS, LABEL_SOURCES, argument_flags, digest, risk_score, validate_completeness_flags)
+from dscg.audit_router import (LABELS, LABEL_SOURCES, INPUT_SCHEMA, argument_flags, digest, risk_score, validate_completeness_flags)
+from dscg.audit_context import FACT_BUDGET, MAX_RESULTS, MAX_CALL_ARGUMENTS
 
 
 def _sha(value):
@@ -15,20 +16,25 @@ def _sha(value):
 
 
 def _eligible(packet,host):
+    if packet.get('schema_version') != INPUT_SCHEMA:return False
     actions=packet['current_actions'];policy=packet['policy_features']
     if len(actions)!=1 or policy['allowlist_matches']!=[True]:return False
     action=actions[0];meta=policy['candidate_metadata_states'][action['tool_name']]
     if (meta.get('metadata_state'),meta.get('effect'),meta.get('sink'),meta.get('sensitivity'),meta.get('idempotent'))!=('valid','read','none','internal',True):return False
     if (host['schema_valid'] is not True or any(host['completeness_flags'].values()) or
         packet['history_truncated'] or packet['tool_results_window_truncated'] or
-        any(r.get('content_truncated') or r.get('error') for r in packet['recent_tool_results']) or
+        any(r.get('content_truncated') or r.get('error') or r.get('omitted_fields') or r.get('call_arguments_truncated') or r.get('call_arguments_nonfinite_or_unsupported') for r in packet['recent_tool_results']) or
         any(argument_flags(action['untrusted_argument_data']).values())):return False
     if not packet['trusted_user_request'].strip() or not action['host_tool_description'].strip():return False
     if len(packet['trusted_user_request'])>2048 or len(action['host_tool_description'])>512:return False
-    if any(len(r['content'])>2048 for r in packet['recent_tool_results']) or len(packet['recent_tool_results'])>4 or len(packet['action_history'])>32:return False
+    facts=packet['recent_tool_results']
+    if len(facts)>MAX_RESULTS or len(packet['action_history'])>32:return False
+    if any(not isinstance(r.get('call_arguments'),dict) or len(json.dumps(r['call_arguments'],ensure_ascii=False))>MAX_CALL_ARGUMENTS for r in facts):return False
+    if sum(len(r['content'])+len(json.dumps(r['call_arguments'],ensure_ascii=False))+len(r.get('error') or '') for r in facts)>FACT_BUDGET:return False
     return (len(packet['trusted_user_request'])+len(action['host_tool_description'])+
             len(json.dumps(action['untrusted_argument_data'],ensure_ascii=True))+
-            sum(len(r['content']) for r in packet['recent_tool_results']))<=12288
+            sum(len(r['content'])+len(json.dumps(r['call_arguments'],ensure_ascii=False))+len(r.get('error') or '')
+                for r in packet['recent_tool_results']))<=12288
 
 
 def build_dataset(input_path, output_dir):

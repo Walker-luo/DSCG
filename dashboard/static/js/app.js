@@ -235,7 +235,7 @@ function updateRunPreview() {
   $("#layer-config-note").textContent = !(sandbox || checker)
     ? "L2/L3 全关时 L1 随之关闭；该 DSCG 消融仍使用 Monitor，与原生 Baseline 的工具循环不同。"
     : sandbox && !precheck ? "已关闭候选前置检查；工具授权仍由 Monitor 检查。重审 0 次，完成提示关闭。"
-    : "Monitor 与一次性票据负责执行。L2 支持授权工具视图与显式任务文件展开；重审 0 次，完成提示关闭。";
+    : "Monitor 与一次性票据负责执行。L2 支持授权工具视图与显式任务来源展开；重审 0 次，完成提示关闭。";
   if (!isOrigin && $('#defense-preset').value === 'v2') {
     $('#layer-config-note').textContent = 'V2 风格关闭 L1、前置检查、工具视图和任务展开，保留新版目录复核；不是历史 V2 的精确复现。';
   }
@@ -657,7 +657,7 @@ async function loadOverview(runId) {
       ['L2 累计可见工具定义', statValue('l2', 'visible_tools_total')],
       ['L2 累计完整目录定义', statValue('l2', 'catalog_tools_total')],
       ['L2 授权编译次数', statValue('l2', 'authorization_compilations')],
-      ['已展开任务文件', statValue('l2', 'delegated_tasks_expanded')],
+      ['已展开任务来源', statValue('l2', 'delegated_tasks_expanded')],
       ['L3 公开读取免审批次', statValue('routing', 'public_read_bypass_batches')],
       ['L3 实际语义调用', statValue('routing', 'semantic_audit_calls')],
     ];
@@ -668,7 +668,7 @@ async function loadOverview(runId) {
         layerBadge('L1 返回隔离', layerFlag('input_isolation')) + layerBadge('L2 工具授权', layerFlag('use_sandbox')) +
         layerBadge('L2 前置检查', layerFlag('authorization_precheck')) +
         layerBadge('L2 工具视图', layerFlag('planning_tool_view')) +
-        layerBadge('任务文件展开', layerFlag('delegated_tasks')) + layerBadge('L3 动作审计', layerFlag('use_security_checker'))}</div>
+        layerBadge('任务来源展开', layerFlag('delegated_tasks')) + layerBadge('L3 动作审计', layerFlag('use_security_checker'))}</div>
       ${config.origin ? '' : `<p class="audit-routing-note">${escapeHtml(auditNote)}</p>`}
       <div class="overview-cards">
         <div class="metric-card tsr"><div class="metric-label">任务成功率 TSR</div><div class="metric-value">${formatRate(agg.avg_utility_rate)}</div><small>${formatCount(agg.utility_passed)} / ${formatCount(agg.total_tasks)} 个任务成功</small></div>
@@ -1248,7 +1248,7 @@ async function loadReport() {
           ${config.defense ? `<tr><td class="text-muted">AgentDojo 防御</td><td>${escapeHtml(config.defense)}</td></tr>` : ""}
           ${!config.origin ? `
             <tr><td class="text-muted">框架版本</td><td>${escapeHtml(config.framework_version || '未记录')}</td></tr>
-            ${[['input_isolation','L1 工具返回隔离'],['use_sandbox','L2 工具授权'],['authorization_precheck','L2 前置检查'],['planning_tool_view','L2 授权工具视图'],['delegated_tasks','显式任务文件展开'],['use_security_checker','L3 动作审计']].map(([key,label]) => `<tr><td class="text-muted">${label}</td><td>${typeof config[key] === 'boolean' ? config[key] ? '启用' : '关闭' : '未记录'}</td></tr>`).join('')}
+            ${[['input_isolation','L1 工具返回隔离'],['use_sandbox','L2 工具授权'],['authorization_precheck','L2 前置检查'],['planning_tool_view','L2 授权工具视图'],['delegated_tasks','显式任务来源展开'],['use_security_checker','L3 动作审计']].map(([key,label]) => `<tr><td class="text-muted">${label}</td><td>${typeof config[key] === 'boolean' ? config[key] ? '启用' : '关闭' : '未记录'}</td></tr>`).join('')}
           ` : ""}
         </table>
 

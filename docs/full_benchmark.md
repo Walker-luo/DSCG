@@ -18,7 +18,7 @@
 模型字段、API Key 获取和工具目录配置见 [模型、工具与运行参数详解](./model_tool_configuration.md)。准备好 `config/models.local.toml` 和对应 Key 环境变量即可；标准 AgentDojo 工具与模拟环境已提供，不需要真实银行、邮箱或 Slack 账号，也不要求额外任务清单。
 
 - **baseline：** 加 `--baseline`，使用原生 AgentDojo 工具循环与相同主模型配置；不加载 DSCG 风险目录，不创建安全模型，不启用 DSCG 或 AgentDojo 防御。`--no-checker` 是保留其他防御的消融，不能代替无防御 baseline。
-- **当前 DSCG：** 不加 `--baseline`。沿用 `three-layer-l1-v3`：L1 有限投影默认 `projected`，L2 工具授权/前置检查、工具视图和有限任务文件展开开启，L3 当前动作审计开启。
+- **当前 DSCG：** 不加 `--baseline`。沿用 `three-layer-v3.1`：L1 有限投影默认 `projected`，L2 工具授权/前置检查、工具视图和有限明确任务来源展开开启，L3 当前动作审计开启。
 - **保持普通对照默认值：** 算法路由 `off`、重审 `0`、完成提示关闭、日志 `summary`。路由 `off` 不会关闭 L3。没有部署阈值时，不在这轮全量测试中临时启用 selective；参数决策另见 [plan.md](../plan.md)。
 
 两组使用同一份 `[main]`；只有 DSCG 使用 `[security]`，省略该角色时按既有规则复用主模型。固定模型配置、工具目录和源码后再开始成对实验；记录中保留 revision 与源码哈希，但模型服务未提供或未固定的实际修订仍是重复性限制。
@@ -32,6 +32,8 @@ python -m experiments.run_benchmark \
 ```
 
 第二条仅导出全部注册任务 ID 并退出，文件已存在时拒绝覆盖。该清单可供核对，普通运行无需导入；若需要冻结它，在两组运行中都加 `--task-manifest download/full_v12_tasks_01.json`。DoS 仍从完整清单按原生规则选首个注入 ID，不把它扩展成所有注入组合。
+
+v3.1的clean优化目标是相对**同轮**baseline下降约5个百分点以内，尚无新线上结果。旧导出90/97与69/97保持原身份，不重算或替换。先分别以新名称跑完整clean，再进行攻击对照；若需原框架三臂比较，在独立检出原修订的工作区使用相同模型配置运行，不能把关闭L3等消融当成原v3。详见 [本轮工程报告](../workshop/completed/clean_utility_20261015.md)。
 
 ## 3. 先运行全量干净任务对照
 

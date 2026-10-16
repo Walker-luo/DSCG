@@ -2,7 +2,7 @@
 
 | 入口 | 内容 |
 | --- | --- |
-| [项目 README](../README.md) | 当前three-layer-l1-v3三层框架、使用命令和能力边界 |
+| [项目 README](../README.md) | 当前three-layer-v3.1三层框架、使用命令和能力边界 |
 | [模型、工具与运行参数](./model_tool_configuration.md) | 配置字段、信息获取、工具schema/风险分类、默认控制及排错 |
 | [评测指南](./evaluation.md) | 模型配置、全部可选攻击、对照与日志口径 |
 | [全量测试指南](./full_benchmark.md) | 当前框架与原生无防御 baseline、全部任务/攻击规模、运行命令、缓存及结果核对 |
