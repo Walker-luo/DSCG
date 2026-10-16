@@ -58,6 +58,8 @@ Not all injection tasks were solved as user tasks.
 
 预检使用当前受测 pipeline：baseline 运行检查原生智能体，DSCG 运行也会经过 DSCG。因此 DSCG 的目标预检失败不能直接归为裸模型能力不足，预检成功也不保证注入成功。诊断时另记目标预检的通过/失败/错误，保留攻击结果原有分母。
 
+如需先独立运行全部 injection GOAL、复测失败并冻结能力筛选名单，使用 [独立预检入口](./injection_precheck.md)。筛选测量保留全部 user tasks，但属于单独的目标子集；不改写本指南的 full 范围和原始结果。
+
 ### 3.2 成对运行命令
 
 固定两组的主模型公开配置、工具/任务版本、环境和源码。保持 DSCG 的现行默认开关，使用不同的新 name；如果下列名称已经使用，改为新的后缀，不覆盖已保留结果。两组合计计划 194 个 clean 样本，不等于 194 次 API 请求。
