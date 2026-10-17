@@ -44,9 +44,9 @@ def load_task_manifest(path):
 
 
 def select_tasks(manifest,suite_name,users,injections,run_attack,is_dos,*,task_scope='partial'):
-    if task_scope not in {'partial', 'full', 'screened'}:
+    if task_scope not in {'partial', 'full', 'screened', 'partial_screened'}:
         raise ValueError('unknown task scope')
-    if task_scope == 'screened' and (manifest is None or not run_attack or is_dos):
+    if task_scope in {'screened', 'partial_screened'} and (manifest is None or not run_attack or is_dos):
         raise ValueError('screened measurements require a frozen targeted-attack cohort')
     if manifest is None:
         selected_users = list(users) if task_scope == 'full' else users[:3]
@@ -66,11 +66,14 @@ def select_tasks(manifest,suite_name,users,injections,run_attack,is_dos,*,task_s
         if selected_users != list(users) or (run_attack and selected_injections != list(injections)):
             raise ValueError('full benchmark requires all registered task IDs in registration order; partial manifests cannot reduce it')
         return selected_users, selected_injections[:1] if is_dos and run_attack else selected_injections
-    if task_scope == 'screened':
+    if task_scope in {'screened', 'partial_screened'}:
         if (manifest.get('schema_version') != 'dscg.injection-screen.v1' or not manifest.get('cohort_sha256')
                 or selected_users != list(users)
                 or selected_injections != [i for i in injections if i in selected_injections]):
             raise ValueError('screened cohort must retain all user tasks and registered injection order')
+        if task_scope == 'partial_screened':
+            # Filter the existing prefix; do not backfill with later easy goals.
+            return list(users[:3]), [i for i in injections[:3] if i in selected_injections]
     if is_dos and selected_injections!=injections[:1]:
         raise ValueError('AgentDojo DoS uses first injection ID; supply a separate matching manifest')
     return selected_users,selected_injections

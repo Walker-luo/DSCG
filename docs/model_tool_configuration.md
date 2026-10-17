@@ -180,7 +180,7 @@ print("classified tools:", len(catalog))
 
 ## 5. 运行控制：默认值、用途及设置入口
 
-下表列出的 partial CLI 开关也适用于全量 `experiments.run_benchmark`；两者共用执行与报告流程，仅默认任务范围和输出根不同。完整框架/baseline 全量命令见 [全量测试指南](./full_benchmark.md)。`use_sandbox` 等仅 API/网页控制仍不因此新增同名 CLI。
+下表列出的 partial CLI 开关也适用于全量 `experiments.run_benchmark`；两者共用执行与报告流程，仅默认任务范围和输出根不同。另有仅 partial 支持的 `--suites travel banking slack`，可在优化时跳过 workspace，默认仍跑四场景，示例见 [评测指南](./evaluation.md#对照与输出)。完整框架/baseline 全量命令见 [全量测试指南](./full_benchmark.md)。`use_sandbox` 等仅 API/网页控制仍不因此新增同名 CLI。
 
 | 控制 | 默认 | 可设置入口 / 作用 |
 | --- | --- | --- |

@@ -332,6 +332,23 @@ class InjectionPrecheckTests(unittest.TestCase):
         self.assertEqual(self.suite.executed.count('injection_task_0'), 1)
         self.assertEqual(manifest.read_bytes(), original)
 
+    def test_known_previous_unified_screen_resumes_after_partial_cli_change(self):
+        self.suite.outcomes[1] = [RuntimeError('offline'), False, False]
+        self.assertEqual(self.screen(), 1)
+        mapping = json.loads(Path(cohort_module.__file__).with_name('injection_cohort_compatibility.json').read_text())
+        binding = precheck._binding(self.config, ['workspace'])
+        binding['source']['source_sha256'] = mapping['equivalent_source_sha256'][0]
+        manifest = self.output / 'screen_manifest.json'
+        manifest.write_text(json.dumps(binding))
+        for p in self.output.rglob('attempt_manifest.json'):
+            record = json.loads(p.read_text()); record['binding_sha256'] = precheck._digest(binding)
+            p.write_text(json.dumps(record))
+        originals = {p: p.read_bytes() for p in [manifest, *self.output.rglob('attempt.json')]}
+        self.assertEqual(self.screen(), 0)
+        self.assertEqual(self.suite.executed.count('injection_task_0'), 1)
+        for p, content in originals.items():
+            self.assertEqual(p.read_bytes(), content)
+
     def test_unknown_legacy_script_or_changed_defense_runtime_is_not_accepted(self):
         self.screen()
         binding = self.legacy_binding(); binding['screening_script_sha256'] = '0' * 64

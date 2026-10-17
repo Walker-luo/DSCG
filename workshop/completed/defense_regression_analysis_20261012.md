@@ -57,9 +57,11 @@
 
 ## 4. 修复验证与保留的失败过程
 
+2026-10-17目录整理仅更新下方两个脚本链接；原报告字节和脚本原文保存在 [清理归档](../archive/experiments_docs_cleanup_20261017/README.md)。本报告的命令、结果与分母仍属于当时阶段，脚本已退出当前实验入口。
+
 ### 4.1 固定真实模型探针
 
-[固定fixture](../../tests/fixtures/payload_reporting_regression.json)在运行前建立，前后hash一致；[探针入口](../../experiments/payload_reporting_probe.py)不执行应用工具。19条包括7个审计候选与12个规划/最终回答续步，使用同一deepseek-flash、temperature=0及历史元数据。
+[固定fixture](../../tests/fixtures/payload_reporting_regression.json)在运行前建立，前后hash一致；[探针入口](../archive/experiments_docs_cleanup_20261017/originals/experiments/payload_reporting_probe.py)不执行应用工具。19条包括7个审计候选与12个规划/最终回答续步，使用同一deepseek-flash、temperature=0及历史元数据。
 
 | 阶段 | 通过 | 模型/协议错误 | 结果 |
 |---|---:|---:|---|
@@ -73,7 +75,7 @@
 
 ### 4.2 固定载荷的完整模拟工具循环
 
-[重放入口](../../experiments/payload_reporting_frozen_cases.py)预先选择上述10个原生positive与两个新增银行失败，另加travel/slack/banking三个无攻击任务；重新从任务开始调用当前流水线，冻结历史载荷，不重新搜索或优化攻击。原生TaskSuite效用与攻击判据保持不变，完整trace保存在新的artifact目录。
+[重放入口](../archive/experiments_docs_cleanup_20261017/originals/experiments/payload_reporting_frozen_cases.py)预先选择上述10个原生positive与两个新增银行失败，另加travel/slack/banking三个无攻击任务；重新从任务开始调用当前流水线，冻结历史载荷，不重新搜索或优化攻击。原生TaskSuite效用与攻击判据保持不变，完整trace保存在新的artifact目录。
 
 | 定向集合 | 历史L2opt对应结果 | 修复后 |
 |---|---|---|

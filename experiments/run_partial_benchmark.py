@@ -21,7 +21,7 @@ from experiments.harness_audit import rank_ids, security_result_fields
 from experiments.partial_reporting import collect_suite_report, write_run_overview
 from experiments.partial_controls import (validate_controls, make_task_manifest, load_task_manifest,
                                           select_tasks, guard_run, source_revision, preserve_cached_cost,
-                                          RunConfigurationError)
+                                          RunConfigurationError, SUITES)
 
 
 TYPICAL_ATTACKS = (
@@ -161,21 +161,42 @@ def main(
     task_scope: str = 'partial',
     use_sandbox: bool = True,
     cohort_sha256: str | None = None,
+    cohort_path: str | Path | None = None,
 ) -> int:
-    if task_scope not in {'partial', 'full', 'screened'}:
+    if task_scope not in {'partial', 'full', 'screened', 'partial_screened'}:
         raise ValueError('unknown task scope')
+    suites = list(suites)
+    if not suites or any(name not in SUITES for name in suites) or len(set(suites)) != len(suites):
+        raise ValueError('suites must be a nonempty, unique selection of workspace/travel/banking/slack')
+    if cohort_path is not None:
+        if task_scope != 'partial' or not run_attack or task_manifest_path or cohort_sha256:
+            raise ValueError('partial --cohort requires attacks and cannot use another manifest or scope')
+        from experiments.injection_cohort import run_screened
+        return run_screened(
+            cohort_path, task_scope='partial_screened', suites=suites, model_id=model_id,
+            sec_model_id=sec_model_id, origin=origin, defense=defense, config_path=config_path,
+            run_name=run_name, results_dir=results_dir, attack=attack, force_rerun=force_rerun,
+            api_key=api_key, base_url=base_url, provider=provider, api_key_env=api_key_env,
+            sec_api_key=sec_api_key, sec_base_url=sec_base_url, sec_provider=sec_provider,
+            sec_api_key_env=sec_api_key_env, trace_level=trace_level, tool_metadata_path=tool_metadata_path,
+            use_security_checker=use_security_checker, use_sandbox=use_sandbox,
+            audit_retries=audit_retries, completion_prompt=completion_prompt,
+            audit_router_mode=audit_router_mode, audit_router_artifact=audit_router_artifact,
+            planning_tool_view=planning_tool_view, delegated_tasks=delegated_tasks,
+            l1_projection_mode=l1_projection_mode,
+        )
     if not isinstance(l1_projection_mode, str) or l1_projection_mode not in L1_PROJECTION_MODES:
         raise ValueError('invalid L1 projection mode')
     _validate_router_controls(origin,use_security_checker,audit_router_mode,use_sandbox)
     validate_controls(origin=origin, use_security_checker=use_security_checker,
                       audit_retries=audit_retries, completion_prompt=completion_prompt)
     frozen_tasks = load_task_manifest(task_manifest_path)
-    if task_scope == 'screened':
+    if task_scope in {'screened', 'partial_screened'}:
         from experiments.injection_cohort import _digest
         if (not frozen_tasks or not cohort_sha256 or frozen_tasks.get('cohort_sha256') != cohort_sha256
                 or _digest({k: v for k, v in frozen_tasks.items() if k != 'cohort_sha256'}) != cohort_sha256):
             raise ValueError('screened measurement requires the validated frozen cohort identity')
-    if task_scope in {'full', 'screened'} and frozen_tasks is not None:
+    if task_scope in {'full', 'screened', 'partial_screened'} and frozen_tasks is not None:
         # Validate the full catalogue before model/client construction. DoS later
         # projects this complete catalogue to its native first-injection rule.
         for suite_name in suites:
@@ -183,7 +204,7 @@ def main(
             select_tasks(frozen_tasks, suite_name, list(suite.user_tasks), list(suite.injection_tasks),
                          run_attack, False, task_scope=task_scope)
     attack_names = resolve_attack_names(attack) if run_attack else ["none"]
-    if task_scope == 'screened' and any(ATTACKS[name].is_dos_attack for name in attack_names):
+    if task_scope in {'screened', 'partial_screened'} and any(ATTACKS[name].is_dos_attack for name in attack_names):
         raise ValueError('screened measurements do not support DoS')
     logdir = Path(results_dir) if results_dir is not None else BENCHMARK_RESULTS_DIR if task_scope in {'full', 'screened'} else RESULTS_DIR / "partial_benchmark"
     multiple = len(attack_names) > 1
@@ -192,6 +213,7 @@ def main(
     report_sources = []
     if run_attack:
         print(f"本次攻击 ({len(attack_names)}): {', '.join(attack_names)}")
+    print(f"本次场景 ({len(suites)}): {', '.join(suites)}", flush=True)
 
     for attack_name in attack_names:
         context["active_suite"] = None
@@ -240,6 +262,7 @@ def main(
         "pipeline_name": context.get("pipeline_name"),
         "model_id": context.get("model_id"),
         "attacks": attack_names if run_attack else [],
+        "suites": suites,
         "excluded_from_all": {"manual": "requires interactive input"},
         "runs": run_records,
     }
@@ -373,6 +396,12 @@ def _run_single_attack(
         resolved_sec_model_id = None if origin or not use_security_checker else sec_model_config.get("model_id", sec_model_id)
         result_dir_name = _apply_run_name(pipeline, resolved_model_id, run_name)
         base_output_dir = logdir / result_dir_name
+        if task_scope in {'partial', 'partial_screened'}:
+            # Bind the entire selection, including disjoint subsets, before any
+            # scored execution or report rewrite under this run name.
+            guard_run(base_output_dir / 'suite_manifest.json', {
+                'schema_version': 'dscg.partial-suites.v1', 'suites': suites,
+            })
         attack_component = _safe_result_component(attack_name if run_attack else "none", "attack")
         output_dir = base_output_dir / attack_component
         if report_context is not None:
@@ -686,8 +715,11 @@ def cli(argv: list[str] | None = None, *, task_scope: str = 'partial', entrypoin
         raise ValueError('task scope must be partial or full')
     full = task_scope == 'full'
     parser = argparse.ArgumentParser(
-        description="运行 DSCG 的四场景全量 AgentDojo 评测（全部用户/注入任务）。" if full else "运行 DSCG 的四场景小批量 AgentDojo 回归评测。"
+        description="运行 DSCG 的四场景全量 AgentDojo 评测（全部用户/注入任务）。" if full else "运行 DSCG 的小批量 AgentDojo 回归评测，默认四场景，可指定场景。"
     )
+    if not full:
+        parser.add_argument('--suites', nargs='+', choices=SUITES, default=list(SUITES),
+                            help='仅 partial：选择场景，例如 --suites travel banking slack 跳过 workspace；默认全部四场景。')
     parser.add_argument(
         "--attack",
         nargs="+",
@@ -753,9 +785,13 @@ def cli(argv: list[str] | None = None, *, task_scope: str = 'partial', entrypoin
     parser.add_argument("--clean", action="store_true", help="用相同用户任务运行无攻击效用控制。")
     parser.add_argument("--task-manifest", dest="task_manifest_path", help="读取冻结 v1.2 全量任务清单；拒绝缩小实际执行集合。" if full else "读取冻结 v1.2 任务 ID 清单。")
     parser.add_argument("--write-task-manifest", metavar="PATH", help="离线导出当前任务 ID 清单并退出，不调用模型。")
-    if full:
-        parser.add_argument('--cohort', dest='cohort_path', help='冻结的 injection 预检名单；显式标为 screened，保留全部用户任务。')
+    parser.add_argument('--cohort', dest='cohort_path', help=(
+        '冻结的 injection 预检名单；显式标为 screened，保留全部用户任务。' if full else
+        '冻结的 injection 预检名单；保留每场景前3个用户，仅过滤原来前3个注入目标，不补位。'))
     args = parser.parse_args(argv)
+    selected_suites = list(SUITES) if full else args.suites
+    if len(set(selected_suites)) != len(selected_suites):
+        parser.error('--suites cannot contain duplicate names')
     cohort_path = getattr(args, 'cohort_path', None)
     if (require_cohort or cohort_path is not None) and not cohort_path:
         parser.error('screened benchmark requires a nonempty --cohort PATH')
@@ -771,7 +807,9 @@ def cli(argv: list[str] | None = None, *, task_scope: str = 'partial', entrypoin
             path = Path(args.write_task_manifest)
             if path.exists(): parser.error("task manifest already exists; preserve old evidence")
             path.parent.mkdir(parents=True, exist_ok=True)
-            path.write_text(json.dumps(make_task_manifest(task_scope), ensure_ascii=False, indent=2) + "\n")
+            manifest = make_task_manifest(task_scope)
+            manifest['suites'] = {name: manifest['suites'][name] for name in selected_suites}
+            path.write_text(json.dumps(manifest, ensure_ascii=False, indent=2) + "\n")
             print(f"任务清单: {path}")
             return 0
     except ValueError as exc:
@@ -786,7 +824,7 @@ def cli(argv: list[str] | None = None, *, task_scope: str = 'partial', entrypoin
         execution = entrypoint or main
         dispatch_options = {} if entrypoint is not None else {'task_scope': task_scope}
         if cohort_path is not None:
-            if entrypoint is None:
+            if full and entrypoint is None:
                 from experiments.run_benchmark import main as execution
                 dispatch_options.pop('task_scope', None)
             dispatch_options['cohort_path'] = cohort_path
@@ -795,7 +833,7 @@ def cli(argv: list[str] | None = None, *, task_scope: str = 'partial', entrypoin
             sec_model_id=os.getenv("DSCG_SEC_MODEL_ID"),
             provider=os.getenv("DSCG_MAIN_PROVIDER"),
             sec_provider=os.getenv("DSCG_SEC_PROVIDER"),
-            suites=["workspace", "travel", "banking", "slack"],
+            suites=selected_suites,
             run_attack=not args.clean,
             origin=args.baseline,
             defense=None,

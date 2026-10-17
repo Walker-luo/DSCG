@@ -11,9 +11,9 @@ from pathlib import Path
 from agentdojo.attacks.attack_registry import ATTACKS
 from agentdojo.task_suite import get_suite
 from dscg.model_config import resolve_model_config
-from dscg.paths import BENCHMARK_RESULTS_DIR
+from dscg.paths import BENCHMARK_RESULTS_DIR, RESULTS_DIR
 from experiments import run_partial_benchmark as shared
-from experiments.partial_controls import source_revision, guard_run, validate_controls
+from experiments.partial_controls import source_revision, guard_run, validate_controls, select_tasks
 
 SCHEMA = 'dscg.injection-screen.v1'
 RULE = 'keep-any-valid-success; exclude-after-two-valid-failures; errors-unresolved'
@@ -104,11 +104,12 @@ def _source_compatible(recorded, current, *, check_python=True):
     if old_hashes == new_hashes and old_hashes:
         return True  # A Git commit change alone is provenance, not behavior.
     mapping = _legacy_mapping()
-    if not mapping or old_hashes != mapping['legacy_source']['source_sha256']:
+    if not mapping or old_hashes not in [mapping['legacy_source']['source_sha256'],
+                                        *mapping.get('equivalent_source_sha256', [])]:
         return False
     if set(new_hashes) != set(mapping['current_source_paths']):
         return False
-    changed_paths = set(mapping['current_harness_sha256'])
+    changed_paths = set(mapping['current_harness_sha256']) | {'experiments/injection_cohort_compatibility.json'}
     return all(new_hashes.get(p) == h for p, h in old_hashes.items() if p not in changed_paths)
 
 
@@ -128,7 +129,7 @@ def _bindings_compatible(recorded, current):
 def _record_compatibility(root, recorded, current):
     if recorded == current:
         return
-    record = {'reason': 'verified-equivalent progress/entry refactor or identical-source revision',
+    record = {'reason': 'verified byte-bound harness transition or identical-source revision',
               'original_binding': recorded, 'current_binding': current}
     path = root / 'compatibility' / (_digest(current) + '.json')
     if path.exists():
@@ -212,7 +213,7 @@ def _validate_cohort_data(cohort, config):
     return cohort
 
 
-def _preflight_report(base, cohort, active, attacks):
+def _preflight_report(base, cohort, active, attacks, selected_tasks=None):
     """Keep unscored native preflight outcomes/cost uncertainty separate."""
     records, aggregate_costs = [], []
     for attack in attacks:
@@ -225,7 +226,7 @@ def _preflight_report(base, cohort, active, attacks):
                     'main_overhead_including_preflight': value.get('overhead'),
                     'security_overhead_including_preflight': value.get('sec_overhead'),
                     'cost_scope': value.get('cost_scope')})
-            for task_id in cohort['suites'][name]['injection_task_ids']:
+            for task_id in (selected_tasks if selected_tasks is not None else cohort['suites'])[name]['injection_task_ids']:
                 path = directory / task_id / 'none' / 'none.json'
                 record = {'attack': attack, 'suite': name, 'injection_task_id': task_id,
                           'trace_path': str(path.resolve()), 'status': 'missing', 'total_tokens': None}
@@ -249,7 +250,11 @@ def _preflight_report(base, cohort, active, attacks):
 
 def run_screened(cohort_path, *, config_path=None, run_name=None, results_dir=None, origin=False,
                  attack='typical', audit_router_mode='off', trace_level='summary', audit_router_artifact=None,
-                 force_rerun=False, model_id=None, sec_model_id=None, defense=None, suites=None, **controls):
+                 force_rerun=False, model_id=None, sec_model_id=None, defense=None, suites=None,
+                 task_scope='screened', **controls):
+    if task_scope not in {'screened', 'partial_screened'}:
+        raise ValueError('unknown screened task scope')
+    partial = task_scope == 'partial_screened'
     if not run_name:
         raise ValueError('screened measurements require a new --name')
     config = resolve_model_config(model_id, config_path=config_path,
@@ -268,19 +273,35 @@ def run_screened(cohort_path, *, config_path=None, run_name=None, results_dir=No
     if not origin and use_checker:
         security_model = resolve_model_config(sec_model_id, config_path=config_path, prefix='DSCG_SEC', fallback=config,
             **{k: controls['sec_' + k] for k in ('api_key', 'base_url', 'provider', 'api_key_env') if 'sec_' + k in controls}).public_dict()
-    active = [name for name, entry in cohort['suites'].items() if entry['injection_task_ids']]
+    requested = list(suites) if suites is not None else list(cohort['suites'])
+    if not requested or len(set(requested)) != len(requested) or (partial and not set(requested) <= set(cohort['suites'])):
+        raise ValueError('frozen cohort lacks requested suites or selection is empty/duplicated')
+    selected = {}
+    for name, entry in cohort['suites'].items():
+        if partial and name not in requested:
+            continue
+        if partial and entry['injection_task_ids']:
+            catalog = cohort['binding']['catalog'][name]
+            users, injections = select_tasks(cohort, name, catalog['user_task_ids'],
+                list(catalog['injection_tasks']), True, False, task_scope=task_scope)
+            selected[name] = {'user_task_ids': users, 'injection_task_ids': injections}
+        else:
+            selected[name] = {'user_task_ids': entry['user_task_ids'][:3] if partial else entry['user_task_ids'],
+                              'injection_task_ids': entry['injection_task_ids']}
+    active = [name for name, entry in selected.items() if entry['injection_task_ids']]
     if not active:
-        raise ValueError('no injection targets passed screening; benchmark not started')
-    if suites is not None and not set(active).issubset(set(suites)):
+        raise ValueError('no injection targets remain in the requested task scope; benchmark not started')
+    if not partial and suites is not None and not set(active).issubset(set(suites)):
         raise ValueError('suite selection cannot omit active suites in the frozen cohort; no measurement started')
-    root = Path(results_dir or BENCHMARK_RESULTS_DIR)
+    root = Path(results_dir or (RESULTS_DIR / 'partial_benchmark' if partial else BENCHMARK_RESULTS_DIR))
     base = root / (shared._safe_result_component(config.model_id, 'model') + '_' + shared._safe_result_component(run_name, 'run'))
     with _lock(base):
         effective = {k: controls.get(k, default) for k, default in {
             'use_sandbox': True, 'use_security_checker': True, 'planning_tool_view': True,
             'delegated_tasks': True, 'l1_projection_mode': 'projected', 'audit_retries': 0,
             'completion_prompt': False}.items()}
-        identity = {'cohort_sha256': cohort['cohort_sha256'], 'main_model': config.public_dict(), 'security_model': security_model,
+        identity = {'task_scope': task_scope, 'requested_suites': requested, 'selected_tasks': selected,
+                    'cohort_sha256': cohort['cohort_sha256'], 'main_model': config.public_dict(), 'security_model': security_model,
                     'baseline': origin, 'attacks': names, 'audit_router_mode': audit_router_mode,
                     'trace_level': trace_level, 'controls': effective, 'defense': defense,
                     'tool_metadata_sha256': _file_hash(controls['tool_metadata_path']) if controls.get('tool_metadata_path') else None,
@@ -291,27 +312,31 @@ def run_screened(cohort_path, *, config_path=None, run_name=None, results_dir=No
             raise ValueError('existing non-screened run; use a new --name')
         guard_run(base / 'screened_run_manifest.json', identity)
         _record_compatibility(base, cohort['binding'], _binding(config, list(cohort['binding']['catalog'])))
-        attachment = {'scope': 'capability-conditioned screened subset', 'task_scope': 'screened',
+        attachment = {'scope': 'capability-conditioned screened subset', 'task_scope': task_scope,
                       'cohort_path': str(cohort_path), 'cohort': cohort,
-                      'skipped_suites': [name for name in cohort['suites'] if name not in active],
+                      'selected_tasks': selected, 'requested_suites': requested,
+                      'omitted_suites': [name for name in cohort['suites'] if name not in requested],
+                      'skipped_suites': [name for name in selected if name not in active],
                       'counts': {name: {'original_targets': len(cohort['binding']['catalog'][name]['injection_tasks']),
-                          'retained_targets': len(entry['injection_task_ids']), 'user_tasks': len(entry['user_task_ids']),
+                          'retained_targets': len(cohort['suites'][name]['injection_task_ids']),
+                          'prefix_targets': min(3, len(cohort['binding']['catalog'][name]['injection_tasks'])) if partial else len(cohort['binding']['catalog'][name]['injection_tasks']),
+                          'selected_targets': len(entry['injection_task_ids']), 'user_tasks': len(entry['user_task_ids']),
                           'planned_per_targeted_attack': len(entry['user_task_ids']) * len(entry['injection_task_ids'])}
-                          for name, entry in cohort['suites'].items()},
+                          for name, entry in selected.items()},
                       'cost_scope': 'native per-attack preflight retained; not scored attack samples; screening cost separate'}
         attachment_path = base / 'screened_cohort.json'
         if not attachment_path.exists():
             _write_new(attachment_path, attachment)
         for name in attachment['skipped_suites']:
-            print(f'{name}: 无通过目标，明确跳过。')
+            print(f'{name}: {"原前3个注入目标中" if partial else ""}无通过目标，明确跳过。')
         try:
             return shared.main(model_id=config.model_id, sec_model_id=sec_model_id, defense=defense,
                                provider=config.provider, base_url=config.base_url,
                                api_key_env=config.api_key_env, api_key=config.api_key, config_path=config_path,
                                suites=active, origin=origin, run_name=run_name, results_dir=root,
-                               task_manifest_path=cohort_path, task_scope='screened', attack=names,
+                               task_manifest_path=cohort_path, task_scope=task_scope, attack=names,
                                cohort_sha256=cohort['cohort_sha256'],
                                audit_router_mode=audit_router_mode, trace_level=trace_level,
                                audit_router_artifact=audit_router_artifact, force_rerun=force_rerun, **controls)
         finally:
-            _preflight_report(base, cohort, active, names)
+            _preflight_report(base, cohort, active, names, selected)

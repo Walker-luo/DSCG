@@ -4,6 +4,8 @@
 
 这是**基于直接目标预检的筛选子集**，不能标为 AgentDojo 全量结果。直接请求失败不证明间接注入无法成功：模型可能主动拒绝直接请求，也可能在执行细节或原生评分上失败。筛选后的 ASR 与未筛选的 ASR 分母不同，不能直接混作防御收益。
 
+优化阶段也可用 `experiments.run_partial_benchmark --cohort PATH --suites travel banking slack --name <新名称>`。默认每场景3用户×3注入的前缀不变，只从原前三个注入目标中筛掉名单排除项，不补位；结果标记 `partial_screened`，默认保存到 `results/partial_benchmark/`。完整命令见 [评测指南](./evaluation.md#对照与输出)。本指南下方 `run_benchmark --cohort` 仍使用全部用户任务。
+
 ## 1. 独立预检
 
 以下命令在 `DSCG/`、已激活 `ipi` 环境下执行。使用新 name，不复用其他类型实验的目录：

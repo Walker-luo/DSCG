@@ -1,6 +1,6 @@
 # 当前框架与平台展示交接
 
-更新时间：2026-10-15。当前默认版本 **three-layer-v3.1**。本次用户授权实现有限L1结构化投影，沿用L2工具视图/任务文件与L3动作正文审查；默认投影已接入factory、partial和网页API，架构说明同步。Spotlighting风格来源封装仍是不适用输入的回退。正式研究路线和闸门不改变。
+更新时间：2026-10-17（目录与文档整理，运行机制未变）。当前默认版本 **three-layer-v3.1**。本次用户授权实现有限L1结构化投影，沿用L2工具视图/任务文件与L3动作正文审查；默认投影已接入factory、partial和网页API，架构说明同步。Spotlighting风格来源封装仍是不适用输入的回退。正式研究路线和闸门不改变。
 
 ## v3.1增量交接
 
@@ -63,37 +63,10 @@ L1不增加独立模型调用：明确的原生银行月支出任务保留全部
 
 前序交接和历史截图见 [工作台报告](../workshop/completed/dashboard_framework_ui_20261010.md)、[文档清理报告](../workshop/completed/framework_docs_cleanup_20261010.md)。前序显示源码已同步，详见 [v2.2平台报告](../workshop/completed/dashboard_v22_20261013.md)。未重启用户服务；重启Dashboard并刷新即可加载新页面。历史结果和既有证据保持原身份。
 
-## 前序v2.2证据与版本身份（2026-10-13核对）
+## 验证与后续工作
 
-前序文档复核时HEAD为 `c209c6ef35247bb646dcdff45a1c3207a1cd7185`，初始工作树clean。L2 helper与原实施hash一致；当时L1/流水线、两探针入口和固定fixture均匹配v2.2修复记录。保留的54份探针/定向模拟产物hash一致；真实模型探针19/19、12攻击TSR12/12/nativeASR0/12与3干净TSR3/3是此前结果，该文档阶段只读核对、未新增API调用。模拟的是AgentDojo工具环境，不能写成所有验证都使用Mock模型。
+历史工程过程和统计集中保留在workshop：[v2.2显示与版本身份](../workshop/completed/dashboard_v22_20261013.md)、[L1投影实施](../workshop/completed/l1_projection_20261013.md)、[v3.1 clean修正](../workshop/completed/clean_utility_20261015.md)及[准备读取候选撤回](../workshop/completed/read_discovery_20261016.md)。旧144条v2.2实验不能重新标记成当前版本；离线检查不证明模型收益或真实E0通过。
 
-现有目录 `results/partial_benchmark/deepseek-flash_3layer_L2opt/` 中144条记录日期为2026-10-13、版本均为v2.2。manifest的pipeline名为 `deepseek-flash_3layer_L2_v2`；输出目录字段还保留原路径。本轮不重命名/迁移目录，不把目录名当版本证据。
+当前真实E0仍pending，I3为24个有效探针/8个范围缺口/0个工具边界缺口，I2仍locked。后续工作按 [研究路线](../../research/technical_route.md)选择，保留原始评分、数据与版本身份。
 
-| 检查项 | 当前源记录 |
-| --- | --- |
-| 任务/原生指标 | 144条，utility有效144、security布尔有效144、错误0；TSR130/144、nativeASR0/144 |
-| 与初版三层配对 | 144相同task keys、144相同载荷、144相同授权工具集合；后续L1/L3策略同时改变，不是L2视图单变量消融 |
-| L3状态 | 144条use_security_checker=true，audit_router_mode=off；off不等于移除L3 |
-| 成本 | 主模型1,347,126、审计338,699、合计1,685,825 Tokens为16份汇总记录量；cost_scope=new_api_calls_this_invocation，cost_comparison_ready全部false，不能直接算节省比例 |
-| 历史hash边界 | 旧诊断292个input中148相符、144旧L2opt轨迹字节变化、缺失0；旧导出/诊断保留为当时证据，不能用当前文件重新认证原比较 |
-
-本次 [结果核对](../workshop/artifacts/20261013_l2_docs_sync/latest_results.json)保留实际task ID、版本、成本状态和输入hash。单次源记录不替代独立环境终态oracle、真实E0或重复验证；不能推断参数范围已被强制约束，也不以警告引用减少单独证明安全增强。
-
-## 验证及下一步
-
-前序文档复核的离线283/283、Node28/28及源码/证据检查见 [复核报告](../workshop/completed/l2_docs_sync_20261013.md)，其原产物和9份文档原文保留。前序Dashboard离线284/284、Node31/31通过；新增回归验证引擎版本动态展示、有效流程和历史运行身份。新产物在 `workshop/artifacts/20261013_dashboard_v22/`，六份当前文档原始字节在 `workshop/archive/dashboard_v22_20261013/`；原报告/manifest/hash不改写，用户results/download保留。
-
-平台v2.2显示交接已完成，沿用已接线控件，不增加配置机制。CSA专门模式/artifact控件和失败片段浏览器仍未实施，未因本次页面更新而开启选择性免审。
-
-下一项使用新run名做v3的projection off/projected匹配对照，另保留shadow覆盖与合法引用反例，核查独立终态及总模型成本。已有144条属于v2.2，不能重新标记成v3。归因L2时两组固定投影模式/L3规则并关闭delegation，再比较view开/关。Agent临时partial实验必须显式传新的 `--results-dir workshop/artifacts/<YYYYMMDD>_<task>/partial_benchmark`；原结果与导出不覆盖。
-
-真实E0仍pending、I3仍partial24valid/8scope/0tool-boundary、I2locked/closed路线不变。前序文档阶段未新跑I3/E0；本次L1工程复跑仍得到同一partial/合成分母。按 [implementation_status](../../research/Experiments/implementation_status.md)回报本轮文档/审查证据，不修改 [technical_route](../../research/technical_route.md)。
-
-
-## L1 v3新增交接（2026-10-13）
-
-- 一个原生banking-monthly-spending-v1 profile；完整有限请求、原生callable/code/输入schema、七字段Transaction、read/sink-none元数据与严格解析。全行/顺序、六字段保留，subject省略；格式异常/错误/截断/绑定歧义/混合内容/未知字段/超界/不更短均回退。必要备注、引用及委托任务保持原文。
-- 网页API保存有效l1_projection_mode并转交factory；模板版本仍来自引擎，配置/预览/架构说明已更新。TXT导出记录模式，旧记录显示未记录；没有添加投影模式选择器或独立计数面板，API/partial可做off/shadow/projected对照。
-- 模式、profile/adapter/native/schema/bounds身份进入缓存和L3兼容配置，旧artifact不沿用。原L3与Monitor读取例外不变；字段正确不等于事实正确，源端漏行无法验证。dscg_l1_projection记录重复呈现的实际/候选计数、回退原因和字符；封装added_characters_total仍独立，不能抵扣后当总Tokens。
-- 离线303/303、Node31/31；144历史末视图检查只有12任务/12返回适用，14787→7380字符。没有真实模型/外部工具调用或新benchmark rollout，离线I3执行测试工具桩，历史标签未重算。I3复跑24valid/8scope/0tool、E0合成6例valid1/tool1/infrastructure4；正式E0未通过。
-- 证据/原字节/精确命令见 [L1实施报告](../workshop/completed/l1_projection_20261013.md)。用户服务需重启/刷新才加载源码；本阶段未重启服务，旧结果/证据保持。workshop只把完成的有限工程计划/报告归入completed，L1_opt保留未验收项。
+框架优化可用partial的场景选择和冻结cohort；正式full及全用户筛选测量保持独立，具体命令和分母见 [评测指南](./evaluation.md#对照与输出)与[全量指南](./full_benchmark.md)。新对照使用新run名，Agent产物写入新的workshop/artifacts目录。CSA网页专门控件、失败片段浏览器及独立审计证据面板仍未交付，不把文档整理视为实现。

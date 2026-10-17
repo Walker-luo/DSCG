@@ -13,6 +13,10 @@
 
 测量入口共用模型配置、当前框架、攻击选择、缓存绑定和报告流程。**全量入口不再使用前 3 个任务的限制**；如通过 `--task-manifest` 显式导入 full 任务清单，必须包含当前注册顺序下的完整执行集合，不能用 partial 清单缩小全量测试。
 
+框架优化阶段可使用 `python -m experiments.run_partial_benchmark --suites travel banking slack --name dscg_no_workspace_01` 跳过 workspace；匹配 baseline 也需传入相同 `--suites`，并使用独立新名称。默认 typical 下计划从 144 降为 108 条计分 rollout，另有预检成本。这是 partial 子集，完整命令见 [评测指南](./evaluation.md#对照与输出)；全量入口不提供此场景缩减选项。
+
+partial 同样支持 `--cohort PATH`：只过滤原来前三个 injection targets，仍保留每场景前三个用户，不补入后续目标，标记为 `partial_screened`；不会转到全量用户任务。与本指南全量 `--cohort` 的 `screened` 范围不同，用法及分母见 [partial筛选说明](./evaluation.md#对照与输出)。
+
 “全部任务”与“全部攻击”是两项独立选择：全量入口默认 `--attack typical`，在全部任务上运行四种目标型攻击；`--attack all` 才运行已安装注册表中的全部自动攻击，排除交互式 `manual`。具体名称、类型和来源见 [评测指南的攻击表](./evaluation.md#攻击选择)。
 
 如已完成 injection 目标预检，筛选测量也统一使用本入口：显式加 `--cohort <cohort.json>`，结果标为 `task_scope=screened`，保留全部用户任务并采用冻结目标。该选项与 clean/其他任务清单/清单导出互斥，拒绝 DoS；不传时仍为完整 full。命令、进度和旧数据续跑见 [Injection 目标预检指南](./injection_precheck.md)。
