@@ -18,7 +18,7 @@ from experiments.common.partial_controls import SUITES, source_revision, guard_r
 from experiments.common.injection_cohort import (
     SCHEMA, RULE, LIMITATIONS, _digest, _file_hash, _read, _write_new, _replace,
     _lock, _binding, _trace_status, _decision, _validate_cohort, _validate_cohort_data,
-    _bindings_compatible, _source_compatible, _record_compatibility, run_screened,
+    _bindings_compatible, _binding_error, _source_compatible, _record_compatibility, run_screened,
 )
 
 class Progress:
@@ -194,7 +194,7 @@ def screen(*, config_path, run_name, results_dir=None, reuse_from=None, suites=S
         resumed = manifest_path.exists()
         binding = _read(manifest_path) if resumed else current_binding
         if not _bindings_compatible(binding, current_binding):
-            raise ValueError('screening configuration/source/catalog changed; use a new --name')
+            raise ValueError(_binding_error(binding, current_binding))
         guard_run(manifest_path, binding)
         _record_compatibility(root, binding, current_binding)
         total = sum(len(e['injection_tasks']) for e in binding['catalog'].values())

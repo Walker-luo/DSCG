@@ -827,6 +827,7 @@ def cli(argv: list[str] | None = None, *, task_scope: str = 'partial', entrypoin
     parser.add_argument('--no-delegated-tasks', action='store_true', help='关闭显式任务文件展开，用于原任务编译对照。')
     parser.add_argument('--l1-projection-mode', choices=('off','shadow','projected'), default='projected',
                         help='L1有限交易投影，默认projected；off保留旧来源封装，shadow只观察。')
+    # None selects the profile default below: DSCG shadow, baseline/NoChecker off.
     parser.add_argument("--audit-router-mode", choices=("off", "shadow", "selective"), default=None,
                         help="L3纯算法路由；DSCG CLI默认shadow，baseline/NoChecker默认off；可显式选择。")
     parser.add_argument("--audit-router-artifact",help="冻结的独立分组校准JSON；缺失/无效时保留完整审计。")
@@ -908,9 +909,15 @@ def cli(argv: list[str] | None = None, *, task_scope: str = 'partial', entrypoin
             l1_projection_mode='off' if args.baseline else args.l1_projection_mode,
             **dispatch_options,
         )
-    except (ModelConfigurationError, ToolMetadataError, ValueError) as exc:
+    except ModelConfigurationError as exc:
         print(f"模型配置错误: {exc}")
         print("请设置 DSCG_MAIN_* 环境变量，或复制 config/models.example.toml 为 config/models.local.toml 后填写。")
+        return 1
+    except ToolMetadataError as exc:
+        print(f"工具元数据错误: {exc}", flush=True)
+        return 1
+    except ValueError as exc:
+        print(f"测量配置或证据校验失败: {exc}", flush=True)
         return 1
     return 1 if status == 1 else 0
 

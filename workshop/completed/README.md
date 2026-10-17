@@ -8,6 +8,7 @@
 
 | 材料 | 已完成 / 当前保留 | 未完成、撤回或仅为设计 |
 | --- | --- | --- |
+| [服务器cohort续跑排错](./cohort_resume_diagnostics_20261017.md) | 明确源码不匹配提示、相同服务器Python版本的兼容修复；413项离线回归 | 服务器需同步修复、恢复解析器默认None并保持原防御参数；未运行真实benchmark |
 | [默认攻击与显式续跑](./benchmark_reuse_20261017.md) · [用法](../../docs/benchmark.md#显式续跑示例) | 新typical三攻击；reuse保留旧计划/缓存及证据，407项离线通过 | 旧baseline缺原生防御证据时拒绝；不新增错误重试或真实模型结果 |
 | [Experiments目录归类](./experiments_layout_20261017.md) · [入口索引](../../experiments/README.md) | 三个日常入口保留原命令，其余归入common/diagnostics/calibration/tools；391项离线回归 | 没有新增模型结果，I3/E0状态及既有实验身份保留 |
 | [测试指南结构整理](./docs_benchmark_structure_20261017.md) · [测试索引](../../docs/evaluation.md) | 分开完整任务与partial运行说明；同步CLI shadow默认与baseline/NoChecker兼容 | 无真实模型或收益验证；原始文档及历史证据保持可追溯 |

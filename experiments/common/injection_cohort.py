@@ -87,13 +87,22 @@ def _binding(config, names):
             'catalog': _catalog(names)}
 
 
+def _mapping_mismatches(mapping):
+    root = Path(__file__).resolve().parents[2]
+    mismatches = []
+    for path, expected in mapping['current_harness_sha256'].items():
+        actual = _file_hash(root / path) if (root / path).is_file() else 'MISSING'
+        if actual != expected:
+            mismatches.append((path, expected, actual))
+    return mismatches
+
+
 def _legacy_mapping():
     """An explicit, byte-bound equivalent transition, not a source-hash bypass."""
     mapping = _read(Path(__file__).with_name('injection_cohort_compatibility.json'))
     if mapping.get('schema_version') != 'dscg.injection-compatibility.v1':
         raise ValueError('unknown compatibility mapping')
-    root = Path(__file__).resolve().parents[2]
-    return mapping if all(_file_hash(root / p) == h for p, h in mapping['current_harness_sha256'].items()) else None
+    return None if _mapping_mismatches(mapping) else mapping
 
 
 def _source_compatible(recorded, current, *, check_python=True):
@@ -112,7 +121,10 @@ def _source_compatible(recorded, current, *, check_python=True):
         return False
     changed_paths = (set(mapping['current_harness_sha256'])
                      | set(mapping.get('relocated_source_paths', {}))
-                     | {'experiments/common/injection_cohort_compatibility.json'})
+                     | {'experiments/common/injection_cohort_compatibility.json',
+                        'experiments/common/benchmark_reuse_compatibility.json'})
+    # Compatibility registries evolve with reviewed code; measurement validates
+    # its independent registry when dispatching, not during direct-GOAL checks.
     return all(new_hashes.get(p) == h for p, h in old_hashes.items() if p not in changed_paths)
 
 
@@ -133,6 +145,34 @@ def _bindings_compatible(recorded, current):
     return any(recorded.get('source', {}).get('source_sha256') == source
                and recorded.get('screening_script_sha256') == script_hash
                for source, script_hash in known if script_hash)
+
+
+def _binding_error(recorded, current):
+    """Explain a rejected binding without printing credentials or task text."""
+    details = []
+    old_source, new_source = recorded.get('source', {}), current.get('source', {})
+    for key in ('python', 'agentdojo'):
+        if old_source.get(key) != new_source.get(key):
+            details.append(f'{key}: recorded={old_source.get(key)}, current={new_source.get(key)}')
+    old_model, new_model = recorded.get('main_model', {}), current.get('main_model', {})
+    details.extend(f'main_model.{key} changed' for key in sorted(set(old_model) | set(new_model))
+                   if old_model.get(key) != new_model.get(key))
+    details.extend(f'{key} changed' for key in sorted(set(recorded) | set(current))
+                   if key not in {'source', 'main_model', 'screening_script_sha256'}
+                   and recorded.get(key) != current.get(key))
+    if old_source.get('source_sha256') != new_source.get('source_sha256'):
+        mapping = _read(Path(__file__).with_name('injection_cohort_compatibility.json'))
+        mismatches = _mapping_mismatches(mapping)
+        if mismatches:
+            details.extend(f'current source mismatch {p}: expected={expected[:12]}, actual={actual[:12]}'
+                           for p, expected, actual in mismatches)
+            details.append(f'import root={Path(__file__).resolve().parents[2]}; inspect git diff before restoring or updating code')
+        else:
+            details.append('source compatibility could not be verified against the reviewed mapping')
+    if not details:
+        details.append('screening script identity is not compatible')
+    return ('screening configuration/source/catalog changed; ' + '; '.join(details)
+            + '. Keep the original configuration and reviewed source, or use a new screen run.')
 
 
 def _record_compatibility(root, recorded, current):
@@ -195,7 +235,7 @@ def _validate_cohort_data(cohort, config):
     binding = cohort['binding']
     current = _binding(config, list(binding['catalog']))
     if not _bindings_compatible(binding, current):
-        raise ValueError('screening configuration/source/catalog changed; use a new screen run')
+        raise ValueError(_binding_error(binding, current))
     for name, entry in binding['catalog'].items():
         decisions = cohort['decisions'][name]
         if set(decisions) != set(entry['injection_tasks']):

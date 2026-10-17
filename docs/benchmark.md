@@ -376,6 +376,14 @@ cohort续跑分别核对原请求场景和非空的实际执行场景；被筛�
 
 reuse与 `--force-rerun`、离线清单导出互斥；要求name；显式reuse覆盖DSCG_FORCE_RERUN。Python API使用 `reuse=True`，未指定attack/suites时同样恢复原计划；默认reuse=False。它与screen阶段引用旧预检的 `--reuse-from` 是不同参数。
 
+### cohort 或续跑校验失败
+
+`screening configuration/source/catalog changed` 表示冻结名单的配置、源码或任务目录未通过核验，不等于模型配置文件缺失。当前错误提示区分模型配置、工具元数据与测量证据问题，并列出不匹配的源码路径及预期/实际哈希前缀。先核对导入目录，再查看 `git diff -- experiments/run_partial_benchmark.py` 等提示中的文件；不要修改历史 manifest/cohort 或直接替换兼容映射中的哈希来绕过检查。
+
+例如，CLI 的 `--audit-router-mode` 在解析器中使用 `default=None`，随后根据 profile 选择 DSCG 的 `shadow` 或 baseline/NoChecker 的 `off`。因此无需把解析器默认值改成 `"shadow"`；这种修改会破坏默认分流，并使文件哈希与已审核版本不符。先备份本地差异，再恢复这一处为已审核代码。更新代码时，runner 与两个兼容映射也应一起同步。
+
+旧运行必须沿用原防御设置；原路由为 off 时，即使当前 DSCG CLI 默认 shadow，也应显式传入 `--audit-router-mode off`。Python 与 AgentDojo 版本仍须和原运行一致；兼容映射生成机器的 Python 版本仅作来源记录，不额外限制前后版本相同的服务器。未知源码变更仍拒绝复用，无法核验时使用原代码或新运行名。
+
 需要改变结果位置时，两组都支持 `--results-dir DIR`。用户正式实验默认留在 results；agent 临时检查必须显式隔离，例如：
 
 ```bash

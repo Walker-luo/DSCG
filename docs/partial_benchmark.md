@@ -148,4 +148,6 @@ DSCG、clean、cohort续跑分别保留原防御控制、`--clean`、`--cohort P
 
 保留native缓存对成功/失败/API错误的原判定，不增加错误重试；不完整JSON重跑前留快照，损坏JSON按原错误路径报告。汇总更新前备份到reuse子目录；全部绑定通过前不执行任务或改写结果。完整的[兼容、成本与快照说明](./benchmark.md#显式续跑示例)由公共指南维护。screen入口的reuse-from只引用历史预检，不是测量续跑。
 
+若出现源码或 cohort 校验错误，按[校验失败排查](./benchmark.md#cohort-或续跑校验失败)检查具体文件与版本。CLI 解析器的路由默认值应保留 `None`，运行时自动选择 DSCG shadow、baseline/NoChecker off；续跑时显式保持旧运行的路由模式。
+
 用户结果使用默认results目录；agent临时检查须加 `--results-dir workshop/artifacts/<YYYYMMDD>_<task>/partial_benchmark` 并使用新name。不改写历史轨迹或用诊断结果替换原生评分。

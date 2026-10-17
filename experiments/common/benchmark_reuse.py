@@ -35,8 +35,10 @@ def compatible_source(old, current):
     mapping = _read(Path(__file__).with_name('benchmark_reuse_compatibility.json'))
     if mapping.get('schema_version') != 'dscg.benchmark-reuse-compatibility.v1':
         return False
+    # Runtime equality is enforced above. The mapping author's Python patch
+    # version does not restrict an otherwise identical old/current runtime.
     known = [s['source_sha256'] for s in mapping['reviewed_sources']
-             if all(s.get(k) == old.get(k) for k in ('python', 'agentdojo'))]
+             if s.get('agentdojo') == old.get('agentdojo')]
     root = Path(__file__).resolve().parents[2]
     return bool(previous in known and set(target or {}) == set(mapping['current_source_paths'])
                 and all((root / p).is_file() and _hash(root / p) == h
