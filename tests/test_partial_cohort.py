@@ -113,6 +113,24 @@ class PartialCohortTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             runner.main(cohort_path=path, origin=True, run_name='missing', results_dir=self.root / 'runs')
 
+    def test_full_cli_suite_subset_keeps_all_users_and_all_kept_targets(self):
+        from experiments import run_benchmark as full
+        path = self.screen(); original = path.read_bytes()
+        self.assertEqual(full.cli(['--cohort', str(path), '--suites', 'travel', 'banking', 'slack',
+            '--baseline', '--attack', 'injecagent', '--name', 'full_subset',
+            '--results-dir', str(self.root / 'runs')]), 0)
+        base = self.root / 'runs/offline_full_subset'
+        self.assertFalse((base / 'injecagent/workspace').exists())
+        for name in ['travel', 'banking', 'slack']:
+            data = json.loads((base / 'injecagent' / name / 'summary.json').read_text())
+            self.assertEqual(data['task_scope'], 'screened')
+            self.assertEqual(data['task_selection']['user_task_ids'], list(self.suites[name].user_tasks))
+            self.assertEqual(data['task_selection']['injection_task_ids'], ['injection_task_1', 'injection_task_3', 'injection_task_4'])
+        attachment = json.loads((base / 'screened_cohort.json').read_text())
+        self.assertEqual(attachment['omitted_suites'], ['workspace'])
+        self.assertEqual(attachment['counts']['travel']['planned_per_targeted_attack'], 12)
+        self.assertEqual(path.read_bytes(), original)
+
     def test_defended_shadow_controls_and_partial_default_output_are_retained(self):
         path = self.screen()
         with patch.object(cohort, 'RESULTS_DIR', self.root / 'default_results'), patch.object(

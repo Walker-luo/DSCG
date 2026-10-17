@@ -263,6 +263,7 @@ def main(
         "model_id": context.get("model_id"),
         "attacks": attack_names if run_attack else [],
         "suites": suites,
+        "suite_scope": "all_registered" if set(suites) == set(SUITES) else "selected",
         "excluded_from_all": {"manual": "requires interactive input"},
         "runs": run_records,
     }
@@ -396,11 +397,12 @@ def _run_single_attack(
         resolved_sec_model_id = None if origin or not use_security_checker else sec_model_config.get("model_id", sec_model_id)
         result_dir_name = _apply_run_name(pipeline, resolved_model_id, run_name)
         base_output_dir = logdir / result_dir_name
-        if task_scope in {'partial', 'partial_screened'}:
+        if task_scope in {'partial', 'partial_screened', 'full'}:
             # Bind the entire selection, including disjoint subsets, before any
             # scored execution or report rewrite under this run name.
             guard_run(base_output_dir / 'suite_manifest.json', {
-                'schema_version': 'dscg.partial-suites.v1', 'suites': suites,
+                'schema_version': 'dscg.full-suites.v1' if task_scope == 'full' else 'dscg.partial-suites.v1',
+                'suites': suites,
             })
         attack_component = _safe_result_component(attack_name if run_attack else "none", "attack")
         output_dir = base_output_dir / attack_component
@@ -566,6 +568,8 @@ def _run_single_attack(
 
         summary_data = {
             "task_scope": task_scope,
+            "suites": suites,
+            "suite_scope": "all_registered" if set(suites) == set(SUITES) else "selected",
             "suite_name": suite_name,
             "pipeline_name": f"{result_dir_name}/{attack_component}",
             "model_id": resolved_model_id,
@@ -715,11 +719,10 @@ def cli(argv: list[str] | None = None, *, task_scope: str = 'partial', entrypoin
         raise ValueError('task scope must be partial or full')
     full = task_scope == 'full'
     parser = argparse.ArgumentParser(
-        description="运行 DSCG 的四场景全量 AgentDojo 评测（全部用户/注入任务）。" if full else "运行 DSCG 的小批量 AgentDojo 回归评测，默认四场景，可指定场景。"
+        description="运行 DSCG 的 AgentDojo 评测（默认四场景，所选场景全部用户/注入任务）。" if full else "运行 DSCG 的小批量 AgentDojo 回归评测，默认四场景，可指定场景。"
     )
-    if not full:
-        parser.add_argument('--suites', nargs='+', choices=SUITES, default=list(SUITES),
-                            help='仅 partial：选择场景，例如 --suites travel banking slack 跳过 workspace；默认全部四场景。')
+    parser.add_argument('--suites', nargs='+', choices=SUITES, default=list(SUITES),
+                        help='选择场景，例如 --suites travel banking slack 跳过 workspace；默认全部四场景，full保留所选场景全部任务。')
     parser.add_argument(
         "--attack",
         nargs="+",
@@ -789,7 +792,7 @@ def cli(argv: list[str] | None = None, *, task_scope: str = 'partial', entrypoin
         '冻结的 injection 预检名单；显式标为 screened，保留全部用户任务。' if full else
         '冻结的 injection 预检名单；保留每场景前3个用户，仅过滤原来前3个注入目标，不补位。'))
     args = parser.parse_args(argv)
-    selected_suites = list(SUITES) if full else args.suites
+    selected_suites = args.suites
     if len(set(selected_suites)) != len(selected_suites):
         parser.error('--suites cannot contain duplicate names')
     cohort_path = getattr(args, 'cohort_path', None)

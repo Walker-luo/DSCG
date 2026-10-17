@@ -32,7 +32,7 @@ python -m experiments.run_partial_benchmark --model-config config/models.local.t
   --suites travel banking slack --force-rerun --name dscg_no_workspace_01
 ```
 
-`--suites` 只作用于 partial，默认仍为四场景。上述三场景仍各取前 3×3 个任务，默认 typical 四攻击计划 108 条计分 rollout（四场景为 144 条），另有原生 injection 预检；实际费用不保证同比下降。`--clean` 时同样跳过 workspace，仅运行这三场景的 9 个用户任务。它是优化子集，不能代表四场景完整评测。
+`--suites` 在partial和full均可用，默认仍为四场景。上述partial三场景仍各取前 3×3 个任务，默认 typical 四攻击计划 108 条计分 rollout（四场景为 144 条），另有原生 injection 预检；实际费用不保证同比下降。partial的 `--clean` 同样跳过 workspace，仅运行这三场景的 9 个用户任务。full则运行所选场景全部注册任务，命令见 [全量指南](./full_benchmark.md#1-使用哪个入口)。场景子集不能代表四场景完整评测。
 
 启动输出、`attack_manifest.json.suites` 和 `suite_manifest.json` 记录所选场景。更换场景集合需用新 `--name`，即使 `--force-rerun` 也不能覆盖原绑定。`--write-task-manifest` 仅导出所选场景，读取 `--task-manifest` 时仍按 `--suites` 选择场景，不从清单自动扩大范围。
 
@@ -114,7 +114,7 @@ DoS 显式选择或 all 才运行，按 AgentDojo 原生规则每个用户使用
 | --- | --- |
 | `--name NAME` | 区分运行，保留历史结果 |
 | `--baseline` | 匹配当前入口任务范围的原生无防御控制 |
-| `--suites NAME [NAME ...]` | 仅 partial；可选 workspace/travel/banking/slack，默认四场景 |
+| `--suites NAME [NAME ...]` | 两入口均支持；默认四场景，full保留所选场景全部任务，partial仍取前三个 |
 | `--cohort PATH` | 冻结 injection 预检名单；partial仅过滤原前三个目标并保留前三个用户，full保留全部用户 |
 | `--attack NAME [NAME ...]` | 具体攻击，可重复该选项；默认 typical，all 显式运行全部 |
 | `--force-rerun` | 重跑任务；也可设 DSCG_FORCE_RERUN=1 |

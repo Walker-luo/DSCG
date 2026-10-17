@@ -1,7 +1,7 @@
 """Full AgentDojo entry point sharing execution, controls and reports with partial.
 
-Defaults select all registered tasks. Explicit --cohort measures a separately
-labeled screened subset, still preserving all user tasks.
+Defaults select all four suites; --suites selects complete suite catalogues.
+Explicit --cohort retains all users in selected suites and frozen kept targets.
 """
 from pathlib import Path
 
@@ -26,7 +26,7 @@ def main(
     cohort_path: str | Path | None = None,
     **options,
 ) -> int:
-    """Run every task; retain legacy positional arguments and shared keyword controls."""
+    """Run all tasks within selected suites, retaining shared controls and defaults."""
     if 'task_scope' in options:
         raise ValueError('full benchmark task scope cannot be overridden')
     if cohort_path is not None:

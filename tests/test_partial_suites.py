@@ -9,7 +9,6 @@ import unittest
 from unittest.mock import patch
 
 from agentdojo.task_suite import get_suite
-from experiments import run_benchmark as full
 from experiments import run_partial_benchmark as runner
 
 
@@ -85,10 +84,6 @@ class PartialSuiteTests(unittest.TestCase):
                 runner.main(suites=names, results_dir=directory)
         with redirect_stderr(StringIO()), self.assertRaises(SystemExit):
             runner.cli(['--suites', 'worksapce'])
-
-    def test_full_cli_cannot_reduce_suites(self):
-        with redirect_stderr(StringIO()), self.assertRaises(SystemExit):
-            full.cli(['--suites', 'travel'])
 
 
 if __name__ == '__main__':

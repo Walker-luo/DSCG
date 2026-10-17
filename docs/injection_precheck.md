@@ -6,6 +6,8 @@
 
 优化阶段也可用 `experiments.run_partial_benchmark --cohort PATH --suites travel banking slack --name <新名称>`。默认每场景3用户×3注入的前缀不变，只从原前三个注入目标中筛掉名单排除项，不补位；结果标记 `partial_screened`，默认保存到 `results/partial_benchmark/`。完整命令见 [评测指南](./evaluation.md#对照与输出)。本指南下方 `run_benchmark --cohort` 仍使用全部用户任务。
 
+全量筛选也支持 `run_benchmark --cohort PATH --suites travel banking slack --name <新名称>`：只运行所选场景，保留这些场景全部用户与全部通过目标。名单必须覆盖显式选择的场景；原名单、证据和筛选结论不变。完整命令与范围标记见 [全量指南](./full_benchmark.md#1-使用哪个入口)。
+
 ## 1. 独立预检
 
 以下命令在 `DSCG/`、已激活 `ipi` 环境下执行。使用新 name，不复用其他类型实验的目录：

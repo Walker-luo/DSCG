@@ -8,9 +8,9 @@
 | --- | --- | --- |
 | `python -m experiments.run_injection_precheck screen` | 直接GOAL能力预检、恢复历史尝试、冻结 injection 名单 | [预检指南](../docs/injection_precheck.md) |
 | `python -m experiments.run_partial_benchmark` | 框架优化；每场景前三个用户×前三个注入 | [partial场景与cohort用法](../docs/evaluation.md#对照与输出) |
-| `python -m experiments.run_benchmark` | 全部注册任务，或显式 `--cohort` 的全用户筛选测量 | [全量指南](../docs/full_benchmark.md) |
+| `python -m experiments.run_benchmark` | 所选场景全部注册任务，或显式 `--cohort` 的全用户筛选测量；默认四场景 | [全量指南](../docs/full_benchmark.md) |
 
-partial 可用 `--suites travel banking slack` 跳过workspace；加 `--cohort PATH` 只过滤原前三个注入目标，不补位、不扩大用户任务，标记 `partial_screened`。full 的 `--cohort` 保留全部用户，标记 `screened`。新配置使用新 `--name`，不覆盖历史实验。
+两个入口均可用 `--suites travel banking slack` 跳过workspace。partial加 `--cohort PATH` 只过滤原前三个注入目标，不补位、不扩大用户任务，标记 `partial_screened`；full的 `--cohort` 保留所选场景全部用户，标记 `screened`。场景子集记录 `suite_scope=selected`，不能标成四场景全量。新配置使用新 `--name`，不覆盖历史实验。
 
 ## 校准、元数据与离线审计
 

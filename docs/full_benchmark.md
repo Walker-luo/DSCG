@@ -13,7 +13,20 @@
 
 测量入口共用模型配置、当前框架、攻击选择、缓存绑定和报告流程。**全量入口不再使用前 3 个任务的限制**；如通过 `--task-manifest` 显式导入 full 任务清单，必须包含当前注册顺序下的完整执行集合，不能用 partial 清单缩小全量测试。
 
-框架优化阶段可使用 `python -m experiments.run_partial_benchmark --suites travel banking slack --name dscg_no_workspace_01` 跳过 workspace；匹配 baseline 也需传入相同 `--suites`，并使用独立新名称。默认 typical 下计划从 144 降为 108 条计分 rollout，另有预检成本。这是 partial 子集，完整命令见 [评测指南](./evaluation.md#对照与输出)；全量入口不提供此场景缩减选项。
+两个测量入口都支持 `--suites travel banking slack` 跳过workspace，默认仍为四场景。`run_benchmark` 保留所选场景的全部注册任务；`run_partial_benchmark` 保留每场景原前三个用户×前三个注入，三场景typical计划108条计分rollout，另有预检成本。partial命令见 [评测指南](./evaluation.md#对照与输出)。
+
+例如，只对travel/banking/slack进行完整任务测量：
+
+```bash
+python -m experiments.run_benchmark \
+  --model-config config/models.local.toml \
+  --suites travel banking slack \
+  --force-rerun --name dscg_selected_suites_01
+```
+
+匹配baseline使用相同场景并加 `--baseline`、换新name。可与 `--clean` 或 `--cohort PATH` 分别组合；cohort模式使用所选场景全部用户×名单通过目标，原生预检仍保留，clean与cohort继续互斥。显式选择的场景须在cohort中存在，未选场景不执行，不重写冻结名单。
+
+`attack_manifest.json` 和场景summary记录 `suites`、`suite_scope=selected`；普通完整任务测量仍为 `task_scope=full`，意指所选场景内部完整，摘要标题为“所选场景全任务评测摘要”。实际执行四场景时记录 `suite_scope=all_registered`；cohort空目标场景仍按原规则跳过。场景子集不能标成四场景正式全量结果。改变场景集合需新name，`--force-rerun`不绕过绑定；离线 `--write-task-manifest` 仅导出所选场景的完整ID集合，导入清单仍不能缩减这些场景内部的任务。
 
 partial 同样支持 `--cohort PATH`：只过滤原来前三个 injection targets，仍保留每场景前三个用户，不补入后续目标，标记为 `partial_screened`；不会转到全量用户任务。与本指南全量 `--cohort` 的 `screened` 范围不同，用法及分母见 [partial筛选说明](./evaluation.md#对照与输出)。
 
@@ -45,7 +58,7 @@ v3.1的clean优化目标是相对**同轮**baseline下降约5个百分点以内�
 
 ## 3. 先运行全量干净任务对照
 
-正式全量攻击前，先判断当前基础智能体能完成哪些正常任务，再检查 DSCG 是否损失这些能力。两组均无注入，使用当前全部 97 个用户任务；与后续攻击实验分别命名、分别保存。这里的失败是“固定模型/配置下本轮未完成”，不是模型永远无法完成的证明。
+正式全量攻击前，先判断当前基础智能体能完成哪些正常任务，再检查 DSCG 是否损失这些能力。两组均无注入，默认四场景共97个用户任务；加 `--suites` 后只运行所选场景的全部用户。与后续攻击实验分别命名、分别保存。这里的失败是“固定模型/配置下本轮未完成”，不是模型永远无法完成的证明。
 
 ### 3.1 clean 与攻击目标预检的区别
 

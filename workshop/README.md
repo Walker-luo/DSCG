@@ -6,6 +6,7 @@
 
 | 方案 / 阶段 | 已完成 | 尚未完成或未采用 |
 | --- | --- | --- |
+| [全量入口场景选择](./completed/full_suites_20261017.md) · [用法](../docs/full_benchmark.md#1-使用哪个入口) | full/partial共用--suites；full保留所选场景全部任务，兼容clean/cohort/导出；385项离线回归 | 场景子集不是四场景全量；无真实模型/费用收益测量 |
 | [experiments/docs整理](./completed/experiments_docs_cleanup_20261017.md) · [当前实验入口](../experiments/README.md) | 退役8个旧文件、清理生成缓存、索引与文档去重；原始字节归档 | 不改变运行/评分；早期迁移快照校验已有README哈希冲突，单独保留记录 |
 | [Partial 冻结目标筛选](./completed/partial_cohort_20261017.md) · [用法](../docs/evaluation.md#对照与输出) | `--cohort`只过滤原前三个注入目标，保留前三个用户；partial_screened明确分母；381项离线回归 | 未调用真实模型或证明费用/安全收益；与全量screened范围不同 |
 | [Partial 场景选择](./completed/partial_suites_20261017.md) · [用法](../docs/evaluation.md#对照与输出) | 可跳过workspace，按所选场景导出/计分/绑定范围；375项离线回归 | 优化子集不代表四场景完整评测；未运行真实模型或测量实际节省费用 |

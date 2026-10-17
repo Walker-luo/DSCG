@@ -13,7 +13,7 @@ from agentdojo.task_suite import get_suite
 from dscg.model_config import resolve_model_config
 from dscg.paths import BENCHMARK_RESULTS_DIR, RESULTS_DIR
 from experiments import run_partial_benchmark as shared
-from experiments.partial_controls import source_revision, guard_run, validate_controls, select_tasks
+from experiments.partial_controls import source_revision, guard_run, validate_controls, select_tasks, SUITES
 
 SCHEMA = 'dscg.injection-screen.v1'
 RULE = 'keep-any-valid-success; exclude-after-two-valid-failures; errors-unresolved'
@@ -274,11 +274,12 @@ def run_screened(cohort_path, *, config_path=None, run_name=None, results_dir=No
         security_model = resolve_model_config(sec_model_id, config_path=config_path, prefix='DSCG_SEC', fallback=config,
             **{k: controls['sec_' + k] for k in ('api_key', 'base_url', 'provider', 'api_key_env') if 'sec_' + k in controls}).public_dict()
     requested = list(suites) if suites is not None else list(cohort['suites'])
-    if not requested or len(set(requested)) != len(requested) or (partial and not set(requested) <= set(cohort['suites'])):
+    if (not requested or len(set(requested)) != len(requested) or not set(requested) <= set(SUITES)
+            or ((partial or set(requested) != set(SUITES)) and not set(requested) <= set(cohort['suites']))):
         raise ValueError('frozen cohort lacks requested suites or selection is empty/duplicated')
     selected = {}
     for name, entry in cohort['suites'].items():
-        if partial and name not in requested:
+        if name not in requested:
             continue
         if partial and entry['injection_task_ids']:
             catalog = cohort['binding']['catalog'][name]
@@ -291,8 +292,6 @@ def run_screened(cohort_path, *, config_path=None, run_name=None, results_dir=No
     active = [name for name, entry in selected.items() if entry['injection_task_ids']]
     if not active:
         raise ValueError('no injection targets remain in the requested task scope; benchmark not started')
-    if not partial and suites is not None and not set(active).issubset(set(suites)):
-        raise ValueError('suite selection cannot omit active suites in the frozen cohort; no measurement started')
     root = Path(results_dir or (RESULTS_DIR / 'partial_benchmark' if partial else BENCHMARK_RESULTS_DIR))
     base = root / (shared._safe_result_component(config.model_id, 'model') + '_' + shared._safe_result_component(run_name, 'run'))
     with _lock(base):
