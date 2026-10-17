@@ -10,7 +10,7 @@
 | `python -m experiments.run_partial_benchmark` | 默认每场景前三个用户×前三个注入 | [小批量指南](../docs/partial_benchmark.md) |
 | `python -m experiments.run_benchmark` | 所选场景全部任务，或cohort冻结目标；默认四场景 | [完整任务指南](../docs/benchmark.md) |
 
-两个测量入口均支持 `--suites travel banking slack` 跳过workspace。partial的cohort仅过滤原注入前缀，不补位，标记partial_screened；full的cohort保留全部用户，标记screened。DSCG CLI默认shadow；baseline/NoChecker默认off。任务选择、参数和结果目录保持不变。
+两个测量入口均支持 `--suites travel banking slack` 跳过workspace。partial的cohort仅过滤原注入前缀，不补位，标记partial_screened；full的cohort保留全部用户，标记screened。DSCG CLI默认shadow；baseline/NoChecker默认off。任务前缀和结果目录保持不变。新typical为ignore_previous、important_instructions、tool_knowledge；injecagent保留显式/all选择。
 
 ## 目录分工
 
@@ -56,3 +56,5 @@ python -m experiments.tools.generate_tool_metadata --help
 已知旧screen目录与cohort通过明确源码/脚本哈希绑定兼容，旧manifest、attempt与名单不改写；未知源码或任务变化仍拒绝。新的攻击测量使用新name，`--force-rerun`不绕过配置绑定。
 
 用户实验仍默认写入results。Agent临时检查显式写入新的workshop/artifacts任务目录，不改写历史实验。
+
+显式续跑：两个入口均支持 `--reuse --name <原名称>`，未指定attack/suites时恢复原计划，包括旧四攻击；与显式force-rerun互斥并覆盖环境强制设置。共享校验位于 [common/benchmark_reuse.py](./common/benchmark_reuse.py)，独立[测量兼容映射](./common/benchmark_reuse_compatibility.json)不等同于预检资格。规则与命令见 [公共续跑说明](../docs/benchmark.md#显式续跑示例)。

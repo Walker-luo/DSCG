@@ -45,7 +45,7 @@ class PartialSuiteTests(unittest.TestCase):
             self.assertEqual(manifest['suites'], ['travel', 'banking', 'slack'])
             self.assertEqual(manifest['task_scope'], 'partial')
             total = 0
-            for attack in ['ignore_previous', 'injecagent', 'important_instructions', 'tool_knowledge']:
+            for attack in ['ignore_previous', 'important_instructions', 'tool_knowledge']:
                 self.assertFalse((base / attack / 'workspace').exists())
                 for name in ['travel', 'banking', 'slack']:
                     summary = json.loads((base / attack / name / 'summary.json').read_text())
@@ -53,7 +53,7 @@ class PartialSuiteTests(unittest.TestCase):
                     self.assertEqual(summary['task_selection']['user_task_ids'], list(suite.user_tasks)[:3])
                     self.assertEqual(summary['task_selection']['injection_task_ids'], list(suite.injection_tasks)[:3])
                     total += summary['task_counts']['total_tasks']
-            self.assertEqual(total, 108)
+            self.assertEqual(total, 81)
             original = {p: p.read_bytes() for p in base.rglob('*') if p.is_file()}
             self.assertEqual(runner.cli(['--baseline', '--force-rerun', '--name', 'three',
                                         '--results-dir', directory, '--suites', 'workspace']), 1)

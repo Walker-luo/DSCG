@@ -6,10 +6,10 @@
 
 默认运行v1.2的workspace、travel、banking、slack四场景，每场景取**注册顺序前3个用户任务×前3个injection task＝9个组合/目标型攻击**。选择不随机，seed:7只是保留元数据，不排列当前前缀。
 
-| 范围 | 用户任务数 | typical四攻击的计划计分组合 | clean计划任务数 |
+| 范围 | 用户任务数 | typical三攻击的计划计分组合 | clean计划任务数 |
 | --- | --- | --- | --- |
-| 默认四场景 | 12 | 144 | 12 |
-| travel、banking、slack | 9 | 108 | 9 |
+| 默认四场景 | 12 | 108 | 12 |
+| travel、banking、slack | 9 | 81 | 9 |
 
 目标型攻击另有原生GOAL预检；计划数不等于模型API请求数、有效计分分母或实际费用。结果默认在 `results/partial_benchmark/`，`task_scope=partial`；与full分别命名、分别解释。
 
@@ -27,7 +27,7 @@ python -m experiments.run_partial_benchmark \
   --force-rerun --name partial_dscg_typical_01
 ```
 
-默认typical为ignore_previous、injecagent、important_instructions、tool_knowledge。常规DSCG CLI默认router shadow、重试0、completion_prompt=false、summary日志；shadow保留L3审计，仅收集观测。baseline不运行DSCG，NoChecker关闭L3，两者未显式指定时路由均为off。DSCG显式off仍保留原L3；`--no-checker`是消融，不等于baseline。
+默认typical为ignore_previous、important_instructions、tool_knowledge；injecagent仍可显式选择或通过all运行。常规DSCG CLI默认router shadow、重试0、completion_prompt=false、summary日志；shadow保留L3审计，仅收集观测。baseline不运行DSCG，NoChecker关闭L3，两者未显式指定时路由均为off。DSCG显式off仍保留原L3；`--no-checker`是消融，不等于baseline。
 
 ### 跳过workspace
 
@@ -131,9 +131,21 @@ results/partial_benchmark/<model_id>_<name>/
 
 ## 中断、缓存与任务清单
 
-- 同配置续跑：保持源码、模型、name与场景不变，去掉force-rerun并取消DSCG_FORCE_RERUN的强制设置。缓存复用不是从单个中断动作继续；混合缓存与新调用的成本不能当作一次新鲜运行。
-- 改模型/源码/控制/场景/cohort，或测新成本时使用新name。force-rerun不解除配置绑定，也不覆盖冻结预检名单。
+- 显式续跑使用 `--reuse --name <原名称>`，保持原模型、控制和结果根目录；不带攻击/场景参数时读取原名单。旧四攻击实验仍按四攻击续跑，不自动删去injecagent。
+- 模型、控制、场景、任务和cohort必须匹配；仅明确审阅的等价源码过渡可用reuse兼容，未知变化仍需新name。force-rerun不解除绑定。成本比较使用新name的新鲜运行。
 - `--write-task-manifest PATH` 离线导出所选场景前缀并退出，不调用模型，拒绝覆盖。显式task-manifest可读冻结自定义ID；这时以清单和task_selection为准，不再称为默认3×3前缀。
 - 退出0表示流程完成，仍须检查错误与样本完整性；退出1为配置/运行/攻击异常，退出2通常为参数错误。无失败时JSONL可以为空，强制终止可能尚无运行级摘要。
+
+显式续跑示例（使用原配置与运行名）：
+
+```bash
+python -m experiments.run_partial_benchmark --reuse \
+  --model-config config/models.local.toml \
+  --baseline --name partial_baseline_typical_01
+```
+
+DSCG、clean、cohort续跑分别保留原防御控制、`--clean`、`--cohort PATH`。未指定attack/suites时采用原计划，显式指定须一致；缺少根记录的旧目录需提供完整原名单。目录/绑定不存在时拒绝启动。reuse与显式force-rerun及清单导出互斥，覆盖环境强制重跑。Python API支持reuse=True，默认False。
+
+保留native缓存对成功/失败/API错误的原判定，不增加错误重试；不完整JSON重跑前留快照，损坏JSON按原错误路径报告。汇总更新前备份到reuse子目录；全部绑定通过前不执行任务或改写结果。完整的[兼容、成本与快照说明](./benchmark.md#显式续跑示例)由公共指南维护。screen入口的reuse-from只引用历史预检，不是测量续跑。
 
 用户结果使用默认results目录；agent临时检查须加 `--results-dir workshop/artifacts/<YYYYMMDD>_<task>/partial_benchmark` 并使用新name。不改写历史轨迹或用诊断结果替换原生评分。

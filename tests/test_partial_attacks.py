@@ -64,7 +64,7 @@ class PartialAttackTests(unittest.TestCase):
             runner.resolve_attack_names(["all", "injecagent"])
 
     def test_typical_preset_is_fixed_targeted_and_rejects_mixed_selections(self):
-        expected = ["ignore_previous", "injecagent", "important_instructions", "tool_knowledge"]
+        expected = ["ignore_previous", "important_instructions", "tool_knowledge"]
         self.assertEqual(runner.resolve_attack_names(), expected)
         self.assertEqual(runner.resolve_attack_names("typical"), expected)
         self.assertTrue(all(not ATTACKS[name].is_dos_attack for name in expected))
@@ -101,7 +101,7 @@ class PartialAttackTests(unittest.TestCase):
 
     def test_default_and_all_keep_reports_and_task_subsets_separate_in_both_modes(self):
         selections = {
-            "typical": ["ignore_previous", "injecagent", "important_instructions", "tool_knowledge"],
+            "typical": ["ignore_previous", "important_instructions", "tool_knowledge"],
             "all": sorted(name for name in ATTACKS if name != "manual"),
         }
         suite = get_suite("v1.2", "workspace")

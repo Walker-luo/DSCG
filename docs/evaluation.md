@@ -39,11 +39,13 @@ full的cohort保留所选场景全部用户；partial的cohort只过滤原注入
 | --- | --- |
 | 预检目录的screen_manifest.json、status.json、summary.md | 配置绑定、逐目标尝试、通过/失败/未决及成本记录 |
 | 预检目录的attempts/及cohort.json | 直接GOAL轨迹、结果证据和冻结名单；错误不当作能力失败 |
-| 测量目录的attack_manifest.json、suite_manifest.json | 攻击、场景及范围绑定；suite_manifest用于普通full/partial及partial筛选，full筛选由screened_run_manifest绑定 |
+| 测量目录的benchmark_plan.json、attack_manifest.json、suite_manifest.json | 攻击、场景及范围绑定；suite_manifest用于普通full/partial及partial筛选，full筛选由screened_run_manifest绑定 |
 | 测量目录的summary.md、all_report.txt | 各攻击/场景的完成情况、TSR/ASR分母与模型Tokens |
 | 测量目录的failure_cases.jsonl | 用户计分任务中的效用失败、攻击成功、缺失/错误与轨迹位置；片段不是原因证明 |
 | 场景内的run_manifest.json、summary.json、detailed_results.csv | 实际用户/注入ID、模型/源码和防御配置、计数与成本范围 |
 | 原始任务JSON与full日志侧车 | 模型/工具交互、原生评分；路由与有界审计输入供复核，侧车仅详细日志时写入 |
 | 筛选测量的screened_run_manifest.json、screened_cohort.json、preflight_report.json | cohort身份、实际选择/跳过集合、分母和未计分原生预检记录 |
+
+显式reuse的原汇总/不完整轨迹快照和兼容依据在测量目录的reuse子目录；参数规则见两份运行指南。
 
 同名文件按所属阶段区分含义。先确认task_scope、suite_scope与实际ID，再比较计分和成本；计划数不等于有效样本数。用户结果留在results，agent临时检查使用新的workshop/artifacts任务目录。布局与字段详解见两份运行指南，不修改历史实验文件。

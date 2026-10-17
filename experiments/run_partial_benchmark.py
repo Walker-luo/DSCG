@@ -9,7 +9,7 @@ from agentdojo.attacks.attack_registry import ATTACKS
 from agentdojo.task_suite import get_suite
 import json
 
-from dscg.model_config import ModelConfigurationError
+from dscg.model_config import ModelConfigurationError, resolve_model_config
 from dscg.paths import RESULTS_DIR, BENCHMARK_RESULTS_DIR
 from dscg.audit_router import summarize_events
 from dscg.input_isolation import FRAMEWORK_VERSION
@@ -22,10 +22,11 @@ from experiments.common.partial_reporting import collect_suite_report, write_run
 from experiments.common.partial_controls import (validate_controls, make_task_manifest, load_task_manifest,
                                           select_tasks, guard_run, source_revision, preserve_cached_cost,
                                           RunConfigurationError, SUITES)
+from experiments.common.benchmark_reuse import ReusePlan, execution_plan
 
 
 TYPICAL_ATTACKS = (
-    "ignore_previous", "injecagent", "important_instructions", "tool_knowledge",
+    "ignore_previous", "important_instructions", "tool_knowledge",
 )
 
 
@@ -129,7 +130,7 @@ def _router_trace_summary(suite_dir, task_keys, attack_name, run_attack):
 def main(
     model_id: str | None = None,
     sec_model_id: str | None = None,
-    suites: list[str] = ["workspace", "travel", "banking", "slack"],
+    suites: list[str] | None = None,
     run_attack: bool = True,
     origin=False,
     defense: str = None,
@@ -144,6 +145,7 @@ def main(
     sec_api_key_env: str | None = None,
     config_path: str | Path | None = None,
     force_rerun: bool = False,
+    reuse: bool = False,
     run_name: str | None = None,
     trace_level: str = "summary",
     tool_metadata_path: str | Path | None = None,
@@ -152,7 +154,7 @@ def main(
     completion_prompt: bool = False,
     task_manifest_path: str | Path | None = None,
     results_dir: str | Path | None = None,
-    attack: str | list[str] = "typical",
+    attack: str | list[str] | None = None,
     audit_router_mode: str = "off",
     audit_router_artifact: str | Path | None = None,
     planning_tool_view: bool = True,
@@ -162,12 +164,14 @@ def main(
     use_sandbox: bool = True,
     cohort_sha256: str | None = None,
     cohort_path: str | Path | None = None,
+    _reuse_plan=None,
 ) -> int:
     if task_scope not in {'partial', 'full', 'screened', 'partial_screened'}:
         raise ValueError('unknown task scope')
-    suites = list(suites)
-    if not suites or any(name not in SUITES for name in suites) or len(set(suites)) != len(suites):
-        raise ValueError('suites must be a nonempty, unique selection of workspace/travel/banking/slack')
+    if reuse and (force_rerun or not run_name):
+        raise ValueError('--reuse requires --name and cannot combine with force_rerun')
+    if suites is None and not reuse:
+        suites = list(SUITES)
     if cohort_path is not None:
         if task_scope != 'partial' or not run_attack or task_manifest_path or cohort_sha256:
             raise ValueError('partial --cohort requires attacks and cannot use another manifest or scope')
@@ -175,7 +179,7 @@ def main(
         return run_screened(
             cohort_path, task_scope='partial_screened', suites=suites, model_id=model_id,
             sec_model_id=sec_model_id, origin=origin, defense=defense, config_path=config_path,
-            run_name=run_name, results_dir=results_dir, attack=attack, force_rerun=force_rerun,
+            run_name=run_name, results_dir=results_dir, attack=attack, force_rerun=force_rerun, reuse=reuse,
             api_key=api_key, base_url=base_url, provider=provider, api_key_env=api_key_env,
             sec_api_key=sec_api_key, sec_base_url=sec_base_url, sec_provider=sec_provider,
             sec_api_key_env=sec_api_key_env, trace_level=trace_level, tool_metadata_path=tool_metadata_path,
@@ -185,6 +189,22 @@ def main(
             planning_tool_view=planning_tool_view, delegated_tasks=delegated_tasks,
             l1_projection_mode=l1_projection_mode,
         )
+    logdir = Path(results_dir) if results_dir is not None else BENCHMARK_RESULTS_DIR if task_scope in {'full', 'screened'} else RESULTS_DIR / "partial_benchmark"
+    resume = _reuse_plan
+    if reuse and resume is None:
+        config = resolve_model_config(model_id, api_key=api_key, base_url=base_url, provider=provider,
+                                      api_key_env=api_key_env, config_path=config_path)
+        base = logdir / (_safe_result_component(config.model_id, 'model') + '_' + _safe_result_component(run_name, 'run'))
+        try:
+            resume = ReusePlan(base, suites=suites, attack=attack, run_attack=run_attack,
+                               task_scope=task_scope, resolve_attacks=resolve_attack_names)
+        except RunConfigurationError as exc:
+            print(f'❌ 续跑校验失败: {exc}', flush=True)
+            return 1
+        suites, attack = resume.suites, resume.attacks if run_attack else None
+    suites = list(SUITES if suites is None else suites)
+    if not suites or any(name not in SUITES for name in suites) or len(set(suites)) != len(suites):
+        raise ValueError('suites must be a nonempty, unique selection of workspace/travel/banking/slack')
     if not isinstance(l1_projection_mode, str) or l1_projection_mode not in L1_PROJECTION_MODES:
         raise ValueError('invalid L1 projection mode')
     _validate_router_controls(origin,use_security_checker,audit_router_mode,use_sandbox)
@@ -203,22 +223,20 @@ def main(
             suite = get_suite('v1.2', suite_name)
             select_tasks(frozen_tasks, suite_name, list(suite.user_tasks), list(suite.injection_tasks),
                          run_attack, False, task_scope=task_scope)
-    attack_names = resolve_attack_names(attack) if run_attack else ["none"]
+    attack_names = resolve_attack_names(attack if attack is not None else 'typical') if run_attack else ["none"]
     if task_scope in {'screened', 'partial_screened'} and any(ATTACKS[name].is_dos_attack for name in attack_names):
         raise ValueError('screened measurements do not support DoS')
     logdir = Path(results_dir) if results_dir is not None else BENCHMARK_RESULTS_DIR if task_scope in {'full', 'screened'} else RESULTS_DIR / "partial_benchmark"
     multiple = len(attack_names) > 1
-    context = {}
+    context = {'execution_plan': execution_plan(task_scope, suites, attack_names, cohort_sha256)}
     run_records = []
     report_sources = []
     if run_attack:
         print(f"本次攻击 ({len(attack_names)}): {', '.join(attack_names)}")
     print(f"本次场景 ({len(suites)}): {', '.join(suites)}", flush=True)
 
-    for attack_name in attack_names:
-        context["active_suite"] = None
-        try:
-            output_dir = _run_single_attack(
+    def execute(attack_name, prepare_only=False):
+        return _run_single_attack(
                 model_id, sec_model_id, suites, run_attack, origin, defense,
                 api_key=api_key, base_url=base_url, provider=provider, api_key_env=api_key_env,
                 sec_api_key=sec_api_key, sec_base_url=sec_base_url, sec_provider=sec_provider,
@@ -233,7 +251,20 @@ def main(
                 delegated_tasks=delegated_tasks and not origin and use_sandbox,
                 l1_projection_mode='off' if origin or not (use_sandbox or use_security_checker) else l1_projection_mode,
                 task_scope=task_scope, use_sandbox=use_sandbox, cohort_sha256=cohort_sha256,
+                reuse_plan=resume, prepare_only=prepare_only,
             )
+    if reuse:
+        try:
+            for attack_name in attack_names:
+                execute(attack_name, prepare_only=True)
+            resume.commit()
+        except RunConfigurationError as exc:
+            print(f'❌ 续跑校验失败: {exc}', flush=True)
+            return 1
+    for attack_name in attack_names:
+        context["active_suite"] = None
+        try:
+            output_dir = execute(attack_name)
         except RunConfigurationError as exc:
             print(f"❌ 配置绑定冲突: {exc}")
             return 1
@@ -325,6 +356,8 @@ def _run_single_attack(
     task_scope: str = 'partial',
     use_sandbox: bool = True,
     cohort_sha256: str | None = None,
+    reuse_plan=None,
+    prepare_only=False,
 ):
     """
         model_id: 执行的llm的id
@@ -397,13 +430,20 @@ def _run_single_attack(
         resolved_sec_model_id = None if origin or not use_security_checker else sec_model_config.get("model_id", sec_model_id)
         result_dir_name = _apply_run_name(pipeline, resolved_model_id, run_name)
         base_output_dir = logdir / result_dir_name
+        def bind(path, expected):
+            if reuse_plan is not None:
+                return reuse_plan.check(path, expected) if prepare_only else reuse_plan.guard(path, expected)
+            guard_run(path, expected)
+            return expected
         if task_scope in {'partial', 'partial_screened', 'full'}:
             # Bind the entire selection, including disjoint subsets, before any
             # scored execution or report rewrite under this run name.
-            guard_run(base_output_dir / 'suite_manifest.json', {
+            bind(base_output_dir / 'suite_manifest.json', {
                 'schema_version': 'dscg.full-suites.v1' if task_scope == 'full' else 'dscg.partial-suites.v1',
                 'suites': suites,
             })
+        if cohort_sha256 is None and report_context is not None:
+            bind(base_output_dir / 'benchmark_plan.json', report_context['execution_plan'])
         attack_component = _safe_result_component(attack_name if run_attack else "none", "attack")
         output_dir = base_output_dir / attack_component
         if report_context is not None:
@@ -438,6 +478,7 @@ def _run_single_attack(
             "attack": attack_name if run_attack else None,
             "main_model": main_model_config, "security_model": sec_model_config,
             "profile": "baseline" if origin else "full" if use_security_checker else "no-checker",
+            "agentdojo_defense": defense if origin else None,
             "audit_retries": audit_retries, "completion_prompt": completion_prompt,
             "trace_level": None if origin else trace_level,
             "tool_metadata": tool_metadata, "source": source_revision(),
@@ -454,7 +495,7 @@ def _run_single_attack(
         }
         if cohort_sha256 is not None:
             run_binding['cohort_sha256'] = cohort_sha256
-        guard_run(output_dir / suite_name / "run_manifest.json", run_binding)
+        recorded_binding = bind(output_dir / suite_name / "run_manifest.json", run_binding)
 
         planned_task_count = (
             len(selected_users) * len(selected_injections)
@@ -466,6 +507,8 @@ def _run_single_attack(
             f"Injection Tasks: {len(selected_injections)}/{len(injection_task_ids)}, "
             f"预计任务组合: {planned_task_count}"
         )
+        if prepare_only:
+            continue
         
         # 运行基准测试并记录日志
         print(
@@ -574,7 +617,7 @@ def _run_single_attack(
             "pipeline_name": f"{result_dir_name}/{attack_component}",
             "model_id": resolved_model_id,
             "defense": active_defense,
-            "run_manifest": run_binding,
+            "run_manifest": recorded_binding,
             "audit_router": _router_trace_summary(suite_output_dir,utility_results,attack_name if run_attack else "none",run_attack)
                             if audit_router_mode != "off" else None,
             "api_accounting": {"main": main_tracker.snapshot() if hasattr(main_tracker, "snapshot") else {},
@@ -721,7 +764,7 @@ def cli(argv: list[str] | None = None, *, task_scope: str = 'partial', entrypoin
     parser = argparse.ArgumentParser(
         description="运行 DSCG 的 AgentDojo 评测（默认四场景，所选场景全部用户/注入任务）。" if full else "运行 DSCG 的小批量 AgentDojo 回归评测，默认四场景，可指定场景。"
     )
-    parser.add_argument('--suites', nargs='+', choices=SUITES, default=list(SUITES),
+    parser.add_argument('--suites', nargs='+', choices=SUITES, default=None,
                         help='选择场景，例如 --suites travel banking slack 跳过 workspace；默认全部四场景，full保留所选场景全部任务。')
     parser.add_argument(
         "--attack",
@@ -729,14 +772,17 @@ def cli(argv: list[str] | None = None, *, task_scope: str = 'partial', entrypoin
         action="extend",
         choices=("typical", "all", *resolve_attack_names("all")),
         metavar="ATTACK",
-        help="默认 typical（4 种典型目标型攻击）；all 运行全部自动攻击，也可指定具体名称。",
+        help="默认 typical（3 种目标型攻击，不含injecagent）；reuse未指定时沿用原攻击名单。",
     )
     parser.add_argument(
         "--baseline",
         action="store_true",
         help="运行无防御 AgentDojo 基线；与默认 DSCG 使用相同任务范围和注入攻击。",
     )
-    parser.add_argument(
+    cache_policy = parser.add_mutually_exclusive_group()
+    cache_policy.add_argument('--reuse', action='store_true',
+        help='按原name显式续跑，保留原名单与原生缓存规则；覆盖DSCG_FORCE_RERUN，不自动重试错误。')
+    cache_policy.add_argument(
         "--force-rerun",
         action="store_true",
         help="重新执行任务，不复用已有结果；也可设置 DSCG_FORCE_RERUN=1。",
@@ -795,9 +841,11 @@ def cli(argv: list[str] | None = None, *, task_scope: str = 'partial', entrypoin
     args = parser.parse_args(argv)
     if args.audit_router_mode is None:
         args.audit_router_mode = 'off' if args.baseline or args.no_checker else 'shadow'
-    selected_suites = args.suites
-    if len(set(selected_suites)) != len(selected_suites):
+    selected_suites = args.suites if args.reuse else args.suites or list(SUITES)
+    if selected_suites is not None and len(set(selected_suites)) != len(selected_suites):
         parser.error('--suites cannot contain duplicate names')
+    if args.reuse and (not args.run_name or args.write_task_manifest):
+        parser.error('--reuse requires --name and cannot combine with --write-task-manifest')
     cohort_path = getattr(args, 'cohort_path', None)
     if (require_cohort or cohort_path is not None) and not cohort_path:
         parser.error('screened benchmark requires a nonempty --cohort PATH')
@@ -820,9 +868,10 @@ def cli(argv: list[str] | None = None, *, task_scope: str = 'partial', entrypoin
             return 0
     except ValueError as exc:
         parser.error(str(exc))
-    selected_attacks = args.attack or ["typical"]
+    selected_attacks = args.attack if args.reuse else args.attack or ["typical"]
     try:
-        resolve_attack_names(selected_attacks)
+        if selected_attacks is not None:
+            resolve_attack_names(selected_attacks)
     except ValueError as exc:
         parser.error(str(exc))
 
@@ -843,7 +892,8 @@ def cli(argv: list[str] | None = None, *, task_scope: str = 'partial', entrypoin
             run_attack=not args.clean,
             origin=args.baseline,
             defense=None,
-            force_rerun=args.force_rerun or os.getenv("DSCG_FORCE_RERUN", "0").lower() in {"1", "true", "yes"},
+            force_rerun=False if args.reuse else args.force_rerun or os.getenv("DSCG_FORCE_RERUN", "0").lower() in {"1", "true", "yes"},
+            reuse=args.reuse,
             run_name=args.run_name,
             trace_level="full" if args.include_extra_info else args.trace_level,
             tool_metadata_path=args.tool_metadata_path,

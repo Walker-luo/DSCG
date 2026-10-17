@@ -6,6 +6,7 @@
 
 | 方案 / 阶段 | 已完成 | 尚未完成或未采用 |
 | --- | --- | --- |
+| [默认攻击与显式续跑](./completed/benchmark_reuse_20261017.md) · [用法](../docs/benchmark.md#显式续跑示例) | 新typical三攻击；full/partial/clean/cohort支持reuse、旧名单与严格兼容、快照；407项离线回归 | 原生错误缓存不自动重试；未知来源或旧baseline证据不足拒绝；无真实模型测量 |
 | [Experiments目录归类](./completed/experiments_layout_20261017.md) · [入口索引](../experiments/README.md) | 顶层三个日常入口；共享实现、诊断、校准与工具分目录，已知旧预检严格兼容；391项离线回归 | 无真实模型或费用/安全收益验证；专项fixture与历史证据保留 |
 | [测试指南拆分与CLI默认值](./completed/docs_benchmark_structure_20261017.md) · [测试索引](../docs/evaluation.md) | benchmark/partial分开，公共说明集中；CLI默认shadow、baseline/NoChecker off；389项离线回归 | 未调用真实模型；保留原档与用户删除，既有plan/report缺失引用另列 |
 | [全量入口场景选择](./completed/full_suites_20261017.md) · [用法](../docs/benchmark.md#1-使用哪个入口) | full/partial共用--suites；full保留所选场景全部任务，兼容clean/cohort/导出；385项离线回归 | 场景子集不是四场景全量；无真实模型/费用收益测量 |

@@ -160,16 +160,17 @@ python -m experiments.run_partial_benchmark --baseline --force-rerun --name base
 python -m experiments.run_partial_benchmark --force-rerun --name workshop_compare_01
 ```
 
-baseline 使用原生 AgentDojo 工具循环，不启用 DSCG 或安全模型；两组使用相同主模型配置及 v1.2 任务子集：workspace、travel、banking、slack 各取注册顺序前 3 个用户任务和前 3 个注入任务。默认 `typical` 共计划 144 条攻击评测，另有攻击能力预检；实际分母与任务 ID 以 `summary.json` 为准。
+baseline 使用原生 AgentDojo 工具循环，不启用 DSCG 或安全模型；两组使用相同主模型配置及 v1.2 任务子集：workspace、travel、banking、slack 各取注册顺序前 3 个用户任务和前 3 个注入任务。默认 `typical` 共计划 108 条攻击评测，另有攻击能力预检；实际分母与任务 ID 以 `summary.json` 为准。
 
 | 默认 `--attack typical` 的攻击 | 简要说明 | 来源 |
 | --- | --- | --- |
 | `ignore_previous` | 要求忽略原任务，改做攻击任务 | [AgentDojo 论文 §4.2][agentdojo-paper]及[AgentDojo 官方实现][agentdojo-baseline] |
-| `injecagent` | 用强调标记和忽略指令模板提出攻击目标 | [InjecAgent 论文][injecagent-paper]、[AgentDojo 官方适配][agentdojo-baseline] |
 | `important_instructions` | 冒充用户，要求先完成攻击目标 | [AgentDojo 论文 §4.1–4.2][agentdojo-paper]及[AgentDojo 官方实现][agentdojo-baseline] |
 | `tool_knowledge` | 补充攻击所需工具顺序和参数提示 | [AgentDojo 官方实现][agentdojo-baseline] |
 
-典型集用于控制测试规模，不表示已验证攻击强度。可用 `--attack NAME [NAME ...]` 指定攻击，或 `--attack all` 显式运行全部自动攻击；`manual` 不可选。完整攻击表、消融和指标口径见[benchmark指南](./docs/benchmark.md#攻击选择)。
+`injecagent`已退出默认typical，仍可用 `--attack injecagent` 或 `all` 运行。典型集用于控制测试规模，不表示已验证攻击强度。可用 `--attack NAME [NAME ...]` 指定攻击，或 `--attack all` 显式运行全部自动攻击；`manual` 不可选。完整攻击表、消融和指标口径见[benchmark指南](./docs/benchmark.md#攻击选择)。
+
+中断续跑可在原命令中去掉force-rerun、加 `--reuse` 并保留原name；旧四攻击实验恢复原名单，新实验typical为三种。原生接受的错误缓存不会自动重试，兼容边界见[续跑说明](./docs/benchmark.md#显式续跑示例)。
 
 默认 `summary` 足够用于对比。`--trace-level full` 保存详细诊断及压缩侧车，增加序列化和写入开销；按需排错时使用。正式对照还需匹配任务 ID、攻击、模型配置及预检口径，历史结果仅作参照。
 

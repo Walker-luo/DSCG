@@ -96,7 +96,9 @@ def source_revision():
     root=Path(__file__).resolve().parents[2]
     paths=sorted((root/'dscg').rglob('*.py'))+[Path(__file__),root/'experiments/run_partial_benchmark.py',root/'experiments/run_benchmark.py']
     paths += [root / 'experiments' / name for name in (
-        'run_injection_precheck.py', 'common/injection_cohort.py', 'common/injection_cohort_compatibility.json')
+        'run_injection_precheck.py', 'common/injection_cohort.py', 'common/injection_cohort_compatibility.json',
+        'common/benchmark_reuse.py', 'common/benchmark_reuse_compatibility.json',
+        'common/partial_reporting.py', 'diagnostics/harness_audit.py')
         if (root / 'experiments' / name).exists()]
     hashes={str(p.relative_to(root)):hashlib.sha256(p.read_bytes()).hexdigest() for p in paths}
     try:commit=subprocess.check_output(['git','rev-parse','HEAD'],cwd=root,text=True).strip()

@@ -14,6 +14,7 @@ from dscg.model_config import resolve_model_config
 from dscg.paths import BENCHMARK_RESULTS_DIR, RESULTS_DIR
 from experiments import run_partial_benchmark as shared
 from experiments.common.partial_controls import source_revision, guard_run, validate_controls, select_tasks, SUITES
+from experiments.common.benchmark_reuse import ReusePlan
 
 SCHEMA = 'dscg.injection-screen.v1'
 RULE = 'keep-any-valid-success; exclude-after-two-valid-failures; errors-unresolved'
@@ -257,19 +258,28 @@ def _preflight_report(base, cohort, active, attacks, selected_tasks=None):
 
 
 def run_screened(cohort_path, *, config_path=None, run_name=None, results_dir=None, origin=False,
-                 attack='typical', audit_router_mode='off', trace_level='summary', audit_router_artifact=None,
-                 force_rerun=False, model_id=None, sec_model_id=None, defense=None, suites=None,
+                 attack=None, audit_router_mode='off', trace_level='summary', audit_router_artifact=None,
+                 force_rerun=False, reuse=False, model_id=None, sec_model_id=None, defense=None, suites=None,
                  task_scope='screened', **controls):
     if task_scope not in {'screened', 'partial_screened'}:
         raise ValueError('unknown screened task scope')
     partial = task_scope == 'partial_screened'
     if not run_name:
         raise ValueError('screened measurements require a new --name')
+    if reuse and force_rerun:
+        raise ValueError('--reuse cannot combine with force_rerun')
     config = resolve_model_config(model_id, config_path=config_path,
         **{k: controls.pop(k) for k in ('api_key', 'base_url', 'provider', 'api_key_env') if k in controls})
     cohort_path = Path(cohort_path).resolve()
     cohort = _validate_cohort(cohort_path, config)
-    names = shared.resolve_attack_names(attack)
+    root = Path(results_dir) if results_dir else RESULTS_DIR / 'partial_benchmark' if partial else BENCHMARK_RESULTS_DIR
+    base = root / (shared._safe_result_component(config.model_id, 'model') + '_' + shared._safe_result_component(run_name, 'run'))
+    resume = None
+    if reuse:
+        resume = ReusePlan(base, suites=suites, attack=attack, run_attack=True, task_scope=task_scope,
+                           resolve_attacks=shared.resolve_attack_names)
+        suites, attack = resume.suites, resume.attacks
+    names = shared.resolve_attack_names(attack if attack is not None else 'typical')
     if any(ATTACKS[name].is_dos_attack for name in names):
         raise ValueError('DoS is not supported by injection-goal screening; select targeted attacks')
     use_checker = controls.get('use_security_checker', True)
@@ -300,8 +310,6 @@ def run_screened(cohort_path, *, config_path=None, run_name=None, results_dir=No
     active = [name for name, entry in selected.items() if entry['injection_task_ids']]
     if not active:
         raise ValueError('no injection targets remain in the requested task scope; benchmark not started')
-    root = Path(results_dir or (RESULTS_DIR / 'partial_benchmark' if partial else BENCHMARK_RESULTS_DIR))
-    base = root / (shared._safe_result_component(config.model_id, 'model') + '_' + shared._safe_result_component(run_name, 'run'))
     with _lock(base):
         effective = {k: controls.get(k, default) for k, default in {
             'use_sandbox': True, 'use_security_checker': True, 'planning_tool_view': True,
@@ -317,8 +325,11 @@ def run_screened(cohort_path, *, config_path=None, run_name=None, results_dir=No
         # Refuse to relabel existing ordinary runs as screened cohorts.
         if not (base / 'screened_run_manifest.json').exists() and any(base.glob('*/*/run_manifest.json')):
             raise ValueError('existing non-screened run; use a new --name')
-        guard_run(base / 'screened_run_manifest.json', identity)
-        _record_compatibility(base, cohort['binding'], _binding(config, list(cohort['binding']['catalog'])))
+        if resume is not None:
+            resume.check(base / 'screened_run_manifest.json', identity)
+        else:
+            guard_run(base / 'screened_run_manifest.json', identity)
+            _record_compatibility(base, cohort['binding'], _binding(config, list(cohort['binding']['catalog'])))
         attachment = {'scope': 'capability-conditioned screened subset', 'task_scope': task_scope,
                       'cohort_path': str(cohort_path), 'cohort': cohort,
                       'selected_tasks': selected, 'requested_suites': requested,
@@ -332,7 +343,7 @@ def run_screened(cohort_path, *, config_path=None, run_name=None, results_dir=No
                           for name, entry in selected.items()},
                       'cost_scope': 'native per-attack preflight retained; not scored attack samples; screening cost separate'}
         attachment_path = base / 'screened_cohort.json'
-        if not attachment_path.exists():
+        if not attachment_path.exists() and resume is None:
             _write_new(attachment_path, attachment)
         for name in attachment['skipped_suites']:
             print(f'{name}: {"原前3个注入目标中" if partial else ""}无通过目标，明确跳过。')
@@ -344,6 +355,8 @@ def run_screened(cohort_path, *, config_path=None, run_name=None, results_dir=No
                                task_manifest_path=cohort_path, task_scope=task_scope, attack=names,
                                cohort_sha256=cohort['cohort_sha256'],
                                audit_router_mode=audit_router_mode, trace_level=trace_level,
-                               audit_router_artifact=audit_router_artifact, force_rerun=force_rerun, **controls)
+                               audit_router_artifact=audit_router_artifact, force_rerun=force_rerun,
+                               reuse=reuse, _reuse_plan=resume, **controls)
         finally:
-            _preflight_report(base, cohort, active, names, selected)
+            if resume is None or resume.committed:
+                _preflight_report(base, cohort, active, names, selected)

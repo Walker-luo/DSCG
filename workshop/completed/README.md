@@ -8,6 +8,7 @@
 
 | 材料 | 已完成 / 当前保留 | 未完成、撤回或仅为设计 |
 | --- | --- | --- |
+| [默认攻击与显式续跑](./benchmark_reuse_20261017.md) · [用法](../../docs/benchmark.md#显式续跑示例) | 新typical三攻击；reuse保留旧计划/缓存及证据，407项离线通过 | 旧baseline缺原生防御证据时拒绝；不新增错误重试或真实模型结果 |
 | [Experiments目录归类](./experiments_layout_20261017.md) · [入口索引](../../experiments/README.md) | 三个日常入口保留原命令，其余归入common/diagnostics/calibration/tools；391项离线回归 | 没有新增模型结果，I3/E0状态及既有实验身份保留 |
 | [测试指南结构整理](./docs_benchmark_structure_20261017.md) · [测试索引](../../docs/evaluation.md) | 分开完整任务与partial运行说明；同步CLI shadow默认与baseline/NoChecker兼容 | 无真实模型或收益验证；原始文档及历史证据保持可追溯 |
 | [预检进度与统一benchmark入口](./injection_progress_20261016.md) | screen实时进度/15秒等待、旧状态与名单兼容、统一--cohort、screened元数据、薄兼容转发；369/369离线通过 | 真实服务器预检/筛选攻击待执行，未产生新模型结果或安全收益 |

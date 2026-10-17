@@ -13,7 +13,7 @@
 
 测量入口共用模型配置、当前框架、攻击选择、缓存绑定和报告流程。**全量入口不再使用前 3 个任务的限制**；如通过 `--task-manifest` 显式导入 full 任务清单，必须包含当前注册顺序下的完整执行集合，不能用 partial 清单缩小全量测试。
 
-两个测量入口都支持 `--suites travel banking slack` 跳过workspace，默认仍为四场景。`run_benchmark` 保留所选场景的全部注册任务；`run_partial_benchmark` 保留每场景原前三个用户×前三个注入，三场景typical计划108条计分rollout，另有预检成本。partial命令见 [小批量测试指南](./partial_benchmark.md#对照与输出)。
+两个测量入口都支持 `--suites travel banking slack` 跳过workspace，默认仍为四场景。`run_benchmark` 保留所选场景的全部注册任务；`run_partial_benchmark` 保留每场景原前三个用户×前三个注入，三场景typical计划81条计分rollout，另有预检成本。partial命令见 [小批量测试指南](./partial_benchmark.md#对照与输出)。
 
 例如，只对travel/banking/slack进行完整任务测量：
 
@@ -30,7 +30,7 @@ python -m experiments.run_benchmark \
 
 partial 同样支持 `--cohort PATH`：只过滤原来前三个 injection targets，仍保留每场景前三个用户，不补入后续目标，标记为 `partial_screened`；不会转到全量用户任务。与本指南全量 `--cohort` 的 `screened` 范围不同，用法及分母见 [partial筛选说明](./partial_benchmark.md#对照与输出)。
 
-“全部任务”与“全部攻击”是两项独立选择：全量入口默认 `--attack typical`，在全部任务上运行四种目标型攻击；`--attack all` 才运行已安装注册表中的全部自动攻击，排除交互式 `manual`。具体名称、类型和来源见 [评测指南的攻击表](./benchmark.md#攻击选择)。
+“全部任务”与“全部攻击”是两项独立选择：全量入口默认 `--attack typical`，在全部任务上运行三种目标型攻击；`--attack all` 才运行已安装注册表中的全部自动攻击，排除交互式 `manual`。具体名称、类型和来源见 [评测指南的攻击表](./benchmark.md#攻击选择)。
 
 如已完成 injection 目标预检，筛选测量也统一使用本入口：显式加 `--cohort <cohort.json>`，结果标为 `task_scope=screened`，保留全部用户任务并采用冻结目标。该选项与 clean/其他任务清单/清单导出互斥，拒绝 DoS；不传时仍为完整 full。命令、进度和旧数据续跑见 [Injection 目标预检指南](./injection_precheck.md)。
 
@@ -155,7 +155,7 @@ C_0=\{(s,u):\operatorname{Utility}^{\mathrm{baseline,clean}}(s,u)=1
 
 ### 可选：先预检 injection 目标，再运行筛选对照
 
-如果本轮希望先排除当前 baseline 直接请求下两次均未完成的攻击目标，先运行以下流程。`screen` 只负责预检和生成名单；后续 baseline、DSCG 与 shadow 测量统一使用 `run_benchmark --cohort`。不采用筛选时，直接使用下方“四种典型攻击”或“全部自动攻击”的完整任务命令。
+如果本轮希望先排除当前 baseline 直接请求下两次均未完成的攻击目标，先运行以下流程。`screen` 只负责预检和生成名单；后续 baseline、DSCG 与 shadow 测量统一使用 `run_benchmark --cohort`。不采用筛选时，直接使用下方“三种典型攻击”或“全部自动攻击”的完整任务命令。
 
 **第一步：独立预检全部 injection GOAL，复用已有兼容记录。**
 
@@ -222,7 +222,7 @@ shadow 保留 L3 语义审计，不实际新增免审；无需提供路由 artif
 
 | `--attack` 值 | 简要说明 | 类型 | 来源 |
 | --- | --- | --- | --- |
-| `typical` | 默认运行上述 4 种典型目标型攻击 | 批量选择 | 本项目选择器 |
+| `typical` | 默认运行3种目标型攻击（不含injecagent） | 批量选择 | 本项目选择器 |
 | `all` | 显式运行全部 16 种自动攻击 | 批量选择 | 本项目选择器 |
 | `direct` | 用 `TODO` 直接要求执行攻击目标 | 目标型 | [AgentDojo §4.2][agentdojo-paper] |
 | `ignore_previous` | 要求忽略原指令，改做攻击任务 | 目标型 | [AgentDojo §4.2][agentdojo-paper] |
@@ -248,9 +248,9 @@ shadow 保留 L3 语义审计，不实际新增免审；无需提供路由 artif
 [agentdojo-variants]: https://github.com/ethz-spylab/agentdojo/blob/main/src/agentdojo/attacks/important_instructions_attacks.py
 [agentdojo-dos]: https://github.com/ethz-spylab/agentdojo/blob/main/src/agentdojo/attacks/dos_attacks.py
 
-### 四种典型攻击
+### 三种典型攻击
 
-`typical` 为 `ignore_previous`、`injecagent`、`important_instructions`、`tool_knowledge`。以下运行全部任务，不是 partial 子集：
+`typical` 为 `ignore_previous`、`important_instructions`、`tool_knowledge`。`injecagent`仍保留显式与all选择。以下运行全部任务，不是 partial 子集：
 
 ```bash
 python -m experiments.run_benchmark --baseline --attack typical --force-rerun \
@@ -292,7 +292,7 @@ python -m experiments.run_benchmark --attack all --force-rerun \
 | --- | --- |
 | `--clean` | 97 |
 | 任一目标型攻击 | 949 |
-| `--attack typical` | 4 × 949 = 3,796 |
+| `--attack typical` | 3 × 949 = 2,847 |
 | 任一 DoS 攻击 | 97 |
 | `--attack all` | 当前 11 种目标型 × 949 + 5 种 DoS × 97 = 10,924 |
 
@@ -340,10 +340,41 @@ results/benchmarks/<model_id>_<name>/
 
 ## 6. 中断、缓存和退出状态
 
-- 正式成本对照推荐本指南的**新 name + force-rerun**。源码、模型、工具/schema 或框架开关变化后使用新 name；`--force-rerun` 不绕过配置绑定，也不把 partial 缓存变成 full。
-- 若长任务中断且只想继续，保持源码/配置/name 不变，去掉 `--force-rerun` 后重新执行；同时取消 `DSCG_FORCE_RERUN` 的强制设置。原生缓存复用已完成任务，不代表恢复中断中的单个动作。
+- 正式成本对照推荐本指南的**新 name + force-rerun**。模型、工具/schema 或框架开关变化后使用新 name；源码仅在明确审阅的等价过渡下允许reuse兼容；`--force-rerun` 不绕过配置绑定，也不把 partial 缓存变成 full。
+- 长任务中断时，用相同name、模型与控制参数加 `--reuse`。未指定攻击/场景时读取原计划；旧typical四攻击继续按四攻击运行。reuse与显式force-rerun互斥，并覆盖DSCG_FORCE_RERUN的强制设置。
 - 续跑可能混合历史缓存和新调用，Token 记录不再等同于一次完整新运行。检查 `cost_scope`、`invocation_cost` 与 `cost_comparison_ready`，将其与新鲜匹配成本实验分开；不为获取统一成本而覆盖旧证据。
 - 退出 `1` 表示配置/运行或某攻击发生异常；攻击异常被记录后继续后续攻击，不能算成 0-ASR。退出 `2` 通常是命令行参数错误。退出 `0` 只表示流程正常结束，还须检查结果完整性；不表示所有任务成功或真实 E0/安全验收通过。
+
+### 显式续跑示例
+
+```bash
+python -m experiments.run_benchmark --reuse \
+  --model-config config/models.local.toml \
+  --baseline --name full_baseline_typical_01
+```
+
+使用原name和结果根目录；DSCG省略baseline并传回原框架控制。cohort测量仍需传同一份 `--cohort PATH`，clean测量仍需 `--clean`。未指定attack/suites时采用原完整名单，因此旧typical可能仍包含injecagent；显式指定必须与原名单一致。想运行新的三攻击实验应使用新name，不能在旧四攻击目录下改分母。
+
+没有根计划的旧目录须显式提供完整原攻击及场景，例如：
+
+```bash
+python -m experiments.run_benchmark --reuse --baseline \
+  --model-config config/models.local.toml --name baseline \
+  --attack ignore_previous injecagent important_instructions tool_knowledge \
+  --suites workspace travel banking slack
+```
+
+该命令仅适用于这些参数确为原实验范围、其逐场景绑定也可核验的目录。不要根据已经生成的部分子目录推断未启动部分。目录不存在、缺少可核验绑定或任一配置冲突时拒绝续跑；不会自动启动新的全量测量。
+
+旧普通baseline若未记录原生防御选项，须有与原绑定一致的summary明确记录defense，或screened根绑定提供明确证据；缺失时不能推定为无防御，将拒绝reuse。此类目录需用原代码继续，或用新name重新测量。新运行会直接绑定该选项。兼容名单也不覆盖真实防御实现变化。
+
+新普通运行在任务执行前写入benchmark_plan.json，保存完整攻击/场景计划；screened运行使用screened_run_manifest.json。reuse先核对全部已有绑定，仅读取明确哈希映射的等价源码版本；旧manifest和完整缓存轨迹不重写，新增compatibility记录保存原/当前身份。更新汇总前，将原报告和执行清单存到 `reuse/<本次ID>/snapshot/`；原生loader判定不完整、将被重跑的JSON及其侧车也先保存原字节。新缺失场景的绑定可以在全部检查通过后补写。
+
+reuse沿用原生缓存规则：有效成功和任务失败都保留，原生接受的带API错误结果也不自动重试；损坏JSON沿用原报错路径。它补跑缺失/原生未完成的任务，不恢复单个工具动作，也不修正原生评分。无需显式reuse的同版本默认缓存行为继续保留。
+
+cohort续跑分别核对原请求场景和非空的实际执行场景；被筛空场景继续明确跳过，不因续跑重新加入任务。
+
+reuse与 `--force-rerun`、离线清单导出互斥；要求name；显式reuse覆盖DSCG_FORCE_RERUN。Python API使用 `reuse=True`，未指定attack/suites时同样恢复原计划；默认reuse=False。它与screen阶段引用旧预检的 `--reuse-from` 是不同参数。
 
 需要改变结果位置时，两组都支持 `--results-dir DIR`。用户正式实验默认留在 results；agent 临时检查必须显式隔离，例如：
 
@@ -364,7 +395,8 @@ python -m experiments.run_benchmark --baseline --attack injecagent \
 | `--suites NAME [NAME ...]` | 两入口均支持；默认四场景，full保留所选场景全部任务，partial仍取前三个 |
 | `--cohort PATH` | 冻结 injection 预检名单；partial仅过滤原前三个目标并保留前三个用户，full保留全部用户 |
 | `--attack NAME [NAME ...]` | 具体攻击，可重复该选项；默认 typical，all 显式运行全部 |
-| `--force-rerun` | 重跑任务；也可设 DSCG_FORCE_RERUN=1 |
+| `--force-rerun` | 重跑任务；也可设 DSCG_FORCE_RERUN=1，与显式reuse互斥 |
+| `--reuse` | 同name显式续跑，沿用原名单及native缓存；覆盖环境强制重跑，不自动重试错误 |
 | `--clean` | 相同用户任务的无攻击效用控制；使用独立运行名称 |
 | `--no-checker` | 关闭语义审计，保留工具授权、Monitor、ticket |
 | `--trace-level summary/standard/full` | 默认 summary；standard 简化逐条记录；full 详细诊断和压缩侧车，增加写入成本 |

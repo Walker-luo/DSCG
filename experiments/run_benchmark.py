@@ -17,18 +17,20 @@ _apply_run_name = runner._apply_run_name
 def main(
     model_id: str | None = None,
     sec_model_id: str | None = None,
-    suites=SUITES,
+    suites=None,
     run_attack: bool = True,
     origin=False,
     defense: str | None = None,
     use_sandbox: bool = True,
     use_security_checker: bool = True,
     cohort_path: str | Path | None = None,
+    reuse: bool = False,
     **options,
 ) -> int:
     """Run all tasks within selected suites, retaining shared controls and defaults."""
     if 'task_scope' in options:
         raise ValueError('full benchmark task scope cannot be overridden')
+    suites = list(SUITES) if suites is None and not reuse else suites
     if cohort_path is not None:
         if not run_attack or options.get('task_manifest_path'):
             raise ValueError('--cohort cannot be combined with clean or another task manifest')
@@ -36,13 +38,14 @@ def main(
         from experiments.common.injection_cohort import run_screened
         return run_screened(cohort_path, model_id=model_id, sec_model_id=sec_model_id,
                             origin=origin, defense=defense, use_sandbox=use_sandbox,
-                            use_security_checker=use_security_checker, suites=list(suites), **options)
+                            use_security_checker=use_security_checker, suites=suites, reuse=reuse, **options)
     results_dir = options.pop('results_dir', None)
     return runner.main(
-        model_id=model_id, sec_model_id=sec_model_id, suites=list(suites),
+        model_id=model_id, sec_model_id=sec_model_id, suites=suites,
         run_attack=run_attack, origin=origin, defense=defense,
         use_sandbox=use_sandbox, use_security_checker=use_security_checker,
         task_scope='full',
+        reuse=reuse,
         results_dir=results_dir if results_dir is not None else BENCHMARK_RESULTS_DIR,
         **options,
     )

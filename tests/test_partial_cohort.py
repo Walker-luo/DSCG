@@ -62,18 +62,18 @@ class PartialCohortTests(unittest.TestCase):
         self.assertEqual(manifest['task_scope'], 'partial_screened')
         self.assertEqual(manifest['suites'], ['travel', 'banking', 'slack'])
         total = 0
-        for attack in ['ignore_previous', 'injecagent', 'important_instructions', 'tool_knowledge']:
+        for attack in ['ignore_previous', 'important_instructions', 'tool_knowledge']:
             self.assertFalse((base / attack / 'workspace').exists())
             for name in ['travel', 'banking', 'slack']:
                 data = json.loads((base / attack / name / 'summary.json').read_text())
                 self.assertEqual(data['task_selection']['user_task_ids'], ['user_task_0', 'user_task_1', 'user_task_2'])
                 self.assertEqual(data['task_selection']['injection_task_ids'], ['injection_task_1'])
                 total += data['task_counts']['total_tasks']
-        self.assertEqual(total, 36)
+        self.assertEqual(total, 27)
         attachment = json.loads((base / 'screened_cohort.json').read_text())
         self.assertEqual(attachment['counts']['travel']['planned_per_targeted_attack'], 3)
         self.assertEqual(attachment['counts']['travel']['prefix_targets'], 3)
-        self.assertEqual(json.loads((base / 'preflight_report.json').read_text())['planned_preflight_samples'], 12)
+        self.assertEqual(json.loads((base / 'preflight_report.json').read_text())['planned_preflight_samples'], 9)
         self.assertEqual(path.read_bytes(), original)
         self.assertIn('前 3', (base / 'summary.md').read_text())
 
@@ -153,6 +153,38 @@ class PartialCohortTests(unittest.TestCase):
             self.assertTrue(cohort._bindings_compatible(recorded, current))
             recorded['source']['source_sha256'] = {**hashes, 'dscg/pipelines/baseline.py': '0' * 64}
             self.assertFalse(cohort._bindings_compatible(recorded, current))
+
+    def test_reuse_keeps_screened_scope_and_frozen_bindings_for_both_entrypoints(self):
+        from experiments import run_benchmark as full
+        path = self.screen(); original = path.read_bytes()
+        for entry, scope in [(runner.main, 'partial_screened'), (full.main, 'screened')]:
+            options = dict(cohort_path=path, origin=True, suites=['travel', 'banking'],
+                           attack='injecagent', run_name=scope, results_dir=self.root / 'runs')
+            self.assertEqual(entry(**options), 0)
+            base = self.root / 'runs' / ('offline_' + scope)
+            bindings = {p: p.read_bytes() for p in base.rglob('*manifest.json') if p.name != 'attack_manifest.json'}
+            self.assertEqual(entry(**{**options, 'suites': None, 'attack': None}, reuse=True), 0)
+            self.assertEqual(json.loads((base / 'attack_manifest.json').read_text())['task_scope'], scope)
+            self.assertEqual(json.loads((base / 'attack_manifest.json').read_text())['attacks'], ['injecagent'])
+            for p, content in bindings.items(): self.assertEqual(p.read_bytes(), content)
+        self.assertEqual(path.read_bytes(), original)
+
+    def test_reuse_preserves_requested_and_active_suites_when_a_scene_is_empty(self):
+        from experiments import run_benchmark as full
+        self.suites['travel'].outcomes[1] = [False, False]
+        self.suites['travel'].outcomes[3] = [False, False]
+        self.suites['travel'].outcomes[4] = [False, False]
+        path = self.screen(); original = path.read_bytes()
+        for entry, name in [(runner.main, 'partial_empty'), (full.main, 'full_empty')]:
+            options = dict(cohort_path=path, origin=True, suites=['travel', 'banking'],
+                           attack='injecagent', run_name=name, results_dir=self.root / 'runs')
+            self.assertEqual(entry(**options), 0)
+            self.assertEqual(entry(**{**options, 'suites': None, 'attack': None}, reuse=True), 0)
+            base = self.root / 'runs' / ('offline_' + name)
+            self.assertEqual(json.loads((base / 'screened_run_manifest.json').read_text())['requested_suites'], ['travel', 'banking'])
+            self.assertEqual(json.loads((base / 'attack_manifest.json').read_text())['suites'], ['banking'])
+            self.assertFalse((base / 'injecagent/travel').exists())
+        self.assertEqual(path.read_bytes(), original)
 
 
 if __name__ == '__main__':

@@ -59,9 +59,9 @@ results/injection_precheck/<model_id>_injection_screen_01/
 
 本次进度/入口整理提供明确的旧版本兼容映射：核对已知旧脚本/runner 字节哈希、当前改动文件哈希、相同模型/任务/规则以及未变的防御运行源码后，可以继续旧预检或读取旧名单。只新增 compatibility 记录，保留旧 manifest、attempt 和 cohort 的原始字节。Git revision 变化但绑定源码完全相同也只记录出处；未知脚本、模型、任务或防御变化仍拒绝执行，须用新 name。
 
-共享实现现归入 `experiments/common/`，三个日常入口命令保持不变。此次目录迁移也包含明确的旧来源/路径哈希映射；已知旧screen可按原命令续跑，冻结名单和历史尝试不重写。新代码的攻击测量仍需新name，不能用预检兼容规则绕过测量配置绑定。专项工具位置见 [实验工具索引](../experiments/README.md)。
+共享实现现归入 `experiments/common/`，三个日常入口命令保持不变。此次目录迁移也包含明确的旧来源/路径哈希映射；已知旧screen可按原命令续跑，冻结名单和历史尝试不重写。攻击测量可用独立的 `--reuse` 规则续跑明确兼容版本；不能把预检兼容资格直接用于攻击测量，其他变化仍需新name。专项工具位置见 [实验工具索引](../experiments/README.md)。
 
-已经启动的进程不会自动获得新日志。更新代码后重新执行同一条预检命令；Ctrl+C 会停止等待提示，已有尝试保留用于续跑。旧版已经开始的攻击测量保留原身份，升级后使用新的测量 name。
+已经启动的进程不会自动获得新日志。更新代码后重新执行同一条预检命令；Ctrl+C 会停止等待提示，已有尝试保留用于续跑。旧版攻击测量保留原身份；明确审阅的等价版本可按测量入口的reuse规则继续，其他升级使用新name。
 
 ## 3. 使用冻结名单测 baseline
 
@@ -73,7 +73,7 @@ python -m experiments.run_benchmark \
   --name baseline_screened_02
 ```
 
-保留各场景全部 user tasks，仅筛选 injection tasks。默认 typical 四种目标型攻击，也支持具体名称及重复 `--attack`；DoS 或包含 DoS 的 `all` 会被拒绝。某场景没有保留目标时明确跳过；全部场景为空或名单不完整/证据变化时拒绝启动。
+保留各场景全部 user tasks，仅筛选 injection tasks。默认typical三种目标型攻击（不含injecagent），也支持具体名称及重复 `--attack`；DoS 或包含 DoS 的 `all` 会被拒绝。某场景没有保留目标时明确跳过；全部场景为空或名单不完整/证据变化时拒绝启动。
 
 底层复用共享 runner，筛选结果在 run/attack manifest 和场景汇总中明确记录 `task_scope=screened` 与名单哈希，摘要标题为“筛选目标评测摘要（全部用户任务）”。以 `task_selection` 中 ID 和 `screened_cohort.json` 为准。`--cohort` 不能与 `--clean`、`--task-manifest` 或 `--write-task-manifest` 同用；不传 `--cohort` 时正式 full 任务范围保持完整。
 
