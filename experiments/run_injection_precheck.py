@@ -14,8 +14,8 @@ from dscg.model_config import resolve_model_config
 from dscg.paths import RESULTS_DIR
 from dscg.pipelines.baseline import make_openai_compatible_pipeline
 from experiments import run_partial_benchmark as shared
-from experiments.partial_controls import SUITES, source_revision, guard_run
-from experiments.injection_cohort import (
+from experiments.common.partial_controls import SUITES, source_revision, guard_run
+from experiments.common.injection_cohort import (
     SCHEMA, RULE, LIMITATIONS, _digest, _file_hash, _read, _write_new, _replace,
     _lock, _binding, _trace_status, _decision, _validate_cohort, _validate_cohort_data,
     _bindings_compatible, _source_compatible, _record_compatibility, run_screened,

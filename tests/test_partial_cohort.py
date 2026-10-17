@@ -9,7 +9,7 @@ import unittest
 from unittest.mock import patch
 
 from dscg.model_config import ModelConfig
-from experiments import injection_cohort as cohort
+from experiments.common import injection_cohort as cohort
 from experiments import run_injection_precheck as precheck
 from experiments import run_partial_benchmark as runner
 from test_injection_precheck import FakeSuite

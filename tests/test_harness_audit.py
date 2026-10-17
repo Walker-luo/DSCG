@@ -4,7 +4,7 @@ import unittest
 from pathlib import Path
 
 from dscg.harness_records import SampleStatus
-from experiments.harness_audit import (
+from experiments.diagnostics.harness_audit import (
     audit_cases,
     classify_sample,
     manifest_hash,

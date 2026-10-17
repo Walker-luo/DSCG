@@ -8,7 +8,7 @@
 
 [checker/Monitor](../../dscg/pipelines/defended.py)支持off/shadow/selective；开启路由后所有checker输出均认证交接，绑定任务、精确候选、完整动作历史/source-ID状态、policy/contract、catalog/schema/函数/依赖、上下文、artifact和运行配置。default off保留原路径；public/L2不计作新增节省。保留READ_ONLY_SOURCE_ALLOW有效读取deny例外、abstain/错误阻断与原执行ticket，无对象/数据权限扩展。
 
-[数据准备](../../experiments/l3_router_dataset.py)读取显式独立标注JSONL，检查组/相关key/同包/标签/输入hash/完整性，输出数值rows与manifest；原任务/返回正文不重复输出。[校准入口](../../experiments/calibrate_l3_router.py)再核对实际行与manifest，按组any风险、CP上界和delta/K筛选冻结grid；不足输出null。数据与artifact均拒绝覆盖。独立标签、组独立和grid预注册需外部核查，程序不能从hash证明。
+[数据准备](../../experiments/calibration/l3_router_dataset.py)读取显式独立标注JSONL，检查组/相关key/同包/标签/输入hash/完整性，输出数值rows与manifest；原任务/返回正文不重复输出。[校准入口](../../experiments/calibration/calibrate_l3_router.py)再核对实际行与manifest，按组any风险、CP上界和delta/K筛选冻结grid；不足输出null。数据与artifact均拒绝覆盖。独立标签、组独立和grid预注册需外部核查，程序不能从hash证明。
 
 [partial runner](../../experiments/run_partial_benchmark.py)新增显式模式/artifact配置，缓存绑定模式、artifact和运行配置；原任务/攻击选择保持。scored trace成本账区分原public、L2拒绝、合格内部读、would/actual、已知/未知usage和参考轨迹潜在成本。真实总节省保持null直到匹配实验。网页专门CSA控件待接线，既有基础三层网页实现不在本任务修改范围。
 

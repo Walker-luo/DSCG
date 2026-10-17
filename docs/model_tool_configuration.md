@@ -161,7 +161,7 @@ reversible = false
 默认已内置目录，普通比较无需生成本地文件。需要独立维护覆盖时：
 
 ```bash
-python -m experiments.generate_tool_metadata --output config/tools.local.toml
+python -m experiments.tools.generate_tool_metadata --output config/tools.local.toml
 ```
 
 该命令核对AgentDojo0.1.35/v1.2工具覆盖，再**复制仓库审核目录**，不调用模型、不通过训练或工具名字自动猜分类；已有目标文件默认拒绝覆盖。--force会替换已有本地分类，不应拿它代替人工核对自定义工具。
@@ -169,7 +169,7 @@ python -m experiments.generate_tool_metadata --output config/tools.local.toml
 只读检查所用目录（不生成文件、不调用模型）：
 
 ```python
-from experiments.generate_tool_metadata import validate_catalog
+from experiments.tools.generate_tool_metadata import validate_catalog
 
 catalog = validate_catalog()  # 校验内置AgentDojo完整目录
 print("classified tools:", len(catalog))
@@ -180,7 +180,7 @@ print("classified tools:", len(catalog))
 
 ## 5. 运行控制：默认值、用途及设置入口
 
-下表列出的 partial CLI 开关也适用于全量 `experiments.run_benchmark`；两者共用执行与报告流程，仅任务范围和默认输出根不同。两入口均支持 `--suites travel banking slack` 跳过workspace，默认四场景；full保留所选场景全部注册任务，partial保留前三个任务前缀，示例见 [评测指南](./evaluation.md#对照与输出)。完整框架/baseline命令见 [全量测试指南](./full_benchmark.md)。`use_sandbox` 等仅 API/网页控制仍不因此新增同名 CLI。
+下表列出的 partial CLI 开关也适用于全量 `experiments.run_benchmark`；两者共用执行与报告流程，仅任务范围和默认输出根不同。两入口均支持 `--suites travel banking slack` 跳过workspace，默认四场景；full保留所选场景全部注册任务，partial保留前三个任务前缀，示例见 [小批量测试指南](./partial_benchmark.md#对照与输出)。完整框架/baseline命令见 [全量测试指南](./benchmark.md)。`use_sandbox` 等仅 API/网页控制仍不因此新增同名 CLI。
 
 | 控制 | 默认 | 可设置入口 / 作用 |
 | --- | --- | --- |
@@ -191,7 +191,7 @@ print("classified tools:", len(catalog))
 | planning_tool_view | true | factory/API、网页、partial --no-tool-view；关掉展示完整目录，执行授权仍检查 |
 | delegated_tasks | true | factory/API、网页、partial --no-delegated-tasks；有界明确执行文件/唯一邮件/指定网页任务，不把普通返回变成任务 |
 | use_security_checker | true | factory/API、网页、partial --no-checker；整个L3语义审计开关 |
-| audit_router_mode | off | factory/API、partial --audit-router-mode off/shadow/selective；off仍运行原L3，shadow观察，selective需兼容校准artifact |
+| audit_router_mode | API/factory off；DSCG CLI shadow | full/partial CLI未显式指定时，baseline/NoChecker为off，其余为shadow；显式不兼容组合报错。off仍运行原L3，shadow观察，selective需兼容artifact |
 | audit_router_artifact | None | factory/API、partial --audit-router-artifact PATH；独立标签/分组校准产生，不由模型置信度自动生成；默认不需要 |
 | audit_retries | 0 | factory/API、partial --audit-retries 0/1；仅语义abstain有界重审，普通比较保持0，不是SDK传输重试设置 |
 | completion_prompt | false | factory/API、partial --completion-prompt；历史可选提示，当前普通比较保持关闭 |
@@ -219,4 +219,4 @@ L1投影仅支持原生银行月支出请求与完整Transaction返回，最多3
 | DELEGATED_* | 有限执行句式/限制、注册reader、源是否唯一且成功监控读取、1536/2048/16384长度；仅总结文件不会展开权限 |
 | router设off仍有审计成本 | off只关新增免审路由；关闭整个L3需NoChecker对照，不能混淆两种实验 |
 
-先完成无需API的配置解析/schema/风险目录检查，再由测试者运行有限的干净工具任务与JSON协议检查，最后做匹配attack对照。以上离线检查只确认字段/覆盖，不证明模型理解正确、任务完成或安全有效。其他攻击选择、结果目录和评分口径见 [评测指南](./evaluation.md)。
+先完成无需API的配置解析/schema/风险目录检查，再由测试者运行有限的干净工具任务与JSON协议检查，最后做匹配attack对照。以上离线检查只确认字段/覆盖，不证明模型理解正确、任务完成或安全有效。其他攻击选择、结果目录和评分口径见 [测试文件索引](./evaluation.md)。

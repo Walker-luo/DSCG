@@ -8,12 +8,12 @@
 
 - [README](./README.md) 保留当前架构、默认行为、限制和运行入口。
 - 本文集中维护参数决策、校准流程、验证优先级与后续方向。
-- [模型、工具与运行参数详解](./docs/model_tool_configuration.md) 维护配置获取、字段含义与固定源码边界；[评测指南](./docs/evaluation.md) 维护具体运行与结果口径。
+- [模型、工具与运行参数详解](./docs/model_tool_configuration.md) 维护配置获取、字段含义与固定源码边界；[测试文件索引](./docs/evaluation.md) 提供运行指南、配置和结果文件导航。
 - 各层的设计细节与未完成项继续见 [L1](./workshop/L1_opt.md)、[L2](./workshop/L2_opt.md)、[L3](./workshop/L3_checker_opt.md)，本文不复制完整实现说明。
 
 ## 1. 需要作出的参数决策
 
-当前 L3 语义审计开启，新增算法路由默认 `off`；没有真实独立校准集或可部署阈值。首先确定风险和验收要求，再由数据决定是否能够启用免审。
+当前L3语义审计开启；测量CLI的DSCG默认shadow（仅观测），API/factory默认off；没有真实独立校准集或可部署阈值。首先确定风险和验收要求，再由数据决定是否能够启用免审。
 
 | 待决项 | 含义 | 确定方法与约束 |
 | --- | --- | --- |
@@ -60,6 +60,8 @@
 
 ### 3.1 数据与校准步骤
 
+当前测量CLI的DSCG默认shadow；API/factory仍默认off。做CLI的off对照时显式指定 `--audit-router-mode off`，并固定同轮其余配置。
+
 - [ ] **冻结参考配置。** 记录源码 revision 与工作树哈希、主/审计模型公开配置、服务返回的模型标识（如可获取）、工具目录/schema、提示、L1/L2 模式和输入边界。服务真实修订无法固定时明确限制。
 - [ ] **运行 shadow。** 完整保留原审计，分开统计元数据候选、完整硬资格、各回退原因、分数分布、审计 Tokens 和全链延迟。无有效 artifact 时现有 `would_bypass=false`，不能将其当作没有低分候选；应从资格与分数分析潜力。
 - [ ] **建立独立标签。** 仅 `safe_and_sufficient` 算可免审；`unsafe`、`insufficient_or_ambiguous`、`unjudgeable` 都算不应免审。基础设施错误、无效样本另外记录，不静默作为安全样本。
@@ -68,7 +70,7 @@
 - [ ] **校准并生成 artifact。** 使用现有数据构建和校准工具；标签、分组、版本或兼容域不满足要求时停止启用。校准器能检查格式与部分一致性，不能证明人工标签正确或发现所有隐藏相关性。
 - [ ] **开展冻结后的 selective/off 匹配验证。** 独立核查真实工具轨迹、环境终态、效用、安全、总 Tokens 和延迟；shadow 上的统计结论不直接认证改变后的轨迹或适应性攻击。
 
-现有工具：[数据构建](./experiments/l3_router_dataset.py)、[阈值校准](./experiments/calibrate_l3_router.py)、[算法实现](./dscg/audit_router.py)。数据格式与调用方式沿用 [L3 方案](./workshop/L3_checker_opt.md)，不在本文填写尚未选定的风险数值或执行新模型实验。
+现有工具：[数据构建](./experiments/calibration/l3_router_dataset.py)、[阈值校准](./experiments/calibration/calibrate_l3_router.py)、[算法实现](./dscg/audit_router.py)。数据格式与调用方式沿用 [L3 方案](./workshop/L3_checker_opt.md)，不在本文填写尚未选定的风险数值或执行新模型实验。
 
 ### 3.2 校准目标与样本量
 
@@ -134,7 +136,7 @@ m_{\min}=\left\lceil\frac{\log(\delta/K)}{\log(1-\epsilon)}\right\rceil.
 | 顺序 | 工作 | 交付与继续条件 |
 | --- | --- | --- |
 | P0 | 核查真实评测与成本口径 | 在既有 E0 工作范围内核查 payload 送达、真实轨迹与环境终态；有效/错误/无效分母分开；成本记录完整且配置可比后再作收益归因。 |
-| P1 | 验证各层及现有改动的增量 | 原生 baseline、完整框架与逐层关闭对照采用匹配任务/攻击/模型配置；先小范围检查可归因差异，再决定扩大重复实验。L3 路由保持 off。 |
+| P1 | 验证各层及现有改动的增量 | 原生 baseline、完整框架与逐层关闭对照采用匹配任务/攻击/模型配置；先小范围检查可归因差异，再决定扩大重复实验。L3路由显式指定 `--audit-router-mode off`，不依赖CLI默认值。 |
 | P2 | 验证 L1 投影价值 | 比较无 L1、旧来源标记与 projected，分别报告适用子集和总体。若要归因于任务选字段，补齐 L1 方案中的同字符预算非任务裁剪对照及四臂验证，实际 Token 差异另报；不能仅凭文本变短宣称机制收益。 |
 | P3 | 改善 L2 授权质量 | 工具视图 A0/A1 对照两组均关闭任务展开，固定 L1/L3；host profile 和任务文件另设有限案例，检查准备读取、条件工具及撤销旧授权。 |
 | P4 | 判断 L3 路由是否值得校准 | 先完成 shadow 的完整资格、成本覆盖与独立组评估。有实质成本空间且标签/样本可获得时，才进入阈值校准与 selective 验收。 |

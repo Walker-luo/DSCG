@@ -1,1 +1,0 @@
-../workshop/archive/original_documents/DSCG/docs/framework_v2_followup_report.md

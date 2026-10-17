@@ -8,7 +8,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from experiments.i3_p0_stress import REQUIRED_CASES, FIXTURE_PATH, audit_i3, main, write_report
+from experiments.diagnostics.i3_p0_stress import REQUIRED_CASES, FIXTURE_PATH, audit_i3, main, write_report
 from dscg.pipelines.defended import (ActionLedger, ActionState, PermissionSandbox,
                                      ReferenceMonitor, TicketedToolsExecutor)
 from agentdojo.functions_runtime import EmptyEnv, FunctionCall, FunctionsRuntime
@@ -17,7 +17,7 @@ from agentdojo.functions_runtime import EmptyEnv, FunctionCall, FunctionsRuntime
 class I3P0StressTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        from experiments.i3_p0_stress import _RecoveryModel
+        from experiments.diagnostics.i3_p0_stress import _RecoveryModel
         cls.original_model_query = staticmethod(_RecoveryModel.query)
         with redirect_stdout(io.StringIO()):
             cls.report = audit_i3()
@@ -106,7 +106,7 @@ class I3P0StressTests(unittest.TestCase):
 
     def test_no_go_requires_all_samples_and_assertions_to_pass(self):
         # A run with only safe paths can be no_go; a broken/empty run cannot.
-        from experiments.i3_p0_stress import summarize_records
+        from experiments.diagnostics.i3_p0_stress import summarize_records
         records = self.report["records"]
         safe = [r for r in records if r["outcome"] != "scope_violation"]
         self.assertEqual(summarize_records(safe)["status"], "no_go")
@@ -151,7 +151,7 @@ class I3P0StressTests(unittest.TestCase):
                     audit_i3(path)
 
     def test_sample_errors_are_retained_and_never_become_no_go(self):
-        with patch("experiments.i3_p0_stress._run_recovery", side_effect=RuntimeError("offline error")), redirect_stdout(io.StringIO()):
+        with patch("experiments.diagnostics.i3_p0_stress._run_recovery", side_effect=RuntimeError("offline error")), redirect_stdout(io.StringIO()):
             report = audit_i3()
         self.assertEqual(report["status"], "partial")
         self.assertEqual(report["counts"]["total"], 24)
@@ -180,8 +180,8 @@ class I3P0StressTests(unittest.TestCase):
 
     def test_error_report_preserves_partial_effects_and_ledger(self):
         # Force a failure after the initial batch, when an effect already exists.
-        with patch("experiments.i3_p0_stress._RecoveryModel.query", autospec=True) as query, redirect_stdout(io.StringIO()):
-            from experiments.i3_p0_stress import _RecoveryModel
+        with patch("experiments.diagnostics.i3_p0_stress._RecoveryModel.query", autospec=True) as query, redirect_stdout(io.StringIO()):
+            from experiments.diagnostics.i3_p0_stress import _RecoveryModel
             original = self.original_model_query
             def fail_after_initial(model, *args):
                 if model.step == 1:
@@ -196,7 +196,7 @@ class I3P0StressTests(unittest.TestCase):
         self.assertEqual([a["state"] for a in record["actions"]], ["executed", "failed"])
 
     def test_ticket_fixture_runtime_forwards_object_and_destination_arguments(self):
-        from experiments.i3_p0_stress import _runtime
+        from experiments.diagnostics.i3_p0_stress import _runtime
         effects = []
         runtime = _runtime(effects)
         self.assertEqual(runtime.run_function(EmptyEnv(), "safe_tool", {"record_id": "all-records"})[1], None)

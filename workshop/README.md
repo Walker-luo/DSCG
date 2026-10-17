@@ -6,15 +6,17 @@
 
 | 方案 / 阶段 | 已完成 | 尚未完成或未采用 |
 | --- | --- | --- |
-| [全量入口场景选择](./completed/full_suites_20261017.md) · [用法](../docs/full_benchmark.md#1-使用哪个入口) | full/partial共用--suites；full保留所选场景全部任务，兼容clean/cohort/导出；385项离线回归 | 场景子集不是四场景全量；无真实模型/费用收益测量 |
+| [Experiments目录归类](./completed/experiments_layout_20261017.md) · [入口索引](../experiments/README.md) | 顶层三个日常入口；共享实现、诊断、校准与工具分目录，已知旧预检严格兼容；391项离线回归 | 无真实模型或费用/安全收益验证；专项fixture与历史证据保留 |
+| [测试指南拆分与CLI默认值](./completed/docs_benchmark_structure_20261017.md) · [测试索引](../docs/evaluation.md) | benchmark/partial分开，公共说明集中；CLI默认shadow、baseline/NoChecker off；389项离线回归 | 未调用真实模型；保留原档与用户删除，既有plan/report缺失引用另列 |
+| [全量入口场景选择](./completed/full_suites_20261017.md) · [用法](../docs/benchmark.md#1-使用哪个入口) | full/partial共用--suites；full保留所选场景全部任务，兼容clean/cohort/导出；385项离线回归 | 场景子集不是四场景全量；无真实模型/费用收益测量 |
 | [experiments/docs整理](./completed/experiments_docs_cleanup_20261017.md) · [当前实验入口](../experiments/README.md) | 退役8个旧文件、清理生成缓存、索引与文档去重；原始字节归档 | 不改变运行/评分；早期迁移快照校验已有README哈希冲突，单独保留记录 |
-| [Partial 冻结目标筛选](./completed/partial_cohort_20261017.md) · [用法](../docs/evaluation.md#对照与输出) | `--cohort`只过滤原前三个注入目标，保留前三个用户；partial_screened明确分母；381项离线回归 | 未调用真实模型或证明费用/安全收益；与全量screened范围不同 |
-| [Partial 场景选择](./completed/partial_suites_20261017.md) · [用法](../docs/evaluation.md#对照与输出) | 可跳过workspace，按所选场景导出/计分/绑定范围；375项离线回归 | 优化子集不代表四场景完整评测；未运行真实模型或测量实际节省费用 |
+| [Partial 冻结目标筛选](./completed/partial_cohort_20261017.md) · [用法](../docs/partial_benchmark.md#对照与输出) | `--cohort`只过滤原前三个注入目标，保留前三个用户；partial_screened明确分母；381项离线回归 | 未调用真实模型或证明费用/安全收益；与全量screened范围不同 |
+| [Partial 场景选择](./completed/partial_suites_20261017.md) · [用法](../docs/partial_benchmark.md#对照与输出) | 可跳过workspace，按所选场景导出/计分/绑定范围；375项离线回归 | 优化子集不代表四场景完整评测；未运行真实模型或测量实际节省费用 |
 | [预检进度与统一入口](./completed/injection_progress_20261016.md) · [指南](../docs/injection_precheck.md) | 即时进度/15秒等待提示、已知旧状态兼容、run_benchmark --cohort、明确screened范围；369项离线回归 | 未执行新的真实模型预检/攻击；需同步服务器并用新测量name执行匹配对照 |
 | [Injection 目标预检](./completed/injection_precheck_20261016.md) · [用户指南](../docs/injection_precheck.md) | 独立目标预检、兼容历史复用、失败复测、冻结名单与全用户/筛选目标测量；离线358/358 | 未运行新的模型预检/攻击；筛选子集不是全量结果，不证明安全收益或E0通过 |
 | [准备读取诊断及候选撤回](./completed/read_discovery_20261016.md) · [配对清单](./completed/read_discovery_20261016_manifest.json) | 有限模型审计28+28、L1延续4次；候选18/28→22/28但新增误拒，已撤回；保留JSON请求预检查 | 未恢复TSR，未运行新全量clean/攻击；默认v3.1，准备读取/相关来源的稳定判定仍待解决 |
 | [Clean通用误伤修正](./completed/clean_utility_20261015.md) · [已实施计划](./completed/clean_utility_opt_20261015.md) | L3有界相关调用—返回证据、大小比较完整元数据；L2明确邮件/网页来源；L1来源澄清；v2输入兼容绑定 | 全量clean/攻击及重复真实模型验收待完成，约5pp是目标，不宣称TSR恢复 |
-| [全量benchmark同步](./completed/full_benchmark_20261015.md) · [测试指南](../docs/full_benchmark.md) | 全任务范围、原生baseline/clean、多攻击、当前控制、隔离输出、配置绑定和统一报告；partial前缀保留 | 该工程阶段仅离线验证；当前另有用户全量clean导出，重复/攻击/研究闸门验收仍待完成 |
+| [全量benchmark同步](./completed/full_benchmark_20261015.md) · [测试指南](../docs/benchmark.md) | 全任务范围、原生baseline/clean、多攻击、当前控制、隔离输出、配置绑定和统一报告；partial前缀保留 | 该工程阶段仅离线验证；当前另有用户全量clean导出，重复/攻击/研究闸门验收仍待完成 |
 | [L1有限投影实施](./completed/l1_projection_20261013.md) · [计划](./completed/L1_projection_implementation_plan_20261013.md) | 原生银行月支出六字段/全行投影、严格回退、模式/缓存/路由绑定、原文审计与平台默认同步 | 仅一个有限profile；真实四臂安全/效用/Token验收与更广输出适配仍待完成，未宣称新颖性 |
 | [Dashboard v2.2显示同步](./completed/dashboard_v22_20261013.md) | 引擎版本动态读取、L1/L3规则、普通/委托流程预览、路由与成本状态、窄屏验收 | 无新防御机制、模型评测、网页CSA控件或失败片段浏览器 |
 | [防御下降诊断与修复](./completed/defense_regression_analysis_20261012.md) · [最新复核](./completed/l2_docs_sync_20261013.md) | L1概述/外发规则与L3正文审查；19/19探针、12攻击+3干净任务；当前已记录144条v2.2：TSR130/144、nativeASR0/144 | 单次观察；重复匹配、独立终态与因果/成本验收未完成；原144条历史诊断不改写 |

@@ -5,18 +5,18 @@
 | [项目 README](../README.md) | 当前three-layer-v3.1三层框架、使用命令和能力边界 |
 | [实验工具索引](../experiments/README.md) | 当前测量、校准、元数据与审计入口；区分入口与共享实现 |
 | [模型、工具与运行参数](./model_tool_configuration.md) | 配置字段、信息获取、工具schema/风险分类、默认控制及排错 |
-| [评测指南](./evaluation.md) | 模型配置、全部可选攻击、对照与日志口径 |
-| [全量测试指南](./full_benchmark.md) | 当前框架与原生无防御 baseline、全部任务/攻击规模、运行命令、缓存及结果核对 |
+| [测试文件索引](./evaluation.md) | 测试指南、主要入口、配置与结果文件的用途 |
+| [完整任务测试指南](./benchmark.md) | run_benchmark的baseline/DSCG、clean、场景/cohort、公共攻击与指标口径 |
+| [小批量测试指南](./partial_benchmark.md) | run_partial_benchmark的3×3前缀、场景/cohort、shadow与续跑 |
 | [Injection 目标预检](./injection_precheck.md) | 实时进度、失败复测、旧状态续跑与冻结名单；full/partial各自支持cohort |
 | [框架与平台交接](./framework_updates.md) | 当前L2默认/可选能力、L1/L3后续修订、网页已接线与待办 |
 | [Dashboard 指南](./dashboard.md) | 历史筛选、多版本对比及分析导出 |
-| [I3 P0 压力测试报告](./i3_p0_stress_report.md) | 当前 `partial` 证据；未实现对象/数据范围约束 |
 | [Workshop 索引](../workshop/README.md) | 优化计划、调研、当前报告和历史归档 |
 
 阶段验收报告、旧版项目介绍、旧图表及提示词草稿已移至 [历史归档](../workshop/archive/project_structure_20261008/README.md)。归档保留原始字节，不作为当前框架说明。
 
-硬编码旧数据绘图和阶段专用模型探针已从experiments退役，见 [2026-10-17清理归档](../workshop/archive/experiments_docs_cleanup_20261017/README.md)。当前文档只保留配置、评测、预检、平台与I3说明，阶段过程与历史统计从workshop查阅。
+硬编码旧数据绘图和阶段专用模型探针已从experiments退役，见 [2026-10-17清理归档](../workshop/archive/experiments_docs_cleanup_20261017/README.md)。当前文档只保留配置、评测、预检、平台说明，阶段过程与历史统计从workshop查阅。
 
-`framework_v2_followup_report.md` 仅保留为兼容链接，供已有三层调研引用原版本；当前阅读使用 [workshop 中的报告](../workshop/completed/framework_v2_followup_report.md)。其余旧入口退役情况与原哈希见[清理清单](../workshop/artifacts/20261008_project_structure/structure_manifest.json)。
+V2历史报告从 [workshop报告](../workshop/completed/framework_v2_followup_report.md)查阅。已移除的旧docs报告与兼容别名不恢复，也不列作当前入口。
 
 本目录不存优化计划或 agent 测试产物；测试源码在 `tests/`，新产物固定在 `workshop/artifacts/<YYYYMMDD>_<task>/`。

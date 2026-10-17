@@ -8,9 +8,11 @@
 
 | 材料 | 已完成 / 当前保留 | 未完成、撤回或仅为设计 |
 | --- | --- | --- |
+| [Experiments目录归类](./experiments_layout_20261017.md) · [入口索引](../../experiments/README.md) | 三个日常入口保留原命令，其余归入common/diagnostics/calibration/tools；391项离线回归 | 没有新增模型结果，I3/E0状态及既有实验身份保留 |
+| [测试指南结构整理](./docs_benchmark_structure_20261017.md) · [测试索引](../../docs/evaluation.md) | 分开完整任务与partial运行说明；同步CLI shadow默认与baseline/NoChecker兼容 | 无真实模型或收益验证；原始文档及历史证据保持可追溯 |
 | [预检进度与统一benchmark入口](./injection_progress_20261016.md) | screen实时进度/15秒等待、旧状态与名单兼容、统一--cohort、screened元数据、薄兼容转发；369/369离线通过 | 真实服务器预检/筛选攻击待执行，未产生新模型结果或安全收益 |
 | [Injection 目标预检与筛选测量](./injection_precheck_20261016.md) · [用户指南](../../docs/injection_precheck.md) | 独立screen/benchmark、兼容复用/失败复测、冻结分母与错误/成本记录；358项离线回归 | 真实服务器预检和筛选后的匹配攻击实验待执行，直接失败不证明间接攻击不可能 |
-| [全量benchmark入口同步](./full_benchmark_20261015.md) · [用户指南](../../docs/full_benchmark.md) | 复用执行/报告流程、全部注册任务、baseline/clean/攻击选择、当前控制与绑定；318项离线检查通过 | 未运行真实全量模型实验，不证明防御率/成本收益或E0通过 |
+| [全量benchmark入口同步](./full_benchmark_20261015.md) · [用户指南](../../docs/benchmark.md) | 复用执行/报告流程、全部注册任务、baseline/clean/攻击选择、当前控制与绑定；318项离线检查通过 | 未运行真实全量模型实验，不证明防御率/成本收益或E0通过 |
 | [L1有限投影实施](./l1_projection_20261013.md) · [计划](./L1_projection_implementation_plan_20261013.md) | 原生银行月支出六字段/全行投影、严格回退、模式/缓存/路由绑定、原文审计与平台默认同步 | 仅一个有限profile；真实四臂安全/效用/Token验收与更广输出适配仍待完成，未宣称新颖性 |
 | [Dashboard v2.2显示同步](./dashboard_v22_20261013.md) | 动态引擎版本、L1/L3规则、有效流程预览、历史版本/路由/成本状态、桌面与窄屏验收 | 无新模型评测或运行机制；网页CSA控制和失败片段浏览器仍未实施 |
 | [防御下降诊断与修复](./defense_regression_analysis_20261012.md) · [后续复核](./l2_docs_sync_20261013.md) | 定向验证保留；当前已记录144条v2.2：TSR130/144、nativeASR0/144 | 原报告是2026-10-12快照；当前重复控制、独立终态与因果/成本验收仍待完成，旧哈希不改写 |
@@ -32,7 +34,7 @@
 
 L2原始工程报告和计划保留为当时v2的实施记录，当前v2.2状态读 [后续复核](./l2_docs_sync_20261013.md)；未验收的 [L2方案](../L2_opt.md)仍在顶层。
 
-仍待真实数据与收益验收的 [L3 Checker](../L3_checker_opt.md) 与 [授权对照校准（历史归档）](../archive/framework_docs_cleanup_20261010/originals/workshop/original_framework_direction_20261008.md) 留在 [顶层索引](../README.md)。正式E0/I3/I2状态以 [研究路线](../../../research/technical_route.md) 和 [I3报告](../../docs/i3_p0_stress_report.md) 为准。
+仍待真实数据与收益验收的 [L3 Checker](../L3_checker_opt.md) 与 [授权对照校准（历史归档）](../archive/framework_docs_cleanup_20261010/originals/workshop/original_framework_direction_20261008.md) 留在 [顶层索引](../README.md)。正式E0/I3/I2状态以 [研究路线](../../../research/technical_route.md) 和 [I3交接记录](../../../research/Experiments/implementation_status.md) 为准。
 
 旧稿件与CFP：[投稿草案](../archive/legacy_submission/ALMML_sub.md)、[原附件](<../archive/legacy_submission/AIMLL WS.pdf>)；旧docs/图表见 [归档索引](../archive/project_structure_20261008/README.md)。旧证据位于 [workshop/results/](../results/framework_optimization/)，所有新输出放 `workshop/artifacts/`。
 

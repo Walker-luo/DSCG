@@ -31,7 +31,7 @@ from dscg.paths import DASHBOARD_RESULTS_DIR, RESULTS_DIR
 from dscg.pipelines.baseline import make_openai_compatible_pipeline
 from dscg.pipelines.defended import make_defended_pipeline
 from dscg.tool_metadata import load_tool_metadata
-from experiments.harness_audit import rank_ids, security_result_fields
+from experiments.diagnostics.harness_audit import rank_ids, security_result_fields
 from dashboard.history_export import build_history_export
 from dashboard.evaluation import FRAMEWORK_VERSION, aggregate, display_metrics, normalize_config, trace_stats
 

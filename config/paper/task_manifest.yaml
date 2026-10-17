@@ -58,4 +58,4 @@ notes:
   - E0-HARNESS must emit the complete exact task IDs and valid pairing manifest before confirmatory execution.
   - The current partial entry takes the first two IDs and is not accepted as the frozen pilot selector.
   - Any unavailable task or attack must be recorded with a denominator status; it cannot be silently removed.
-  - Workshop offline harness selection and replay helpers live in experiments/harness_audit.py; this does not unlock I2.
+  - Workshop offline harness selection and replay helpers live in experiments/diagnostics/harness_audit.py; this does not unlock I2.

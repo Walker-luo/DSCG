@@ -14,7 +14,7 @@ from dscg.model_config import ModelConfig
 
 try:
     from experiments import run_injection_precheck as precheck
-    from experiments import injection_cohort as cohort_module
+    from experiments.common import injection_cohort as cohort_module
 except ImportError:
     precheck = None
 
@@ -362,6 +362,28 @@ class InjectionPrecheckTests(unittest.TestCase):
         with patch.object(cohort_module, 'source_revision', return_value=current), self.assertRaises(ValueError):
             self.screen()
         self.assertEqual(len(self.suite.executed), 3)
+
+    def test_pre_relocation_cohort_resumes_without_rewriting_or_repeating_goals(self):
+        self.screen()
+        previous = json.loads((Path(__file__).with_name('fixtures') /
+                               'experiments_layout_source_20261017.json').read_text())
+        binding = precheck._binding(self.config, ['workspace'])
+        binding.update(previous)
+        cohort = self.cohort()
+        cohort['binding'] = binding
+        cohort['cohort_sha256'] = precheck._digest({k: v for k, v in cohort.items() if k != 'cohort_sha256'})
+        cohort_path = self.output / 'cohort.json'
+        cohort_path.write_text(json.dumps(cohort))
+        manifest = self.output / 'screen_manifest.json'
+        manifest.write_text(json.dumps(binding))
+        originals = {p: p.read_bytes() for p in [manifest, cohort_path, *self.output.rglob('attempt.json')]}
+        self.assertEqual(self.screen(), 0)
+        self.assertEqual(self.suite.executed, ['injection_task_0', 'injection_task_1', 'injection_task_1'])
+        for p, data in originals.items():
+            self.assertEqual(p.read_bytes(), data)
+        current = precheck._binding(self.config, ['workspace'])
+        binding['screening_script_sha256'] = '0' * 64
+        self.assertFalse(cohort_module._bindings_compatible(binding, current))
 
     def test_legacy_compatibility_rejects_unknown_added_runtime_source(self):
         binding = self.legacy_binding()

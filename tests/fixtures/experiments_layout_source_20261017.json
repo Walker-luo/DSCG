@@ -1,0 +1,30 @@
+{
+  "source": {
+    "commit": "8c591e27390c77614dbf4d1ff46f98428c8b5e30",
+    "source_sha256": {
+      "dscg/__init__.py": "ac228319829d4f1c4b9e32d904efaa78065f7f7fd6da1086a5a181c7515bd961",
+      "dscg/audit_context.py": "1a8cb9dd553963734dfba41cd8054cf0b0e1a0f8a6500ab0753694a306dd538b",
+      "dscg/audit_router.py": "750c718ad0bc951b291113a8da795e44a73fd6d23abb658c0b0bac53b718aa98",
+      "dscg/harness_records.py": "679c446a89d2e668145ece1d7d5b82ac268580f9004e71c43b7bdbfc0fa405a7",
+      "dscg/input_isolation.py": "3bfdd29882b7eb45f77705c0e68db653fae5b45914a3b89135a1c8af81b663e0",
+      "dscg/l1_projection.py": "abec0602e5813443b90ceef9fea456ba8dc2e8efdb4bbf2b658db8aadc29239c",
+      "dscg/l2_authorization.py": "f1d11ce9abddd765bd76812904ccbc1e328604e13a356844400c75823b50686b",
+      "dscg/model_config.py": "fb2d7bf48d6507dbcbb15ffc15f3f05582ceefd6e376a4e0d2d7b37f4f83f620",
+      "dscg/paths.py": "be9445576a972e722be89834b72b0717f4e1475adf12fd601803f8660187ae13",
+      "dscg/pipelines/__init__.py": "35dca586fe37f5229ec2c13805a2b46b46d342a272ed24ffde7df2cafc0b2209",
+      "dscg/pipelines/baseline.py": "253d8b1581749a30dec0c953e5f4bdafdf9693a5d5e42b291b1c2f2bc321cfcd",
+      "dscg/pipelines/defended.py": "e0eec15ba00c96f85fcc0c1ab7b603ee47562e3e7e4d986843708d1a8bfe3d8c",
+      "dscg/token_tracking.py": "6518055d80f31145f539360c61ef403b55515cdd0832df01f8e56042dc604728",
+      "dscg/tool_metadata.py": "9802d5af6f1882b81ba747583fc612959fb5e68e89182ab24c4ecb51b9d441f1",
+      "experiments/partial_controls.py": "4a5b8264ae1b906d621730b78a329c583f36cfd05226040280c6786939dc4bde",
+      "experiments/run_partial_benchmark.py": "23141f4ac84d7c3d4b211abb6d03bb03b51cc93a26c49ba0c7cfba5dc1dbb6a1",
+      "experiments/run_benchmark.py": "2de1422ee54ae7fc327d9bfbd76d93b107d8647238ecd33c15cb52c685c59640",
+      "experiments/run_injection_precheck.py": "f045f75aeb39ca922e8098c38057aeb1b72ab74cd99e907d6e2072589d842488",
+      "experiments/injection_cohort.py": "501494510da724e51920f5a894ba35191987f36df4454a2afcaeaa7869a9f79c",
+      "experiments/injection_cohort_compatibility.json": "0d3f6f60616ca52d47c487e25d655534722e9b42131761817332fdaacd19e667"
+    },
+    "python": "3.10.21",
+    "agentdojo": "0.1.35"
+  },
+  "screening_script_sha256": "f045f75aeb39ca922e8098c38057aeb1b72ab74cd99e907d6e2072589d842488"
+}

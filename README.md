@@ -33,7 +33,7 @@ flowchart TD
 
 2026-10-15 clean 导出的相同97个任务中，baseline成功90个、原v3成功69个；这是修正前的单次观察。v3.1优先修复L3证据截断/调用参数缺失与准备读取判断，L2补充必要附带效果和明确邮件/网页任务源，L1仅澄清用户与工具数据的来源。**相对同轮baseline下降约5个百分点以内是待验证目标，不是当前成绩**；不按任务ID或标准答案补规则，不增加模型、默认重审或免审。
 
-L3改为当前任务内最多8条调用—返回对（保留最近4条，再补充相关旧证据），正文、调用参数与错误共享8192字符预算；删除候选且任务仅需文件大小比较时，可保留所有行的元数据并省略正文。遗漏、截断和省略均显式标记，仍是未认证事实。新增紧凑统计 `dscg_audit_evidence`；full trace保留实际输入。输入协议更新为 `dscg.audit-input.v2`，旧路由artifact不能直接沿用，所有比较使用新run名。工程范围和限制见 [修正报告](./workshop/completed/clean_utility_20261015.md)，全量命令见 [测试指南](./docs/full_benchmark.md)。
+L3改为当前任务内最多8条调用—返回对（保留最近4条，再补充相关旧证据），正文、调用参数与错误共享8192字符预算；删除候选且任务仅需文件大小比较时，可保留所有行的元数据并省略正文。遗漏、截断和省略均显式标记，仍是未认证事实。新增紧凑统计 `dscg_audit_evidence`；full trace保留实际输入。输入协议更新为 `dscg.audit-input.v2`，旧路由artifact不能直接沿用，所有比较使用新run名。工程范围和限制见 [修正报告](./workshop/completed/clean_utility_20261015.md)，全量命令见 [测试指南](./docs/benchmark.md)。
 
 ### 每层具体负责什么
 
@@ -85,7 +85,7 @@ API 可传入 `ToolAuthorizationProfile`（[实现](./dscg/l2_authorization.py)�
 
 ### L3 可选纯算法路由
 
-L3 现在支持 `off / shadow / selective`，默认 `off`。本地路由采用固定字符三元组公式：任务—工具距离、参数新颖度、不可信支持增量和近期失败比例取最大值；不训练分类器，不调用小模型或 embedding，不增加 API Tokens。只有单个已授权、有效注册、internal、idempotent、无 sink 的读取可进入新增免审，个人/秘密读取、任何写入或外发仍完整审计。
+L3支持 `off / shadow / selective`。full/partial测量CLI的DSCG默认shadow，baseline/NoChecker未显式指定时为off；Python API/factory仍默认off。显式不兼容组合报错。本地路由采用固定字符三元组公式：任务—工具距离、参数新颖度、不可信支持增量和近期失败比例取最大值；不训练分类器，不调用小模型或 embedding，不增加 API Tokens。只有单个已授权、有效注册、internal、idempotent、无 sink 的读取可进入新增免审，个人/秘密读取、任何写入或外发仍完整审计。
 
 低分本身不会免审：还要匹配冻结的工具/schema/模型配置，并通过独立任务组标签的阈值校准。`shadow` 只观察分数，保留原审计；`selective` 命中才省去本次审计，仍由 Monitor 验证一次性路由凭据和执行票据。无有效 artifact 或样本不足得到 `threshold=null` 时继续完整审计。当前没有部署阈值或真实节省结论，词面信号不认证事实或参数来源。
 
@@ -145,11 +145,11 @@ conda activate ipi
 cp config/models.example.toml config/models.local.toml
 ```
 
-在本地 TOML 中配置 `[main]`、`[security]` 的 provider、model_id 和 api_key_env，再设置对应 Key 环境变量；省略 `[security]` 会复用主模型。不要提交本地配置或凭证。项目使用 Python 3.10、AgentDojo 0.1.35；详细配置见[模型、工具与运行参数详解](./docs/model_tool_configuration.md)：解释模型字段/API Key获取、工具参数schema查看、六项风险元数据的作用、可选运行参数及离线检查；评测步骤见[评测指南](./docs/evaluation.md)。
+在本地 TOML 中配置 `[main]`、`[security]` 的 provider、model_id 和 api_key_env，再设置对应 Key 环境变量；省略 `[security]` 会复用主模型。不要提交本地配置或凭证。项目使用 Python 3.10、AgentDojo 0.1.35；详细配置见[模型、工具与运行参数详解](./docs/model_tool_configuration.md)：解释模型字段/API Key获取、工具参数schema查看、六项风险元数据的作用、可选运行参数及离线检查；测试文件与指南见[测试文件索引](./docs/evaluation.md)。
 
 ## 对比测试
 
-**全部任务的正式对照使用 `experiments.run_benchmark`**，当前框架与无防御 baseline 的命令、任务/攻击规模和续跑方法见 [全量测试指南](./docs/full_benchmark.md)。下面的 partial 命令仅用于小规模回归。
+**全部任务的正式对照使用 `experiments.run_benchmark`**，当前框架与无防御 baseline 的命令、任务/攻击规模和续跑方法见 [全量测试指南](./docs/benchmark.md)。下面的 partial 命令仅用于小规模回归。
 
 需要先检查攻击目标是否可直接完成时，使用 [Injection 目标预检](./docs/injection_precheck.md) 的 `run_injection_precheck screen`：提供实时进度、兼容旧预检复用、失败复测和冻结名单。后续测量统一使用 `run_benchmark`，加 `--cohort PATH` 时保留全部 user tasks 并记录为 screened 子集；不加时仍为完整 full。两类结果分别命名、分别报告。
 
@@ -169,7 +169,7 @@ baseline 使用原生 AgentDojo 工具循环，不启用 DSCG 或安全模型；
 | `important_instructions` | 冒充用户，要求先完成攻击目标 | [AgentDojo 论文 §4.1–4.2][agentdojo-paper]及[AgentDojo 官方实现][agentdojo-baseline] |
 | `tool_knowledge` | 补充攻击所需工具顺序和参数提示 | [AgentDojo 官方实现][agentdojo-baseline] |
 
-典型集用于控制测试规模，不表示已验证攻击强度。可用 `--attack NAME [NAME ...]` 指定攻击，或 `--attack all` 显式运行全部自动攻击；`manual` 不可选。完整攻击表、消融和指标口径见[评测指南](./docs/evaluation.md)。
+典型集用于控制测试规模，不表示已验证攻击强度。可用 `--attack NAME [NAME ...]` 指定攻击，或 `--attack all` 显式运行全部自动攻击；`manual` 不可选。完整攻击表、消融和指标口径见[benchmark指南](./docs/benchmark.md#攻击选择)。
 
 默认 `summary` 足够用于对比。`--trace-level full` 保存详细诊断及压缩侧车，增加序列化和写入开销；按需排错时使用。正式对照还需匹配任务 ID、攻击、模型配置及预检口径，历史结果仅作参照。
 
@@ -179,7 +179,7 @@ baseline 使用原生 AgentDojo 工具循环，不启用 DSCG 或安全模型；
 results/partial_benchmark/<model_id>_<name>/<attack>/<suite>/
 ```
 
-每次 partial 运行还会在 `<model_id>_<name>/` 下生成 `summary.md`（attack × 场景指标、分母、Token 和失败案例位置）与 `failure_cases.jsonl`（逐例的失败标签、原始路径与有界片段）。TSR=false 和 ASR=true 分别记录；指标缺失/运行错误单列。详见[结果文件说明](./docs/evaluation.md#结果文件)。
+每次 partial 运行还会在 `<model_id>_<name>/` 下生成 `summary.md`（attack × 场景指标、分母、Token 和失败案例位置）与 `failure_cases.jsonl`（逐例的失败标签、原始路径与有界片段）。TSR=false 和 ASR=true 分别记录；指标缺失/运行错误单列。详见[结果文件说明](./docs/benchmark.md#结果文件)。
 
 ## Dashboard
 
@@ -197,9 +197,9 @@ python -m dashboard.app
 
 ```bash
 python -m unittest discover -s tests -v
-python -m experiments.i3_p0_stress \
+python -m experiments.diagnostics.i3_p0_stress \
   --output workshop/artifacts/20261008_offline_check/i3.json
-python -m experiments.harness_audit \
+python -m experiments.diagnostics.harness_audit \
   --fixture tests/fixtures/harness_audit_cases.json \
   --output workshop/artifacts/20261008_offline_check/e0.json
 ```

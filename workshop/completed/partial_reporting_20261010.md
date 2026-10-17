@@ -9,7 +9,7 @@
 - 仅读取需报告案例的原生 JSON。每例最多 6 个片段、每片最多 800 字符，保留 JSON pointer、字符范围及截断标记；任务描述/攻击目标各最多 400 字符。优先选错误、最后的助手文本、最近工具调用和精确注入匹配的工具返回，不复制完整案例。
 - 不覆盖原生任务 JSON；原有场景 JSON/TXT/CSV 和合并 TXT 保留。正常缓存读取也生成新报告，空失败集产生空 JSONL。异常保留本次已完成场景，不读未完成场景的残留旧统计。DoS 和无攻击的分母/含义继续单独展示。
 
-实现：[partial_reporting.py](../../experiments/partial_reporting.py)、[runner](../../experiments/run_partial_benchmark.py)；使用说明：[评测指南](../../docs/evaluation.md#结果文件)。
+实现：[partial_reporting.py](../../experiments/common/partial_reporting.py)、[runner](../../experiments/run_partial_benchmark.py)；使用说明：[评测指南](../../docs/benchmark.md#结果文件)。
 
 ## 验证
 

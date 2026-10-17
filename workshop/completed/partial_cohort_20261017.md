@@ -25,4 +25,4 @@ partial CLI/Python API新增 `--cohort`/`cohort_path`，复用共享cohort证据
 
 新增真实模型请求0、真实benchmark样本0；离线结果不是实际省费率、模型能力或安全收益证据。直接目标失败不能证明间接攻击不可能。E0 pending、I3 partial、I2 locked及closed路线保持原状。
 
-下一步：用户在服务器以同一cohort/场景启动新名称的partial baseline与DSCG，核对附件中的实际分母。命令见 [评测指南](../../docs/evaluation.md#对照与输出)。
+下一步：用户在服务器以同一cohort/场景启动新名称的partial baseline与DSCG，核对附件中的实际分母。命令见 [小批量测试指南](../../docs/partial_benchmark.md#对照与输出)。

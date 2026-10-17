@@ -15,7 +15,7 @@ from agentdojo.task_suite import get_suite
 from dscg.paths import BENCHMARK_RESULTS_DIR
 from experiments import run_benchmark as full
 from experiments import run_partial_benchmark as shared
-from experiments.partial_controls import SUITES, make_task_manifest, select_tasks, source_revision
+from experiments.common.partial_controls import SUITES, make_task_manifest, select_tasks, source_revision
 from dscg.pipelines.defended import _append_full_trace
 
 
@@ -108,7 +108,7 @@ class FullCliTests(unittest.TestCase):
             self.assertEqual(run.call_args.kwargs['l1_projection_mode'], 'projected')
             self.assertTrue(run.call_args.kwargs['planning_tool_view'])
             self.assertTrue(run.call_args.kwargs['delegated_tasks'])
-            self.assertEqual(run.call_args.kwargs['audit_router_mode'], 'off')
+            self.assertEqual(run.call_args.kwargs['audit_router_mode'], 'shadow')
             self.assertEqual(run.call_args.kwargs['audit_retries'], 0)
             self.assertFalse(run.call_args.kwargs['completion_prompt'])
 

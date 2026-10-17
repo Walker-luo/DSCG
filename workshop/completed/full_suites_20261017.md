@@ -24,4 +24,4 @@ RED日志复现full CLI尚未提供--suites；GREEN模拟pipeline完整执行所
 
 新增真实模型请求0、真实benchmark样本0；计划数不是有效分母或费用节省结果。E0 pending、I3 partial、I2 locked及closed路线不变。历史cleanup/迁移清单保持原哈希，不用它们来认证本次新源码。
 
-下一步：用户以相同场景集合和攻击选择，用新名称运行匹配baseline与DSCG；需要筛选目标时两组使用同一cohort。命令见 [全量指南](../../docs/full_benchmark.md#1-使用哪个入口)。
+下一步：用户以相同场景集合和攻击选择，用新名称运行匹配baseline与DSCG；需要筛选目标时两组使用同一cohort。命令见 [全量指南](../../docs/benchmark.md#1-使用哪个入口)。

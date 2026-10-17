@@ -3,7 +3,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from experiments.harness_audit import audit_fixture_file
+from experiments.diagnostics.harness_audit import audit_fixture_file
 
 
 class HarnessAuditReplayTests(unittest.TestCase):

@@ -7,7 +7,7 @@ from pathlib import Path
 
 from dscg.paths import BENCHMARK_RESULTS_DIR
 from experiments import run_partial_benchmark as runner
-from experiments.partial_controls import SUITES
+from experiments.common.partial_controls import SUITES
 
 # Preserve helpers imported by older local callers.
 _safe_result_component = runner._safe_result_component
@@ -33,7 +33,7 @@ def main(
         if not run_attack or options.get('task_manifest_path'):
             raise ValueError('--cohort cannot be combined with clean or another task manifest')
         options.pop('task_manifest_path', None)
-        from experiments.injection_cohort import run_screened
+        from experiments.common.injection_cohort import run_screened
         return run_screened(cohort_path, model_id=model_id, sec_model_id=sec_model_id,
                             origin=origin, defense=defense, use_sandbox=use_sandbox,
                             use_security_checker=use_security_checker, suites=list(suites), **options)

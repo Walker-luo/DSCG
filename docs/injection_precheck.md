@@ -4,9 +4,9 @@
 
 这是**基于直接目标预检的筛选子集**，不能标为 AgentDojo 全量结果。直接请求失败不证明间接注入无法成功：模型可能主动拒绝直接请求，也可能在执行细节或原生评分上失败。筛选后的 ASR 与未筛选的 ASR 分母不同，不能直接混作防御收益。
 
-优化阶段也可用 `experiments.run_partial_benchmark --cohort PATH --suites travel banking slack --name <新名称>`。默认每场景3用户×3注入的前缀不变，只从原前三个注入目标中筛掉名单排除项，不补位；结果标记 `partial_screened`，默认保存到 `results/partial_benchmark/`。完整命令见 [评测指南](./evaluation.md#对照与输出)。本指南下方 `run_benchmark --cohort` 仍使用全部用户任务。
+优化阶段也可用 `experiments.run_partial_benchmark --cohort PATH --suites travel banking slack --name <新名称>`。默认每场景3用户×3注入的前缀不变，只从原前三个注入目标中筛掉名单排除项，不补位；结果标记 `partial_screened`，默认保存到 `results/partial_benchmark/`。完整命令见 [小批量测试指南](./partial_benchmark.md#对照与输出)。本指南下方 `run_benchmark --cohort` 仍使用全部用户任务。
 
-全量筛选也支持 `run_benchmark --cohort PATH --suites travel banking slack --name <新名称>`：只运行所选场景，保留这些场景全部用户与全部通过目标。名单必须覆盖显式选择的场景；原名单、证据和筛选结论不变。完整命令与范围标记见 [全量指南](./full_benchmark.md#1-使用哪个入口)。
+全量筛选也支持 `run_benchmark --cohort PATH --suites travel banking slack --name <新名称>`：只运行所选场景，保留这些场景全部用户与全部通过目标。名单必须覆盖显式选择的场景；原名单、证据和筛选结论不变。完整命令与范围标记见 [全量指南](./benchmark.md#1-使用哪个入口)。
 
 ## 1. 独立预检
 
@@ -58,6 +58,8 @@ results/injection_precheck/<model_id>_injection_screen_01/
 冻结名单已经生成时只核验并返回，不重跑或重写名单。没有 `--force-rerun` 选项；需要全新预检就使用新 name，并按需省略 `--reuse-from`。
 
 本次进度/入口整理提供明确的旧版本兼容映射：核对已知旧脚本/runner 字节哈希、当前改动文件哈希、相同模型/任务/规则以及未变的防御运行源码后，可以继续旧预检或读取旧名单。只新增 compatibility 记录，保留旧 manifest、attempt 和 cohort 的原始字节。Git revision 变化但绑定源码完全相同也只记录出处；未知脚本、模型、任务或防御变化仍拒绝执行，须用新 name。
+
+共享实现现归入 `experiments/common/`，三个日常入口命令保持不变。此次目录迁移也包含明确的旧来源/路径哈希映射；已知旧screen可按原命令续跑，冻结名单和历史尝试不重写。新代码的攻击测量仍需新name，不能用预检兼容规则绕过测量配置绑定。专项工具位置见 [实验工具索引](../experiments/README.md)。
 
 已经启动的进程不会自动获得新日志。更新代码后重新执行同一条预检命令；Ctrl+C 会停止等待提示，已有尝试保留用于续跑。旧版已经开始的攻击测量保留原身份，升级后使用新的测量 name。
 

@@ -11,7 +11,7 @@ from dscg.tool_metadata import (
     metadata_for_runtime,
     set_tool_metadata,
 )
-from experiments.generate_tool_metadata import generate, registered_tools, validate_catalog
+from experiments.tools.generate_tool_metadata import generate, registered_tools, validate_catalog
 
 
 class ToolMetadataTests(unittest.TestCase):

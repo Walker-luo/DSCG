@@ -2,7 +2,7 @@
 
 日期：2026-10-17。基准 revision：`9f385a3433f6d09bb7c9b278258ecc43f34e62c8`，本次修改尚未提交。
 
-`experiments.run_partial_benchmark --suites travel banking slack` 在优化阶段跳过 workspace。默认四场景、每场景注册顺序前3个用户/注入任务、攻击选择和原生评分不变。使用示例见 [评测指南](../../docs/evaluation.md#对照与输出)。完整 full / screened 测量仍使用原入口，full CLI 不新增缩减场景选项。
+`experiments.run_partial_benchmark --suites travel banking slack` 在优化阶段跳过 workspace。默认四场景、每场景注册顺序前3个用户/注入任务、攻击选择和原生评分不变。使用示例见 [小批量测试指南](../../docs/partial_benchmark.md#对照与输出)。完整 full / screened 测量仍使用原入口，full CLI 不新增缩减场景选项。
 
 启动输出与 attack_manifest.suites 记录选择，partial 根目录 suite_manifest.json 绑定完整场景列表；同名改用不相交集合也在执行前拒绝，旧报告保持原样。读取任务清单仍按显式选择执行，离线导出只含所选场景。非法、空或重复名称在模型构造前拒绝。
 

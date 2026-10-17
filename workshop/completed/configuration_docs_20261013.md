@@ -1,6 +1,6 @@
 # 模型与工具配置说明补全（2026-10-13）
 
-用户要求新增一份外部配置/工具参数说明、在README指出，并进一步展开docs/evaluation.md的“模型与工具配置”。本轮已新增 [详细指南](../../docs/model_tool_configuration.md)，扩写 [评测配置节](../../docs/evaluation.md#模型与工具配置)，同步README、docs入口、workshop索引和AGENTS。
+用户要求新增一份外部配置/工具参数说明、在README指出，并进一步展开docs/evaluation.md的“模型与工具配置”。本轮已新增 [详细指南](../../docs/model_tool_configuration.md)，扩写 [评测配置节](../../docs/model_tool_configuration.md#2-主模型和审计模型)，同步README、docs入口、workshop索引和AGENTS。
 
 HEAD为 `0ec73ea`（精确SHA见evidence.json），分支workshop，开始工作树clean；本轮未提交、未修改runtime/UI/tests/config或本地凭证。当前框架仍three-layer-l2-v2.2，正式route/E0/I3/I2状态保持。
 

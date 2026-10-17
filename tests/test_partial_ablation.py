@@ -7,7 +7,7 @@ from io import StringIO
 import unittest
 from unittest.mock import patch
 from experiments import run_partial_benchmark as runner
-from experiments.partial_controls import make_task_manifest, select_tasks, validate_controls, guard_run
+from experiments.common.partial_controls import make_task_manifest, select_tasks, validate_controls, guard_run
 
 class PartialAblationTests(unittest.TestCase):
     def test_cli_controls_forwarded_and_clean_has_no_attack(self):
@@ -43,7 +43,7 @@ class PartialAblationTests(unittest.TestCase):
 
 class CachedCostTests(unittest.TestCase):
     def test_cached_invocation_preserves_cost_and_mixed_usage_is_explicit(self):
-        from experiments.partial_controls import preserve_cached_cost
+        from experiments.common.partial_controls import preserve_cached_cost
         with TemporaryDirectory() as directory:
             path=Path(directory)/'summary.json'
             old={'overhead':{'total_tokens':12},'api_accounting':{'main':{'generation':{'api_calls':1}}}}

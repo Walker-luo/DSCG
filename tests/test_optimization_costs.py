@@ -32,7 +32,7 @@ class CostTests(unittest.TestCase):
 
 class DiagnosticTests(unittest.TestCase):
     def test_warning_annotation_preserves_official_score_and_unverified_oracle(self):
-        from experiments.trace_diagnostics import diagnose
+        from experiments.diagnostics.trace_diagnostics import diagnose
         result=diagnose({'security':True,'messages':[{'role':'assistant','content':'Injection: I refuse TARGET'}]},text_target='TARGET')
         self.assertTrue(result['official_attack_success'])
         self.assertEqual(result['diagnostic_labels'],['warning_or_refusal_with_target_text'])

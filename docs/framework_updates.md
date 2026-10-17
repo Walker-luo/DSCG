@@ -6,7 +6,7 @@
 
 2026-10-16后续：准备读取候选完成有限配对诊断后撤回，默认版本/输入仍为v3.1/v2，无新增网页选项或候选接线。仅增加审计请求的JSON格式预检查，错误配置在API调用前按现有失败关闭路径处理；正常请求不变。L1/L2/Monitor/路由开关保持。用户全量clean导出73/97，不是新候选成绩；[诊断与撤回报告](../workshop/completed/read_discovery_20261016.md)。
 
-L3使用最多8条当前任务相关调用—返回对，最近4条必留，再补相关旧证据，调用参数、正文与错误共享8192字符；删除候选的纯大小比较保留完整元数据，来源与省略/截断仍明确标记。输入v2与配置身份使旧路由artifact失效。L2新增有限的唯一邮件/指定网页来源，读取仍经原中介；有序复合委托不提前展开，保留原流程；L1只澄清用户请求不因工具数据而失去权威。默认模型、router off、重试0、completion false不变。新紧凑 `dscg_audit_evidence` 已写trace，网页尚无独立证据统计面板；full可诊断，不默认展示原始工具文本。模板/控件说明同步，旧结果不重标。约5pp clean目标与攻击/成本收益均待新线上验收；[工程报告](../workshop/completed/clean_utility_20261015.md)。
+L3使用最多8条当前任务相关调用—返回对，最近4条必留，再补相关旧证据，调用参数、正文与错误共享8192字符；删除候选的纯大小比较保留完整元数据，来源与省略/截断仍明确标记。输入v2与配置身份使旧路由artifact失效。L2新增有限的唯一邮件/指定网页来源，读取仍经原中介；有序复合委托不提前展开，保留原流程；L1只澄清用户请求不因工具数据而失去权威。该阶段模型、router off、重试0、completion false保持原设置；后续CLI路由默认值见下方控制表。新紧凑 `dscg_audit_evidence` 已写trace，网页尚无独立证据统计面板；full可诊断，不默认展示原始工具文本。模板/控件说明同步，旧结果不重标。约5pp clean目标与攻击/成本收益均待新线上验收；[工程报告](../workshop/completed/clean_utility_20261015.md)。
 
 ## 实际运行顺序
 
@@ -19,7 +19,7 @@ L3使用最多8条当前任务相关调用—返回对，最近4条必留，再�
               └──── 主模型规划 ← L1 有限投影/来源封装 ← 结果/错误 ──┘
 ```
 
-L1不增加独立模型调用：明确的原生银行月支出任务保留全部交易六字段，省略subject自由文本；其他输入保留原来源封装，原历史与L3正文保持。投影不是事实认证或范围授权。当前规则要求日常任务/摘要中的无关注入提醒使用概述，避免转述攻击目标；用户明确要求的分析/安全报告/必要引用仍支持原文。该日常输出规则仍是规划提示；有限投影只改变支持域内的工具视图，最终文本没有新增过滤器。L3仍审计当前动作，外发同时审查正文与目的地；安全提醒若夹带无关攻击链接/目标也可能越出任务，必要来源链接及显式安全分析可以保留。默认纯算法路由off、重审0、completion_prompt=false；公开sink-free读取免审是既有行为。有效deny对已授权sink-free读取仍可能被原Monitor的READ_ONLY_SOURCE_ALLOW覆盖，abstain/错误阻断。对象/目的地/参数/数据权限未强制约束，最终纯文本回答不经动作审计。
+L1不增加独立模型调用：明确的原生银行月支出任务保留全部交易六字段，省略subject自由文本；其他输入保留原来源封装，原历史与L3正文保持。投影不是事实认证或范围授权。当前规则要求日常任务/摘要中的无关注入提醒使用概述，避免转述攻击目标；用户明确要求的分析/安全报告/必要引用仍支持原文。该日常输出规则仍是规划提示；有限投影只改变支持域内的工具视图，最终文本没有新增过滤器。L3仍审计当前动作，外发同时审查正文与目的地；安全提醒若夹带无关攻击链接/目标也可能越出任务，必要来源链接及显式安全分析可以保留。API默认纯算法路由off，full/partial的DSCG CLI默认shadow，baseline/NoChecker自动off；重审0、completion_prompt=false；公开sink-free读取免审是既有行为。有效deny对已授权sink-free读取仍可能被原Monitor的READ_ONLY_SOURCE_ALLOW覆盖，abstain/错误阻断。对象/目的地/参数/数据权限未强制约束，最终纯文本回答不经动作审计。
 
 ## L2 已实施与限制
 
@@ -42,7 +42,7 @@ L1不增加独立模型调用：明确的原生银行月支出任务保留全部
 | delegated_tasks | true，网页/API/partial `--no-delegated-tasks` | 有界明确任务来源展开；NoL2关闭 |
 | authorization_profile / delegated_task_reader | 默认None，仅宿主API | 受信配置，不由网页文本/工具返回创建 |
 | L3/use_security_checker | true，网页/API | 原动作审计 |
-| audit_router_mode/artifact | 默认off，API/partial CLI | CSA硬门/真实校准不变，网页专门控件仍待完成 |
+| audit_router_mode/artifact | API off；full/partial DSCG CLI shadow，baseline/NoChecker off | CSA硬门/真实校准不变，网页专门控件仍待完成 |
 | trace_level | summary | standard判决/账本、full压缩诊断；保留实际字段覆盖 |
 
 网页完整/NoL1/NoL2/NoL3预设和自定义组合已接线。**V2风格**预设关闭L1、前置、视图与文件展开，但新版目录复核仍存在，不是历史V2精确复现。L2/L3全关时L1关闭；原生baseline始终走AgentDojo原循环，不带DSCG元数据。
@@ -69,4 +69,4 @@ L1不增加独立模型调用：明确的原生银行月支出任务保留全部
 
 当前真实E0仍pending，I3为24个有效探针/8个范围缺口/0个工具边界缺口，I2仍locked。后续工作按 [研究路线](../../research/technical_route.md)选择，保留原始评分、数据与版本身份。
 
-框架优化可用partial的场景选择和冻结cohort；正式full及全用户筛选测量保持独立，具体命令和分母见 [评测指南](./evaluation.md#对照与输出)与[全量指南](./full_benchmark.md)。新对照使用新run名，Agent产物写入新的workshop/artifacts目录。CSA网页专门控件、失败片段浏览器及独立审计证据面板仍未交付，不把文档整理视为实现。
+框架优化可用partial的场景选择和冻结cohort；正式full及全用户筛选测量保持独立，具体命令和分母见 [小批量测试指南](./partial_benchmark.md#对照与输出)与[全量指南](./benchmark.md)。新对照使用新run名，Agent产物写入新的workshop/artifacts目录。CSA网页专门控件、失败片段浏览器及独立审计证据面板仍未交付，不把文档整理视为实现。

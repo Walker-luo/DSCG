@@ -1,6 +1,6 @@
 # DSCG Workshop 优化结果
 
-> 2026-10-06 复核：下文八例 I3 的 `no_go` 是历史记录。旧脚本没有把错误反馈送入恢复回路，且注册工具时缺少参数 docstring，不能支撑对象级恢复约束。补齐后的 fixture 发现并修复了并发票据状态 bug，当前仍观察到全新调用的范围缺口，回报 `partial`。新证据见 [I3 报告](../../docs/i3_p0_stress_report.md)。
+> 2026-10-06 复核：下文八例 I3 的 `no_go` 是历史记录。旧脚本没有把错误反馈送入恢复回路，且注册工具时缺少参数 docstring，不能支撑对象级恢复约束。补齐后的 fixture 发现并修复了并发票据状态 bug，当前仍观察到全新调用的范围缺口，回报 `partial`。新证据见 [I3交接记录](../../../research/Experiments/implementation_status.md)。
 
 本轮改动集中在评测记录可靠性和离线恢复压力测试，未改变 P0 的授权、Reference Monitor、一次性执行票据或模型调用路径。
 

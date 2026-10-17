@@ -8,8 +8,8 @@ from dscg import audit_router as a
 
 class DatasetTests(unittest.TestCase):
     def api(self):
-        self.assertIsNotNone(importlib.util.find_spec('experiments.l3_router_dataset'),'dataset tooling missing')
-        from experiments.l3_router_dataset import build_dataset
+        self.assertIsNotNone(importlib.util.find_spec('experiments.calibration.l3_router_dataset'),'dataset tooling missing')
+        from experiments.calibration.l3_router_dataset import build_dataset
         return build_dataset
 
     def record(self,group='g',split='development',source='environment_oracle'):
@@ -51,7 +51,7 @@ class DatasetTests(unittest.TestCase):
         out=self.run_records([r]);rows=json.loads((Path(out['output_dir'])/'rows.json').read_text());self.assertFalse(rows[0]['eligible'])
 
     def test_calibration_tool_requires_attestation_and_preserves_outputs(self):
-        from experiments.calibrate_l3_router import calibrate_dataset
+        from experiments.calibration.calibrate_l3_router import calibrate_dataset
         records=[self.record('dev')]
         for i in range(64):
             r=self.record(str(i),'calibration');r['packet']['trusted_user_request']=f'Read budget {i}'
@@ -68,7 +68,7 @@ class DatasetTests(unittest.TestCase):
         with self.assertRaises(ValueError):self.run_records([r])
 
     def test_calibrator_rechecks_row_sources_and_actual_groups(self):
-        from experiments.calibrate_l3_router import calibrate_dataset
+        from experiments.calibration.calibrate_l3_router import calibrate_dataset
         records=[self.record('dev')]
         for i in range(64):
             r=self.record(str(i),'calibration');r['packet']['trusted_user_request']=f'Read budget {i}'

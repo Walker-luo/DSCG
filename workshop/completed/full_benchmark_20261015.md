@@ -10,7 +10,7 @@
 - 原生 baseline 不加载防御元数据/安全客户端；当前 DSCG 默认 projected、工具视图/委托开启、语义审计开启、router off、retry 0、completion false。
 - `task_scope`、全部 ID 和完整入口源码进入配置/来源绑定，partial 清单不能缩小 full，且导入清单先于模型构造核查。新结果布局是 `model_run/attack/suite`；旧结果不迁移、不作为新布局缓存。
 - 修复已绑定运行的配置冲突被普通攻击异常路径吞掉后覆盖根摘要的问题：现在直接返回失败并保留旧报告。未绑定旧场景摘要仍沿用拒绝复用/记录错误的既有路径；不把它冒充匹配缓存，也不读取其旧指标来补本轮结果。
-- 新增 [全量指南](../../docs/full_benchmark.md)，同步 README、evaluation、模型配置入口及 agent 输出约定；指南包含 clean/typical/all 两组命令、规模、续跑和指标/成本核对。
+- 新增 [全量指南](../../docs/benchmark.md)，同步 README、evaluation、模型配置入口及 agent 输出约定；指南包含 clean/typical/all 两组命令、规模、续跑和指标/成本核对。
 
 ## 验证与证据
 

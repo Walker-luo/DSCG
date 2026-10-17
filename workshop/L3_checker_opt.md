@@ -88,8 +88,8 @@ U = 单侧Clopper–Pearson上界，alpha=delta/K
 
 - [固定路由/校准/凭据](../dscg/audit_router.py)
 - [checker与Monitor接线](../dscg/pipelines/defended.py)
-- [显式数据准备](../experiments/l3_router_dataset.py)
-- [分组阈值校准](../experiments/calibrate_l3_router.py)
+- [显式数据准备](../experiments/calibration/l3_router_dataset.py)
+- [分组阈值校准](../experiments/calibration/calibrate_l3_router.py)
 - [partial runner](../experiments/run_partial_benchmark.py)
 
 数据准备只读取显式提供的、已独立标注的JSONL，不自动扫描results/download，也不根据审计器生成标签。一行需提供：
@@ -120,8 +120,8 @@ U = 单侧Clopper–Pearson上界，alpha=delta/K
 已激活ipi的命令（使用新的任务目录和输出文件）：
 
 ```bash
-python -m experiments.l3_router_dataset --input <labeled.jsonl> --output-dir workshop/artifacts/<task>/dataset
-python -m experiments.calibrate_l3_router --dataset-dir workshop/artifacts/<task>/dataset --grid <预先冻结的阈值列表> --epsilon <风险目标> --delta <置信错误水平> --attest-independent-groups --output workshop/artifacts/<task>/router.json
+python -m experiments.calibration.l3_router_dataset --input <labeled.jsonl> --output-dir workshop/artifacts/<task>/dataset
+python -m experiments.calibration.calibrate_l3_router --dataset-dir workshop/artifacts/<task>/dataset --grid <预先冻结的阈值列表> --epsilon <风险目标> --delta <置信错误水平> --attest-independent-groups --output workshop/artifacts/<task>/router.json
 python -m experiments.run_partial_benchmark --name <new-shadow-name> --audit-router-mode shadow --audit-router-artifact workshop/artifacts/<task>/router.json --results-dir workshop/artifacts/<task>/partial_benchmark
 ```
 

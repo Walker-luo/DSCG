@@ -17,9 +17,9 @@ from dscg.l1_projection import MODES as L1_PROJECTION_MODES, PROFILE_SHA256 as L
 from dscg.pipelines.baseline import make_openai_compatible_pipeline
 from dscg.pipelines.defended import make_defended_pipeline
 from dscg.tool_metadata import ToolMetadataError, load_tool_metadata
-from experiments.harness_audit import rank_ids, security_result_fields
-from experiments.partial_reporting import collect_suite_report, write_run_overview
-from experiments.partial_controls import (validate_controls, make_task_manifest, load_task_manifest,
+from experiments.diagnostics.harness_audit import rank_ids, security_result_fields
+from experiments.common.partial_reporting import collect_suite_report, write_run_overview
+from experiments.common.partial_controls import (validate_controls, make_task_manifest, load_task_manifest,
                                           select_tasks, guard_run, source_revision, preserve_cached_cost,
                                           RunConfigurationError, SUITES)
 
@@ -171,7 +171,7 @@ def main(
     if cohort_path is not None:
         if task_scope != 'partial' or not run_attack or task_manifest_path or cohort_sha256:
             raise ValueError('partial --cohort requires attacks and cannot use another manifest or scope')
-        from experiments.injection_cohort import run_screened
+        from experiments.common.injection_cohort import run_screened
         return run_screened(
             cohort_path, task_scope='partial_screened', suites=suites, model_id=model_id,
             sec_model_id=sec_model_id, origin=origin, defense=defense, config_path=config_path,
@@ -192,7 +192,7 @@ def main(
                       audit_retries=audit_retries, completion_prompt=completion_prompt)
     frozen_tasks = load_task_manifest(task_manifest_path)
     if task_scope in {'screened', 'partial_screened'}:
-        from experiments.injection_cohort import _digest
+        from experiments.common.injection_cohort import _digest
         if (not frozen_tasks or not cohort_sha256 or frozen_tasks.get('cohort_sha256') != cohort_sha256
                 or _digest({k: v for k, v in frozen_tasks.items() if k != 'cohort_sha256'}) != cohort_sha256):
             raise ValueError('screened measurement requires the validated frozen cohort identity')
@@ -781,7 +781,8 @@ def cli(argv: list[str] | None = None, *, task_scope: str = 'partial', entrypoin
     parser.add_argument('--no-delegated-tasks', action='store_true', help='关闭显式任务文件展开，用于原任务编译对照。')
     parser.add_argument('--l1-projection-mode', choices=('off','shadow','projected'), default='projected',
                         help='L1有限交易投影，默认projected；off保留旧来源封装，shadow只观察。')
-    parser.add_argument("--audit-router-mode",choices=("off","shadow","selective"),default="off",help="L3纯算法路由；默认off。")
+    parser.add_argument("--audit-router-mode", choices=("off", "shadow", "selective"), default=None,
+                        help="L3纯算法路由；DSCG CLI默认shadow，baseline/NoChecker默认off；可显式选择。")
     parser.add_argument("--audit-router-artifact",help="冻结的独立分组校准JSON；缺失/无效时保留完整审计。")
     parser.add_argument("--audit-retries", type=int, choices=(0, 1), default=0, help="语义 abstain 有界重审次数；默认 0。")
     parser.add_argument("--completion-prompt", action="store_true", help="启用通用任务完成提示；默认关闭。")
@@ -792,6 +793,8 @@ def cli(argv: list[str] | None = None, *, task_scope: str = 'partial', entrypoin
         '冻结的 injection 预检名单；显式标为 screened，保留全部用户任务。' if full else
         '冻结的 injection 预检名单；保留每场景前3个用户，仅过滤原来前3个注入目标，不补位。'))
     args = parser.parse_args(argv)
+    if args.audit_router_mode is None:
+        args.audit_router_mode = 'off' if args.baseline or args.no_checker else 'shadow'
     selected_suites = args.suites
     if len(set(selected_suites)) != len(selected_suites):
         parser.error('--suites cannot contain duplicate names')
