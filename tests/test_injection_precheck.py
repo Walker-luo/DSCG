@@ -2,6 +2,7 @@
 from contextlib import redirect_stdout, redirect_stderr
 from io import StringIO
 import json
+import threading
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from types import SimpleNamespace
@@ -13,6 +14,7 @@ from dscg.model_config import ModelConfig
 
 try:
     from experiments import run_injection_precheck as precheck
+    from experiments import injection_cohort as cohort_module
 except ImportError:
     precheck = None
 
@@ -50,7 +52,7 @@ class FakeSuite:
 class InjectionPrecheckTests(unittest.TestCase):
     def setUp(self):
         self.assertIsNotNone(precheck, 'standalone injection precheck entrypoint is missing')
-        artifacts = Path(__file__).resolve().parents[1] / 'workshop/artifacts/20261016_injection_precheck/test_runs'
+        artifacts = Path(__file__).resolve().parents[1] / 'workshop/artifacts/20261016_injection_progress/test_runs'
         artifacts.mkdir(parents=True, exist_ok=True)
         self.temp = TemporaryDirectory(dir=artifacts)
         self.addCleanup(self.temp.cleanup)
@@ -58,7 +60,9 @@ class InjectionPrecheckTests(unittest.TestCase):
         self.suite = FakeSuite()
         self.config = ModelConfig('offline', 'not-a-real-key', 'https://example.invalid', 'openai', 'TEST_KEY')
         self.patchers = [patch.object(precheck, 'get_suite', return_value=self.suite),
+                         patch.object(cohort_module, 'get_suite', return_value=self.suite),
                          patch.object(precheck, 'resolve_model_config', return_value=self.config),
+                         patch.object(cohort_module, 'resolve_model_config', return_value=self.config),
                          patch.object(precheck, 'make_openai_compatible_pipeline', side_effect=self.factory)]
         for p in self.patchers:
             p.start()
@@ -88,6 +92,57 @@ class InjectionPrecheckTests(unittest.TestCase):
         self.assertEqual(cohort['suites']['workspace']['injection_task_ids'], ['injection_task_0'])
         self.assertEqual(cohort['decisions']['workspace']['injection_task_1']['status'], 'excluded')
         self.assertEqual(len(list(self.output.rglob('none.json'))), 3)
+
+    def test_progress_is_visible_before_model_work_and_after_each_result(self):
+        stream = StringIO()
+        snapshots = []
+        def observed_factory(**kwargs):
+            snapshots.append(stream.getvalue())
+            return self.factory(**kwargs)
+        with patch.object(precheck, 'make_openai_compatible_pipeline', side_effect=observed_factory), redirect_stdout(stream):
+            self.assertEqual(precheck.screen(config_path=None, run_name='screen', suites=['workspace'],
+                results_dir=self.root / 'screens'), 0)
+        text = stream.getvalue()
+        self.assertTrue(all('开始尝试' in value for value in snapshots), text)
+        self.assertIn('[1/2]', text)
+        self.assertIn('[2/2]', text)
+        self.assertIn('复测', text)
+        self.assertIn('保留=1', text)
+        self.assertIn('排除=1', text)
+        self.assertNotIn('goal 0', text)
+        self.assertNotIn(self.config.api_key, text)
+
+    def test_waiting_progress_flushes_and_stops_when_work_finishes(self):
+        self.assertTrue(hasattr(precheck, 'Progress'), 'periodic progress reporter missing')
+        noticed = threading.Event()
+        class Sink(StringIO):
+            flushes = 0
+            def write(self, value):
+                if '等待' in value:
+                    noticed.set()
+                return super().write(value)
+            def flush(self):
+                self.flushes += 1
+        stream = Sink()
+        with redirect_stdout(stream):
+            progress = precheck.Progress()
+            with progress.waiting('workspace/injection_task_0', interval=0.01):
+                self.assertTrue(noticed.wait(1), stream.getvalue())
+            done = stream.getvalue()
+            threading.Event().wait(0.03)
+        self.assertEqual(stream.getvalue(), done)
+        self.assertGreater(stream.flushes, 0)
+
+    def test_keyboard_interrupt_stops_progress_and_preserves_attempt_for_resume(self):
+        stream = StringIO()
+        with patch.object(precheck, 'make_openai_compatible_pipeline', side_effect=KeyboardInterrupt), redirect_stdout(stream):
+            self.assertEqual(precheck.cli(['screen', '--name', 'interrupt',
+                '--results-dir', str(self.root / 'screens')]), 130)
+        self.assertIn('同一条 screen 命令续跑', stream.getvalue())
+        self.assertFalse(any(t.name == 'injection-precheck-progress' for t in threading.enumerate()))
+        output = self.root / 'screens/offline_interrupt'
+        self.assertFalse((output / 'cohort.json').exists())
+        self.assertEqual(len(list(output.rglob('attempt.json'))), 1)
 
     def test_second_attempt_success_keeps_target_and_resume_does_no_work(self):
         self.suite.outcomes[1] = [False, True]
@@ -197,9 +252,105 @@ class InjectionPrecheckTests(unittest.TestCase):
             self.assertEqual(options['trace_level'], 'full')
             self.assertFalse(options['origin'])
             runner.reset_mock()
-            self.assertEqual(precheck.cli(['benchmark', '--cohort', str(self.output / 'cohort.json'),
-                '--name', 'bad', '--attack', 'not-an-attack']), 1)
+            with redirect_stderr(StringIO()), self.assertRaises(SystemExit):
+                precheck.cli(['benchmark', '--cohort', str(self.output / 'cohort.json'),
+                    '--name', 'bad', '--attack', 'not-an-attack'])
             runner.assert_not_called()
+
+    def test_full_entry_accepts_cohort_and_forwards_all_existing_defense_controls(self):
+        self.screen()
+        from experiments import run_benchmark as full
+        with patch.object(precheck.shared, 'main', return_value=0) as runner, redirect_stdout(StringIO()):
+            self.assertEqual(full.cli(['--cohort', str(self.output / 'cohort.json'), '--name', 'unified',
+                '--results-dir', str(self.root / 'benchmarks'), '--audit-router-mode', 'shadow',
+                '--trace-level', 'full', '--no-tool-view', '--no-delegated-tasks',
+                '--l1-projection-mode', 'off', '--audit-retries', '1', '--completion-prompt']), 0)
+            options = runner.call_args.kwargs
+            self.assertEqual(options['task_scope'], 'screened')
+            self.assertEqual(options['audit_router_mode'], 'shadow')
+            self.assertEqual(options['trace_level'], 'full')
+            self.assertFalse(options['planning_tool_view'])
+            self.assertFalse(options['delegated_tasks'])
+            self.assertEqual(options['l1_projection_mode'], 'off')
+            self.assertEqual(options['audit_retries'], 1)
+            self.assertTrue(options['completion_prompt'])
+
+    def test_cohort_conflicts_are_rejected_before_model_resolution(self):
+        from experiments import run_benchmark as full
+        for conflicting in (['--clean'], ['--task-manifest', 'tasks.json'], ['--write-task-manifest', 'out.json']):
+            with self.subTest(conflicting=conflicting), patch.object(precheck, 'resolve_model_config') as resolve, redirect_stderr(StringIO()):
+                with self.assertRaises(SystemExit):
+                    full.cli(['--cohort', 'cohort.json', '--name', 'bad', *conflicting])
+                resolve.assert_not_called()
+
+    def test_legacy_benchmark_alias_requires_nonempty_cohort_before_dispatch(self):
+        for extra in ([], ['--cohort=']):
+            with self.subTest(extra=extra), patch.object(precheck.shared, 'main') as runner, redirect_stdout(StringIO()), redirect_stderr(StringIO()):
+                with self.assertRaises(SystemExit):
+                    precheck.cli(['benchmark', '--name', 'must_not_run_full', *extra])
+                runner.assert_not_called()
+
+    def test_cohort_python_entry_rejects_suite_selection_that_would_expand_work(self):
+        self.screen()
+        from experiments import run_benchmark as full
+        with patch.object(precheck.shared, 'main') as runner, self.assertRaises(ValueError):
+            full.main(cohort_path=self.output / 'cohort.json', suites=['travel'], run_name='bad_suite')
+        runner.assert_not_called()
+
+    def legacy_binding(self):
+        mapping = json.loads(Path(cohort_module.__file__).with_name('injection_cohort_compatibility.json').read_text())
+        binding = precheck._binding(self.config, ['workspace'])
+        binding['source'] = mapping['legacy_source']
+        binding['screening_script_sha256'] = mapping['legacy_screening_script_sha256']
+        return binding
+
+    def test_known_legacy_frozen_cohort_and_manifest_are_read_without_rewriting(self):
+        self.screen()
+        cohort = self.cohort(); binding = self.legacy_binding()
+        cohort['binding'] = binding
+        cohort['cohort_sha256'] = precheck._digest({k: v for k, v in cohort.items() if k != 'cohort_sha256'})
+        cohort_path = self.output / 'cohort.json'
+        cohort_path.write_text(json.dumps(cohort))
+        manifest = self.output / 'screen_manifest.json'; manifest.write_text(json.dumps(binding))
+        originals = {p: p.read_bytes() for p in [cohort_path, manifest, *self.output.rglob('attempt.json')]}
+        self.assertEqual(self.screen(), 0)
+        self.assertEqual(len(self.suite.executed), 3)
+        self.assertTrue(list((self.output / 'compatibility').glob('*.json')))
+        for p, content in originals.items():
+            self.assertEqual(p.read_bytes(), content)
+
+    def test_known_legacy_pending_screen_resumes_without_repeating_completed_goal(self):
+        self.suite.outcomes[1] = [RuntimeError('offline'), False, False]
+        self.assertEqual(self.screen(), 1)
+        binding = self.legacy_binding()
+        manifest = self.output / 'screen_manifest.json'; manifest.write_text(json.dumps(binding))
+        for p in self.output.rglob('attempt_manifest.json'):
+            record = json.loads(p.read_text()); record['binding_sha256'] = precheck._digest(binding)
+            p.write_text(json.dumps(record))
+        original = manifest.read_bytes()
+        self.assertEqual(self.screen(), 0)
+        self.assertEqual(self.suite.executed.count('injection_task_0'), 1)
+        self.assertEqual(manifest.read_bytes(), original)
+
+    def test_unknown_legacy_script_or_changed_defense_runtime_is_not_accepted(self):
+        self.screen()
+        binding = self.legacy_binding(); binding['screening_script_sha256'] = '0' * 64
+        (self.output / 'screen_manifest.json').write_text(json.dumps(binding))
+        with self.assertRaises(ValueError):
+            self.screen()
+        binding = self.legacy_binding()
+        (self.output / 'screen_manifest.json').write_text(json.dumps(binding))
+        current = precheck.source_revision()
+        current['source_sha256']['dscg/pipelines/baseline.py'] = '0' * 64
+        with patch.object(cohort_module, 'source_revision', return_value=current), self.assertRaises(ValueError):
+            self.screen()
+        self.assertEqual(len(self.suite.executed), 3)
+
+    def test_legacy_compatibility_rejects_unknown_added_runtime_source(self):
+        binding = self.legacy_binding()
+        current = precheck._binding(self.config, ['workspace'])
+        current['source']['source_sha256']['dscg/unknown_new_layer.py'] = '0' * 64
+        self.assertFalse(cohort_module._bindings_compatible(binding, current))
 
     def test_native_logged_context_error_is_not_a_valid_failure(self):
         self.suite.outcomes[1] = [('error', 'offline context_length_exceeded'), False, False]
@@ -211,7 +362,8 @@ class InjectionPrecheckTests(unittest.TestCase):
 
     def test_empty_scene_is_skipped_while_nonempty_scene_keeps_all_users(self):
         empty = FakeSuite(); empty.name = 'travel'; empty.outcomes = {0: [False, False], 1: [False, False]}
-        with patch.object(precheck, 'get_suite', side_effect=lambda version, name: self.suite if name == 'workspace' else empty), redirect_stdout(StringIO()):
+        lookup = lambda version, name: self.suite if name == 'workspace' else empty
+        with patch.object(precheck, 'get_suite', side_effect=lookup), patch.object(cohort_module, 'get_suite', side_effect=lookup), redirect_stdout(StringIO()):
             self.assertEqual(precheck.screen(config_path=None, run_name='screen', suites=['workspace', 'travel'],
                 results_dir=self.root / 'screens'), 0)
             with patch.object(precheck.shared, 'main', return_value=0) as runner:
@@ -246,17 +398,20 @@ class InjectionPrecheckTests(unittest.TestCase):
         def fake_pipeline(*args, **kwargs):
             return SimpleNamespace(name='offline', dscg_model_config=self.config.public_dict()), SimpleNamespace(
                 total_prompt_tokens=0, total_completion_tokens=0, get_total_tokens=lambda: 0)
-        with patch.object(precheck.shared, 'make_openai_compatible_pipeline', side_effect=fake_pipeline), patch.object(
+        from experiments import run_benchmark as full
+        with patch.object(precheck.shared, 'get_suite', return_value=self.suite), patch.object(precheck.shared, 'make_openai_compatible_pipeline', side_effect=fake_pipeline), patch.object(
             precheck.shared.attacks, 'load_attack', side_effect=fake_attack), patch.object(
             precheck.shared.benchmark, 'benchmark_suite_with_injections', side_effect=fake_results), redirect_stdout(StringIO()):
-            self.assertEqual(precheck.run_screened(self.output / 'cohort.json', config_path=None, run_name='selected',
+            self.assertEqual(full.main(cohort_path=self.output / 'cohort.json', config_path=None, run_name='selected',
                 results_dir=self.root / 'benchmarks', origin=True, attack=['ignore_previous']), 0)
         base = self.root / 'benchmarks/offline_selected'
         summary = json.loads((base / 'ignore_previous/workspace/summary.json').read_text())
         self.assertEqual(summary['task_counts']['planned_tasks'], 4)
         self.assertEqual(summary['task_selection']['injection_task_ids'], ['injection_task_0'])
         self.assertEqual(len(summary['task_selection']['user_task_ids']), 4)
-        self.assertNotEqual(summary['task_scope'], 'full')
+        self.assertEqual(summary['task_scope'], 'screened')
+        self.assertEqual(summary['cohort_sha256'], self.cohort()['cohort_sha256'])
+        self.assertIn('筛选目标', (base / 'summary.md').read_text())
         self.assertTrue((base / 'screened_cohort.json').exists())
         preflights = json.loads((base / 'preflight_report.json').read_text())
         self.assertEqual(preflights['planned_preflight_samples'], 1)

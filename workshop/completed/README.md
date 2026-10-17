@@ -8,6 +8,7 @@
 
 | 材料 | 已完成 / 当前保留 | 未完成、撤回或仅为设计 |
 | --- | --- | --- |
+| [预检进度与统一benchmark入口](./injection_progress_20261016.md) | screen实时进度/15秒等待、旧状态与名单兼容、统一--cohort、screened元数据、薄兼容转发；369/369离线通过 | 真实服务器预检/筛选攻击待执行，未产生新模型结果或安全收益 |
 | [Injection 目标预检与筛选测量](./injection_precheck_20261016.md) · [用户指南](../../docs/injection_precheck.md) | 独立screen/benchmark、兼容复用/失败复测、冻结分母与错误/成本记录；358项离线回归 | 真实服务器预检和筛选后的匹配攻击实验待执行，直接失败不证明间接攻击不可能 |
 | [全量benchmark入口同步](./full_benchmark_20261015.md) · [用户指南](../../docs/full_benchmark.md) | 复用执行/报告流程、全部注册任务、baseline/clean/攻击选择、当前控制与绑定；318项离线检查通过 | 未运行真实全量模型实验，不证明防御率/成本收益或E0通过 |
 | [L1有限投影实施](./l1_projection_20261013.md) · [计划](./L1_projection_implementation_plan_20261013.md) | 原生银行月支出六字段/全行投影、严格回退、模式/缓存/路由绑定、原文审计与平台默认同步 | 仅一个有限profile；真实四臂安全/效用/Token验收与更广输出适配仍待完成，未宣称新颖性 |

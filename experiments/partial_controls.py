@@ -44,8 +44,10 @@ def load_task_manifest(path):
 
 
 def select_tasks(manifest,suite_name,users,injections,run_attack,is_dos,*,task_scope='partial'):
-    if task_scope not in {'partial', 'full'}:
-        raise ValueError('task scope must be partial or full')
+    if task_scope not in {'partial', 'full', 'screened'}:
+        raise ValueError('unknown task scope')
+    if task_scope == 'screened' and (manifest is None or not run_attack or is_dos):
+        raise ValueError('screened measurements require a frozen targeted-attack cohort')
     if manifest is None:
         selected_users = list(users) if task_scope == 'full' else users[:3]
         selected_injections = injections[:1] if is_dos else list(injections) if task_scope == 'full' else injections[:3]
@@ -64,6 +66,11 @@ def select_tasks(manifest,suite_name,users,injections,run_attack,is_dos,*,task_s
         if selected_users != list(users) or (run_attack and selected_injections != list(injections)):
             raise ValueError('full benchmark requires all registered task IDs in registration order; partial manifests cannot reduce it')
         return selected_users, selected_injections[:1] if is_dos and run_attack else selected_injections
+    if task_scope == 'screened':
+        if (manifest.get('schema_version') != 'dscg.injection-screen.v1' or not manifest.get('cohort_sha256')
+                or selected_users != list(users)
+                or selected_injections != [i for i in injections if i in selected_injections]):
+            raise ValueError('screened cohort must retain all user tasks and registered injection order')
     if is_dos and selected_injections!=injections[:1]:
         raise ValueError('AgentDojo DoS uses first injection ID; supply a separate matching manifest')
     return selected_users,selected_injections
@@ -85,6 +92,9 @@ def guard_run(path,manifest):
 def source_revision():
     root=Path(__file__).resolve().parents[1]
     paths=sorted((root/'dscg').rglob('*.py'))+[Path(__file__),root/'experiments/run_partial_benchmark.py',root/'experiments/run_benchmark.py']
+    paths += [root / 'experiments' / name for name in (
+        'run_injection_precheck.py', 'injection_cohort.py', 'injection_cohort_compatibility.json')
+        if (root / 'experiments' / name).exists()]
     hashes={str(p.relative_to(root)):hashlib.sha256(p.read_bytes()).hexdigest() for p in paths}
     try:commit=subprocess.check_output(['git','rev-parse','HEAD'],cwd=root,text=True).strip()
     except (OSError,subprocess.CalledProcessError):commit=None

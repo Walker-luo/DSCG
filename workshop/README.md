@@ -6,6 +6,7 @@
 
 | 方案 / 阶段 | 已完成 | 尚未完成或未采用 |
 | --- | --- | --- |
+| [预检进度与统一入口](./completed/injection_progress_20261016.md) · [指南](../docs/injection_precheck.md) | 即时进度/15秒等待提示、已知旧状态兼容、run_benchmark --cohort、明确screened范围；369项离线回归 | 未执行新的真实模型预检/攻击；需同步服务器并用新测量name执行匹配对照 |
 | [Injection 目标预检](./completed/injection_precheck_20261016.md) · [用户指南](../docs/injection_precheck.md) | 独立目标预检、兼容历史复用、失败复测、冻结名单与全用户/筛选目标测量；离线358/358 | 未运行新的模型预检/攻击；筛选子集不是全量结果，不证明安全收益或E0通过 |
 | [准备读取诊断及候选撤回](./completed/read_discovery_20261016.md) · [配对清单](./completed/read_discovery_20261016_manifest.json) | 有限模型审计28+28、L1延续4次；候选18/28→22/28但新增误拒，已撤回；保留JSON请求预检查 | 未恢复TSR，未运行新全量clean/攻击；默认v3.1，准备读取/相关来源的稳定判定仍待解决 |
 | [Clean通用误伤修正](./completed/clean_utility_20261015.md) · [已实施计划](./completed/clean_utility_opt_20261015.md) | L3有界相关调用—返回证据、大小比较完整元数据；L2明确邮件/网页来源；L1来源澄清；v2输入兼容绑定 | 全量clean/攻击及重复真实模型验收待完成，约5pp是目标，不宣称TSR恢复 |

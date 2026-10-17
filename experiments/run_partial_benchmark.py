@@ -160,24 +160,32 @@ def main(
     l1_projection_mode: str = 'projected',
     task_scope: str = 'partial',
     use_sandbox: bool = True,
+    cohort_sha256: str | None = None,
 ) -> int:
-    if task_scope not in {'partial', 'full'}:
-        raise ValueError('task scope must be partial or full')
+    if task_scope not in {'partial', 'full', 'screened'}:
+        raise ValueError('unknown task scope')
     if not isinstance(l1_projection_mode, str) or l1_projection_mode not in L1_PROJECTION_MODES:
         raise ValueError('invalid L1 projection mode')
     _validate_router_controls(origin,use_security_checker,audit_router_mode,use_sandbox)
     validate_controls(origin=origin, use_security_checker=use_security_checker,
                       audit_retries=audit_retries, completion_prompt=completion_prompt)
     frozen_tasks = load_task_manifest(task_manifest_path)
-    if task_scope == 'full' and frozen_tasks is not None:
+    if task_scope == 'screened':
+        from experiments.injection_cohort import _digest
+        if (not frozen_tasks or not cohort_sha256 or frozen_tasks.get('cohort_sha256') != cohort_sha256
+                or _digest({k: v for k, v in frozen_tasks.items() if k != 'cohort_sha256'}) != cohort_sha256):
+            raise ValueError('screened measurement requires the validated frozen cohort identity')
+    if task_scope in {'full', 'screened'} and frozen_tasks is not None:
         # Validate the full catalogue before model/client construction. DoS later
         # projects this complete catalogue to its native first-injection rule.
         for suite_name in suites:
             suite = get_suite('v1.2', suite_name)
             select_tasks(frozen_tasks, suite_name, list(suite.user_tasks), list(suite.injection_tasks),
-                         run_attack, False, task_scope='full')
+                         run_attack, False, task_scope=task_scope)
     attack_names = resolve_attack_names(attack) if run_attack else ["none"]
-    logdir = Path(results_dir) if results_dir is not None else BENCHMARK_RESULTS_DIR if task_scope == 'full' else RESULTS_DIR / "partial_benchmark"
+    if task_scope == 'screened' and any(ATTACKS[name].is_dos_attack for name in attack_names):
+        raise ValueError('screened measurements do not support DoS')
+    logdir = Path(results_dir) if results_dir is not None else BENCHMARK_RESULTS_DIR if task_scope in {'full', 'screened'} else RESULTS_DIR / "partial_benchmark"
     multiple = len(attack_names) > 1
     context = {}
     run_records = []
@@ -202,7 +210,7 @@ def main(
                 planning_tool_view=planning_tool_view and not origin and use_sandbox,
                 delegated_tasks=delegated_tasks and not origin and use_sandbox,
                 l1_projection_mode='off' if origin or not (use_sandbox or use_security_checker) else l1_projection_mode,
-                task_scope=task_scope, use_sandbox=use_sandbox,
+                task_scope=task_scope, use_sandbox=use_sandbox, cohort_sha256=cohort_sha256,
             )
         except RunConfigurationError as exc:
             print(f"❌ 配置绑定冲突: {exc}")
@@ -235,6 +243,8 @@ def main(
         "excluded_from_all": {"manual": "requires interactive input"},
         "runs": run_records,
     }
+    if cohort_sha256 is not None:
+        manifest['cohort_sha256'] = cohort_sha256
     manifest_path = batch_dir / "attack_manifest.json"
     manifest_path.write_text(json.dumps(manifest, indent=2, ensure_ascii=False), encoding="utf-8")
     if multiple:
@@ -247,7 +257,7 @@ def main(
         _write_combined_report(batch_dir, report_sources)
     overview_path, failures_path = write_run_overview(
         batch_dir, attack_names, suites, run_records, context.get("suite_reports", []),
-        model_id=context.get("model_id", model_id),
+        model_id=context.get("model_id", model_id), task_scope=task_scope,
     )
     print(f"📝 紧凑摘要: {overview_path}")
     print(f"🔎 失败片段: {failures_path}")
@@ -290,6 +300,7 @@ def _run_single_attack(
     l1_projection_mode: str = 'projected',
     task_scope: str = 'partial',
     use_sandbox: bool = True,
+    cohort_sha256: str | None = None,
 ):
     """
         model_id: 执行的llm的id
@@ -306,10 +317,10 @@ def _run_single_attack(
     validate_controls(origin=origin, use_security_checker=use_security_checker,
                       audit_retries=audit_retries, completion_prompt=completion_prompt)
     frozen_tasks = load_task_manifest(task_manifest_path)
-    selection_seed = None if task_scope == 'full' else frozen_tasks.get("seed", 7) if frozen_tasks else 7
+    selection_seed = None if task_scope in {'full', 'screened'} else frozen_tasks.get("seed", 7) if frozen_tasks else 7
     tool_metadata = None if origin else load_tool_metadata(tool_metadata_path)
     active_defense = defense if origin else "dscg"
-    logdir = Path(results_dir) if results_dir is not None else BENCHMARK_RESULTS_DIR if task_scope == 'full' else RESULTS_DIR / "partial_benchmark"
+    logdir = Path(results_dir) if results_dir is not None else BENCHMARK_RESULTS_DIR if task_scope in {'full', 'screened'} else RESULTS_DIR / "partial_benchmark"
     logdir.mkdir(parents=True, exist_ok=True)
     report_sources: list[tuple[str, Path]] = []
     output_dir: Path | None = None
@@ -389,7 +400,7 @@ def _run_single_attack(
             task_scope=task_scope,
         )
         run_binding = {
-            "schema_version": "dscg.full-run.v1" if task_scope == 'full' else "dscg.partial-run.v1",
+            "schema_version": f"dscg.{task_scope}-run.v1",
             "task_scope": task_scope,
             "task_selection": {"users": selected_users, "injections": selected_injections,
                                "suite_version": "v1.2", "seed": selection_seed},
@@ -410,6 +421,8 @@ def _run_single_attack(
             "audit_router_artifact_sha256": getattr(pipeline,"dscg_optimization_config",{}).get("audit_router_artifact_sha256"),
             "audit_router_config_sha256": getattr(pipeline,"dscg_optimization_config",{}).get("audit_router_config_sha256"),
         }
+        if cohort_sha256 is not None:
+            run_binding['cohort_sha256'] = cohort_sha256
         guard_run(output_dir / suite_name / "run_manifest.json", run_binding)
 
         planned_task_count = (
@@ -566,6 +579,8 @@ def _run_single_attack(
                 "total_tokens": total_tokens
             },
         }
+        if cohort_sha256 is not None:
+            summary_data['cohort_sha256'] = cohort_sha256
 
         if sec_tracker:
             summary_data["sec_overhead"] = {
@@ -666,7 +681,7 @@ def _run_single_attack(
 
 
 
-def cli(argv: list[str] | None = None, *, task_scope: str = 'partial') -> int:
+def cli(argv: list[str] | None = None, *, task_scope: str = 'partial', entrypoint=None, require_cohort=False) -> int:
     if task_scope not in {'partial', 'full'}:
         raise ValueError('task scope must be partial or full')
     full = task_scope == 'full'
@@ -738,7 +753,16 @@ def cli(argv: list[str] | None = None, *, task_scope: str = 'partial') -> int:
     parser.add_argument("--clean", action="store_true", help="用相同用户任务运行无攻击效用控制。")
     parser.add_argument("--task-manifest", dest="task_manifest_path", help="读取冻结 v1.2 全量任务清单；拒绝缩小实际执行集合。" if full else "读取冻结 v1.2 任务 ID 清单。")
     parser.add_argument("--write-task-manifest", metavar="PATH", help="离线导出当前任务 ID 清单并退出，不调用模型。")
+    if full:
+        parser.add_argument('--cohort', dest='cohort_path', help='冻结的 injection 预检名单；显式标为 screened，保留全部用户任务。')
     args = parser.parse_args(argv)
+    cohort_path = getattr(args, 'cohort_path', None)
+    if (require_cohort or cohort_path is not None) and not cohort_path:
+        parser.error('screened benchmark requires a nonempty --cohort PATH')
+    if cohort_path and (args.clean or args.task_manifest_path or args.write_task_manifest):
+        parser.error('--cohort cannot be combined with --clean, --task-manifest, or --write-task-manifest')
+    if cohort_path and not args.run_name:
+        parser.error('--cohort requires a new --name')
     try:
         validate_controls(origin=args.baseline, use_security_checker=not args.no_checker,
                           audit_retries=args.audit_retries, completion_prompt=args.completion_prompt)
@@ -759,7 +783,14 @@ def cli(argv: list[str] | None = None, *, task_scope: str = 'partial') -> int:
         parser.error(str(exc))
 
     try:
-        status = main(
+        execution = entrypoint or main
+        dispatch_options = {} if entrypoint is not None else {'task_scope': task_scope}
+        if cohort_path is not None:
+            if entrypoint is None:
+                from experiments.run_benchmark import main as execution
+                dispatch_options.pop('task_scope', None)
+            dispatch_options['cohort_path'] = cohort_path
+        status = execution(
             model_id=os.getenv("DSCG_MAIN_MODEL_ID"),
             sec_model_id=os.getenv("DSCG_SEC_MODEL_ID"),
             provider=os.getenv("DSCG_MAIN_PROVIDER"),
@@ -774,7 +805,6 @@ def cli(argv: list[str] | None = None, *, task_scope: str = 'partial') -> int:
             tool_metadata_path=args.tool_metadata_path,
             config_path=args.config_path,
             results_dir=args.results_dir if args.results_dir is not None else BENCHMARK_RESULTS_DIR if full else None,
-            task_scope=task_scope,
             attack=selected_attacks,
             use_security_checker=not args.no_checker, audit_retries=args.audit_retries,
             completion_prompt=args.completion_prompt, task_manifest_path=args.task_manifest_path,
@@ -782,6 +812,7 @@ def cli(argv: list[str] | None = None, *, task_scope: str = 'partial') -> int:
             planning_tool_view=not args.no_tool_view and not args.baseline,
             delegated_tasks=not args.no_delegated_tasks and not args.baseline,
             l1_projection_mode='off' if args.baseline else args.l1_projection_mode,
+            **dispatch_options,
         )
     except (ModelConfigurationError, ToolMetadataError, ValueError) as exc:
         print(f"模型配置错误: {exc}")

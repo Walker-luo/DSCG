@@ -4,14 +4,18 @@
 
 ## 1. 使用哪个入口
 
-| 入口 | 默认任务范围 | 默认结果根目录 |
+| 入口 | 任务范围 | 默认结果根目录 |
 | --- | --- | --- |
-| `python -m experiments.run_benchmark` | v1.2 四个场景的全部注册用户任务与注入任务 | `results/benchmarks/` |
+| `python -m experiments.run_injection_precheck screen` | 仅将全部 injection GOAL 直接作为用户请求，生成冻结名单 | `results/injection_precheck/` |
+| `python -m experiments.run_benchmark` | 默认 v1.2 四个场景的全部注册用户任务与注入任务（full） | `results/benchmarks/` |
+| `python -m experiments.run_benchmark --cohort PATH` | 全部用户任务 × 名单保留的注入目标（screened；无保留目标的场景跳过） | `results/benchmarks/` |
 | `python -m experiments.run_partial_benchmark` | 每场景注册顺序前 3 个用户任务、前 3 个注入任务 | `results/partial_benchmark/` |
 
-两者共用模型配置、当前框架、攻击选择、缓存绑定和报告流程。**全量入口不再使用前 3 个任务的限制**；如显式导入任务清单，必须包含当前注册顺序下的完整执行集合，不能用 partial 清单缩小全量测试。
+测量入口共用模型配置、当前框架、攻击选择、缓存绑定和报告流程。**全量入口不再使用前 3 个任务的限制**；如通过 `--task-manifest` 显式导入 full 任务清单，必须包含当前注册顺序下的完整执行集合，不能用 partial 清单缩小全量测试。
 
 “全部任务”与“全部攻击”是两项独立选择：全量入口默认 `--attack typical`，在全部任务上运行四种目标型攻击；`--attack all` 才运行已安装注册表中的全部自动攻击，排除交互式 `manual`。具体名称、类型和来源见 [评测指南的攻击表](./evaluation.md#攻击选择)。
+
+如已完成 injection 目标预检，筛选测量也统一使用本入口：显式加 `--cohort <cohort.json>`，结果标为 `task_scope=screened`，保留全部用户任务并采用冻结目标。该选项与 clean/其他任务清单/清单导出互斥，拒绝 DoS；不传时仍为完整 full。命令、进度和旧数据续跑见 [Injection 目标预检指南](./injection_precheck.md)。
 
 ## 2. 配置与默认框架
 
@@ -19,7 +23,7 @@
 
 - **baseline：** 加 `--baseline`，使用原生 AgentDojo 工具循环与相同主模型配置；不加载 DSCG 风险目录，不创建安全模型，不启用 DSCG 或 AgentDojo 防御。`--no-checker` 是保留其他防御的消融，不能代替无防御 baseline。
 - **当前 DSCG：** 不加 `--baseline`。沿用 `three-layer-v3.1`：L1 有限投影默认 `projected`，L2 工具授权/前置检查、工具视图和有限明确任务来源展开开启，L3 当前动作审计开启。
-- **保持普通对照默认值：** 算法路由 `off`、重审 `0`、完成提示关闭、日志 `summary`。路由 `off` 不会关闭 L3。没有部署阈值时，不在这轮全量测试中临时启用 selective；参数决策另见 [plan.md](../plan.md)。
+- **保持普通对照默认值：** 算法路由 `off`、重审 `0`、完成提示关闭、日志 `summary`。路由 `off` 不会关闭 L3。没有部署阈值时，不在这轮全量测试中临时启用 selective；参数决策另见 [L3 参数计划](../L3_plan.md)。
 
 两组使用同一份 `[main]`；只有 DSCG 使用 `[security]`，省略该角色时按既有规则复用主模型。固定模型配置、工具目录和源码后再开始成对实验；记录中保留 revision 与源码哈希，但模型服务未提供或未固定的实际修订仍是重复性限制。
 
@@ -119,7 +123,7 @@ none/<suite>/<user_task_id>/none/none.json
 
 对关键失败采用新的运行名重复验证；可以重复整套 clean，或对个别失败另外做诊断，但诊断结果不能替换原全量结果，也不能据单次失败宣布某任务永久不可完成。
 
-后续攻击实验仍执行全部注册任务并报告全量结果。另可在攻击结果分析前，冻结 baseline clean 中**完成且无已确认运行错误**的任务键集合：
+选择 full 路径时，后续攻击实验仍执行全部注册任务并报告全量结果；选择 injection 目标筛选路径时，按下节的冻结名单另报 screened 结果。两条路径均保留全部用户任务，不根据 clean 成功与否改变执行清单。另可在攻击结果分析前，冻结 baseline clean 中**完成且无已确认运行错误**的任务键集合：
 
 \[
 C_0=\{(s,u):\operatorname{Utility}^{\mathrm{baseline,clean}}(s,u)=1
@@ -131,6 +135,69 @@ C_0=\{(s,u):\operatorname{Utility}^{\mathrm{baseline,clean}}(s,u)=1
 进入正式攻击实验前，应具备两组的实际任务 ID、全量/分场景 clean TSR、四格配对与异常计数、失败轨迹及原因、模型/配置身份和总 Tokens。若网络/服务等错误造成实验明显不完整，先解决并以新名称重跑，避免把基础设施失败解释成安全或能力结论。
 
 ## 4. 运行全量任务攻击对照
+
+### 可选：先预检 injection 目标，再运行筛选对照
+
+如果本轮希望先排除当前 baseline 直接请求下两次均未完成的攻击目标，先运行以下流程。`screen` 只负责预检和生成名单；后续 baseline、DSCG 与 shadow 测量统一使用 `run_benchmark --cohort`。不采用筛选时，直接使用下方“四种典型攻击”或“全部自动攻击”的完整任务命令。
+
+**第一步：独立预检全部 injection GOAL，复用已有兼容记录。**
+
+```bash
+python -m experiments.run_injection_precheck screen \
+  --model-config config/models.local.toml \
+  --reuse-from results/benchmarks/deepseek-flash_baseline \
+  --name injection_screen_01
+```
+
+这里的 `--reuse-from` 是已有 baseline 运行目录；没有旧结果时省略该参数。程序核对兼容性后复用旧预检，缺少的目标才补测：任一次有效成功保留，两次有效失败排除；API/上下文错误、缺失或损坏结果单列为未决，不算能力失败。终端立即显示逐目标进度，执行超过15秒会显示等待提示。
+
+在模型为 `deepseek-flash` 时，先检查：
+
+```text
+results/injection_precheck/deepseek-flash_injection_screen_01/summary.md
+results/injection_precheck/deepseek-flash_injection_screen_01/status.json
+results/injection_precheck/deepseek-flash_injection_screen_01/cohort.json
+```
+
+仅当所有目标判定完成时才生成 `cohort.json`。存在未决或运行中断时，解决问题后以相同 name 重复同一条 `screen` 命令，保留已有尝试并继续补测；该阶段不加 `--force-rerun`。更新代码前先停止旧进程；本次已知旧版本兼容范围内可同名续跑，未知模型/任务/防御变化仍要求新 name。详细兼容规则见 [预检与续跑指南](./injection_precheck.md)。
+
+**第二步：用冻结名单运行新的 baseline 和 DSCG 对照。**
+
+```bash
+python -m experiments.run_benchmark \
+  --cohort results/injection_precheck/deepseek-flash_injection_screen_01/cohort.json \
+  --model-config config/models.local.toml \
+  --baseline --attack typical --force-rerun --name baseline_screened_02
+
+python -m experiments.run_benchmark \
+  --cohort results/injection_precheck/deepseek-flash_injection_screen_01/cohort.json \
+  --model-config config/models.local.toml \
+  --attack typical --force-rerun --name dscg_screened_02
+```
+
+两组使用同一个 `cohort.json`、主模型配置与攻击集合。每个保留场景仍执行全部 user tasks，仅筛选 injection targets；无保留目标的场景明确跳过，全部为空时拒绝启动。输出分别位于 `results/benchmarks/<model_id>_baseline_screened_02/` 和 `<model_id>_dscg_screened_02/`。示例名称已用过时换新名称；不要在旧 full 运行目录上追加筛选结果。
+
+**需要同步收集 L3 路由数据时，将 DSCG 命令替换为 shadow/full 记录：**
+
+```bash
+python -m experiments.run_benchmark \
+  --cohort results/injection_precheck/deepseek-flash_injection_screen_01/cohort.json \
+  --model-config config/models.local.toml \
+  --attack typical --force-rerun --name dscg_screened_shadow_02 \
+  --audit-router-mode shadow --trace-level full
+```
+
+shadow 保留 L3 语义审计，不实际新增免审；无需提供路由 artifact 即可收集资格和分数。任务 JSON 的 `dscg_router_events` 保存逐批记录，场景 `summary.json.audit_router` 保存统计，任务旁的 `.dscg_trace.jsonl.gz` 保存有界 `audit_input`。无有效 artifact 时 `would_bypass=false`，不能据此判断没有路由优化空间。阈值仍需独立标签、相关组和校准；full 增加本地日志开销，不能将这轮观测直接当作 selective 的端到端收益。
+
+筛选测量需同时注意：
+
+- `--cohort` 与 `--clean`、`--task-manifest`、`--write-task-manifest` 互斥，仍需单独运行第3节的 clean 对照。
+- 支持 typical 或具体目标型攻击；DoS 不适用此筛选，包含 DoS 的 `--attack all` 也会拒绝。
+- `task_scope` 必须为 `screened`，两组 `cohort_sha256` 和实际 task/attack ID 必须一致。额外查看 `screened_run_manifest.json`、`screened_cohort.json` 与 `preflight_report.json`。
+- 筛选后计划规模为每种目标型攻击的 `Σ(场景用户数 × 保留目标数)`；下方完整任务规模表不适用于 screened，最终仍按实际有效结果报分母。
+- 原生攻击流程仍执行保留目标的预检，相关成本包含在共享总量中；逐目标 usage 不可得时单独预检 Tokens 为 null，不重复累加。独立筛选阶段的成本另在预检目录中报告。
+
+直接请求下的拒绝或失败不证明间接攻击无法成功。screened 结果描述本轮能力筛选子集，不根据 DSCG 结果重新筛选，也不与 full 的 ASR 分母混作防御收益。旧 `run_injection_precheck benchmark` 仅保留兼容转发，仍要求非空 `--cohort`；推荐使用上述统一入口。
 
 ### 四种典型攻击
 
@@ -206,7 +273,7 @@ results/benchmarks/<model_id>_<name>/
 
 完成后按以下顺序核对：
 
-1. **范围与配对：** `attack_manifest.json` 和各场景 `summary.json` 中的 `task_scope` 应为 `full`；`task_selection` 的 user/injection ID 在 baseline 与 DSCG 之间一致，所选数等于可用数，DoS/clean 除外。仅运行名称相似不足以证明配对。
+1. **范围与配对：** 完整任务运行的 `attack_manifest.json` 和各场景 `summary.json` 中 `task_scope` 应为 `full`，所选数等于可用数（DoS/clean 除外）。使用 `--cohort` 时应为 `screened`，用户 ID 仍完整，注入 ID 与冻结名单一致，同时核对两组 `cohort_sha256`。两种模式均须确认 baseline/DSCG 的实际 task/attack ID 一致，仅运行名称相似不足以证明配对。
 2. **实际防御：** suite 的 `run_manifest.json` 记录 baseline/full/no-checker profile、L1/L2 控制、模型公开配置、源码哈希和路由身份。baseline 的 defense 应为 null，无安全模型开销；正常 DSCG 保持本指南默认开关。
 3. **完整性：** 核对 planned/total/security_missing、运行错误和失败片段。缺失安全结果为未知/基础设施问题，不是安全成功；全部缺失时 ASR 为 null。`summary.md` 的 partial/error 状态也要检查。
 4. **指标：** 分别比较干净 TSR、攻击下 TSR、按攻击类型区分的 native ASR，并检查环境终态与代表性失败。计数加权汇总，不能直接平均不同分母的场景百分比。

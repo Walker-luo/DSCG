@@ -6,7 +6,7 @@
 | [模型、工具与运行参数](./model_tool_configuration.md) | 配置字段、信息获取、工具schema/风险分类、默认控制及排错 |
 | [评测指南](./evaluation.md) | 模型配置、全部可选攻击、对照与日志口径 |
 | [全量测试指南](./full_benchmark.md) | 当前框架与原生无防御 baseline、全部任务/攻击规模、运行命令、缓存及结果核对 |
-| [Injection 目标预检](./injection_precheck.md) | 独立测试攻击目标、失败复测、冻结筛选名单与匹配 baseline/DSCG 子集测量 |
+| [Injection 目标预检](./injection_precheck.md) | 实时进度、失败复测、旧状态续跑与冻结名单；测量统一使用 run_benchmark --cohort |
 | [框架与平台交接](./framework_updates.md) | 当前L2默认/可选能力、L1/L3后续修订、网页已接线与待办 |
 | [Dashboard 指南](./dashboard.md) | 历史筛选、多版本对比及分析导出 |
 | [I3 P0 压力测试报告](./i3_p0_stress_report.md) | 当前 `partial` 证据；未实现对象/数据范围约束 |

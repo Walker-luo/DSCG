@@ -1,0 +1,109 @@
+{
+  "schema_version": "dscg.injection-progress-delivery.v1",
+  "revision": "05b48b0df2fb5e86cbf82d300772299fd2ec91f1",
+  "environment": {
+    "python": "3.10.21",
+    "agentdojo": "0.1.35"
+  },
+  "files": {
+    "AGENTS.md": "c5a3b541b7c55280708a723761df6f2e16d9639f8eb65a524c124553023e38f4",
+    "README.md": "710e147c5c8285ebf19d6457ba289407ba5ca8990057773c8318e0e7c24adb23",
+    "docs/README.md": "2e601888a526d7b18335ca653201a3c0ac2650af6e70801f008557d2930ea054",
+    "docs/full_benchmark.md": "8e6b1bfeb4f41c5a42fa27573578ab5f04f0d71a99dfc4d4edfd5bb600728df0",
+    "docs/injection_precheck.md": "cf658f22cdd46094457f51f4431ae59208686cc6d1f286dc2a2fd67b8c9bd580",
+    "experiments/partial_controls.py": "6f860a8b1221052f0da069811a92b005b1a9d06e1f1d459678d632b7f20a381f",
+    "experiments/partial_reporting.py": "9bdba512ca13e32f7bd6a41eec30fd830e146ae90db1903762aeb2fb942af5bf",
+    "experiments/run_benchmark.py": "a932b1a149791dd350770437dcb36e6ff5228cce786ba2c991ced27b9661dd14",
+    "experiments/run_injection_precheck.py": "f045f75aeb39ca922e8098c38057aeb1b72ab74cd99e907d6e2072589d842488",
+    "experiments/run_partial_benchmark.py": "893c25afe471162f25ca7b0fdc4fd5bd651813aa2700245272f95f935e66bdc7",
+    "tests/test_injection_precheck.py": "2389145635d805e221cb2bbe4588e45b31624b3f4767379c12d5f81ab78b470e",
+    "workshop/README.md": "248f702abd0fd6149e0e6ef18615f0a3de19fca068c81c818e4c2e975cadd1b0",
+    "workshop/completed/README.md": "892b9e9bbdb12831386574962274a7f54653c36ca53a758e67d804bb2b6fcfd7",
+    "experiments/injection_cohort.py": "bdd0119c397edb58b4e9cd49c3c0c97cbbd8c522d5e74c495f1a1cb777cdecad",
+    "experiments/injection_cohort_compatibility.json": "b06412e992dbe99bb482b8be9961ff44cba12fab9b4fc07bbbc02fb4a0951d7a",
+    "workshop/completed/injection_progress_20261016.md": "e065e2dfa445a85e34ee4cca0e097a1f757e8c9a1f91104e7486e247b6ae4980"
+  },
+  "commands": [
+    {
+      "command": "conda run -n ipi python -B -m unittest discover -s tests -p test_injection_precheck.py -v",
+      "exit_code": 0,
+      "passed": 27,
+      "log": "precheck_final.log",
+      "sha256": "425e8be4b7cd422df3855c9179012a55c89f1f00af7949a3333a6cabce58db20"
+    },
+    {
+      "command": "conda run -n ipi python -B -m unittest discover -s tests -v",
+      "exit_code": 0,
+      "passed": 369,
+      "log": "full_regression_final.log",
+      "sha256": "e2db5286778f98d097f75865b84b36ecc9aa03f03754ee7b931791f9fa3d3f84"
+    },
+    {
+      "command": "conda run -n ipi python -B -m unittest discover -s tests -p test_full_benchmark.py -v",
+      "exit_code": 0,
+      "passed": 15,
+      "log": "full_runner_verified.log",
+      "sha256": "6e232e2a5df8b695fa1c0d93b77fb268bafc6ff7754f91004868b9942b5496eb"
+    },
+    {
+      "command": "conda run -n ipi python -B -m unittest discover -s tests -p 'test_partial*.py' -v",
+      "exit_code": 0,
+      "passed": 38,
+      "log": "partial_runner_final.log",
+      "sha256": "9a8c618d80053238d7e8ab87374d9dd08662c3fe8dbce2eded40fbe90cffab4c"
+    },
+    {
+      "command": "conda run -n ipi python -B -m experiments.run_benchmark --help",
+      "exit_code": 0,
+      "log": "benchmark_help_final.log",
+      "sha256": "e45d37107c44f6f47c0230713d1ae283db983b9586d9fd1941488ba55df5f6b8"
+    },
+    {
+      "command": "conda run -n ipi python -B -m experiments.run_injection_precheck screen --help",
+      "exit_code": 0,
+      "log": "screen_help_final.log",
+      "sha256": "b0062961700c2f5aca5e44d0348cb40e3a9c6b6bd43803930e168323d95da32e"
+    },
+    {
+      "command": "conda run -n ipi python -B -m experiments.run_injection_precheck benchmark --help",
+      "exit_code": 0,
+      "log": "legacy_help_final.log",
+      "sha256": "9e7fe30f831cf814e653eb9bfadabf840d0d2edc8fcf438c80d3d9f63fa9778a"
+    },
+    {
+      "command": "git diff --check",
+      "exit_code": 0
+    }
+  ],
+  "counts": {
+    "new_real_model_requests": 0,
+    "new_real_benchmark_samples": 0,
+    "compatible_historical_prechecks": 14,
+    "registered_targets": 35
+  },
+  "review": {
+    "findings": 2,
+    "fixed": [
+      "legacy alias missing-cohort full dispatch",
+      "Python suite restriction ignored"
+    ],
+    "verification": "review_red.log -> review_green.log; final whole suite369/369",
+    "deferred": []
+  },
+  "limitations": [
+    "offline checks are not model efficacy or E0 passage",
+    "historical/environment/model-revision limits retained"
+  ],
+  "next_action": "Update server, resume original screen name, then measure matched arms with new names via run_benchmark --cohort.",
+  "working_tree": "dirty; approved harness/progress refactor and docs, existing defense bytes and baseline data preserved",
+  "protection": {
+    "baseline_files_preserved": 280,
+    "dscg_source_files_preserved": 14,
+    "archived_originals_verified": 13,
+    "compatibility_target_hashes_verified": 6
+  },
+  "validation": {
+    "path": "workshop/artifacts/20261016_injection_progress/validation.json",
+    "sha256": "aff52db195ca61bad955469305b01fd3647011a6da09668dce7650dd0e927b04"
+  }
+}
