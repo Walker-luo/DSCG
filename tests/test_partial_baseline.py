@@ -3,7 +3,7 @@ from io import StringIO
 import json
 import os
 from pathlib import Path
-from tempfile import TemporaryDirectory
+from test_partial_agentdyn import TemporaryDirectory
 from types import SimpleNamespace
 import unittest
 from unittest.mock import Mock, patch
@@ -107,7 +107,7 @@ class PartialBaselineTests(unittest.TestCase):
                     self.assertEqual(options["user_tasks"], expected["user_task_ids"])
                     self.assertEqual(options["injection_tasks"], expected["injection_task_ids"])
                     self.assertTrue(options["force_rerun"])
-                    report = json.loads((Path(directory) / f"offline-model_{mode}" / "important_instructions" / suite_name / "summary.json").read_text())
+                    report = json.loads((Path(directory) / f"offline-model_agentdojo_{mode}" / "important_instructions" / suite_name / "summary.json").read_text())
                     self.assertEqual(report["task_selection"], expected)
                     self.assertEqual(report["task_counts"]["total_tasks"], 9)
                     self.assertEqual(report["defense"], None if mode == "baseline" else "dscg")
@@ -148,3 +148,14 @@ class PartialBaselineTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+# Explicitly retain historical upstream suites as generic offline fixtures.
+def setUpModule():
+    global _fixture_backend
+    from test_partial_agentdyn import legacy_fixture_backend
+    _fixture_backend = legacy_fixture_backend(globals())
+
+
+def tearDownModule():
+    _fixture_backend.close()

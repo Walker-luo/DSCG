@@ -3,7 +3,7 @@ from contextlib import ExitStack, redirect_stderr, redirect_stdout
 from io import StringIO
 import json
 from pathlib import Path
-from tempfile import TemporaryDirectory
+from test_partial_agentdyn import TemporaryDirectory
 import unittest
 from unittest.mock import patch
 
@@ -15,7 +15,7 @@ from test_full_benchmark import fake_pipeline, fake_attack, fake_results
 
 class FullSuiteTests(unittest.TestCase):
     def setUp(self):
-        root = Path(__file__).resolve().parents[1] / 'workshop/artifacts/20261017_full_suites/test_runs'
+        root = Path(__file__).resolve().parents[1] / 'workshop/artifacts/20261018_dual_benchmark/runner/test_runs'
         root.mkdir(parents=True, exist_ok=True)
         temp = TemporaryDirectory(dir=root); self.addCleanup(temp.cleanup)
         self.root = Path(temp.name)
@@ -33,7 +33,7 @@ class FullSuiteTests(unittest.TestCase):
             self.offline(stack)
             self.assertEqual(full.cli(['--baseline', '--suites', 'travel', 'banking', 'slack',
                 '--attack', 'injecagent', '--name', 'subset', '--results-dir', str(self.root)]), 0)
-            base = self.root / 'offline-model_subset'
+            base = self.root / 'offline-model_agentdojo_subset'
             self.assertFalse((base / 'injecagent/workspace').exists())
             manifest = json.loads((base / 'attack_manifest.json').read_text())
             self.assertEqual(manifest['suites'], ['travel', 'banking', 'slack'])
@@ -56,7 +56,7 @@ class FullSuiteTests(unittest.TestCase):
             self.offline(stack)
             self.assertEqual(full.cli(['--baseline', '--clean', '--suites', 'banking',
                 '--name', 'clean', '--results-dir', str(self.root)]), 0)
-            base = self.root / 'offline-model_clean/none'
+            base = self.root / 'offline-model_agentdojo_clean/none'
             self.assertEqual([p.name for p in base.iterdir() if p.is_dir()], ['banking'])
             summary = json.loads((base / 'banking/summary.json').read_text())
             self.assertEqual(summary['task_selection']['user_task_ids'], list(get_suite('v1.2', 'banking').user_tasks))
@@ -79,3 +79,14 @@ class FullSuiteTests(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+# Explicitly retain historical upstream suites as generic offline fixtures.
+def setUpModule():
+    global _fixture_backend
+    from test_partial_agentdyn import legacy_fixture_backend
+    _fixture_backend = legacy_fixture_backend(globals())
+
+
+def tearDownModule():
+    _fixture_backend.close()

@@ -1,12 +1,13 @@
 """Effective L2 controls must reach runtime and identify independent run caches."""
 import json
 from pathlib import Path
-import tempfile
+from tests import test_partial_agentdyn as tempfile
 import unittest
 from unittest.mock import Mock, patch
 
 from dscg.l2_authorization import ToolAuthorizationProfile
 from dscg.model_config import ModelConfig
+from dscg.benchmark_catalog import get_backend
 from dscg.pipelines import defended as d
 from experiments import run_partial_benchmark as partial
 from dashboard.evaluation import normalize_config, trace_stats
@@ -56,15 +57,15 @@ class L2ControlTests(unittest.TestCase):
             self.assertFalse(run.call_args.kwargs['delegated_tasks'])
 
     def test_web_controls_are_validated_and_disabled_with_native_or_no_l2(self):
-        default = normalize_config({'suites': ['workspace']})
+        default = normalize_config({'suites': [get_backend().suites[0]]})
         self.assertTrue(default['planning_tool_view'])
         self.assertTrue(default['delegated_tasks'])
         for flags in ({'origin': True}, {'use_sandbox': False}):
-            effective = normalize_config({'suites': ['workspace'], **flags})
+            effective = normalize_config({'suites': [get_backend().suites[0]], **flags})
             self.assertFalse(effective['planning_tool_view'])
             self.assertFalse(effective['delegated_tasks'])
         with self.assertRaises(ValueError):
-            normalize_config({'suites': ['workspace'], 'delegated_tasks': 'true'})
+            normalize_config({'suites': [get_backend().suites[0]], 'delegated_tasks': 'true'})
 
     def test_l2_trace_totals_cover_scored_records_only_and_old_records_stay_missing(self):
         with tempfile.TemporaryDirectory() as directory:

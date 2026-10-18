@@ -9,12 +9,12 @@ import threading
 import time
 
 from agentdojo import benchmark, logging
-from agentdojo.task_suite import get_suite
+from dscg.benchmark_catalog import get_suite, benchmark_identity, validate_backend, get_backend, get_suites
 from dscg.model_config import resolve_model_config
 from dscg.paths import RESULTS_DIR
 from dscg.pipelines.baseline import make_openai_compatible_pipeline
 from experiments import run_partial_benchmark as shared
-from experiments.common.partial_controls import SUITES, source_revision, guard_run
+from experiments.common.partial_controls import source_revision, guard_run
 from experiments.common.injection_cohort import (
     SCHEMA, RULE, LIMITATIONS, _digest, _file_hash, _read, _write_new, _replace,
     _lock, _binding, _trace_status, _decision, _validate_cohort, _validate_cohort_data,
@@ -59,7 +59,7 @@ def _reuse(reuse_from, suite_name, task, binding):
             manifest_path = path.parents[2] / 'run_manifest.json'
             manifest = _read(manifest_path)
             selection = manifest['task_selection']
-            if (manifest.get('profile') != 'baseline' or manifest.get('main_model') != binding['main_model']
+            if (manifest.get('benchmark') != benchmark_identity() or manifest.get('profile') != 'baseline' or manifest.get('main_model') != binding['main_model']
                     or not _source_compatible(manifest['source'], binding['source'], check_python=False)
                     or selection.get('suite_version') != 'v1.2' or task.ID not in selection.get('injections', [])):
                 raise ValueError('historical configuration mismatch')
@@ -99,7 +99,7 @@ def _native_attempt(directory, suite, task, config, binding):
     record = {'origin': 'fresh', 'status': 'error', 'native_utility': None,
               'started_at': datetime.now(timezone.utc).isoformat(),
               'trace_path': None, 'trace_sha256': None, 'api_accounting': None, 'total_tokens': None}
-    _write_new(directory / 'attempt_manifest.json', {'binding_sha256': _digest(binding),
+    _write_new(directory / 'attempt_manifest.json', {'benchmark': benchmark_identity(), 'binding_sha256': _digest(binding),
                'suite_name': suite.name, 'task_id': task.ID, 'started_at': record['started_at']})
     tracker = None
     try:
@@ -159,7 +159,7 @@ def _attempts(root, suite_name, task_id, binding):
 def _report(root, binding, decisions, rejected):
     counts = Counter(d['status'] for tasks in decisions.values() for d in tasks.values())
     attempts = [a for tasks in decisions.values() for d in tasks.values() for a in d['attempts']]
-    report = {'schema_version': SCHEMA, 'binding_sha256': _digest(binding), 'counts': dict(counts),
+    report = {'schema_version': SCHEMA, 'benchmark': benchmark_identity(), 'binding_sha256': _digest(binding), 'counts': dict(counts),
               'expected_targets': sum(len(e['injection_tasks']) for e in binding['catalog'].values()),
               'processed_targets': sum(counts.values()),
               'attempt_counts': dict(Counter(a['status'] for a in attempts)), 'decisions': decisions,
@@ -180,13 +180,17 @@ def _report(root, binding, decisions, rejected):
     return report
 
 
-def screen(*, config_path, run_name, results_dir=None, reuse_from=None, suites=SUITES):
+def screen(*, config_path, run_name, results_dir=None, reuse_from=None, suites=None):
+    backend = get_backend()
+    suites = list(backend.suites) if suites is None else list(suites)
+    if not suites or len(set(suites)) != len(suites) or not set(suites) <= set(backend.suites):
+        raise ValueError(f'suites must select from {", ".join(backend.suites)}')
     progress = Progress()
     progress.emit('启动，正在读取配置与任务目录。')
     config = resolve_model_config(config_path=config_path)
     current_binding = _binding(config, suites)
     root = Path(results_dir or RESULTS_DIR / 'injection_precheck') / (
-        shared._safe_result_component(config.model_id, 'model') + '_' + shared._safe_result_component(run_name, 'screen'))
+        shared._safe_result_component(config.model_id, 'model') + '_' + backend.id + '_' + shared._safe_result_component(run_name, 'screen'))
     if reuse_from is not None and not Path(reuse_from).is_dir():
         raise ValueError('--reuse-from must be an existing benchmark run directory')
     with _lock(root):
@@ -252,7 +256,7 @@ def screen(*, config_path, run_name, results_dir=None, reuse_from=None, suites=S
         if report['counts'].get('unresolved', 0):
             progress.emit(f'存在待解决目标，未生成名单；以同一条 screen 命令续跑。报告：{root / "summary.md"}；明细：{root / "status.json"}')
             return 1
-        cohort = {'schema_version': SCHEMA, 'suite_version': 'v1.2', 'task_scope': 'screened',
+        cohort = {'schema_version': SCHEMA, 'benchmark': benchmark_identity(), 'suite_version': 'v1.2', 'task_scope': 'screened',
                   'selection_rule': RULE, 'binding': current_binding, 'decisions': decisions,
                   'suites': {name: {'user_task_ids': entry['user_task_ids'],
                       'injection_task_ids': [i for i, d in decisions[name].items() if d['status'] == 'kept']}
@@ -273,6 +277,7 @@ def cli(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     commands = parser.add_subparsers(dest='command', required=True)
     sub = commands.add_parser('screen', help='直接预检 injection GOAL 并冻结筛选名单')
+    sub.add_argument('--suites', nargs='+', metavar='SUITE', help='选择当前环境支持的场景；默认全部场景')
     sub.add_argument('--model-config', dest='config_path')
     sub.add_argument('--name', dest='run_name', required=True)
     sub.add_argument('--results-dir', help='默认 results/injection_precheck')

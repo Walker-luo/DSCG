@@ -30,8 +30,77 @@ def summary(suite, utility, attack, defense):
 
 
 class DashboardHistoryTests(unittest.TestCase):
+    def test_history_preserves_dynamic_suites_and_recorded_benchmark_identity(self):
+        identity = {"id": "agentdyn", "catalog_sha256": "catalog-a", "revision": "revision-a"}
+        payload = {**summary("shopping", .5, 0, 1), "benchmark": identity,
+                   "task_selection": {"user_task_ids": ["u1"], "injection_task_ids": ["i1"]}}
+        write_json(self.results_root / "benchmarks/agentdyn_trial/tool_knowledge/shopping/summary.json", payload)
+        with patch("dashboard.app.RESULTS_DIR", self.results_root):
+            catalog = self.client.get("/api/history/catalog").get_json()
+            run = next(row for row in catalog if row["source"].endswith("tool_knowledge"))
+            legacy = next(row for row in catalog if row["source"].startswith("partial_benchmark"))
+            self.assertEqual(run["benchmark"], identity)
+            self.assertEqual(run["suites"][0]["suite_name"], "shopping")
+            self.assertEqual(run["suites"][0]["task_selection"], payload["task_selection"])
+            self.assertEqual(legacy["benchmark_id"], "unknown")
+            self.assertIsNone(legacy["benchmark"])
+            response = self.client.post("/api/history/analyze", json={"run_ids": [run["id"], legacy["id"]]})
+            self.assertFalse(response.get_json()["paired_comparison_ready"])
+            self.assertIn("benchmark_or_catalog_mismatch", response.get_json()["comparison_warnings"])
+            analyzed = response.get_json()["experiments"][0]
+            self.assertEqual(analyzed["benchmark"], identity)
+
+    def test_export_includes_recorded_identity_and_warns_before_pairing(self):
+        identity = {"id": "agentdojo", "repository": "https://github.com/ethz-spylab/agentdojo",
+                    "revision": "revision", "suite_version": "v1.2",
+                    "implementation_sha256": "impl", "catalog_sha256": "catalog",
+                    "package_version": "0.1.35", "runtime_variant": "reviewed",
+                    "source_kind": "pypi-release", "release_sha256": "release-hash",
+                    **{role + "_sha256": role for role in ("tasks", "environments", "attacks", "tools")}}
+        run_root = self.results_root / "dashboard/agentdyn_export"
+        write_json(run_root / "overall_results.json", {
+            "benchmark": identity, "config": {"benchmark": identity},
+            "suites": [{**summary("github", 100, 0, 100), "benchmark": identity,
+                        "task_counts": {"total_tasks": 2, "utility_passed": 1, "attacked_tasks": 2, "utility_valid": 1, "execution_errors": 1},
+                        "task_selection": {"user_task_ids": ["u1"], "injection_task_ids": ["i1"]}}],
+            "structured_records": [{"suite_name": "github", "user_task_id": "u1", "injection_task_id": "i1",
+                "utility_success": True, "attack_success": False, "defense_success": True, "sample_status": "valid"}]})
+        with patch("dashboard.app.RESULTS_DIR", self.results_root):
+            catalog = self.client.get("/api/history/catalog").get_json()
+            run = next(row for row in catalog if row["source"] == "dashboard/agentdyn_export")
+            response = self.client.post("/api/history/export", json={"run_ids": [run["id"]]})
+        self.assertEqual(response.status_code, 200)
+        with zipfile.ZipFile(io.BytesIO(response.data)) as archive:
+            data = json.loads(archive.read("analysis.json"))
+            rows = list(csv.DictReader(io.StringIO(archive.read("task_records.csv").decode("utf-8-sig"))))
+        self.assertEqual(data["experiments"][0]["benchmark"], identity)
+        self.assertTrue(data["paired_comparison_ready"])
+        counts = data["experiments"][0]["suites"][0]["task_counts"]
+        self.assertEqual(counts["utility_valid"], 1)
+        self.assertEqual(counts["execution_errors"], 1)
+        self.assertEqual(rows[0]["benchmark_id"], "agentdojo")
+        self.assertEqual(rows[0]["benchmark_catalog_sha256"], "catalog")
+        for role in ("tasks", "environments", "attacks", "tools"):
+            self.assertEqual(rows[0]["benchmark_" + role + "_sha256"], role)
+
+    def test_unknown_sibling_suite_cannot_inherit_identity_or_pair(self):
+        from dashboard.app import _history_benchmark_metadata, _comparison_metadata
+        identity = {"id": "agentdyn", "repository": "repo", "revision": "rev", "suite_version": "v1.2",
+                    "implementation_sha256": "impl", "catalog_sha256": "cat"}
+        entry = {"suites": {"shopping": {"summary": {"benchmark": identity}}, "github": {"summary": {}}}}
+        self.assertIsNone(_history_benchmark_metadata(entry)["benchmark"])
+        selection = {"user_task_ids": ["u1"], "injection_task_ids": ["i1"]}
+        run = {"benchmark": identity, "suites": [
+            {"suite_name": "shopping", "benchmark": identity, "task_selection": selection},
+            {"suite_name": "github", "benchmark": None, "task_selection": selection}]}
+        comparison = _comparison_metadata([run, run])
+        self.assertFalse(comparison["paired_comparison_ready"])
+        self.assertIn("benchmark_identity_unavailable", comparison["comparison_warnings"])
+
     def setUp(self):
-        self.temp_dir = tempfile.TemporaryDirectory()
+        artifact_root = Path(__file__).resolve().parents[1] / "workshop/artifacts/20261018_dual_benchmark/dashboard"
+        artifact_root.mkdir(parents=True, exist_ok=True)
+        self.temp_dir = tempfile.TemporaryDirectory(dir=artifact_root)
         self.results_root = Path(self.temp_dir.name)
         self.client = app.test_client()
 
@@ -254,7 +323,7 @@ class DashboardHistoryTests(unittest.TestCase):
         self.assertEqual(set(archive.namelist()), {
             "analysis.json", "summary.csv", "task_records.csv", "README.md",
         })
-        self.assertEqual(data["schema_version"], 1)
+        self.assertEqual(data["schema_version"], 2)
         self.assertEqual([run["source"] for run in data["experiments"]], [
             "partial_benchmark/trial-p04", "dashboard/run-001",
         ])

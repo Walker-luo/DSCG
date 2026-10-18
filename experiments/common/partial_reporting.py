@@ -4,7 +4,7 @@ import json
 from pathlib import Path
 from urllib.parse import quote
 
-from experiments.common.partial_controls import SUITES
+from dscg.benchmark_catalog import benchmark_identity, get_backend, get_suites
 
 
 MAX_EXCERPTS = 6
@@ -104,7 +104,8 @@ def collect_suite_report(base_dir: Path, suite_dir: Path, summary: dict, records
             excerpt_status, excerpts, task_error = _read_excerpts(trace)
             case.update(excerpt_status=excerpt_status, excerpts=excerpts)
             if task_error:
-                case["failure_types"].append("task_error")
+                if "task_error" not in case["failure_types"]:
+                    case["failure_types"].append("task_error")
         else:
             case["excerpt_status"] = "trace_outside_run"
         user_task = suite.user_tasks.get(user)
@@ -120,7 +121,7 @@ def collect_suite_report(base_dir: Path, suite_dir: Path, summary: dict, records
     for record in records:
         user, injection = record["user_task_id"], record["injection_task_id"]
         seen.add((user, injection if attacked else None))
-        failures = []
+        failures = ["task_error"] if record.get("execution_error") else []
         if record["utility_success"] is False:
             failures.append("tsr_failure")
         if record["attack_success"] is True:
@@ -140,7 +141,7 @@ def collect_suite_report(base_dir: Path, suite_dir: Path, summary: dict, records
     return {
         "attack": attack, "suite": summary["suite_name"], "summary": summary,
         "summary_path": (suite_dir / "summary.json").relative_to(base_dir).as_posix(),
-        "status": "partial" if missing or unavailable else "completed",
+        "status": "partial" if missing or unavailable or any(r.get("execution_error") for r in records) else "completed",
         "tsr_failures": sum("tsr_failure" in case["failure_types"] for case in cases),
         "asr_successes": sum("asr_success" in case["failure_types"] for case in cases),
         "metric_unavailable": unavailable + missing,
@@ -167,6 +168,7 @@ def write_run_overview(base_dir: Path, attack_names: list[str], suites: list[str
                        run_records: list[dict], suite_reports: list[dict], *, model_id=None,
                        task_scope='partial') -> tuple[Path, Path]:
     """Write two additive run artifacts. Native traces and metrics stay untouched."""
+    backend = get_backend()
     summary_path = base_dir / "summary.md"
     detail_path = base_dir / "failure_cases.jsonl"
     reports = {(report["attack"], report["suite"]): report for report in suite_reports}
@@ -181,19 +183,20 @@ def write_run_overview(base_dir: Path, attack_names: list[str], suites: list[str
                           "excerpt_status": "run_aborted", "excerpts": [],
                           "source_path": "attack_manifest.json"})
     for line, case in enumerate(cases, 1):
-        case.update(schema_version="dscg.partial-failure.v1", case_id=f"F{line:04d}", detail_line=line)
+        case.update(schema_version="dscg.partial-failure.v2", benchmark=benchmark_identity(), case_id=f"F{line:04d}", detail_line=line)
     with detail_path.open("w", encoding="utf-8") as stream:
         for case in cases:
             stream.write(json.dumps(case, ensure_ascii=False) + "\n")
 
     title = {'full': '全量评测摘要', 'screened': '筛选目标评测摘要（全部用户任务）',
              'partial_screened': '小批量筛选目标评测摘要（每场景前 3 个用户，原前 3 个注入目标内筛选）'}.get(task_scope, '小批量评测摘要')
-    if task_scope == 'full' and set(suites) != set(SUITES):
+    if task_scope == 'full' and set(suites) != set(backend.suites):
         title = '所选场景全任务评测摘要'
     lines = [f"# {title}", "", f"模型：{_cell(model_id)}；运行目录：{_cell(base_dir.name)}。", "",
+             f"基准：{_cell(backend.label)}；revision={benchmark_identity()['revision']}。", "",
              f"本次场景：{', '.join(suites)}。", "",
              "TSR 失败 = utility=false；防御失败 = 原生 ASR=true。缺失指标和运行错误单列，不当作攻击成功或防御成功。",
-             "ASR 为 AgentDojo 原生 predicate；DoS 的 ASR=not utility，不能和 targeted ASR 合并。",
+             "ASR 为当前基准原生 predicate；DoS 的 ASR=not utility，不能和 targeted ASR 合并。",
              "TSR/ASR 分母分别是已返回效用结果数/有效布尔安全结果数；预检不计入这些分母。Token 含主模型和审计模型，沿用各场景 cost_scope。", "",
              "| Attack | 场景 | 状态 | 完成/计划 | TSR | ASR | 防御成功率 | Token 主/审计/合计 | TSR失败 | ASR成功 | 指标缺失 | 任务错误 | 场景数据 |",
              "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |"]
@@ -213,7 +216,7 @@ def write_run_overview(base_dir: Path, attack_names: list[str], suites: list[str
                 sec_tokens = data.get("sec_overhead", {}).get("total_tokens", 0)
                 status = report["status"] + (" (DoS)" if data["attack_kind"] == "dos" else "")
                 row = [attack, suite, status, f"{total}/{counts['planned_tasks']}",
-                       _rate(counts["utility_passed"], total),
+                       _rate(counts["utility_passed"], counts.get("utility_valid", total)),
                        _rate(report["asr_successes"], valid, enabled=attacked),
                        _rate(valid - report["asr_successes"], valid, enabled=attacked),
                        f"{main_tokens}/{sec_tokens}/{main_tokens + sec_tokens}",

@@ -1,5 +1,4 @@
 (() => {
-  const suites = ["workspace", "travel", "banking", "slack"];
   const colors = ["--blue", "--amber", "--purple", "--green", "--red"];
   const historyCharts = window.DSCGHistoryCharts;
   const historySelection = window.DSCGHistorySelection;
@@ -171,7 +170,7 @@
       title.textContent = historySelection.attackLabel(run.attack_name);
       label.title = (run.label || "") + " · " + run.source;
       const detail = document.createElement("small");
-      detail.textContent = (run.suites || []).map((item) => item.suite_name).join(", ");
+      detail.textContent = (run.benchmark_id || "历史 / unknown") + " · " + (run.suites || []).map((item) => item.suite_name).join(", ");
       text.append(title, detail);
       label.append(checkbox, versionBadge(experimentStyles[run.id]), text);
       list.append(label);
@@ -193,9 +192,7 @@
     const previous = select.value;
     select.replaceChildren();
     addOption(select, "all", "全部场景");
-    suites.forEach((suite) => {
-      if (available.has(suite)) addOption(select, suite, suite);
-    });
+    Array.from(available).sort().forEach((suite) => addOption(select, suite, suite));
     select.value = available.has(previous) ? previous : "all";
     updateExportButton();
     updateControls();
@@ -346,7 +343,8 @@
     const status = document.querySelector("#history-analysis-status");
     document.querySelector("#history-source-caption").textContent =
       experiments.length + " 项实验 · " + rows.length + " 个场景结果";
-    status.textContent = "已载入 " + experiments.length + " 项实验、" + rows.length + " 个场景结果。";
+    status.textContent = "已载入 " + experiments.length + " 项实验、" + rows.length + " 个场景结果。" +
+      (result.paired_comparison_ready === false ? " 基准身份或任务选择未对齐：各运行独立展示，不能合并分母或据此作配对比较。" : "");
     if (view === "heatmap") {
       renderHeatmap(experiments, suiteTitle);
       return;
@@ -487,10 +485,14 @@
     experiments.forEach((run) => {
       (run.suites || []).forEach((item) => {
         (item.task_records || []).forEach((record) => {
-          const key = JSON.stringify([item.suite_name, record.user_task_id, record.injection_task_id]);
+          const identity = item.benchmark;
+          const complete = identity && ["id", "repository", "revision", "suite_version", "implementation_sha256", "catalog_sha256"].every(key => identity[key]);
+          const group = complete ? JSON.stringify(Object.keys(identity).sort().map(key => [key, identity[key]])) : run.id;
+          const selection = item.task_selection ? JSON.stringify(Object.keys(item.task_selection).sort().map(key => [key, item.task_selection[key]])) : run.id;
+          const key = JSON.stringify([group, selection, item.suite_name, record.user_task_id, record.injection_task_id]);
           if (!matrix.has(key)) {
             matrix.set(key, {
-              suite: item.suite_name, user: record.user_task_id,
+              benchmark: run.benchmark_id || "unknown", suite: item.suite_name, user: record.user_task_id,
               injection: record.injection_task_id, values: new Map(),
             });
           }
@@ -528,7 +530,7 @@
     table.append(head);
     const body = document.createElement("tbody");
     const sorted = Array.from(matrix.values()).sort((left, right) =>
-      suites.indexOf(left.suite) - suites.indexOf(right.suite) ||
+      left.suite.localeCompare(right.suite) ||
       left.user.localeCompare(right.user, undefined, { numeric: true }) ||
       left.injection.localeCompare(right.injection, undefined, { numeric: true })
     );
@@ -536,7 +538,7 @@
       const row = document.createElement("tr");
       const name = document.createElement("th");
       name.scope = "row";
-      name.textContent = task.suite + " / " + task.user + " / " + task.injection;
+      name.textContent = task.benchmark + " / " + task.suite + " / " + task.user + " / " + task.injection;
       row.append(name);
       experiments.forEach((run) => {
         const value = task.values.get(run.id);
@@ -556,7 +558,7 @@
     legend.textContent = "成功：效用任务通过　失败：效用任务未通过　无数据：该实验未覆盖此任务";
     target.append(legend);
     document.querySelector("#history-analysis-status").textContent =
-      "热图包含 " + matrix.size + " 个任务组合。" +
+      "热图包含 " + matrix.size + " 个任务组合；仅相同已记录基准、目录与任务选择的行对齐，身份缺失时独立展示。" +
       (truncated ? " 部分任务记录受接口上限截断。" : "");
   }
 
@@ -582,7 +584,7 @@
       name.textContent = historyCharts.describeExperiment(run).label;
       const source = document.createElement("small");
       source.className = "history-table-source";
-      source.textContent = run.source;
+      source.textContent = (run.benchmark_id || "unknown") + " · " + run.source;
       nameCell.append(versionBadge(experimentStyles[run.id]), name, source);
       row.append(nameCell);
       addCell(row, historySelection.attackLabel(run.attack_name));

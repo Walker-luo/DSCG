@@ -10,6 +10,7 @@ from agentdojo.benchmark import load_task_results
 from pydantic import ValidationError
 
 from experiments.common.partial_controls import RunConfigurationError
+from dscg.benchmark_catalog import benchmark_identity
 
 
 def _read(path):
@@ -27,13 +28,18 @@ def _hash(path):
 
 def compatible_source(old, current):
     """Reviewed measurement transitions only; precheck eligibility is separate."""
+    if (not isinstance(old.get('benchmark'), dict)
+            or old.get('benchmark') != current.get('benchmark')
+            or current.get('benchmark') != benchmark_identity()):
+        return False
     if any(old.get(k) != current.get(k) for k in ('python', 'agentdojo')):
         return False
     previous, target = old.get('source_sha256'), current.get('source_sha256')
     if previous and previous == target:
         return True
     mapping = _read(Path(__file__).with_name('benchmark_reuse_compatibility.json'))
-    if mapping.get('schema_version') != 'dscg.benchmark-reuse-compatibility.v1':
+    if (mapping.get('schema_version') != 'dscg.benchmark-reuse-compatibility.v2'
+            or mapping.get('benchmark') != current['benchmark']):
         return False
     # Runtime equality is enforced above. The mapping author's Python patch
     # version does not restrict an otherwise identical old/current runtime.
@@ -63,7 +69,7 @@ def _compatible_binding(old, current):
 
 
 def execution_plan(task_scope, suites, attacks, cohort_sha256=None):
-    result = {'schema_version': 'dscg.benchmark-plan.v1', 'task_scope': task_scope,
+    result = {'schema_version': 'dscg.benchmark-plan.v2', 'benchmark': benchmark_identity(), 'task_scope': task_scope,
               'suites': list(suites), 'attacks': list(attacks)}
     if cohort_sha256 is not None: result['cohort_sha256'] = cohort_sha256
     return result
@@ -87,6 +93,8 @@ class ReusePlan:
                   if screened is not None else None)
         recorded_attacks = []; recorded_suites = []
         for filename, item in metadata:
+            if item.get('benchmark') != benchmark_identity():
+                raise RunConfigurationError('recorded benchmark identity differs; use a new run for the current backend')
             if 'task_scope' in item and item['task_scope'] != task_scope:
                 raise RunConfigurationError('--reuse task scope differs from original run')
             if 'attacks' in item:

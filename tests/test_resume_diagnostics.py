@@ -22,9 +22,9 @@ class ResumeDiagnosticsTests(unittest.TestCase):
 
     def test_reviewed_code_accepts_matching_server_runtime_independently_of_mapping_runtime(self):
         path = Path(reuse.__file__)
-        old = {'python': '3.10.19', 'agentdojo': '0.1.35', 'source_sha256': {'old.py': 'known'}}
+        old = {'benchmark': __import__('test_partial_agentdyn').DOJO_IDENTITY, 'python': '3.10.19', 'agentdojo': '0.1.35', 'source_sha256': {'old.py': 'known'}}
         current = {**old, 'source_sha256': {'new.py': 'current'}}
-        mapping = {'schema_version': 'dscg.benchmark-reuse-compatibility.v1',
+        mapping = {'schema_version': 'dscg.benchmark-reuse-compatibility.v2', 'benchmark': __import__('test_partial_agentdyn').DOJO_IDENTITY,
                    'reviewed_sources': [{**old, 'python': '3.10.21'}],
                    'current_source_paths': ['new.py'],
                    'current_harness_sha256': {'experiments/common/benchmark_reuse.py': hashlib.sha256(path.read_bytes()).hexdigest()}}
@@ -37,7 +37,7 @@ class ResumeDiagnosticsTests(unittest.TestCase):
             self.assertFalse(reuse.compatible_source(old, current))
 
     def rejected_cohort(self, recorded, current):
-        frozen = {'schema_version': cohort.SCHEMA, 'selection_rule': cohort.RULE, 'binding': recorded}
+        frozen = {'schema_version': cohort.SCHEMA, 'benchmark': __import__('test_partial_agentdyn').DOJO_IDENTITY, 'selection_rule': cohort.RULE, 'binding': recorded}
         frozen['cohort_sha256'] = cohort._digest(frozen)
         with patch.object(cohort, '_binding', return_value=current):
             with self.assertRaises(ValueError) as error:
@@ -45,8 +45,8 @@ class ResumeDiagnosticsTests(unittest.TestCase):
         return str(error.exception)
 
     def binding(self):
-        return {'catalog': {}, 'main_model': {'model_id': 'offline', 'base_url': 'private-url'},
-                'source': {'python': '3.10.19', 'agentdojo': '0.1.35', 'source_sha256': {'old.py': 'known'}},
+        return {'benchmark': __import__('test_partial_agentdyn').DOJO_IDENTITY, 'catalog': {}, 'main_model': {'model_id': 'offline', 'base_url': 'private-url'},
+                'source': {'benchmark': __import__('test_partial_agentdyn').DOJO_IDENTITY, 'python': '3.10.19', 'agentdojo': '0.1.35', 'source_sha256': {'old.py': 'known'}},
                 'screening_script_sha256': 'old'}
 
     def test_cohort_error_reports_runtime_versions(self):
@@ -84,3 +84,14 @@ class ResumeDiagnosticsTests(unittest.TestCase):
                 self.assertIn('screening source changed', stream.getvalue())
                 self.assertNotIn('模型配置错误', stream.getvalue())
                 self.assertNotIn('DSCG_MAIN_*', stream.getvalue())
+
+
+# Explicitly retain historical upstream suites as generic offline fixtures.
+def setUpModule():
+    global _fixture_backend
+    from test_partial_agentdyn import legacy_fixture_backend
+    _fixture_backend = legacy_fixture_backend(globals())
+
+
+def tearDownModule():
+    _fixture_backend.close()

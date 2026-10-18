@@ -1,6 +1,26 @@
 # 当前框架与平台展示交接
 
-更新时间：2026-10-17（目录与文档整理，运行机制未变）。当前默认版本 **three-layer-v3.1**。本次用户授权实现有限L1结构化投影，沿用L2工具视图/任务文件与L3动作正文审查；默认投影已接入factory、partial和网页API，架构说明同步。Spotlighting风格来源封装仍是不适用输入的回退。正式研究路线和闸门不改变。
+更新时间：2026-10-18（AgentDojo / AgentDyn 按环境自动识别；三层防御规则及默认开关保持）。当前默认版本 **three-layer-v3.1**。此前用户授权实现有限L1结构化投影，沿用L2工具视图/任务文件与L3动作正文审查；默认投影已接入factory、partial和网页API，架构说明同步。Spotlighting风格来源封装仍是不适用输入的回退。正式研究路线和闸门不改变。
+
+## 双后端平台交接（2026-10-18）
+
+同一个 Dashboard 入口按 Python 进程实际安装的来源与锁定源码自动识别后端：`ipi` 使用 AgentDojo，`ipi-agentdyn` 使用 AgentDyn，不增加后端选择器或额外参数。切换环境后须重启 Dashboard；需要并行查看时可在两个终端使用不同 `PORT`，各进程保持各自后端。启动命令见 [Dashboard 指南](./dashboard.md)。这替代 2026-10-17 仅允许 AgentDyn 新执行的接线限制；原始说明已保存在本次整理的原文归档中。
+
+两边的 suite version 均为 `v1.2`。AgentDojo 注册 workspace/travel/banking/slack，用户/注入任务分别为 40/14、20/7、16/9、21/5；AgentDyn 注册 shopping/github/dailylife，分别为 20/9、20/9、20/10。全用户 clean 范围分别为 97 与 60 个原生用户任务，不是本次模型结果。网页场景、计数、预估任务、原生循环标签与攻击注册表来自当前已验证安装；任务上限、seed、模型连接、原生 baseline、三层开关及路由规则保持原设置。
+
+来源和源码按 [AgentDojo](../config/agentdojo.lock.json)与 [AgentDyn](../config/agentdyn.lock.json)两份锁定文件核对。AgentDyn 固定 Git 提交 `5353cf7615b135cace8d07c8f12dac53a16b6db3`；AgentDojo 记录 PyPI 版本、发行包哈希及被允许的已审阅本地变体。`runtime_variant` 和实际 `implementation_sha256` 保留变体差异，不能将审阅后的本地内容称作逐字节原发行版。
+
+`/api/config` 在未知安装或来源/字节不符时返回 `benchmark_id=unknown`、`backend_ready=false`、空场景/攻击及 `backend_error`，页面可打开且禁用启动。新执行在创建模型客户端前失败关闭，后台任务再次核对提交时身份；历史分析不依赖活动后端通过校验。新网页 ID 自动带实际 `agentdojo_` 或 `agentdyn_` 前缀。配置、summary、整体结果、报告和下载保留 `benchmark` 的 id、repository、revision、suite_version、implementation_sha256、catalog_sha256、任务/环境/攻击/工具哈希，以及 package_version、source_kind、runtime_variant；AgentDojo 另保留 release_sha256。
+
+风险目录按活动后端选择，`tool_metadata_selection`、`tool_metadata_path` 和单独的 `tool_metadata_error` 报告实际来源、路径与问题。已识别为相反基准的通用 local 目录会被跳过并给出 warning，保留用户原文件；未归属的自定义通用目录要求明确配置，不静默合并。后端就绪与风险配置错误分别报告，baseline 不使用 DSCG 风险目录；DSCG 在模型创建前验证目录覆盖及分类。
+
+历史场景和图表按记录动态生成，两个基准的新旧结果均可读；缺失基准身份保持 `unknown`，不根据当前安装或相邻场景补写。旧记录仅供历史查看/导出，新实验用新名称，不能借当前身份自动续跑旧未知目录。历史分析/导出记录 `paired_comparison_ready`、`comparison_warnings` 和 task_selection；不同基准、任务目录、运行变体或未知身份不能合并分母或计算配对收益。工作台多运行对比拒绝未对齐请求，历史图表独立展示，热图按已记录身份及任务选择分隔。同一结果混入不同身份时聚合指标和分母留空。身份/任务一致也不证明模型修订、攻击投递或独立 oracle 一致。
+
+运行错误保留原始结果和轨迹；派生效用/安全标签留空，错误不计入有效分母，不把原生谓词在异常轨迹上的布尔输出当成有效安全结果。记录分别保留计划/实际任务、有效分母、错误数和 Token；下载 schema 2 保留原汇总与明细统计两套口径，不补零。
+
+AgentDyn 的 `browse_webpage`、`input_to_webpage` 可派发模拟账户/文件/仓库修改、外发或转账等处理器；[内置风险目录](../config/tools.agentdyn-v1.2.toml)按共享名称的实现并集保守分类，不能按“浏览”名称走只读免审。单一 effect 字段只记录主导风险；当前仍是工具级授权与语义审计，不强制校验 URL、域名、处理器、对象、目的地或参数，也不限制工具内部每个副作用。此前银行月支出 L1 投影未扩展为 AgentDyn 专用投影。
+
+本次 Dashboard 在两环境分别通过 47 项 Python 检查，Node 历史/UI 检查 41 项通过，另完成实际目录、metadata 选择、新 ID 与未知后端拒绝/保留历史探测；见 [验证记录](../workshop/artifacts/20261018_dual_benchmark/dashboard/dashboard_validation.json)。没有模型调用或计分 rollout，也没有图形浏览器布局验收；不证明模型效果、E0 通过、浏览器操作安全保证或框架增益。研究闸门不因双后端接线改变。
 
 ## v3.1增量交接
 
@@ -19,7 +39,7 @@ L3使用最多8条当前任务相关调用—返回对，最近4条必留，再�
               └──── 主模型规划 ← L1 有限投影/来源封装 ← 结果/错误 ──┘
 ```
 
-L1不增加独立模型调用：明确的原生银行月支出任务保留全部交易六字段，省略subject自由文本；其他输入保留原来源封装，原历史与L3正文保持。投影不是事实认证或范围授权。当前规则要求日常任务/摘要中的无关注入提醒使用概述，避免转述攻击目标；用户明确要求的分析/安全报告/必要引用仍支持原文。该日常输出规则仍是规划提示；有限投影只改变支持域内的工具视图，最终文本没有新增过滤器。L3仍审计当前动作，外发同时审查正文与目的地；安全提醒若夹带无关攻击链接/目标也可能越出任务，必要来源链接及显式安全分析可以保留。API默认纯算法路由off，full/partial的DSCG CLI默认shadow，baseline/NoChecker自动off；重审0、completion_prompt=false；公开sink-free读取免审是既有行为。有效deny对已授权sink-free读取仍可能被原Monitor的READ_ONLY_SOURCE_ALLOW覆盖，abstain/错误阻断。对象/目的地/参数/数据权限未强制约束，最终纯文本回答不经动作审计。
+L1不增加独立模型调用：此前支持的明确原生银行月支出任务保留全部交易六字段，省略subject自由文本；其他输入保留原来源封装，原历史与L3正文保持。投影不是事实认证或范围授权。当前规则要求日常任务/摘要中的无关注入提醒使用概述，避免转述攻击目标；用户明确要求的分析/安全报告/必要引用仍支持原文。该日常输出规则仍是规划提示；有限投影只改变支持域内的工具视图，最终文本没有新增过滤器。L3仍审计当前动作，外发同时审查正文与目的地；安全提醒若夹带无关攻击链接/目标也可能越出任务，必要来源链接及显式安全分析可以保留。API默认纯算法路由off，full/partial的DSCG CLI默认shadow，baseline/NoChecker自动off；重审0、completion_prompt=false；公开sink-free读取免审是既有行为。有效deny对已授权sink-free读取仍可能被原Monitor的READ_ONLY_SOURCE_ALLOW覆盖，abstain/错误阻断。对象/目的地/参数/数据权限未强制约束，最终纯文本回答不经动作审计。
 
 ## L2 已实施与限制
 
@@ -45,7 +65,7 @@ L1不增加独立模型调用：明确的原生银行月支出任务保留全部
 | audit_router_mode/artifact | API off；full/partial DSCG CLI shadow，baseline/NoChecker off | CSA硬门/真实校准不变，网页专门控件仍待完成 |
 | trace_level | summary | standard判决/账本、full压缩诊断；保留实际字段覆盖 |
 
-网页完整/NoL1/NoL2/NoL3预设和自定义组合已接线。**V2风格**预设关闭L1、前置、视图与文件展开，但新版目录复核仍存在，不是历史V2精确复现。L2/L3全关时L1关闭；原生baseline始终走AgentDojo原循环，不带DSCG元数据。
+网页完整/NoL1/NoL2/NoL3预设和自定义组合已接线。**V2风格**预设关闭L1、前置、视图与文件展开，但新版目录复核仍存在，不是历史V2精确复现。L2/L3全关时L1关闭；原生baseline始终走活动后端的原生工具循环，不带DSCG元数据。
 
 [app.js](../dashboard/static/js/app.js)区分待启动配置和保存的有效配置；HTML/TXT报告显示已保存开关。概览新增完整/可见工具累计量、编译器调用和文件展开，且只统计实际计分任务的 `dscg_l2` trace。编译器调用可能零模型调用；字符/工具定义数不是Tokens。旧记录缺字段显示未记录，不推定零；攻击生成预检不计进该trace统计。
 
@@ -57,7 +77,7 @@ L1不增加独立模型调用：明确的原生银行月支出任务保留全部
 | --- | --- |
 | 架构弹窗和实际循环 | 已同步v3有限L1投影及原L3规则；页面和API版本来自引擎常量，预览随工具视图/委托开关更新；[index.html](../dashboard/templates/index.html)、[app.js](../dashboard/static/js/app.js) |
 | 网页开关到factory | 已接线并覆盖配置依赖、保存配置显示；[evaluation.py](../dashboard/evaluation.py)、[app.py](../dashboard/app.py) |
-| 历史分析下载、多指标分图 | 既有实现保留，本轮Node28/28；目录与manifest身份分别记录，旧结果不重标、原始数据不迁移 |
+| 历史分析下载、多指标分图 | 两个基准的新旧场景按记录动态读取；benchmark/运行变体身份、任务选择与对齐告警进入导出，不同目录不配对/合并；本次 Node41/41，旧结果不重标、原始数据不迁移 |
 | L2记录与覆盖 | 已接线，概览单列L2 trace覆盖；已保存版本/路由状态取自运行记录，成本不可比较标记明确显示；[控件/trace检查](../tests/test_l2_controls.py) |
 | CSA专门控件、独立失败片段浏览器 | 仍未实施；API/partial CSA能力不能当作网页已提供 |
 
@@ -70,3 +90,5 @@ L1不增加独立模型调用：明确的原生银行月支出任务保留全部
 当前真实E0仍pending，I3为24个有效探针/8个范围缺口/0个工具边界缺口，I2仍locked。后续工作按 [研究路线](../../research/technical_route.md)选择，保留原始评分、数据与版本身份。
 
 框架优化可用partial的场景选择和冻结cohort；正式full及全用户筛选测量保持独立，具体命令和分母见 [小批量测试指南](./partial_benchmark.md#对照与输出)与[全量指南](./benchmark.md)。新对照使用新run名，Agent产物写入新的workshop/artifacts目录。CSA网页专门控件、失败片段浏览器及独立审计证据面板仍未交付，不把文档整理视为实现。
+
+本轮复核还修正了网页clean的原生函数签名与版本传递。原生捕获的API/JSON运行错误保留原JSON标签，派生TSR/ASR排除错误行，另报total/planned、utility_valid/security_valid及execution_errors；Token不删除。历史页不从相邻场景推定缺失身份，export schema2保留四项组件哈希。

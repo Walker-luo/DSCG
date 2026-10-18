@@ -232,3 +232,14 @@ test("single-suite axis labels wrap experiment names to fit independent panels",
   const format = config.options.scales.x.ticks.callback;
   assert.deepEqual(format.call({ getLabelForValue: () => runs[0].label }, 0), ["deepseek-flash", "baseline_new"]);
 });
+
+test('AgentDyn and recorded future suites are charted without a static suite list', () => {
+  const runs = [{id: 'agentdyn', suites: [
+    {suite_name: 'shopping', metrics: {utility_rate: 75}, overhead: {total_tokens: 20}},
+    {suite_name: 'github', metrics: {utility_rate: 50}, overhead: {total_tokens: 10}},
+    {suite_name: 'recorded_future', metrics: {utility_rate: 100}, overhead: {total_tokens: 5}},
+  ]}];
+  const chart = charts.metricConfigs(runs, {...selection, metrics: ['utility_rate']})[0].config;
+  assert.deepEqual(new Set(chart.data.labels), new Set(['shopping', 'github', 'recorded_future']));
+  assert.equal(chart.data.datasets[0].data.length, 3);
+});

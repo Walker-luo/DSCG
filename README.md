@@ -1,6 +1,15 @@
 # DSCG
 
-DSCG 是工具使用型 LLM Agent 的间接提示词注入（IPI）防御研究原型，基于 AgentDojo 比较任务成功率（TSR）、攻击成功率（ASR）和模型开销。
+DSCG 是工具使用型 LLM Agent 的间接提示词注入（IPI）防御研究原型，同时基于 AgentDojo 与 AgentDyn（动态环境扩展）比较任务成功率（TSR）、攻击成功率（ASR）和模型开销。
+
+**同一份代码，切换 conda 环境即可选择基准**，无需基准参数或修改工具配置：
+
+| 环境 | 基准 / 默认场景 | full clean | partial clean / typical |
+| --- | --- | ---: | ---: |
+| `ipi` | AgentDojo v1.2：workspace、travel、banking、slack | 97 | 12 / 108 |
+| `ipi-agentdyn` | AgentDyn v1.2：shopping、github、dailylife | 60 | 9 / 81 |
+
+启动按实际安装来源和完整源码识别，不依赖环境名称或同为0.1.35的版本号。两套新实验、预检、报告及网页使用各自目录与工具风险配置；旧结果仍可读，基准/任务/实现身份不同不能直接配对或合并分母。详见 [全量测试指南](./docs/benchmark.md)。
 
 ## 当前框架与工作流程
 
@@ -45,6 +54,8 @@ L3改为当前任务内最多8条调用—返回对（保留最近4条，再补�
 | **Monitor / 一次性票据** | 执行前再次复核权限、候选和审计结果；票据只能执行原调用一次，过期、篡改与重放阻断。 | 所有真实工具执行都要经过；这是执行基础设施。 |
 
 L2 默认沿用原授权编译策略：有效读取工具进入权限集合，写入/动作工具按任务选择。工具视图减少不可用工具描述，不自动收紧全部读取权限。可选宿主 profile 才对有限任务启用正负证据和必要读取闭包；默认没有内置业务 profile。个人/秘密读取仍送入 L3，其阻断受下文读取例外影响。
+
+**两个基准的适用范围：**AgentDojo保留现有银行有限投影；AgentDyn三个场景没有新增投影profile，L1使用完整来源封装。下文97/144条历史记录保持原实验身份，不代表本次双基准改造的新成绩。`read_file(path=...)` 的文本返回可沿用有限文件委托；`browse_webpage` 可能执行网页 handler，不能作为纯读取委托入口，也不能免审。工具级授权不能约束其内部每个 handler 或目标参数。
 
 ### L1 优化：任务限定的结构化投影
 
@@ -137,30 +148,38 @@ python -m experiments.run_partial_benchmark --name l3_shadow_new --audit-router-
 
 ## 安装与配置
 
-在 `DSCG/` 执行：
+在 `DSCG/` 首次创建所需环境；已有环境不要覆盖：
 
 ```bash
-conda env create -f environment.yml
-conda activate ipi
-cp config/models.example.toml config/models.local.toml
+conda env create -f environment.yml              # AgentDojo，ipi
+conda env create -f environment-agentdyn.yml     # AgentDyn，ipi-agentdyn
 ```
 
-在本地 TOML 中配置 `[main]`、`[security]` 的 provider、model_id 和 api_key_env，再设置对应 Key 环境变量；省略 `[security]` 会复用主模型。不要提交本地配置或凭证。项目使用 Python 3.10、AgentDojo 0.1.35；详细配置见[模型、工具与运行参数详解](./docs/model_tool_configuration.md)：解释模型字段/API Key获取、工具参数schema查看、六项风险元数据的作用、可选运行参数及离线检查；测试文件与指南见[测试文件索引](./docs/evaluation.md)。
+之后任选环境，同一命令自动识别：
+
+```bash
+conda activate ipi                     # 或 conda activate ipi-agentdyn
+python -m dscg.benchmark_catalog
+```
+
+项目使用Python3.10。AgentDojo固定官方0.1.35发行包及112个源码/数据文件；AgentDyn固定提交`5353cf7615b135cace8d07c8f12dac53a16b6db3`及1374个文件。本机旧ipi的单文件system角色适配另记实际runtime_variant，不冒充官方原版，也不修改环境。未知源码变化拒绝执行。
+
+保留已有 `config/models.local.toml` 和Key；首次配置参考example。模型与安全模型默认不变。风险目录自动按基准选择；现有通用tools.local与AgentDojo内置目录相同，会在AgentDojo使用，在AgentDyn选用对应内置目录并明确提示。自定义配置可使用基准专用local文件或显式参数，未知通用目录不静默忽略。详情见[模型、工具与运行参数详解](./docs/model_tool_configuration.md)及[测试文件索引](./docs/evaluation.md)。
 
 ## 对比测试
 
 **全部任务的正式对照使用 `experiments.run_benchmark`**，当前框架与无防御 baseline 的命令、任务/攻击规模和续跑方法见 [全量测试指南](./docs/benchmark.md)。下面的 partial 命令仅用于小规模回归。
 
-需要先检查攻击目标是否可直接完成时，使用 [Injection 目标预检](./docs/injection_precheck.md) 的 `run_injection_precheck screen`：提供实时进度、兼容旧预检复用、失败复测和冻结名单。后续测量统一使用 `run_benchmark`，加 `--cohort PATH` 时保留全部 user tasks 并记录为 screened 子集；不加时仍为完整 full。两类结果分别命名、分别报告。
+需要先检查攻击目标是否可直接完成时，使用 [Injection 目标预检](./docs/injection_precheck.md) 的 `run_injection_precheck screen`：提供实时进度、同身份新预检复用、失败复测和冻结名单。后续测量统一使用 `run_benchmark`，加 `--cohort PATH` 时保留全部 user tasks 并记录为 screened 子集；不加时仍为完整 full。两类结果分别命名、分别报告。
 
-以下命令默认 `ipi` 已激活，无需额外任务清单。使用新运行名称保存每次对照：
+以下命令在 `ipi` 或 `ipi-agentdyn` 均可执行，无需基准参数、额外任务清单或工具目录参数。使用新运行名称保存每次对照：
 
 ```bash
 python -m experiments.run_partial_benchmark --baseline --force-rerun --name baseline_compare_01
 python -m experiments.run_partial_benchmark --force-rerun --name workshop_compare_01
 ```
 
-baseline 使用原生 AgentDojo 工具循环，不启用 DSCG 或安全模型；两组使用相同主模型配置及 v1.2 任务子集：workspace、travel、banking、slack 各取注册顺序前 3 个用户任务和前 3 个注入任务。默认 `typical` 共计划 108 条攻击评测，另有攻击能力预检；实际分母与任务 ID 以 `summary.json` 为准。
+baseline使用当前基准的原生工具循环，不启用DSCG或安全模型。两组使用同一环境、主模型和v1.2任务；partial每场景取注册前3用户×前3目标。AgentDojo默认typical计划108组合，AgentDyn为81，另有原生GOAL预检；实际ID和有效分母以summary为准。全部任务请用full入口。
 
 | 默认 `--attack typical` 的攻击 | 简要说明 | 来源 |
 | --- | --- | --- |
@@ -170,17 +189,17 @@ baseline 使用原生 AgentDojo 工具循环，不启用 DSCG 或安全模型；
 
 `injecagent`已退出默认typical，仍可用 `--attack injecagent` 或 `all` 运行。典型集用于控制测试规模，不表示已验证攻击强度。可用 `--attack NAME [NAME ...]` 指定攻击，或 `--attack all` 显式运行全部自动攻击；`manual` 不可选。完整攻击表、消融和指标口径见[benchmark指南](./docs/benchmark.md#攻击选择)。
 
-中断续跑可在原命令中去掉force-rerun、加 `--reuse` 并保留原name；旧四攻击实验恢复原名单，新实验typical为三种。原生接受的错误缓存不会自动重试，兼容边界见[续跑说明](./docs/benchmark.md#显式续跑示例)。
+中断续跑可在原命令中去掉force-rerun、加 `--reuse` 并保留原name；本次交付后同一基准/配置/源码身份的新运行恢复原名单；交付前缓存/cohort只保留历史，不做迁移或扩展旧兼容映射，新实验typical为三种。原生接受的错误缓存不会自动重试，兼容边界见[续跑说明](./docs/benchmark.md#显式续跑示例)。
 
 默认 `summary` 足够用于对比。`--trace-level full` 保存详细诊断及压缩侧车，增加序列化和写入开销；按需排错时使用。正式对照还需匹配任务 ID、攻击、模型配置及预检口径，历史结果仅作参照。
 
 用户运行的结果保存到：
 
 ```text
-results/partial_benchmark/<model_id>_<name>/<attack>/<suite>/
+results/partial_benchmark/<model_id>_<benchmark_id>_<name>/<attack>/<suite>/
 ```
 
-每次 partial 运行还会在 `<model_id>_<name>/` 下生成 `summary.md`（attack × 场景指标、分母、Token 和失败案例位置）与 `failure_cases.jsonl`（逐例的失败标签、原始路径与有界片段）。TSR=false 和 ASR=true 分别记录；指标缺失/运行错误单列。详见[结果文件说明](./docs/benchmark.md#结果文件)。
+每次 partial 运行还会在 `<model_id>_<benchmark_id>_<name>/` 下生成 `summary.md`（attack × 场景指标、分母、Token 和失败案例位置）与 `failure_cases.jsonl`（逐例的失败标签、原始路径与有界片段）。TSR=false 和 ASR=true 分别记录；指标缺失/运行错误单列。详见[结果文件说明](./docs/benchmark.md#结果文件)。
 
 ## Dashboard
 
@@ -188,9 +207,13 @@ results/partial_benchmark/<model_id>_<name>/<attack>/<suite>/
 python -m dashboard.app
 ```
 
-打开 [实验配置](http://127.0.0.1:8888/)或[历史分析](http://127.0.0.1:8888/history)。历史页按结果目录、模型/运行名称（多选）、攻击筛选；勾选 baseline 和优化版本后可比较 TSR、ASR、总 Token，并下载分析数据。使用说明见 [dashboard 指南](./docs/dashboard.md)。
+切换环境后重新启动服务；需要并行运行可在另一环境使用 `PORT=8889 python -m dashboard.app`，两个进程各自绑定自己的后端。
+
+打开 [实验配置](http://127.0.0.1:8888/)或[历史分析](http://127.0.0.1:8888/history)。历史页按结果目录、模型/运行名称（多选）、攻击筛选；基准身份和任务集合一致时，勾选 baseline 和优化版本后可比较 TSR、ASR、总 Token，并下载分析数据。使用说明见 [dashboard 指南](./docs/dashboard.md)。
 
 用于后续 LaTeX Beamer 汇报的框架与平台介绍见 [report/report.md](./report/report.md)：10页主线，包含各层实现与例子、当前优缺点、L3 待决定项和平台截图占位。
+
+双基准工程验收见 [当前交付报告](./workshop/completed/dual_benchmark_20261018.md)，此前[AgentDyn阶段报告](./workshop/completed/agentdyn_integration_20261017.md)保留历史。仅离线和确定性模拟，无付费模型调用；TSR、ASR、攻击强度和真实E0仍待后续实验。
 
 ## 离线检查
 

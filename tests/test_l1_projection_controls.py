@@ -4,13 +4,14 @@ from contextlib import redirect_stdout
 from io import StringIO
 import json
 from pathlib import Path
-from tempfile import TemporaryDirectory
+from tests.test_partial_agentdyn import TemporaryDirectory
 import unittest
 from unittest.mock import Mock, patch
 from tests import test_l1_projection as fixture_module
 from tests import test_partial_attacks as partial_fixture
 from tests.test_l1_projection import REQUEST, ATTACK
 from dscg.model_config import ModelConfig
+from dscg.benchmark_catalog import get_backend
 from dscg.pipelines.defended import OurFrameExecutor, make_defended_pipeline
 from dscg.l1_projection import PROFILE_SHA256
 from dashboard.evaluation import normalize_config
@@ -51,10 +52,10 @@ class ProjectionControlTests(unittest.TestCase):
         with self.assertRaises(ValueError):self.factory(l1_projection_mode='guess')
 
     def test_dashboard_effective_mode_defaults_and_disabled_input(self):
-        self.assertEqual(normalize_config({'suites':['banking']})['l1_projection_mode'],'projected')
+        self.assertEqual(normalize_config({'suites':[get_backend().suites[0]]})['l1_projection_mode'],'projected')
         for flags in ({'origin':True},{'input_isolation':False}):
-            self.assertEqual(normalize_config({'suites':['banking'],**flags})['l1_projection_mode'],'off')
-        with self.assertRaises(ValueError):normalize_config({'suites':['banking'],'l1_projection_mode':'guess'})
+            self.assertEqual(normalize_config({'suites':[get_backend().suites[0]],**flags})['l1_projection_mode'],'off')
+        with self.assertRaises(ValueError):normalize_config({'suites':[get_backend().suites[0]],'l1_projection_mode':'guess'})
 
     def test_partial_cli_forwards_mode_and_baseline_resolves_off(self):
         with patch.object(runner,'main',return_value=0) as main:
@@ -77,16 +78,17 @@ class ProjectionControlTests(unittest.TestCase):
         ) as build, patch.object(runner.attacks,'load_attack',side_effect=partial_fixture.fake_attack), patch.object(
             runner.benchmark,'benchmark_suite_with_injections',side_effect=partial_fixture.fake_results
         ):
-            args=dict(suites=['banking'],results_dir=directory,run_name='bound',attack='tool_knowledge')
+            args=dict(suites=[get_backend().suites[0]],results_dir=directory,run_name='bound',attack='tool_knowledge',
+                      tool_metadata_path=get_backend().tool_metadata_path)
             self.assertEqual(runner.main(**args,l1_projection_mode='shadow'),0)
-            manifest=json.loads((Path(directory)/'offline-model_bound/tool_knowledge/banking/run_manifest.json').read_text())
+            manifest=json.loads((Path(directory)/f'offline-model_{get_backend().id}_bound/tool_knowledge/{get_backend().suites[0]}/run_manifest.json').read_text())
             self.assertIn('shadow',str(manifest));self.assertIn(PROFILE_SHA256,str(manifest))
             self.assertEqual(build.call_args.kwargs['l1_projection_mode'],'shadow')
             self.assertEqual(runner.main(**args,l1_projection_mode='projected',force_rerun=True),1)
 
     def test_invalid_unhashable_mode_has_clear_configuration_error(self):
         with self.assertRaises(ValueError):self.factory(l1_projection_mode=[])
-        with self.assertRaises(ValueError):normalize_config({'suites':['banking'],'l1_projection_mode':[]})
+        with self.assertRaises(ValueError):normalize_config({'suites':[get_backend().suites[0]],'l1_projection_mode':[]})
 
     def test_existing_positional_factory_and_executor_arguments_keep_their_meaning(self):
         config=ModelConfig(provider='custom',model_id='offline',api_key='fixture',base_url='http://offline')

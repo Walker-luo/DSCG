@@ -9,22 +9,27 @@ from dashboard import evaluation
 from dashboard.app import app, runs_store, run_test_thread
 
 
-ARTIFACT_ROOT = Path(__file__).resolve().parents[1] / "workshop/artifacts/20261010_dashboard_framework_ui"
+ARTIFACT_ROOT = Path(__file__).resolve().parents[1] / "workshop/artifacts/20261018_dual_benchmark/dashboard"
 
 
 class DashboardEvaluationTests(unittest.TestCase):
+    def setUp(self):
+        selector = patch("dashboard.evaluation.get_suites", return_value=("shopping", "github", "dailylife"), create=True)
+        selector.start()
+        self.addCleanup(selector.stop)
+
     def test_layer_dependencies_and_v2_control_are_recorded_as_effective_config(self):
-        config = evaluation.normalize_config({"suites": ["workspace"], "input_isolation": False,
+        config = evaluation.normalize_config({"suites": ["shopping"], "input_isolation": False,
                                               "authorization_precheck": False})
         self.assertFalse(config["input_isolation"])
         self.assertFalse(config["authorization_precheck"])
-        disabled = evaluation.normalize_config({"suites": ["workspace"], "use_sandbox": False,
+        disabled = evaluation.normalize_config({"suites": ["shopping"], "use_sandbox": False,
                                                 "use_security_checker": False})
         self.assertFalse(disabled["input_isolation"])
         self.assertFalse(disabled["authorization_precheck"])
 
     def test_baseline_has_no_dscg_layers_or_security_connection(self):
-        config = evaluation.normalize_config({"suites": ["workspace"], "origin": True,
+        config = evaluation.normalize_config({"suites": ["shopping"], "origin": True,
                                               "sec_api_key": "unused", "sec_model_id": "unused"})
         for key in ("input_isolation", "authorization_precheck", "use_sandbox", "use_security_checker"):
             self.assertFalse(config[key])
@@ -36,7 +41,7 @@ class DashboardEvaluationTests(unittest.TestCase):
                         {"max_user_tasks": -1}, {"max_injection_tasks": 1.5},
                         {"suites": []}, {"suites": ["unknown"]}):
             with self.subTest(invalid=invalid), self.assertRaises(ValueError):
-                evaluation.normalize_config({"suites": ["workspace"], **invalid})
+                evaluation.normalize_config({"suites": ["shopping"], **invalid})
 
     def test_aggregate_uses_task_denominators_and_includes_security_cost(self):
         summaries = [
@@ -56,6 +61,17 @@ class DashboardEvaluationTests(unittest.TestCase):
         self.assertEqual(aggregate["total_tokens"], 200)
         self.assertEqual(aggregate["main_total_tokens"], 160)
         self.assertEqual(aggregate["security_total_tokens"], 40)
+
+    def test_aggregate_does_not_pool_mixed_recorded_catalogs(self):
+        summaries = [{"benchmark": {"id": "agentdyn", "catalog_sha256": catalog},
+                      "metrics": {"attack_success_rate": 0},
+                      "task_counts": {"total_tasks": 1, "utility_passed": 1, "security_valid": 1},
+                      "overhead": {}} for catalog in ("catalog-a", "catalog-b")]
+        result = evaluation.aggregate(summaries)
+        self.assertIsNone(result["avg_utility_rate"])
+        self.assertIsNone(result["security_denominator"])
+        self.assertIsNone(result["total_tasks"])
+        self.assertEqual(result["aggregation_warning"], "benchmark_or_catalog_mismatch")
 
     def test_clean_or_missing_security_is_not_zero_asr(self):
         aggregate = evaluation.aggregate([{"metrics": {"utility_rate": 100, "attack_success_rate": None},
@@ -124,7 +140,7 @@ class DashboardEvaluationTests(unittest.TestCase):
 
     def test_worker_saves_real_config_and_both_cost_roles_without_a_model_run(self):
         ARTIFACT_ROOT.mkdir(parents=True, exist_ok=True)
-        config = evaluation.normalize_config({"suites": ["workspace"], "run_attack": False,
+        config = evaluation.normalize_config({"suites": ["shopping"], "run_attack": False,
                                                "input_isolation": False, "authorization_precheck": False,
                                                "trace_level": "standard"})
         def factory(*args, **kwargs):
@@ -137,11 +153,15 @@ class DashboardEvaluationTests(unittest.TestCase):
             main = SimpleNamespace(total_prompt_tokens=80, total_completion_tokens=20, get_total_tokens=lambda:100)
             sec = SimpleNamespace(total_prompt_tokens=30, total_completion_tokens=10, get_total_tokens=lambda:40)
             return pipeline, main, sec
+        def native_clean(pipeline, suite, logdir, force_rerun=False, user_tasks=None, benchmark_version=None):
+            self.assertEqual(benchmark_version, "v1.2")
+            return {"utility_results":{("u1",None):True}}
         with tempfile.TemporaryDirectory(dir=ARTIFACT_ROOT) as directory, \
              patch("dashboard.app.DASHBOARD_RESULTS_DIR", Path(directory)), \
              patch("dashboard.app.make_defended_pipeline", side_effect=factory), \
+             patch("dashboard.app.validate_backend", return_value={"id": "agentdyn", "catalog_sha256": "test"}), \
              patch("dashboard.app.get_suite", return_value=SimpleNamespace(user_tasks={"u1":None}, injection_tasks={"i1":None})), \
-             patch("dashboard.app.benchmark.benchmark_suite_without_injections", return_value={"utility_results":{("u1",None):True}}), \
+             patch("dashboard.app.benchmark.benchmark_suite_without_injections", side_effect=native_clean), \
              patch("dashboard.app.threading.Thread"):
             try:
                 run_test_thread("worker-test", config)

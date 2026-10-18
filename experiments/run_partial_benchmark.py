@@ -6,7 +6,7 @@ import csv
 
 from agentdojo import logging, benchmark, attacks
 from agentdojo.attacks.attack_registry import ATTACKS
-from agentdojo.task_suite import get_suite
+from dscg.benchmark_catalog import get_suite, benchmark_identity, validate_backend, get_backend, get_suites, SUITE_VERSION
 import json
 
 from dscg.model_config import ModelConfigurationError, resolve_model_config
@@ -16,12 +16,13 @@ from dscg.input_isolation import FRAMEWORK_VERSION
 from dscg.l1_projection import MODES as L1_PROJECTION_MODES, PROFILE_SHA256 as L1_PROFILE_SHA256
 from dscg.pipelines.baseline import make_openai_compatible_pipeline
 from dscg.pipelines.defended import make_defended_pipeline
-from dscg.tool_metadata import ToolMetadataError, load_tool_metadata
+from dscg.tool_metadata import ToolMetadataError, load_tool_metadata, validate_benchmark_tool_metadata, resolve_tool_metadata
 from experiments.diagnostics.harness_audit import rank_ids, security_result_fields
+from experiments.common.benchmark_outcomes import project_outcomes
 from experiments.common.partial_reporting import collect_suite_report, write_run_overview
 from experiments.common.partial_controls import (validate_controls, make_task_manifest, load_task_manifest,
                                           select_tasks, guard_run, source_revision, preserve_cached_cost,
-                                          RunConfigurationError, SUITES)
+                                          RunConfigurationError)
 from experiments.common.benchmark_reuse import ReusePlan, execution_plan
 
 
@@ -43,18 +44,14 @@ def _safe_result_component(value: str | None, fallback: str) -> str:
 
 
 def _apply_run_name(pipeline, resolved_model_id: str | None, run_name: str | None) -> str:
-    """Apply ``<model_id>_<name>`` to the pipeline/result directory name.
-
-    When no name is supplied, the historical pipeline name is kept so that
-    existing commands and result paths remain backwards compatible.
-    """
-
+    """Namespace benchmark runs while retaining the model/run directory layout."""
+    backend = get_backend()
     if run_name is None or not str(run_name).strip():
-        return pipeline.name
-
-    model_component = _safe_result_component(resolved_model_id, "model")
-    name_component = _safe_result_component(run_name, "run")
-    pipeline.name = f"{model_component}_{name_component}"
+        pipeline.name = f"{pipeline.name}_{backend.id}"
+    else:
+        model_component = _safe_result_component(resolved_model_id, "model")
+        name_component = _safe_result_component(run_name, "run")
+        pipeline.name = f"{model_component}_{backend.id}_{name_component}"
     return pipeline.name
 
 
@@ -166,12 +163,13 @@ def main(
     cohort_path: str | Path | None = None,
     _reuse_plan=None,
 ) -> int:
+    backend = get_backend()
     if task_scope not in {'partial', 'full', 'screened', 'partial_screened'}:
         raise ValueError('unknown task scope')
     if reuse and (force_rerun or not run_name):
         raise ValueError('--reuse requires --name and cannot combine with force_rerun')
     if suites is None and not reuse:
-        suites = list(SUITES)
+        suites = list(backend.suites)
     if cohort_path is not None:
         if task_scope != 'partial' or not run_attack or task_manifest_path or cohort_sha256:
             raise ValueError('partial --cohort requires attacks and cannot use another manifest or scope')
@@ -194,7 +192,7 @@ def main(
     if reuse and resume is None:
         config = resolve_model_config(model_id, api_key=api_key, base_url=base_url, provider=provider,
                                       api_key_env=api_key_env, config_path=config_path)
-        base = logdir / (_safe_result_component(config.model_id, 'model') + '_' + _safe_result_component(run_name, 'run'))
+        base = logdir / (_safe_result_component(config.model_id, 'model') + '_' + backend.id + '_' + _safe_result_component(run_name, 'run'))
         try:
             resume = ReusePlan(base, suites=suites, attack=attack, run_attack=run_attack,
                                task_scope=task_scope, resolve_attacks=resolve_attack_names)
@@ -202,9 +200,9 @@ def main(
             print(f'❌ 续跑校验失败: {exc}', flush=True)
             return 1
         suites, attack = resume.suites, resume.attacks if run_attack else None
-    suites = list(SUITES if suites is None else suites)
-    if not suites or any(name not in SUITES for name in suites) or len(set(suites)) != len(suites):
-        raise ValueError('suites must be a nonempty, unique selection of workspace/travel/banking/slack')
+    suites = list(backend.suites if suites is None else suites)
+    if not suites or any(name not in backend.suites for name in suites) or len(set(suites)) != len(suites):
+        raise ValueError(f'suites must be a nonempty, unique selection of {", ".join(backend.suites)}')
     if not isinstance(l1_projection_mode, str) or l1_projection_mode not in L1_PROJECTION_MODES:
         raise ValueError('invalid L1 projection mode')
     _validate_router_controls(origin,use_security_checker,audit_router_mode,use_sandbox)
@@ -284,17 +282,18 @@ def main(
             if output_dir is not None:
                 report_sources.append((attack_name, output_dir / "all_report.txt"))
 
-    fallback = logdir / _safe_result_component(run_name, "attack-run")
+    fallback = logdir / (backend.id + "_" + _safe_result_component(run_name, "attack-run"))
     batch_dir = context.get("base_output_dir", fallback)
     batch_dir.mkdir(parents=True, exist_ok=True)
     manifest = {
+        "schema_version": "dscg.attack-manifest.v2", "benchmark": benchmark_identity(),
         "task_scope": task_scope,
         "result_layout": "model_run/attack/suite",
         "pipeline_name": context.get("pipeline_name"),
         "model_id": context.get("model_id"),
         "attacks": attack_names if run_attack else [],
         "suites": suites,
-        "suite_scope": "all_registered" if set(suites) == set(SUITES) else "selected",
+        "suite_scope": "all_registered" if set(suites) == set(backend.suites) else "selected",
         "excluded_from_all": {"manual": "requires interactive input"},
         "runs": run_records,
     }
@@ -317,13 +316,14 @@ def main(
     print(f"📝 紧凑摘要: {overview_path}")
     print(f"🔎 失败片段: {failures_path}")
     print(f"📋 攻击执行清单: {manifest_path}")
-    return 1 if any(record["status"] == "error" for record in run_records) else 0
+    return 1 if (any(record["status"] == "error" for record in run_records) or
+                 any(report.get("task_errors") for report in context.get("suite_reports", []))) else 0
 
 
 def _run_single_attack(
     model_id: str | None = None,
     sec_model_id: str | None = None,
-    suites: list[str] = ["workspace", "travel", "banking", "slack"],
+    suites: list[str] | None = None,
     run_attack: bool = True,
     origin = False,
     defense: str = None,
@@ -370,12 +370,25 @@ def _run_single_attack(
 
 
 
+    backend = get_backend()
+    suites = list(backend.suites if suites is None else suites)
+    if not suites or len(set(suites)) != len(suites) or not set(suites) <= set(backend.suites):
+        raise ValueError('invalid suite selection for current backend')
     _validate_router_controls(origin,use_security_checker,audit_router_mode,use_sandbox)
     validate_controls(origin=origin, use_security_checker=use_security_checker,
                       audit_retries=audit_retries, completion_prompt=completion_prompt)
     frozen_tasks = load_task_manifest(task_manifest_path)
     selection_seed = None if task_scope in {'full', 'screened'} else frozen_tasks.get("seed", 7) if frozen_tasks else 7
-    tool_metadata = None if origin else load_tool_metadata(tool_metadata_path)
+    metadata_selection = None
+    tool_metadata = None
+    if not origin:
+        selection = resolve_tool_metadata(tool_metadata_path, backend=backend)
+        metadata_selection = selection.public_dict()
+        print(f"工具分类目录: {metadata_selection['path']}；来源: {metadata_selection['source']}；基准: {backend.label}", flush=True)
+        if metadata_selection.get('warning'):
+            print(f"工具分类目录提示: {metadata_selection['warning']}", flush=True)
+        validate_benchmark_tool_metadata(selection.path)
+        tool_metadata = load_tool_metadata(selection.path)
     active_defense = defense if origin else "dscg"
     logdir = Path(results_dir) if results_dir is not None else BENCHMARK_RESULTS_DIR if task_scope in {'full', 'screened'} else RESULTS_DIR / "partial_benchmark"
     logdir.mkdir(parents=True, exist_ok=True)
@@ -439,7 +452,8 @@ def _run_single_attack(
             # Bind the entire selection, including disjoint subsets, before any
             # scored execution or report rewrite under this run name.
             bind(base_output_dir / 'suite_manifest.json', {
-                'schema_version': 'dscg.full-suites.v1' if task_scope == 'full' else 'dscg.partial-suites.v1',
+                'schema_version': 'dscg.full-suites.v2' if task_scope == 'full' else 'dscg.partial-suites.v2',
+                'benchmark': benchmark_identity(),
                 'suites': suites,
             })
         if cohort_sha256 is None and report_context is not None:
@@ -471,7 +485,8 @@ def _run_single_attack(
             task_scope=task_scope,
         )
         run_binding = {
-            "schema_version": f"dscg.{task_scope}-run.v1",
+            "schema_version": f"dscg.{task_scope}-run.v2",
+            "benchmark": benchmark_identity(),
             "task_scope": task_scope,
             "task_selection": {"users": selected_users, "injections": selected_injections,
                                "suite_version": "v1.2", "seed": selection_seed},
@@ -481,7 +496,7 @@ def _run_single_attack(
             "agentdojo_defense": defense if origin else None,
             "audit_retries": audit_retries, "completion_prompt": completion_prompt,
             "trace_level": None if origin else trace_level,
-            "tool_metadata": tool_metadata, "source": source_revision(),
+            "tool_metadata": tool_metadata, "tool_metadata_selection": metadata_selection, "source": source_revision(),
             "defense_version": None if origin else FRAMEWORK_VERSION,
             "input_isolation": bool(not origin and (use_sandbox or use_security_checker)),
             'l1_projection_mode': 'off' if origin else l1_projection_mode,
@@ -530,7 +545,8 @@ def _run_single_attack(
                         force_rerun=force_rerun,
                         user_tasks = selected_users,
                         injection_tasks = selected_injections,
-                        verbose= True
+                        verbose= True,
+                        benchmark_version=SUITE_VERSION,
                     )
                 else:
                     results = benchmark.benchmark_suite_without_injections(
@@ -539,6 +555,7 @@ def _run_single_attack(
                         base_output_dir,
                         force_rerun=force_rerun,
                         user_tasks = selected_users,
+                        benchmark_version=SUITE_VERSION,
                     )
         finally:
             pipeline.name = result_dir_name
@@ -565,15 +582,15 @@ def _run_single_attack(
         # ==========================================
         # 2. 构造结构化数据列表 (用于画图)
         # ==========================================
+        outcomes = project_outcomes(utility_results, security_results, suite_output_dir,
+                                    attack_name if run_attack else "none", run_attack=run_attack)
         structured_records = []
         for task_key, util_status in utility_results.items():
             user_task_id = task_key[0]
             injection_task_id = task_key[1] if len(task_key) > 1 else "None"
             
             # AgentDojo 原生定义: True 代表执行了恶意指令(攻击成功)，False 代表安全
-            attack_success, defense_success, sample_status = security_result_fields(
-                security_results, task_key, run_attack=run_attack
-            )
+            outcome = outcomes[task_key]
 
             structured_records.append({
                 "suite_name": suite_name,
@@ -581,19 +598,13 @@ def _run_single_attack(
                 "attack_type": attack_name if run_attack else "None",
                 "user_task_id": user_task_id,
                 "injection_task_id": injection_task_id,
-                "utility_success": bool(util_status),        # 是否完成用户任务
-                "attack_success": attack_success,            # 是否被黑客攻破
-                "defense_success": defense_success,          # 是否防御成功 (画图常用)
-                "sample_status": sample_status,
+                **outcome,
             })
 
         # 3. 计算聚合得分 (Summary)
-        utility_score = sum(utility_results.values()) / len(utility_results) if utility_results else 0
-        valid_security_results = [
-            security_results[task_key]
-            for task_key in utility_results
-            if task_key in security_results and isinstance(security_results[task_key], bool)
-        ]
+        valid_utility_results = [r['utility_success'] for r in outcomes.values() if isinstance(r['utility_success'], bool)]
+        utility_score = sum(valid_utility_results) / len(valid_utility_results) if valid_utility_results else None
+        valid_security_results = [r['attack_success'] for r in outcomes.values() if isinstance(r['attack_success'], bool)]
         security_score = (
             sum(valid_security_results) / len(valid_security_results)
             if run_attack and valid_security_results else None
@@ -610,13 +621,15 @@ def _run_single_attack(
             sec_total_tokens = sec_tracker.get_total_tokens() 
 
         summary_data = {
+            "schema_version": "dscg.benchmark-summary.v2", "benchmark": benchmark_identity(),
             "task_scope": task_scope,
             "suites": suites,
-            "suite_scope": "all_registered" if set(suites) == set(SUITES) else "selected",
+            "suite_scope": "all_registered" if set(suites) == set(backend.suites) else "selected",
             "suite_name": suite_name,
             "pipeline_name": f"{result_dir_name}/{attack_component}",
             "model_id": resolved_model_id,
             "defense": active_defense,
+            "tool_metadata_selection": metadata_selection,
             "run_manifest": recorded_binding,
             "audit_router": _router_trace_summary(suite_output_dir,utility_results,attack_name if run_attack else "none",run_attack)
                             if audit_router_mode != "off" else None,
@@ -639,10 +652,12 @@ def _run_single_attack(
             "task_counts": {
                 "total_tasks": len(utility_results),
                 "planned_tasks": planned_task_count,
-                "utility_passed": sum(utility_results.values()),
+                "utility_passed": sum(valid_utility_results),
+                "utility_valid": len(valid_utility_results),
+                "execution_errors": sum(r["execution_error"] for r in outcomes.values()),
                 "attacked_tasks": len(valid_security_results) if run_attack else 0,
                 "security_missing": sum(
-                    task_key not in security_results for task_key in utility_results
+                    not isinstance(r["attack_success"], bool) for r in outcomes.values()
                 ) if run_attack else 0,
                 "selected_user_tasks": len(selected_users),
                 "selected_injection_tasks": len(selected_injections),
@@ -686,7 +701,7 @@ def _run_single_attack(
             f.write("="*50 + "\n")
 
             for record in structured_records:
-                util_str = "✅ 成功 (True)" if record["utility_success"] else "❌ 失败 (False)"
+                util_str = "⚪ 无效/错误" if record["utility_success"] is None else "✅ 成功 (True)" if record["utility_success"] else "❌ 失败 (False)"
                 
                 if run_attack:
                     if record["sample_status"] != "valid":
@@ -704,7 +719,7 @@ def _run_single_attack(
             f.write(f"👉 实际评测任务数量: {len(utility_results)}\n")
             f.write(f"👉 User Tasks: {len(selected_users)}/{len(user_task_ids)}\n")
             f.write(f"👉 Injection Tasks: {len(selected_injections)}/{len(injection_task_ids)}\n")
-            f.write(f"👉 [{suite_name}] 整体可用性 (Utility): {utility_score:.2%}\n")
+            f.write(f"👉 [{suite_name}] 整体可用性 (Utility): " + (f"{utility_score:.2%}" if utility_score is not None else "N/A") + "\n")
             if run_attack and security_score is not None:
                 f.write(f"👉 [{suite_name}] 攻击成功率 (ASR): {security_score:.2%}\n")
                 f.write(f"👉 [{suite_name}] 整体安全性 (Defense Rate): {defense_score:.2%}\n")
@@ -762,10 +777,10 @@ def cli(argv: list[str] | None = None, *, task_scope: str = 'partial', entrypoin
         raise ValueError('task scope must be partial or full')
     full = task_scope == 'full'
     parser = argparse.ArgumentParser(
-        description="运行 DSCG 的 AgentDojo 评测（默认四场景，所选场景全部用户/注入任务）。" if full else "运行 DSCG 的小批量 AgentDojo 回归评测，默认四场景，可指定场景。"
+        description="运行 DSCG 的当前基准全量评测（所选场景全部用户/注入任务）。" if full else "运行 DSCG 的当前基准小批量回归评测，可指定场景。"
     )
-    parser.add_argument('--suites', nargs='+', choices=SUITES, default=None,
-                        help='选择场景，例如 --suites travel banking slack 跳过 workspace；默认全部四场景，full保留所选场景全部任务。')
+    parser.add_argument('--suites', nargs='+', metavar='SUITE', default=None,
+                        help='选择当前环境支持的场景；默认全部场景，full保留所选场景全部任务。')
     parser.add_argument(
         "--attack",
         nargs="+",
@@ -777,7 +792,7 @@ def cli(argv: list[str] | None = None, *, task_scope: str = 'partial', entrypoin
     parser.add_argument(
         "--baseline",
         action="store_true",
-        help="运行无防御 AgentDojo 基线；与默认 DSCG 使用相同任务范围和注入攻击。",
+        help="运行无防御原生基线；与默认 DSCG 使用相同任务范围和注入攻击。",
     )
     cache_policy = parser.add_mutually_exclusive_group()
     cache_policy.add_argument('--reuse', action='store_true',
@@ -791,7 +806,7 @@ def cli(argv: list[str] | None = None, *, task_scope: str = 'partial', entrypoin
         "--name",
         dest="run_name",
         metavar="NAME",
-        help="本次运行名称；结果保存于 --results-dir 指定目录下的 <model_id>_<NAME>/。",
+        help="本次运行名称；结果保存于 --results-dir 指定目录下的 <model_id>_<backend>_<NAME>/。",
     )
     parser.add_argument(
         "--trace-level",
@@ -809,7 +824,7 @@ def cli(argv: list[str] | None = None, *, task_scope: str = 'partial', entrypoin
         dest="tool_metadata_path",
         metavar="PATH",
         default=os.getenv("DSCG_TOOL_METADATA"),
-        help="显式工具风险元数据 TOML；默认本地覆盖或内置 AgentDojo 分类，缺失/非法工具按 critical 处理。",
+        help="显式工具风险元数据 TOML；默认本地覆盖或当前基准内置分类，缺失/非法工具按 critical 处理。",
     )
     parser.add_argument(
         "--model-config",
@@ -842,7 +857,14 @@ def cli(argv: list[str] | None = None, *, task_scope: str = 'partial', entrypoin
     args = parser.parse_args(argv)
     if args.audit_router_mode is None:
         args.audit_router_mode = 'off' if args.baseline or args.no_checker else 'shadow'
-    selected_suites = args.suites if args.reuse else args.suites or list(SUITES)
+    try:
+        active_suites = get_suites()
+    except ValueError as exc:
+        print(f'测量配置或证据校验失败: {exc}')
+        return 1
+    selected_suites = args.suites if args.reuse else args.suites or list(active_suites)
+    if selected_suites is not None and not set(selected_suites) <= set(active_suites):
+        parser.error(f'--suites must select from {", ".join(active_suites)}')
     if selected_suites is not None and len(set(selected_suites)) != len(selected_suites):
         parser.error('--suites cannot contain duplicate names')
     if args.reuse and (not args.run_name or args.write_task_manifest):
@@ -861,9 +883,9 @@ def cli(argv: list[str] | None = None, *, task_scope: str = 'partial', entrypoin
         if args.write_task_manifest:
             path = Path(args.write_task_manifest)
             if path.exists(): parser.error("task manifest already exists; preserve old evidence")
-            path.parent.mkdir(parents=True, exist_ok=True)
             manifest = make_task_manifest(task_scope)
             manifest['suites'] = {name: manifest['suites'][name] for name in selected_suites}
+            path.parent.mkdir(parents=True, exist_ok=True)
             path.write_text(json.dumps(manifest, ensure_ascii=False, indent=2) + "\n")
             print(f"任务清单: {path}")
             return 0

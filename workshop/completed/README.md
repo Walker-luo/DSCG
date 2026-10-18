@@ -1,5 +1,9 @@
 # 已完成阶段的优化材料
 
+当前：[双基准自动切换](./dual_benchmark_20261018.md)支持ipi/AgentDojo与ipi-agentdyn/AgentDyn，只切换环境；旧阶段的AgentDyn-only描述保留当时上下文，不再限制当前新实验。
+
+新增 [AgentDyn全流程接入](./agentdyn_integration_20261017.md)：固定后端、新三个场景、风险目录、CLI/网页/历史身份、错误分母与离线模拟已完成；原四场景结果保持历史，真实攻击强度和模型TSR/ASR待验收。
+
 新增 [Clean通用误伤修正](./clean_utility_20261015.md)：工程与离线回归完成；约5pp目标、真实clean/攻击/成本验收待完成。
 
 后续 [准备读取诊断](./read_discovery_20261016.md) 已完成一轮有限验证，提示/输入候选因新增误拒撤回。保留的请求格式预检查不改善TSR，不能把归档候选算作已部署能力。

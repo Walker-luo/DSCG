@@ -4,7 +4,7 @@ from io import StringIO
 import json
 import os
 from pathlib import Path
-from tempfile import TemporaryDirectory
+from test_partial_agentdyn import TemporaryDirectory
 from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
@@ -15,8 +15,10 @@ from agentdojo.task_suite import get_suite
 from dscg.paths import BENCHMARK_RESULTS_DIR
 from experiments import run_benchmark as full
 from experiments import run_partial_benchmark as shared
-from experiments.common.partial_controls import SUITES, make_task_manifest, select_tasks, source_revision
+from experiments.common.partial_controls import make_task_manifest, select_tasks, source_revision
 from dscg.pipelines.defended import _append_full_trace
+
+SUITES = ('workspace', 'travel', 'banking', 'slack')
 
 
 def fake_pipeline(*args, **kwargs):
@@ -46,7 +48,7 @@ class FullSelectionTests(unittest.TestCase):
     def test_full_manifest_cannot_silently_reduce_scope_and_is_reusable_for_dos(self):
         users = [f'u{i}' for i in range(5)]
         injections = [f'i{i}' for i in range(4)]
-        manifest = {'suite_version': 'v1.2', 'suites': {'s': {
+        manifest = {'benchmark': __import__('test_partial_agentdyn').DOJO_IDENTITY, 'suite_version': 'v1.2', 'suites': {'s': {
             'user_task_ids': users, 'injection_task_ids': injections,
         }}}
         self.assertEqual(select_tasks(manifest, 's', users, injections, True, True, task_scope='full'), (users, injections[:1]))
@@ -150,7 +152,7 @@ class FullExecutionTests(unittest.TestCase):
             for origin, name in ((True, 'baseline'), (False, 'defended')):
                 self.assertEqual(full.main(origin=origin, suites=list(SUITES), run_name=name,
                                            results_dir=directory, attack='injecagent', force_rerun=True), 0)
-                base = Path(directory) / f'offline-model_{name}'
+                base = Path(directory) / f'offline-model_agentdojo_{name}'
                 self.assertEqual(json.loads((base / 'attack_manifest.json').read_text())['task_scope'], 'full')
                 self.assertTrue((base / 'summary.md').exists())
                 self.assertTrue((base / 'failure_cases.jsonl').exists())
@@ -208,7 +210,7 @@ class FullExecutionTests(unittest.TestCase):
         ):
             self.assertEqual(full.main(origin=True, suites=['slack'], results_dir=directory, run_name='mixed',
                                        attack=['injecagent', 'dos']), 1)
-            base = Path(directory) / 'offline-model_mixed'
+            base = Path(directory) / 'offline-model_agentdojo_mixed'
             statuses = json.loads((base / 'attack_manifest.json').read_text())['runs']
             self.assertEqual([run['status'] for run in statuses], ['error', 'completed'])
             summary = json.loads((base / 'dos/slack/summary.json').read_text())
@@ -259,7 +261,7 @@ class FullExecutionTests(unittest.TestCase):
             self.assertEqual(full.main(**options), 0)
             expected = len(suite.injection_tasks) * (len(suite.user_tasks) + 1)
             self.assertEqual(task.call_count, expected)  # Includes unscored injection-task preflights.
-            base = Path(directory) / f'{model}_native'
+            base = Path(directory) / f'{model}_agentdojo_native'
             output = base / 'tool_knowledge/slack'
             scored = list(output.glob('user_task_*/tool_knowledge/injection_task_*.json'))
             self.assertEqual(len(scored), len(suite.user_tasks) * len(suite.injection_tasks))
@@ -280,9 +282,9 @@ class FullExecutionTests(unittest.TestCase):
         ) as benchmark:
             options = dict(origin=True, suites=['slack'], results_dir=directory, run_name='same', attack='injecagent')
             self.assertEqual(shared.main(**options), 0)
-            path = Path(directory) / 'offline-model_same/injecagent/slack/run_manifest.json'
+            path = Path(directory) / 'offline-model_agentdojo_same/injecagent/slack/run_manifest.json'
             original = path.read_bytes()
-            root = Path(directory) / 'offline-model_same'
+            root = Path(directory) / 'offline-model_agentdojo_same'
             previous_reports = {p: p.read_bytes() for p in root.rglob('*') if p.is_file()}
             benchmark.reset_mock()
             self.assertEqual(full.main(**options, force_rerun=True), 1)
@@ -293,3 +295,14 @@ class FullExecutionTests(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+# Explicitly retain historical upstream suites as generic offline fixtures.
+def setUpModule():
+    global _fixture_backend
+    from test_partial_agentdyn import legacy_fixture_backend
+    _fixture_backend = legacy_fixture_backend(globals())
+
+
+def tearDownModule():
+    _fixture_backend.close()

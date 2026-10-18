@@ -9,14 +9,14 @@ from contextlib import contextmanager
 from pathlib import Path
 
 from agentdojo.attacks.attack_registry import ATTACKS
-from agentdojo.task_suite import get_suite
+from dscg.benchmark_catalog import get_suite, benchmark_identity, validate_backend, get_backend, get_suites
 from dscg.model_config import resolve_model_config
 from dscg.paths import BENCHMARK_RESULTS_DIR, RESULTS_DIR
 from experiments import run_partial_benchmark as shared
-from experiments.common.partial_controls import source_revision, guard_run, validate_controls, select_tasks, SUITES
+from experiments.common.partial_controls import source_revision, guard_run, validate_controls, select_tasks
 from experiments.common.benchmark_reuse import ReusePlan
 
-SCHEMA = 'dscg.injection-screen.v1'
+SCHEMA = 'dscg.injection-screen.v2'
 RULE = 'keep-any-valid-success; exclude-after-two-valid-failures; errors-unresolved'
 LIMITATIONS = [
     'Direct-goal failure does not prove an indirect attack cannot succeed.',
@@ -81,7 +81,7 @@ def _catalog(names):
 
 
 def _binding(config, names):
-    return {'schema_version': SCHEMA, 'suite_version': 'v1.2', 'rule': RULE,
+    return {'schema_version': SCHEMA, 'benchmark': benchmark_identity(), 'suite_version': 'v1.2', 'rule': RULE,
             'main_model': config.public_dict(), 'source': source_revision(),
             'screening_script_sha256': _file_hash(Path(__file__).resolve().parents[1] / 'run_injection_precheck.py'),
             'catalog': _catalog(names)}
@@ -100,12 +100,17 @@ def _mapping_mismatches(mapping):
 def _legacy_mapping():
     """An explicit, byte-bound equivalent transition, not a source-hash bypass."""
     mapping = _read(Path(__file__).with_name('injection_cohort_compatibility.json'))
-    if mapping.get('schema_version') != 'dscg.injection-compatibility.v1':
-        raise ValueError('unknown compatibility mapping')
+    if (mapping.get('schema_version') != 'dscg.injection-compatibility.v2'
+            or mapping.get('benchmark') != benchmark_identity()):
+        return None
     return None if _mapping_mismatches(mapping) else mapping
 
 
 def _source_compatible(recorded, current, *, check_python=True):
+    if (not isinstance(recorded.get('benchmark'), dict)
+            or recorded.get('benchmark') != current.get('benchmark')
+            or current.get('benchmark') != benchmark_identity()):
+        return False
     if recorded.get('agentdojo') != current.get('agentdojo'):
         return False
     if check_python and recorded.get('python') != current.get('python'):
@@ -229,7 +234,7 @@ def _validate_cohort(path, config):
 
 def _validate_cohort_data(cohort, config):
     content = {k: v for k, v in cohort.items() if k != 'cohort_sha256'}
-    if (cohort.get('schema_version') != SCHEMA or cohort.get('cohort_sha256') != _digest(content)
+    if (cohort.get('benchmark') != benchmark_identity() or cohort.get('schema_version') != SCHEMA or cohort.get('cohort_sha256') != _digest(content)
             or cohort.get('selection_rule') != RULE):
         raise ValueError('invalid or changed frozen cohort')
     binding = cohort['binding']
@@ -290,6 +295,7 @@ def _preflight_report(base, cohort, active, attacks, selected_tasks=None):
                         record['status'] = 'invalid'
                 records.append(record)
     _replace(base / 'preflight_report.json', {
+        'schema_version': 'dscg.preflight-report.v2', 'benchmark': benchmark_identity(),
         'scope': 'unscored native per-attack goal prechecks; separate from original screening',
         'planned_preflight_samples': len(records), 'counts': dict(Counter(r['status'] for r in records)),
         'preflight_total_tokens': None, 'records': records, 'aggregate_run_costs': aggregate_costs,
@@ -301,6 +307,7 @@ def run_screened(cohort_path, *, config_path=None, run_name=None, results_dir=No
                  attack=None, audit_router_mode='off', trace_level='summary', audit_router_artifact=None,
                  force_rerun=False, reuse=False, model_id=None, sec_model_id=None, defense=None, suites=None,
                  task_scope='screened', **controls):
+    backend = get_backend()
     if task_scope not in {'screened', 'partial_screened'}:
         raise ValueError('unknown screened task scope')
     partial = task_scope == 'partial_screened'
@@ -313,7 +320,7 @@ def run_screened(cohort_path, *, config_path=None, run_name=None, results_dir=No
     cohort_path = Path(cohort_path).resolve()
     cohort = _validate_cohort(cohort_path, config)
     root = Path(results_dir) if results_dir else RESULTS_DIR / 'partial_benchmark' if partial else BENCHMARK_RESULTS_DIR
-    base = root / (shared._safe_result_component(config.model_id, 'model') + '_' + shared._safe_result_component(run_name, 'run'))
+    base = root / (shared._safe_result_component(config.model_id, 'model') + '_' + backend.id + '_' + shared._safe_result_component(run_name, 'run'))
     resume = None
     if reuse:
         resume = ReusePlan(base, suites=suites, attack=attack, run_attack=True, task_scope=task_scope,
@@ -332,8 +339,8 @@ def run_screened(cohort_path, *, config_path=None, run_name=None, results_dir=No
         security_model = resolve_model_config(sec_model_id, config_path=config_path, prefix='DSCG_SEC', fallback=config,
             **{k: controls['sec_' + k] for k in ('api_key', 'base_url', 'provider', 'api_key_env') if 'sec_' + k in controls}).public_dict()
     requested = list(suites) if suites is not None else list(cohort['suites'])
-    if (not requested or len(set(requested)) != len(requested) or not set(requested) <= set(SUITES)
-            or ((partial or set(requested) != set(SUITES)) and not set(requested) <= set(cohort['suites']))):
+    if (not requested or len(set(requested)) != len(requested) or not set(requested) <= set(backend.suites)
+            or ((partial or set(requested) != set(backend.suites)) and not set(requested) <= set(cohort['suites']))):
         raise ValueError('frozen cohort lacks requested suites or selection is empty/duplicated')
     selected = {}
     for name, entry in cohort['suites'].items():
@@ -355,7 +362,7 @@ def run_screened(cohort_path, *, config_path=None, run_name=None, results_dir=No
             'use_sandbox': True, 'use_security_checker': True, 'planning_tool_view': True,
             'delegated_tasks': True, 'l1_projection_mode': 'projected', 'audit_retries': 0,
             'completion_prompt': False}.items()}
-        identity = {'task_scope': task_scope, 'requested_suites': requested, 'selected_tasks': selected,
+        identity = {'schema_version': 'dscg.screened-run.v2', 'benchmark': benchmark_identity(), 'task_scope': task_scope, 'requested_suites': requested, 'selected_tasks': selected,
                     'cohort_sha256': cohort['cohort_sha256'], 'main_model': config.public_dict(), 'security_model': security_model,
                     'baseline': origin, 'attacks': names, 'audit_router_mode': audit_router_mode,
                     'trace_level': trace_level, 'controls': effective, 'defense': defense,
@@ -370,7 +377,7 @@ def run_screened(cohort_path, *, config_path=None, run_name=None, results_dir=No
         else:
             guard_run(base / 'screened_run_manifest.json', identity)
             _record_compatibility(base, cohort['binding'], _binding(config, list(cohort['binding']['catalog'])))
-        attachment = {'scope': 'capability-conditioned screened subset', 'task_scope': task_scope,
+        attachment = {'schema_version': 'dscg.screened-cohort.v2', 'benchmark': benchmark_identity(), 'scope': 'capability-conditioned screened subset', 'task_scope': task_scope,
                       'cohort_path': str(cohort_path), 'cohort': cohort,
                       'selected_tasks': selected, 'requested_suites': requested,
                       'omitted_suites': [name for name in cohort['suites'] if name not in requested],

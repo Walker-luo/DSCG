@@ -11,15 +11,15 @@ from __future__ import annotations
 from dataclasses import dataclass
 from hashlib import sha256
 import json
-from typing import Any, Mapping
+from typing import Any, Iterable, Mapping
 from pathlib import Path
 import os
+import warnings
 
 
 TOOL_METADATA_SCHEMA_VERSION = "dscg.tool-risk.v1"
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_TOOL_METADATA_PATH = PROJECT_ROOT / "config" / "tools.local.toml"
-BUILTIN_TOOL_METADATA_PATH = PROJECT_ROOT / "config" / "tools.agentdojo-v1.2.toml"
 EFFECTS = frozenset({"read", "write", "delete", "financial", "external_send"})
 SOURCES = frozenset({"calendar", "email", "cloud", "web", "local"})
 SINKS = frozenset({"none", "external_recipient", "public_output"})
@@ -31,28 +31,43 @@ class ToolMetadataError(ValueError):
     """Raised when explicit tool metadata does not match the schema."""
 
 
-def load_tool_metadata(
-    config_path: str | os.PathLike[str] | None = None,
-    *,
-    env: Mapping[str, str] | None = None,
-) -> dict[str, Mapping[str, Any]]:
-    """Load explicit/local metadata, falling back to the shipped AgentDojo catalog.
+@dataclass(frozen=True)
+class ToolMetadataSelection:
+    """Public host-side account of which risk catalog was selected."""
 
-    A fresh checkout needs no copied configuration. Explicit missing paths
-    still fail; unclassified runtime tools remain critical.
-    """
+    path: Path
+    source: str
+    backend_id: str | None
+    catalog_backend_id: str | None = None
+    skipped_generic_path: Path | None = None
+    warning: str | None = None
 
-    environ = os.environ if env is None else env
-    configured = config_path or environ.get("DSCG_TOOL_METADATA")
-    path = Path(configured).expanduser() if configured else DEFAULT_TOOL_METADATA_PATH
-    if not configured and not path.exists():
-        path = BUILTIN_TOOL_METADATA_PATH
-    if not path.is_absolute():
-        path = PROJECT_ROOT / path
+    def public_dict(self) -> dict[str, Any]:
+        return {
+            "path": str(self.path),
+            "source": self.source,
+            "backend_id": self.backend_id,
+            "catalog_backend_id": self.catalog_backend_id,
+            "skipped_generic_path": str(self.skipped_generic_path) if self.skipped_generic_path else None,
+            "warning": self.warning,
+        }
+
+
+def _absolute_metadata_path(path: str | os.PathLike[str]) -> Path:
+    candidate = Path(path).expanduser()
+    return candidate if candidate.is_absolute() else PROJECT_ROOT / candidate
+
+
+def _reviewed_catalog_paths() -> dict[str, Path]:
+    return {
+        name: PROJECT_ROOT / "config" / f"tools.{name}-v1.2.toml"
+        for name in ("agentdojo", "agentdyn")
+    }
+
+
+def _read_tool_metadata(path: Path) -> dict[str, Mapping[str, Any]]:
     if not path.exists():
-        if configured:
-            raise ToolMetadataError(f"tool metadata file does not exist: {path}")
-        return {}
+        raise ToolMetadataError(f"tool metadata file does not exist: {path}")
     try:
         import tomllib
     except ModuleNotFoundError:
@@ -66,6 +81,79 @@ def load_tool_metadata(
     if not isinstance(tools, Mapping):
         raise ToolMetadataError(f"tool metadata {path} must contain a [tools] table")
     return {str(name): value for name, value in tools.items()}
+
+
+def _catalog_backend_id(path: Path) -> str | None:
+    """Recognize reviewed copies by complete validated semantics, never names."""
+    try:
+        actual = {name: _coerce_metadata(value) for name, value in _read_tool_metadata(path).items()}
+    except ToolMetadataError:
+        return None
+    for backend_id, reviewed in _reviewed_catalog_paths().items():
+        if not reviewed.exists():
+            continue
+        expected = {name: _coerce_metadata(value) for name, value in _read_tool_metadata(reviewed).items()}
+        if actual == expected:
+            return backend_id
+    return None
+
+
+def resolve_tool_metadata(
+    config_path: str | os.PathLike[str] | None = None,
+    *,
+    env: Mapping[str, str] | None = None,
+    backend: Any = None,
+) -> ToolMetadataSelection:
+    """Select one catalog without merging or overwriting host classifications.
+
+    Explicit paths also support isolated custom runtimes and need no benchmark
+    identity field. Implicit generic files must be known reviewed catalog copies.
+    """
+    environ = os.environ if env is None else env
+    configured = config_path or environ.get("DSCG_TOOL_METADATA")
+    if configured:
+        path = _absolute_metadata_path(configured)
+        if not path.exists():
+            raise ToolMetadataError(f"tool metadata file does not exist: {path}")
+        return ToolMetadataSelection(path, "explicit" if config_path else "environment",
+            getattr(backend, "id", None), _catalog_backend_id(path))
+    if backend is None:
+        from dscg.benchmark_catalog import get_backend
+
+        backend = get_backend()
+    backend_id = backend.id
+    local = PROJECT_ROOT / "config" / f"tools.{backend_id}.local.toml"
+    if local.exists():
+        return ToolMetadataSelection(local, "backend_local", backend_id, _catalog_backend_id(local))
+    generic = _absolute_metadata_path(DEFAULT_TOOL_METADATA_PATH)
+    if generic.exists():
+        association = _catalog_backend_id(generic)
+        if association is None:
+            raise ToolMetadataError(
+                f"unassigned custom generic tool metadata: {generic}; choose it explicitly "
+                f"with --tool-metadata or maintain {local}"
+            )
+        if association == backend_id:
+            return ToolMetadataSelection(generic, "generic_local", backend_id, association)
+        warning = (
+            f"Skipping generic tool metadata {generic}: reviewed {association} catalog copy "
+            f"does not match active {backend_id}; using its builtin catalog"
+        )
+        return ToolMetadataSelection(_absolute_metadata_path(backend.tool_metadata_path), "builtin",
+            backend_id, backend_id, generic, warning)
+    return ToolMetadataSelection(_absolute_metadata_path(backend.tool_metadata_path), "builtin", backend_id, backend_id)
+
+
+def load_tool_metadata(
+    config_path: str | os.PathLike[str] | None = None,
+    *,
+    env: Mapping[str, str] | None = None,
+) -> dict[str, Mapping[str, Any]]:
+    """Load the selected backend catalog with explicit overrides taking priority."""
+    selected = resolve_tool_metadata(config_path, env=env)
+    if selected.warning:
+        warnings.warn(selected.warning, UserWarning, stacklevel=2)
+    return _read_tool_metadata(selected.path)
 
 
 @dataclass(frozen=True)
@@ -90,7 +178,7 @@ class ToolRiskMetadata:
             ("sensitivity", SENSITIVITIES),
         ):
             value = getattr(self, field)
-            if value not in allowed:
+            if not isinstance(value, str) or value not in allowed:
                 raise ToolMetadataError(
                     f"invalid {field}={value!r}; expected one of {sorted(allowed)}"
                 )
@@ -220,6 +308,39 @@ def _coerce_metadata(value: ToolRiskMetadata | Mapping[str, Any]) -> ToolRiskMet
     if missing:
         raise ToolMetadataError(f"missing metadata fields: {sorted(missing)}")
     return ToolRiskMetadata(**{key: value[key] for key in set(value) & (required | {"schema_version"})})
+
+
+def validate_benchmark_tool_metadata(
+    config_path: str | os.PathLike[str] | None = None,
+    *,
+    required_tools: Iterable[str] | None = None,
+    env: Mapping[str, str] | None = None,
+) -> dict[str, ToolRiskMetadata]:
+    """Require complete, valid benchmark coverage before constructing a model.
+
+    This separate preflight does not tighten the generic runtime registration
+    API, which intentionally supports isolated tools and partial metadata.
+    Extra override entries are allowed; every selected benchmark tool is checked.
+    """
+    if required_tools is None:
+        from dscg.benchmark_catalog import get_backend, get_suite
+
+        backend = get_backend()
+        required_tools = {
+            tool.name for name in backend.suites for tool in get_suite(backend.suite_version, name).tools
+        }
+    required = set(required_tools)
+    raw = load_tool_metadata(config_path, env=env)
+    missing = sorted(required - raw.keys())
+    if missing:
+        raise ToolMetadataError(f"benchmark tool metadata missing classifications: {missing}")
+    validated = {}
+    for name in sorted(required):
+        try:
+            validated[name] = _coerce_metadata(raw[name])
+        except ToolMetadataError as exc:
+            raise ToolMetadataError(f"{name}: {exc}") from exc
+    return validated
 
 
 def set_tool_metadata(runtime: Any, metadata: Mapping[str, ToolRiskMetadata | Mapping[str, Any]]) -> None:

@@ -1,7 +1,7 @@
 import json
 import os
 from pathlib import Path
-from tempfile import TemporaryDirectory
+from test_partial_agentdyn import TemporaryDirectory
 from contextlib import redirect_stdout
 from io import StringIO
 import unittest
@@ -21,7 +21,7 @@ class PartialAblationTests(unittest.TestCase):
         for flags in [dict(origin=True,audit_retries=1),dict(origin=True,completion_prompt=True),dict(origin=True,use_security_checker=False),dict(use_security_checker=False,audit_retries=1)]:
             with self.subTest(flags=flags),self.assertRaises(ValueError):validate_controls(**flags)
     def test_frozen_ids_are_used_or_error_never_silently_replaced(self):
-        manifest={'suite_version':'v1.2','suites':{'s':{'user_task_ids':['u2'],'injection_task_ids':['i2']}}}
+        manifest={'benchmark':__import__('test_partial_agentdyn').DOJO_IDENTITY,'suite_version':'v1.2','suites':{'s':{'user_task_ids':['u2'],'injection_task_ids':['i2']}}}
         self.assertEqual(select_tasks(manifest,'s',['u1','u2'],['i1','i2'],True,False),(['u2'],['i2']))
         self.assertEqual(select_tasks(manifest,'s',['u1','u2'],['i1','i2'],False,False),(['u2'],[]))
         for users,injections in [(['u1'],['i2']),(['u2'],['i1'])]:
@@ -85,3 +85,14 @@ class MissingSecuritySummaryTests(unittest.TestCase):
             self.assertIsNone(summary['metrics']['attack_success_rate'])
             self.assertNotIn('ASR): 0.00%',report)
             self.assertNotIn('Defense Rate): 100.00%',report)
+
+
+# Explicitly retain historical upstream suites as generic offline fixtures.
+def setUpModule():
+    global _fixture_backend
+    from test_partial_agentdyn import legacy_fixture_backend
+    _fixture_backend = legacy_fixture_backend(globals())
+
+
+def tearDownModule():
+    _fixture_backend.close()

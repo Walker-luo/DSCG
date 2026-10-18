@@ -1,13 +1,13 @@
-"""Full AgentDojo entry point sharing execution, controls and reports with partial.
+"""Full benchmark entry point sharing execution, controls and reports with partial.
 
-Defaults select all four suites; --suites selects complete suite catalogues.
+Defaults select all current backend suites; --suites selects complete suite catalogues.
 Explicit --cohort retains all users in selected suites and frozen kept targets.
 """
 from pathlib import Path
 
 from dscg.paths import BENCHMARK_RESULTS_DIR
 from experiments import run_partial_benchmark as runner
-from experiments.common.partial_controls import SUITES
+from dscg.benchmark_catalog import get_suites
 
 # Preserve helpers imported by older local callers.
 _safe_result_component = runner._safe_result_component
@@ -30,7 +30,7 @@ def main(
     """Run all tasks within selected suites, retaining shared controls and defaults."""
     if 'task_scope' in options:
         raise ValueError('full benchmark task scope cannot be overridden')
-    suites = list(SUITES) if suites is None and not reuse else suites
+    suites = list(get_suites()) if suites is None and not reuse else suites
     if cohort_path is not None:
         if not run_attack or options.get('task_manifest_path'):
             raise ValueError('--cohort cannot be combined with clean or another task manifest')

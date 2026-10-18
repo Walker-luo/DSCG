@@ -17,28 +17,24 @@
     <aside class="sidebar">
       <div class="sidebar-heading">
         <div><h1>实验配置</h1><p>选择模型、评测范围与防御组合</p></div>
-        <a class="mobile-workspace-link" href="#evaluation-workspace">查看工作台</a><span class="version-badge" title="AgentDojo 基准版本">AgentDojo v1.2</span>
+        <a class="mobile-workspace-link" href="#evaluation-workspace">查看工作台</a><span id="benchmark-badge" class="version-badge" title="当前进程识别的基准">基准未加载</span>
       </div>
 
       <div class="sidebar-body">
         <section class="config-section" aria-labelledby="config-basic">
           <h2 id="config-basic">评测对象与模型</h2>
           <div class="field-group"><label class="form-label" for="run-label">运行名称</label><input type="text" id="run-label" class="form-control form-control-sm" placeholder="例如：{{ framework_version }} · 新对照" maxlength="120"><small class="field-help">框架或配置改变时使用新名称，保留原实验身份。</small></div>
-          <div class="field-group"><label class="form-label" for="pipeline-type">评测对象</label><select id="pipeline-type" class="form-select form-select-sm"><option value="newframe">DSCG · 三层防御</option><option value="origin">AgentDojo · 原生 Baseline / 防御</option></select></div>
+          <div class="field-group"><label class="form-label" for="pipeline-type">评测对象</label><select id="pipeline-type" class="form-select form-select-sm"><option value="newframe">DSCG · 三层防御</option><option value="origin">原生 Baseline / 防御</option></select></div>
           <div class="field-group"><label class="form-label" for="model-id">主模型</label><select id="model-id" class="form-select form-select-sm"><option value="" selected>Local/Env 配置</option></select></div>
           <div class="field-group" id="sec-model-group"><label class="form-label" for="sec-model-id">L3 审计模型</label><select id="sec-model-id" class="form-select form-select-sm"><option value="" selected>Local/Env 配置</option></select><small class="field-help">L2 授权使用主模型；L3 可使用独立审计模型。</small></div>
         </section>
 
         <section class="config-section" aria-labelledby="config-scope">
           <h2 id="config-scope">场景与攻击</h2>
-          <div class="suite-grid">
-            <label class="suite-option" for="suite-workspace"><input class="form-check-input suite-cb" type="checkbox" id="suite-workspace" value="workspace" checked><span><strong>Workspace</strong><small data-suite-count="workspace">40 × 14</small></span></label>
-            <label class="suite-option" for="suite-travel"><input class="form-check-input suite-cb" type="checkbox" id="suite-travel" value="travel"><span><strong>Travel</strong><small data-suite-count="travel">20 × 7</small></span></label>
-            <label class="suite-option" for="suite-banking"><input class="form-check-input suite-cb" type="checkbox" id="suite-banking" value="banking"><span><strong>Banking</strong><small data-suite-count="banking">16 × 9</small></span></label>
-            <label class="suite-option" for="suite-slack"><input class="form-check-input suite-cb" type="checkbox" id="suite-slack" value="slack"><span><strong>Slack</strong><small data-suite-count="slack">21 × 5</small></span></label>
-          </div>
+          <div class="suite-grid" id="suite-grid" aria-live="polite"><small class="field-help">正在读取当前环境的场景目录…</small></div>
+          <small class="field-help" id="backend-status" role="status"></small>
           <div class="field-group"><label class="form-label" for="run-attack">评测模式</label><select id="run-attack" class="form-select form-select-sm"><option value="true" selected>对抗评测（含注入）</option><option value="false">良性效用评测</option></select></div>
-          <div class="field-group" id="attack-type-group"><label class="form-label" for="attack-name">攻击类型</label><select id="attack-name" class="form-select form-select-sm"><option value="important_instructions" selected>重要指令注入</option></select></div>
+          <div class="field-group" id="attack-type-group"><label class="form-label" for="attack-name">攻击类型</label><select id="attack-name" class="form-select form-select-sm"><option value="" selected>正在读取攻击目录…</option></select></div>
           <div class="limit-grid">
             <div class="field-group"><label class="form-label" for="max-user-tasks">用户任务上限</label><input type="number" id="max-user-tasks" class="form-control form-control-sm" value="0" min="0" step="1"></div>
             <div class="field-group" id="injection-limit-group"><label class="form-label" for="max-injection-tasks">注入任务上限</label><input type="number" id="max-injection-tasks" class="form-control form-control-sm" value="0" min="0" step="1"></div>
@@ -105,8 +101,8 @@
 
       <div class="run-dock">
         <div class="run-preview" aria-live="polite">
-          <div><span>场景</span><strong id="preview-suites">1 / 4</strong></div>
-          <div><span>预计任务</span><strong id="preview-tasks">560</strong></div>
+          <div><span>场景</span><strong id="preview-suites">0 / 0</strong></div>
+          <div><span>预计任务</span><strong id="preview-tasks">未加载</strong></div>
           <div><span>防御模式</span><strong id="preview-defense">完整防御</strong></div>
         </div>
         <p id="config-error" class="config-error" role="alert" hidden></p>

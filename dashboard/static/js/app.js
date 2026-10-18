@@ -175,10 +175,17 @@ async function loadDashboardConfig() {
     populateModelSelect("model-id", config.models || []);
     populateModelSelect("sec-model-id", config.sec_models || []);
     populateModelSelect("attack-name", config.attacks || []);
-    (config.suites || []).forEach((suite) => {
-      const count = document.querySelector(`[data-suite-count="${suite.id}"]`);
-      if (count) count.textContent = `${suite.user_tasks} × ${suite.injection_tasks}`;
-    });
+    const selected = new Set(Array.from($$(".suite-cb:checked"), item => item.value));
+    $("#suite-grid").innerHTML = (config.suites || []).map((suite, index) =>
+      `<label class="suite-option" for="suite-${escapeHtml(suite.id)}"><input class="form-check-input suite-cb" type="checkbox" id="suite-${escapeHtml(suite.id)}" value="${escapeHtml(suite.id)}"${selected.has(suite.id) || (!selected.size && index === 0) ? " checked" : ""}><span><strong>${escapeHtml(suite.label)}</strong><small>${formatCount(suite.user_tasks)} × ${formatCount(suite.injection_tasks)}</small></span></label>`
+    ).join("");
+    $$(".suite-cb").forEach(checkbox => checkbox.addEventListener("change", updateRunPreview));
+    $("#backend-status").textContent = config.backend_ready === false ? config.backend_error : config.tool_metadata_error || config.tool_metadata_selection?.warning || "";
+    $("#btn-run").disabled = state.isRunning || config.backend_ready === false;
+    const benchmarkLabel = config.benchmark_label || "基准未加载";
+    $("#benchmark-badge").textContent = `${benchmarkLabel} ${config.suite_version || "版本未加载"}`;
+    $("#pipeline-type option[value='origin']").textContent = `${benchmarkLabel} · 原生 Baseline / 防御`;
+    $("#tool-metadata-path").placeholder = config.tool_metadata_path || "后端未就绪";
     updateRunPreview();
   } catch (err) {
     console.error("加载模型配置失败:", err);
@@ -187,12 +194,7 @@ async function loadDashboardConfig() {
 
 function updateRunPreview() {
   const selectedSuites = Array.from($$(".suite-cb:checked")).map((item) => item.value);
-  const allSuites = state.dashboardConfig?.suites || [
-    { id: "workspace", user_tasks: 40, injection_tasks: 14 },
-    { id: "travel", user_tasks: 20, injection_tasks: 7 },
-    { id: "banking", user_tasks: 16, injection_tasks: 9 },
-    { id: "slack", user_tasks: 21, injection_tasks: 5 },
-  ];
+  const allSuites = state.dashboardConfig?.suites || [];
   const maxUsers = Math.max(0, Number.parseInt($("#max-user-tasks")?.value, 10) || 0);
   const maxInjections = Math.max(0, Number.parseInt($("#max-injection-tasks")?.value, 10) || 0);
   const withAttack = $("#run-attack")?.value === "true";
@@ -214,6 +216,7 @@ function updateRunPreview() {
   const precheck = sandbox && $("#authorization-precheck").checked;
   const toolView = sandbox && $('#planning-tool-view').checked;
   const delegated = sandbox && $('#delegated-tasks').checked;
+  const benchmarkLabel = state.dashboardConfig?.benchmark_label || "基准未加载";
   const frameworkVersion = state.dashboardConfig?.framework_version || document.body?.dataset.frameworkVersion || '版本未记录';
   $("#use-input-isolation").disabled = isOrigin || !(sandbox || checker);
   $("#authorization-precheck").disabled = !sandbox;
@@ -222,7 +225,7 @@ function updateRunPreview() {
   $("#defense-group").style.display = isOrigin ? "block" : "none";
   $("#ablation-group").style.display = isOrigin ? "none" : "grid";
   $("#trace-level-group").style.display = isOrigin ? "none" : "block";
-  $("#config-defense .framework-version").textContent = isOrigin ? "AgentDojo" : frameworkVersion;
+  $("#config-defense .framework-version").textContent = isOrigin ? benchmarkLabel : frameworkVersion;
   $('#planning-tool-view').disabled = !sandbox;
   $('#delegated-tasks').disabled = !sandbox;
   $(".metadata-path-group").style.display = isOrigin ? "none" : "block";
@@ -244,10 +247,10 @@ function updateRunPreview() {
     layer.classList.toggle("is-disabled", !enabled);
     layer.querySelector("b").textContent = enabled ? "启用" : "关闭";
   });
-  $("#workspace-framework").textContent = isOrigin ? "AgentDojo 原生循环" : frameworkVersion;
+  $("#workspace-framework").textContent = isOrigin ? `${benchmarkLabel} 原生循环` : frameworkVersion;
   $("#workspace-mode").textContent = withAttack ? "对抗评测" : "良性效用评测";
   $("#framework-flow").textContent = isOrigin
-    ? "原生 AgentDojo 规划与工具执行；DSCG 三层不参与运行。"
+    ? `${benchmarkLabel} 原生规划与工具执行；DSCG 三层不参与运行。`
     : `${sandbox ? "任务授权 → " : ""}${toolView ? "已授权工具视图 → " : ""}主模型规划${isolation ? "（返回经 L1）" : ""} → ${precheck ? "L2 整批前置 → " : ""}${checker ? "L3 动作审计 → " : ""}Monitor / 票据执行`;
   $('#delegation-flow').hidden = !delegated;
   $('#preview-layer-l2 small').textContent = `${toolView ? '仅展示已授权工具' : '完整工具目录'}；${precheck ? '非法批次整体拒绝' : '执行前复核权限'}`;
@@ -257,7 +260,7 @@ function updateRunPreview() {
     : '本配置关闭 L3；工具执行仍由 Monitor 与票据控制。';
 
   if ($("#preview-suites")) $("#preview-suites").textContent = `${selectedSuites.length} / ${allSuites.length}`;
-  if ($("#preview-tasks")) $("#preview-tasks").textContent = estimatedTasks.toLocaleString("zh-CN");
+  if ($("#preview-tasks")) $("#preview-tasks").textContent = allSuites.length ? estimatedTasks.toLocaleString("zh-CN") : "未加载";
   if ($("#preview-defense")) $("#preview-defense").textContent = defenseLabel;
 }
 
@@ -663,7 +666,7 @@ async function loadOverview(runId) {
     ];
     const totalTokens = s => (s.overhead?.total_tokens || 0) + (s.sec_overhead?.total_tokens || 0);
     $("#overview-content").innerHTML = `
-      <div class="result-heading"><div><h3>${escapeHtml(config.label || '运行结果')}</h3><p>${escapeHtml(runId)} · ${escapeHtml(run.completed_at ? new Date(run.completed_at).toLocaleString('zh-CN') : '未完成')}</p></div><span class="result-version">${escapeHtml(config.origin ? 'AgentDojo 原生' : framework?.framework_version || config.framework_version || '历史版本 · 未记录')}</span></div>
+      <div class="result-heading"><div><h3>${escapeHtml(config.label || '运行结果')}</h3><p>${escapeHtml(config.benchmark?.id || '历史 / unknown')} · ${escapeHtml(runId)} · ${escapeHtml(run.completed_at ? new Date(run.completed_at).toLocaleString('zh-CN') : '未完成')}</p></div><span class="result-version">${escapeHtml(config.origin ? (config.benchmark?.id ? `${config.benchmark.id} 原生` : '历史原生循环') : framework?.framework_version || config.framework_version || '历史版本 · 未记录')}</span></div>
       <div class="effective-config"><strong>本次实际配置</strong>${config.origin ? '<span>原生工具循环 · 无 DSCG 层</span>' :
         layerBadge('L1 返回隔离', layerFlag('input_isolation')) + layerBadge('L2 工具授权', layerFlag('use_sandbox')) +
         layerBadge('L2 前置检查', layerFlag('authorization_precheck')) +
@@ -671,7 +674,7 @@ async function loadOverview(runId) {
         layerBadge('任务来源展开', layerFlag('delegated_tasks')) + layerBadge('L3 动作审计', layerFlag('use_security_checker'))}</div>
       ${config.origin ? '' : `<p class="audit-routing-note">${escapeHtml(auditNote)}</p>`}
       <div class="overview-cards">
-        <div class="metric-card tsr"><div class="metric-label">任务成功率 TSR</div><div class="metric-value">${formatRate(agg.avg_utility_rate)}</div><small>${formatCount(agg.utility_passed)} / ${formatCount(agg.total_tasks)} 个任务成功</small></div>
+        <div class="metric-card tsr"><div class="metric-label">任务成功率 TSR</div><div class="metric-value">${formatRate(agg.avg_utility_rate)}</div><small>${formatCount(agg.utility_passed)} / ${formatCount(agg.utility_valid ?? agg.total_tasks)} 个有效任务成功 · 总任务 ${formatCount(agg.total_tasks)} · 运行错误 ${formatCount(agg.execution_errors)}</small></div>
         <div class="metric-card asr"><div class="metric-label">攻击成功率 ASR</div><div class="metric-value">${formatRate(agg.avg_attack_success_rate)}</div><small>${config.run_attack === false ? '良性评测不适用' : `${agg.security_denominator === null ? "有效分母未记录" : `${formatCount(agg.security_denominator)} 条原生安全判定`} · 越低越好`}</small></div>
         <div class="metric-card tokens"><div class="metric-label">${agg.security_cost_complete || config.origin || config.use_security_checker === false ? "总 Token 消耗" : "已记录 Token（审计缺失）"}</div><div class="metric-value">${formatCount(agg.total_tokens)}</div><small>主模型（含授权）${formatCount(agg.main_total_tokens)} + 审计 ${formatCount(agg.security_cost_complete || config.origin || config.use_security_checker === false ? agg.security_total_tokens : null)}</small></div>
         <div class="metric-card quality"><div class="metric-label">缺失 / 无效安全判定</div><div class="metric-value">${formatCount(agg.security_missing)}</div><small>不计为零 ASR；需核对原始结果</small></div>
@@ -680,7 +683,7 @@ async function loadOverview(runId) {
       <div class="result-section-heading"><h4>各场景结果</h4><span>TSR 按任务加权；ASR 按有效安全判定加权</span></div>
       <div class="table-responsive"><table class="table table-dark table-hover evaluation-suite-table"><thead><tr><th>场景</th><th>TSR</th><th>ASR</th><th>任务数</th><th>已记录总 Tokens</th><th>审计 Tokens</th></tr></thead><tbody>${suites.map(s => `<tr><td><strong>${escapeHtml(s.suite_name)}</strong></td><td class="text-info">${formatRate(s.metrics?.utility_rate)}</td><td class="text-danger">${formatRate(config.run_attack === false ? null : s.metrics?.attack_success_rate)}</td><td>${formatCount(s.task_counts?.total_tasks)}</td><td>${formatCount(totalTokens(s))}</td><td>${formatCount(s.sec_overhead?.total_tokens ?? (config.origin || config.use_security_checker === false ? 0 : null))}</td></tr>`).join('')}</tbody></table></div>
       ${config.origin ? '' : `<section class="layer-observations"><div class="result-section-heading"><h4>三层运行记录</h4><span>L1 ${coverage('isolation_records')} / ${formatCount(agg.total_tasks)} · L2 ${coverage('l2_records')} / ${formatCount(agg.total_tasks)} · 路由 ${coverage('routing_records')} / ${formatCount(agg.total_tasks)} 条 trace</span></div><dl>${statRows.map(([label, value]) => `<div><dt>${label}</dt><dd>${value}</dd></div>`).join('')}</dl><p>仅统计已计分任务，排除攻击生成预检；覆盖不全时为已记录部分。编译次数不等于模型调用，累计工具定义与字符数不等于 Tokens。</p></section>`}
-      <div class="result-footnote"><i class="bi bi-info-circle"></i><span>ASR 使用 AgentDojo 原生判定；工具级约束与路由统计不代表独立安全验证。任务 ID、模型、攻击一致后再作比较。</span></div>
+      <div class="result-footnote"><i class="bi bi-info-circle"></i><span>ASR 使用 AgentDojo 原生判定；工具级约束与路由统计不代表独立安全验证。基准版本、任务目录、任务 ID、模型、攻击一致后再作比较。</span></div>
     `;
     $("#workspace-run").value = runId;
     ["chart-data-source", "detail-data-source", "report-data-source"].forEach(id => $("#" + id).value = runId);
@@ -1032,6 +1035,10 @@ async function runComparison() {
       body: JSON.stringify({ run_ids: runIds }),
     });
     const data = await resp.json();
+    if (!resp.ok) {
+      $("#compare-results").innerHTML = `<div class="empty-state" role="alert"><strong>${escapeHtml(data.error || "对比请求失败")}</strong></div>`;
+      return;
+    }
     renderComparison(data);
 
     const compareTab = new bootstrap.Tab($("#tab-compare"));
@@ -1241,6 +1248,7 @@ async function loadReport() {
           <tr><td class="text-muted">完成时间</td><td>${run.completed_at || "N/A"}</td></tr>
           <tr><td class="text-muted">主模型</td><td>${escapeHtml(config.resolved_main_model?.model_id || config.model_id || "Local/Env 配置")}</td></tr>
           <tr><td class="text-muted">审计模型</td><td>${escapeHtml(auditModel)}</td></tr>
+          <tr><td class="text-muted">基准身份</td><td>${escapeHtml(config.benchmark ? JSON.stringify(config.benchmark) : "历史 / unknown")}</td></tr>
           <tr><td class="text-muted">测试套件</td><td>${escapeHtml((config.suites || []).join(", "))}</td></tr>
           <tr><td class="text-muted">攻击模式</td><td>${config.run_attack ? "启用" : "禁用"}</td></tr>
           <tr><td class="text-muted">攻击类型</td><td>${escapeHtml(config.run_attack === false ? "不适用" : config.attack_name || "未记录")}</td></tr>

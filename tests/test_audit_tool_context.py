@@ -118,16 +118,18 @@ class AuditToolContextTests(unittest.TestCase):
 
 class BuiltinMetadataDefaultsTests(unittest.TestCase):
     def test_checkout_without_local_file_uses_shipped_catalog(self):
+        from dscg.benchmark_catalog import get_backend
         with TemporaryDirectory() as directory, patch('dscg.tool_metadata.DEFAULT_TOOL_METADATA_PATH', Path(directory)/'missing.toml'):
             catalog = load_tool_metadata(env={})
-        self.assertEqual(catalog.get("get_webpage", {}).get("sink"), "external_recipient")
-        self.assertIn("update_scheduled_transaction", catalog)
+        self.assertEqual(catalog, load_tool_metadata(get_backend().tool_metadata_path, env={}))
 
-    def test_existing_local_override_wins_and_explicit_missing_still_errors(self):
+    def test_explicit_custom_override_works_and_unassigned_generic_fails_closed(self):
         with TemporaryDirectory() as directory:
             path = Path(directory)/'local.toml'
             path.write_text('[tools.custom]\neffect="read"\n')
             with patch('dscg.tool_metadata.DEFAULT_TOOL_METADATA_PATH', path):
-                self.assertEqual(set(load_tool_metadata(env={})), {"custom"})
+                self.assertEqual(set(load_tool_metadata(path, env={})), {"custom"})
+                with self.assertRaisesRegex(ValueError,"unassigned custom"):
+                    load_tool_metadata(env={})
             with self.assertRaises(ValueError):
                 load_tool_metadata(Path(directory)/'missing.toml', env={})

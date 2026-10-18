@@ -4,7 +4,7 @@ import json
 import gzip
 import os
 from pathlib import Path
-from tempfile import TemporaryDirectory
+from test_partial_agentdyn import TemporaryDirectory
 from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
@@ -120,7 +120,7 @@ class PartialAttackTests(unittest.TestCase):
                 self.assertEqual(runner.main(origin=origin, suites=["workspace"], run_name=mode,
                                              results_dir=directory, force_rerun=True,
                                              **({"attack": "all"} if preset == "all" else {})), 0)
-                base = Path(directory) / f"offline-model_{mode}"
+                base = Path(directory) / f"offline-model_agentdojo_{mode}"
                 manifest = json.loads((base / "attack_manifest.json").read_text())
                 self.assertEqual(manifest["attacks"], selected_attacks)
                 self.assertEqual(manifest["excluded_from_all"], {"manual": "requires interactive input"})
@@ -158,10 +158,10 @@ class PartialAttackTests(unittest.TestCase):
         ):
             self.assertEqual(runner.main(origin=True, suites=["workspace"], run_name="partial",
                                          results_dir=directory, attack=["tool_knowledge", "injecagent"]), 1)
-            manifest = json.loads((Path(directory) / "offline-model_partial" / "attack_manifest.json").read_text())
+            manifest = json.loads((Path(directory) / "offline-model_agentdojo_partial" / "attack_manifest.json").read_text())
             self.assertEqual([run["status"] for run in manifest["runs"]], ["error", "completed"])
             self.assertEqual(manifest["runs"][0]["error_type"], "ValueError")
-            self.assertTrue((Path(directory) / "offline-model_partial/injecagent/workspace/summary.json").exists())
+            self.assertTrue((Path(directory) / "offline-model_agentdojo_partial/injecagent/workspace/summary.json").exists())
 
     def test_native_traces_sidecars_and_cache_use_the_nested_attack_directory(self):
         # Real AgentDojo logger/cache, with task execution replaced by an offline oracle.
@@ -189,13 +189,14 @@ class PartialAttackTests(unittest.TestCase):
                            results_dir=directory, attack=attack_name)
             self.assertEqual(runner.main(**options), 0)
             self.assertEqual(task.call_count, 12)  # 3 prechecks + 9 attacked tasks.
-            root = Path(directory) / f"{model_id}_baseline"
+            root = Path(directory) / f"{model_id}_agentdojo_baseline"
             result = root / attack_name / "workspace"
             injection = next(iter(suite.injection_tasks))
             trace = result / "user_task_0" / attack_name / f"{injection}.json"
             self.assertTrue(trace.exists())
             raw = json.loads(trace.read_text())
             self.assertEqual(raw["attack_type"], attack_name)
+            self.assertEqual(raw["benchmark_version"], "v1.2")
             self.assertIn("GPT-4", "\n".join(raw["injections"].values()))
             self.assertTrue(raw["utility"])
             cached = runner.benchmark.load_task_results(attack_name, "workspace", "user_task_0",
@@ -232,3 +233,14 @@ class PartialAttackTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+# Explicitly retain historical upstream suites as generic offline fixtures.
+def setUpModule():
+    global _fixture_backend
+    from test_partial_agentdyn import legacy_fixture_backend
+    _fixture_backend = legacy_fixture_backend(globals())
+
+
+def tearDownModule():
+    _fixture_backend.close()

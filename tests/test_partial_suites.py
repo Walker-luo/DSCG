@@ -3,7 +3,7 @@ from contextlib import ExitStack, redirect_stderr, redirect_stdout
 from io import StringIO
 import json
 from pathlib import Path
-from tempfile import TemporaryDirectory
+from test_partial_agentdyn import TemporaryDirectory
 from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
@@ -14,7 +14,7 @@ from experiments import run_partial_benchmark as runner
 
 class PartialSuiteTests(unittest.TestCase):
     def setUp(self):
-        self.artifacts = Path(__file__).resolve().parents[1] / 'workshop/artifacts/20261017_partial_suites/test_runs'
+        self.artifacts = Path(__file__).resolve().parents[1] / 'workshop/artifacts/20261018_dual_benchmark/runner/test_runs'
         self.artifacts.mkdir(parents=True, exist_ok=True)
 
     def offline(self, stack):
@@ -40,7 +40,7 @@ class PartialSuiteTests(unittest.TestCase):
             options = ['--baseline', '--name', 'three', '--results-dir', directory,
                        '--suites', 'travel', 'banking', 'slack']
             self.assertEqual(runner.cli(options), 0)
-            base = Path(directory) / 'offline_three'
+            base = Path(directory) / 'offline_agentdojo_three'
             manifest = json.loads((base / 'attack_manifest.json').read_text())
             self.assertEqual(manifest['suites'], ['travel', 'banking', 'slack'])
             self.assertEqual(manifest['task_scope'], 'partial')
@@ -64,7 +64,7 @@ class PartialSuiteTests(unittest.TestCase):
             self.offline(stack)
             self.assertEqual(runner.cli(['--baseline', '--clean', '--suites', 'travel', 'banking', 'slack',
                                          '--name', 'clean', '--results-dir', directory]), 0)
-            base = Path(directory) / 'offline_clean/none'
+            base = Path(directory) / 'offline_agentdojo_clean/none'
             self.assertFalse((base / 'workspace').exists())
             self.assertEqual(sum(json.loads((base / name / 'summary.json').read_text())['task_counts']['total_tasks']
                                  for name in ['travel', 'banking', 'slack']), 9)
@@ -88,3 +88,14 @@ class PartialSuiteTests(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+# Explicitly retain historical upstream suites as generic offline fixtures.
+def setUpModule():
+    global _fixture_backend
+    from test_partial_agentdyn import legacy_fixture_backend
+    _fixture_backend = legacy_fixture_backend(globals())
+
+
+def tearDownModule():
+    _fixture_backend.close()

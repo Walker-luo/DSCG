@@ -4,10 +4,10 @@ import json
 from copy import deepcopy
 from pathlib import Path
 
+from dscg.benchmark_catalog import get_suites
 from dscg.input_isolation import FRAMEWORK_VERSION
 from dscg.l1_projection import MODES as L1_PROJECTION_MODES
 
-SUITES = {"workspace", "travel", "banking", "slack"}
 ROUTING_KEYS = ("candidate_batches", "precheck_allowed_batches", "precheck_rejected_batches",
                 "public_read_bypass_batches", "semantic_audit_calls")
 ISOLATION_KEYS = ("model_requests", "tool_results_rendered", "escaped_results_rendered",
@@ -20,7 +20,8 @@ L2_KEYS = ('planning_requests', 'catalog_tools_total', 'visible_tools_total',
 def normalize_config(payload):
     config = dict(payload)
     suites = config.get("suites", [])
-    if not isinstance(suites, list) or not suites or any(s not in SUITES for s in suites):
+    active_suites = get_suites()
+    if not isinstance(suites, list) or not suites or any(s not in active_suites for s in suites):
         raise ValueError("请选择有效的评测场景")
     config["suites"] = list(dict.fromkeys(suites))
     for key, default in (("origin", False), ("run_attack", True), ("use_sandbox", True),
@@ -60,8 +61,16 @@ def normalize_config(payload):
 
 
 def aggregate(summaries):
-    """Pool task counts (rather than equally weighting suites) and both model roles."""
+    """Pool suites only within a single recorded benchmark/catalog identity."""
+    identities = {json.dumps(summary.get("benchmark"), sort_keys=True) for summary in summaries}
+    if len(identities) > 1:
+        return {**dict.fromkeys((
+            "avg_utility_rate", "avg_attack_success_rate", "avg_defense_success_rate", "total_tasks",
+            "utility_passed", "security_denominator", "security_missing", "main_total_tokens",
+            "security_total_tokens", "total_tokens", "total_prompt_tokens", "total_completion_tokens",
+        )), "security_cost_complete": False, "aggregation_warning": "benchmark_or_catalog_mismatch"}
     total = sum(s.get("task_counts", {}).get("total_tasks", 0) for s in summaries)
+    utility_valid = sum(s.get("task_counts", {}).get("utility_valid", s.get("task_counts", {}).get("total_tasks", 0)) for s in summaries)
     passed = sum(s.get("task_counts", {}).get("utility_passed", 0) for s in summaries)
     denominator = 0
     successes = 0
@@ -82,10 +91,11 @@ def aggregate(summaries):
     security = {key: sum(s.get("sec_overhead", {}).get(key, 0) for s in summaries)
                 for key in main}
     return {
-        "avg_utility_rate": round(passed / total * 100, 2) if total else None,
+        "avg_utility_rate": round(passed / utility_valid * 100, 2) if utility_valid else None,
         "avg_attack_success_rate": asr,
         "avg_defense_success_rate": round(100 - asr, 2) if asr is not None else None,
-        "total_tasks": total, "utility_passed": passed,
+        "total_tasks": total, "utility_passed": passed, "utility_valid": utility_valid,
+        "execution_errors": sum(s.get("task_counts", {}).get("execution_errors", 0) for s in summaries),
         "security_denominator": denominator if security_known else None,
         "security_missing": (sum(s["task_counts"]["security_missing"] for s in summaries)
                              if all("security_missing" in s.get("task_counts", {}) for s in summaries) else None),

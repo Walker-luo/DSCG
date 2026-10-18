@@ -69,11 +69,11 @@ README = """# 历史对比分析数据
 
 本下载按点击下载时勾选的实验和场景生成，同时包含 ASR 与 TSR，不受当前图表类型或指标选择影响。
 
-- `analysis.json`：推荐交给 agent 的入口，包含实验来源、场景汇总、逐任务结果、分子/分母、缺失与截断标记；schema_version 为 1。
+- `analysis.json`：推荐交给 agent 的入口，包含实验来源、场景汇总、逐任务结果、分子/分母、缺失与截断标记；schema_version 为 2。
 - `summary.csv`：每个实验 × 场景一行，可在 Excel 中查看。
 - `task_records.csv`：带实验 ID 的逐任务结果，可按场景、user_task_id、injection_task_id、model_id、attack_type 对齐对比。
 
-实验身份保留 result_folder、model_group、model_suffix、attack_name，可按原结果目录、模型/运行名称和攻击分组。unknown 表示没有记录攻击；mixed 表示旧汇总含多种攻击，不能据此拆分汇总分母。
+实验身份保留 result_folder、model_group、model_suffix、attack_name 和已记录的 benchmark 身份（仓库、版本、实现及任务目录哈希），可按原结果目录、模型/运行名称和攻击分组。缺失的 benchmark 身份保留 unknown，不能用当前安装的基准补写历史。unknown 表示没有记录攻击；mixed 表示旧汇总含多种攻击，不能据此拆分汇总分母。
 
 ## 指标口径
 
@@ -100,6 +100,8 @@ TSR 使用 utility_success；ASR 使用 attack_success。只计入对应结果�
 - summary_record_count_mismatch：原汇总任务数与导出的明细数不同。
 - summary_record_tsr_mismatch / summary_record_asr_mismatch：原汇总与明细计算的百分比不同，不能混用两种分母。
 
+paired_comparison_ready 和 comparison_warnings 标记已记录的基准及任务选择是否对齐。不同基准、不同任务目录或未知身份的结果独立展示，不合并分母或计算配对增益；身份匹配本身也不证明攻击、模型或独立 oracle 对齐。
+
 部分实验没有当前选定场景时保留空 suites，不能将它视为零分。比较时先确认任务组合、攻击类型、模型和实验配置是否一致，缺失场景和未覆盖任务不算失败。
 CSV 使用 UTF-8 BOM；可能被表格软件当作公式的文本会加单引号，JSON 保留原文本。
 
@@ -111,7 +113,7 @@ CSV 使用 UTF-8 BOM；可能被表格软件当作公式的文本会加单引号
 """
 
 
-def build_history_export(experiments, suites_filter, exported_at):
+def build_history_export(experiments, suites_filter, exported_at, comparison=None):
     """Build a fixed-name ZIP from the already validated, normalized selection."""
     summary_rows = []
     task_rows = []
@@ -122,6 +124,10 @@ def build_history_export(experiments, suites_filter, exported_at):
             **{key: run.get(key, "") for key in ("result_folder", "model_group", "model_suffix", "attack_name")},
         }
         for suite in run["suites"]:
+            benchmark = suite.get("benchmark") or {}
+            identity.update({f"benchmark_{key}": benchmark.get(key, "") for key in
+                ("id", "repository", "revision", "suite_version", "implementation_sha256", "catalog_sha256", "tasks_sha256", "environments_sha256", "attacks_sha256", "tools_sha256", "package_version", "runtime_variant", "source_kind", "release_sha256")})
+            identity["benchmark_id"] = benchmark.get("id", "unknown")
             suite["record_statistics"] = _record_statistics(suite["task_records"])
             suite["warnings"] = _suite_warnings(suite)
             stats = suite["record_statistics"]
@@ -134,6 +140,8 @@ def build_history_export(experiments, suites_filter, exported_at):
                 "defense_success_percent": suite["metrics"]["defense_success_rate"],
                 "total_tasks": suite["task_counts"]["total_tasks"],
                 "utility_passed": suite["task_counts"]["utility_passed"],
+                "utility_valid": suite["task_counts"].get("utility_valid"),
+                "execution_errors": suite["task_counts"].get("execution_errors"),
                 "attacked_tasks": suite["task_counts"]["attacked_tasks"],
                 "security_missing": suite["task_counts"].get("security_missing"),
                 "total_tokens": suite["overhead"]["total_tokens"],
@@ -156,8 +164,9 @@ def build_history_export(experiments, suites_filter, exported_at):
             task_rows.extend({**identity, **row} for row in suite["task_records"])
 
     data = {
-        "schema_version": 1,
+        "schema_version": 2,
         "exported_at": exported_at,
+        **(comparison or {}),
         "selection": {"run_ids": [run["id"] for run in experiments], "suites": suites_filter},
         "metric_definitions": {
             "unit": "percent (0-100)", "missing_value": None,
@@ -177,7 +186,10 @@ def build_history_export(experiments, suites_filter, exported_at):
     }
     task_fields = [
         "experiment_id", "label", "source", "result_type", "result_folder", "model_group",
-        "model_suffix", "attack_name", "suite_name", "model_id",
+        "model_suffix", "attack_name", "benchmark_id", "benchmark_repository", "benchmark_revision",
+        "benchmark_suite_version", "benchmark_implementation_sha256", "benchmark_catalog_sha256",
+        "benchmark_tasks_sha256", "benchmark_environments_sha256", "benchmark_attacks_sha256", "benchmark_tools_sha256",
+        "benchmark_package_version", "benchmark_runtime_variant", "benchmark_source_kind", "benchmark_release_sha256", "suite_name", "model_id",
         "attack_type", "user_task_id", "injection_task_id", "sample_status",
         "utility_success", "attack_success", "defense_success",
     ]

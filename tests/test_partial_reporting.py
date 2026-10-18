@@ -2,7 +2,7 @@ from contextlib import redirect_stdout
 from io import StringIO
 import json
 from pathlib import Path
-from tempfile import TemporaryDirectory
+from test_partial_agentdyn import TemporaryDirectory
 from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
@@ -41,7 +41,7 @@ class PartialReportingTests(unittest.TestCase):
                                **({"suites": ["workspace"], "attack": "injecagent"} | options))
 
     def read_outputs(self, directory):
-        root = Path(directory) / "offline_report"
+        root = Path(directory) / "offline_agentdojo_report"
         self.assertTrue((root / "summary.md").is_file(), "run-level compact summary is missing")
         self.assertTrue((root / "failure_cases.jsonl").is_file(), "failure excerpts are missing")
         return root, (root / "summary.md").read_text(), [
@@ -192,7 +192,7 @@ class PartialReportingTests(unittest.TestCase):
             return task_results(pipeline, suite, attack, *args, **kwargs)
 
         with TemporaryDirectory() as directory:
-            stale = Path(directory) / "offline_report/tool_knowledge/travel/summary.json"
+            stale = Path(directory) / "offline_agentdojo_report/tool_knowledge/travel/summary.json"
             stale.parent.mkdir(parents=True)
             stale.write_text(json.dumps({"metrics": {"utility_rate": 0.123456}}))
             self.assertEqual(self.run_fixture(directory, results=results,
@@ -206,7 +206,7 @@ class PartialReportingTests(unittest.TestCase):
             self.assertEqual(sum(case["failure_types"] == ["tsr_failure", "asr_success"] for case in cases), 3)
             self.assertEqual(json.loads(stale.read_text())["metrics"]["utility_rate"], 0.123456)
 
-    def test_corrupt_trace_is_reported_without_losing_metrics(self):
+    def test_corrupt_trace_is_excluded_without_losing_other_metrics(self):
         def results(pipeline, suite, attack, logdir, **kwargs):
             data = task_results(pipeline, suite, attack, logdir, **kwargs)
             user, injection = next(iter(data["utility_results"]))
@@ -215,9 +215,9 @@ class PartialReportingTests(unittest.TestCase):
             path.write_text("not valid JSON")
             return data
         with TemporaryDirectory() as directory:
-            self.assertEqual(self.run_fixture(directory, results=results), 0)
+            self.assertEqual(self.run_fixture(directory, results=results), 1)
             _, summary, cases = self.read_outputs(directory)
-            self.assertIn("88.89% (8/9)", summary)
+            self.assertIn("100.00% (8/8)", summary)
             self.assertEqual(cases[0]["excerpt_status"], "trace_unreadable")
             self.assertEqual(cases[0]["excerpts"], [])
 
@@ -236,3 +236,14 @@ class PartialReportingTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+# Explicitly retain historical upstream suites as generic offline fixtures.
+def setUpModule():
+    global _fixture_backend
+    from test_partial_agentdyn import legacy_fixture_backend
+    _fixture_backend = legacy_fixture_backend(globals())
+
+
+def tearDownModule():
+    _fixture_backend.close()

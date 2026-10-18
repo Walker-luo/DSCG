@@ -1,5 +1,4 @@
 ((root) => {
-  const suites = ["workspace", "travel", "banking", "slack"];
   const metricInfo = {
     utility_rate: ["任务效用率 TSR", "%"],
     attack_success_rate: ["攻击成功率 ASR", "%"],
@@ -242,7 +241,7 @@
   function metricConfig(experiments, { metric, view, suite, theme }) {
     const byScenario = suite === "all";
     const labels = byScenario
-      ? suites.filter((name) => experiments.some((run) => run.suites.some((item) => item.suite_name === name)))
+      ? Array.from(new Set(experiments.flatMap(run => run.suites.map(item => item.suite_name))))
       : experiments.map((run) => chartIdentity(run, theme).label);
     const readMetric = (run, name, key) => {
       const item = run.suites.find((entry) => entry.suite_name === name);

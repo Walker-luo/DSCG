@@ -1,0 +1,546 @@
+# Reviewed AgentDyn v1.2 catalog; source commit 5353cf7615b135cace8d07c8f12dac53a16b6db3.
+# Active suites: shopping, github, dailylife. Legacy AgentDojo catalog is preserved separately.
+# Explicit source review, never inferred from names/docstrings. Shared names use conservative
+# effects across all suite implementations. Single-effect schema records the dominant risk;
+# dynamic web dispatch and OTP callbacks may also write/delete/send. None is a read bypass.
+# Arbitrary mail/files/account credentials remain secret; repository metadata is internal.
+# Existing public-read path applies only to actual public product lookup and current day.
+# Source/schema inventory and review notes are recorded in the integration evidence.
+
+[tools.add_calendar_event_participants]
+# Body extends participant list and does not send email despite docstring; repeated calls append duplicates.
+effect = "write"
+source = "calendar"
+sink = "none"
+sensitivity = "personal"
+idempotent = false
+reversible = false
+
+[tools.browse_webpage]
+# All three suite-specific bodies dispatch registered web handlers; handlers can mutate accounts/files/repositories, send email or transfer money. Dominant financial + external sink classification conservatively covers this union; source does not authenticate handlers.
+effect = "financial"
+source = "web"
+sink = "external_recipient"
+sensitivity = "secret"
+idempotent = false
+reversible = false
+
+[tools.cancel_calendar_event]
+effect = "external_send"
+source = "calendar"
+sink = "external_recipient"
+sensitivity = "personal"
+idempotent = false
+reversible = false
+
+[tools.cart_add_product]
+effect = "write"
+source = "cloud"
+sink = "none"
+sensitivity = "personal"
+idempotent = false
+reversible = false
+
+[tools.cart_remove_product]
+effect = "delete"
+source = "cloud"
+sink = "none"
+sensitivity = "personal"
+idempotent = false
+reversible = false
+
+[tools.cart_total]
+effect = "read"
+source = "cloud"
+sink = "none"
+sensitivity = "personal"
+idempotent = true
+reversible = true
+
+[tools.checkout_selected_cart]
+effect = "financial"
+source = "cloud"
+sink = "external_recipient"
+sensitivity = "personal"
+idempotent = false
+reversible = false
+
+[tools.clear_cart]
+effect = "delete"
+source = "cloud"
+sink = "none"
+sensitivity = "personal"
+idempotent = false
+reversible = false
+
+[tools.copy_node]
+effect = "write"
+source = "local"
+sink = "none"
+sensitivity = "secret"
+idempotent = false
+reversible = false
+
+[tools.create_calendar_event]
+effect = "external_send"
+source = "calendar"
+sink = "external_recipient"
+sensitivity = "personal"
+idempotent = false
+reversible = false
+
+[tools.create_dir]
+effect = "write"
+source = "local"
+sink = "none"
+sensitivity = "internal"
+idempotent = true
+reversible = false
+
+[tools.create_file]
+effect = "write"
+source = "local"
+sink = "none"
+sensitivity = "secret"
+idempotent = false
+reversible = false
+
+[tools.delete_email]
+effect = "delete"
+source = "email"
+sink = "none"
+sensitivity = "secret"
+idempotent = false
+reversible = false
+
+[tools.delete_node]
+effect = "delete"
+source = "local"
+sink = "none"
+sensitivity = "secret"
+idempotent = false
+reversible = false
+
+[tools.download_file_through_id]
+# Adds attachment node under save_dir in local filesystem.
+effect = "write"
+source = "web"
+sink = "none"
+sensitivity = "secret"
+idempotent = false
+reversible = false
+
+[tools.download_file_through_url]
+# Fetches web download_source then delegates to download_file_through_id, adding node to local filesystem.
+effect = "write"
+source = "web"
+sink = "none"
+sensitivity = "secret"
+idempotent = false
+reversible = false
+
+[tools.get_balance]
+effect = "read"
+source = "cloud"
+sink = "none"
+sensitivity = "personal"
+idempotent = true
+reversible = true
+
+[tools.get_current_day]
+effect = "read"
+source = "calendar"
+sink = "none"
+sensitivity = "public"
+idempotent = true
+reversible = true
+
+[tools.get_day_calendar_events]
+effect = "read"
+source = "calendar"
+sink = "none"
+sensitivity = "personal"
+idempotent = true
+reversible = true
+
+[tools.get_github_account_user_information]
+effect = "read"
+source = "cloud"
+sink = "none"
+sensitivity = "personal"
+idempotent = true
+reversible = true
+
+[tools.get_github_linked_unread_emails]
+# Delegates to Inbox.get_unread; marks returned mail read.
+effect = "write"
+source = "email"
+sink = "none"
+sensitivity = "secret"
+idempotent = false
+reversible = false
+
+[tools.get_github_repository_information]
+effect = "read"
+source = "cloud"
+sink = "none"
+sensitivity = "internal"
+idempotent = true
+reversible = true
+
+[tools.get_invoice]
+# Creates a web-hosted invoice file and sends it by email; not a pure retrieval.
+effect = "external_send"
+source = "cloud"
+sink = "external_recipient"
+sensitivity = "personal"
+idempotent = false
+reversible = false
+
+[tools.get_logged_in_github_user_information]
+effect = "read"
+source = "cloud"
+sink = "none"
+sensitivity = "secret"
+idempotent = true
+reversible = true
+
+[tools.get_received_emails]
+effect = "read"
+source = "email"
+sink = "none"
+sensitivity = "secret"
+idempotent = true
+reversible = true
+
+[tools.get_sent_emails]
+effect = "read"
+source = "email"
+sink = "none"
+sensitivity = "secret"
+idempotent = true
+reversible = true
+
+[tools.get_shopping_account_user_information]
+effect = "read"
+source = "cloud"
+sink = "none"
+sensitivity = "secret"
+idempotent = true
+reversible = true
+
+[tools.get_shopping_linked_received_emails]
+# Body returns inbox.received without marking read despite its docstring claim; classified by body.
+effect = "read"
+source = "email"
+sink = "none"
+sensitivity = "secret"
+idempotent = true
+reversible = true
+
+[tools.get_shopping_linked_unread_emails]
+# Delegates to Inbox.get_unread; marks returned mail read.
+effect = "write"
+source = "email"
+sink = "none"
+sensitivity = "secret"
+idempotent = false
+reversible = false
+
+[tools.get_unread_emails]
+# Inbox.get_unread marks each returned email read; repeated return data changes.
+effect = "write"
+source = "email"
+sink = "none"
+sensitivity = "secret"
+idempotent = false
+reversible = false
+
+[tools.git_add_ssh_key]
+effect = "write"
+source = "cloud"
+sink = "external_recipient"
+sensitivity = "secret"
+idempotent = false
+reversible = false
+
+[tools.git_clone]
+# Copies remote content and writes .git_config into local filesystem.
+effect = "write"
+source = "cloud"
+sink = "none"
+sensitivity = "secret"
+idempotent = false
+reversible = false
+
+[tools.git_create_repo]
+effect = "write"
+source = "cloud"
+sink = "external_recipient"
+sensitivity = "secret"
+idempotent = false
+reversible = false
+
+[tools.git_delete_repo]
+effect = "delete"
+source = "cloud"
+sink = "external_recipient"
+sensitivity = "secret"
+idempotent = false
+reversible = false
+
+[tools.git_delete_ssh_key]
+effect = "delete"
+source = "cloud"
+sink = "external_recipient"
+sensitivity = "secret"
+idempotent = false
+reversible = false
+
+[tools.git_get_linked_ssh_keys]
+# Unverified branch creates OTP/email and queues request; verified branch resets verification and returns keys.
+effect = "external_send"
+source = "cloud"
+sink = "external_recipient"
+sensitivity = "secret"
+idempotent = false
+reversible = false
+
+[tools.git_invite_collaborators]
+effect = "external_send"
+source = "cloud"
+sink = "external_recipient"
+sensitivity = "personal"
+idempotent = false
+reversible = false
+
+[tools.git_issue]
+effect = "external_send"
+source = "cloud"
+sink = "public_output"
+sensitivity = "internal"
+idempotent = false
+reversible = false
+
+[tools.git_pull]
+# Copies/overwrites remote content into local filesystem.
+effect = "write"
+source = "cloud"
+sink = "none"
+sensitivity = "secret"
+idempotent = false
+reversible = false
+
+[tools.git_push]
+effect = "external_send"
+source = "local"
+sink = "public_output"
+sensitivity = "secret"
+idempotent = false
+reversible = false
+
+[tools.git_star]
+# Updates remote star list and user star list; duplicate star guard is idempotent; identity visible through repository information.
+effect = "write"
+source = "cloud"
+sink = "public_output"
+sensitivity = "personal"
+idempotent = true
+reversible = true
+
+[tools.git_transfer_repo_ownership]
+effect = "write"
+source = "cloud"
+sink = "external_recipient"
+sensitivity = "secret"
+idempotent = false
+reversible = false
+
+[tools.git_unstar]
+# Removes remote and account star entries; absent star guard is idempotent; identity visible through repository information.
+effect = "write"
+source = "cloud"
+sink = "public_output"
+sensitivity = "personal"
+idempotent = true
+reversible = true
+
+[tools.input_to_webpage]
+# All three suite bodies submit mapped inputs to registered handlers. GitHub uses inputs mapping, other suites input_ids/input_values; all can have effects. Dominant financial + external sink classification covers the shared handler registry.
+effect = "financial"
+source = "web"
+sink = "external_recipient"
+sensitivity = "secret"
+idempotent = false
+reversible = false
+
+[tools.list_directory]
+effect = "read"
+source = "local"
+sink = "none"
+sensitivity = "internal"
+idempotent = true
+reversible = true
+
+[tools.login_github_account]
+effect = "write"
+source = "cloud"
+sink = "none"
+sensitivity = "secret"
+idempotent = false
+reversible = false
+
+[tools.login_shopping_account]
+effect = "write"
+source = "cloud"
+sink = "none"
+sensitivity = "secret"
+idempotent = false
+reversible = false
+
+[tools.move_node]
+effect = "write"
+source = "local"
+sink = "none"
+sensitivity = "secret"
+idempotent = false
+reversible = false
+
+[tools.read_file]
+effect = "read"
+source = "local"
+sink = "none"
+sensitivity = "secret"
+idempotent = true
+reversible = true
+
+[tools.refund_order]
+effect = "financial"
+source = "cloud"
+sink = "external_recipient"
+sensitivity = "personal"
+idempotent = false
+reversible = false
+
+[tools.reschedule_calendar_event]
+effect = "external_send"
+source = "calendar"
+sink = "external_recipient"
+sensitivity = "personal"
+idempotent = false
+reversible = false
+
+[tools.search_calendar_events]
+effect = "read"
+source = "calendar"
+sink = "none"
+sensitivity = "personal"
+idempotent = true
+reversible = true
+
+[tools.search_emails]
+effect = "read"
+source = "email"
+sink = "none"
+sensitivity = "secret"
+idempotent = true
+reversible = true
+
+[tools.search_product]
+effect = "read"
+source = "web"
+sink = "none"
+sensitivity = "public"
+idempotent = true
+reversible = true
+
+[tools.send_email]
+effect = "external_send"
+source = "email"
+sink = "external_recipient"
+sensitivity = "secret"
+idempotent = false
+reversible = false
+
+[tools.send_money]
+effect = "financial"
+source = "cloud"
+sink = "external_recipient"
+sensitivity = "personal"
+idempotent = false
+reversible = false
+
+[tools.update_github_account_password]
+effect = "write"
+source = "cloud"
+sink = "external_recipient"
+sensitivity = "secret"
+idempotent = false
+reversible = false
+
+[tools.update_shopping_account_password]
+effect = "write"
+source = "cloud"
+sink = "external_recipient"
+sensitivity = "secret"
+idempotent = false
+reversible = false
+
+[tools.update_shopping_account_user_info]
+effect = "write"
+source = "cloud"
+sink = "none"
+sensitivity = "secret"
+idempotent = false
+reversible = false
+
+[tools.verify_github_account]
+# Consumes OTP and executes queued callbacks, including repository deletion/transfer/invitation and credential changes.
+effect = "external_send"
+source = "cloud"
+sink = "external_recipient"
+sensitivity = "secret"
+idempotent = false
+reversible = false
+
+[tools.verify_shopping_account]
+# Consumes OTP and executes the queued callback, including checkout, transfer, refund or password changes.
+effect = "financial"
+source = "cloud"
+sink = "external_recipient"
+sensitivity = "secret"
+idempotent = false
+reversible = false
+
+[tools.verify_transaction]
+# DailyLife consumes OTP and executes the queued transaction callback.
+effect = "financial"
+source = "cloud"
+sink = "external_recipient"
+sensitivity = "secret"
+idempotent = false
+reversible = false
+
+[tools.view_available_discounts]
+effect = "read"
+source = "cloud"
+sink = "none"
+sensitivity = "personal"
+idempotent = true
+reversible = true
+
+[tools.view_cart]
+effect = "read"
+source = "cloud"
+sink = "none"
+sensitivity = "personal"
+idempotent = true
+reversible = true
+
+[tools.view_order_history]
+effect = "read"
+source = "cloud"
+sink = "none"
+sensitivity = "personal"
+idempotent = true
+reversible = true

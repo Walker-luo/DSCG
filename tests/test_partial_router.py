@@ -1,6 +1,6 @@
 import inspect
 import unittest
-import tempfile
+import test_partial_agentdyn as tempfile
 from unittest.mock import patch
 from experiments import run_partial_benchmark as p
 
@@ -33,3 +33,14 @@ class PartialRouterTests(unittest.TestCase):
         self.assertEqual(r['shadow_would_save_tokens'],100);self.assertIsNone(r['actual_total_tokens_saved'])
         events[1]['semantic_audit_tokens']=None
         self.assertIsNone(a.summarize_events(events)['shadow_would_save_tokens'])
+
+
+# Explicitly retain historical upstream suites as generic offline fixtures.
+def setUpModule():
+    global _fixture_backend
+    from test_partial_agentdyn import legacy_fixture_backend
+    _fixture_backend = legacy_fixture_backend(globals())
+
+
+def tearDownModule():
+    _fixture_backend.close()

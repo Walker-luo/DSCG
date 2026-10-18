@@ -4,7 +4,7 @@ from io import StringIO
 import json
 import os
 from pathlib import Path
-from tempfile import TemporaryDirectory
+from test_partial_agentdyn import TemporaryDirectory
 from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
@@ -42,7 +42,7 @@ class ReuseCliTests(unittest.TestCase):
 
 class ReuseIntegrationTests(unittest.TestCase):
     def setUp(self):
-        artifacts = Path(__file__).resolve().parents[1] / 'workshop/artifacts/20261017_benchmark_reuse/test_runs'
+        artifacts = Path(__file__).resolve().parents[1] / 'workshop/artifacts/20261018_dual_benchmark/runner/test_runs'
         artifacts.mkdir(parents=True, exist_ok=True)
         temp = TemporaryDirectory(dir=artifacts); self.addCleanup(temp.cleanup)
         self.root = Path(temp.name); self.executed = []
@@ -64,7 +64,7 @@ class ReuseIntegrationTests(unittest.TestCase):
 
     @property
     def base(self):
-        return self.root / 'offline-model_old'
+        return self.root / 'offline-model_agentdojo_old'
 
     def run_benchmark(self, entry=runner.main, **overrides):
         options = dict(origin=True, suites=['workspace'], results_dir=self.root, run_name='old',
@@ -126,13 +126,13 @@ class ReuseIntegrationTests(unittest.TestCase):
         self.assertEqual(len(self.executed), calls)
         self.assertTrue((self.base / 'benchmark_plan.json').exists())
 
-    def test_known_previous_source_is_accepted_without_changing_manifest(self):
+    def test_old_agentdojo_source_rejects_without_changing_manifest(self):
         self.assertEqual(self.run_benchmark(), 0)
         fixture = json.loads((Path(__file__).with_name('fixtures') / 'benchmark_reuse_source_20261017.json').read_text())
         path = self.base / 'tool_knowledge/workspace/run_manifest.json'
         binding = json.loads(path.read_text()); binding['source'] = fixture
         path.write_text(json.dumps(binding)); original = path.read_bytes(); calls = len(self.executed)
-        self.assertEqual(self.run_benchmark(reuse=True), 0)
+        self.assertEqual(self.run_benchmark(reuse=True), 1)
         self.assertEqual(path.read_bytes(), original)
         self.assertEqual(len(self.executed), calls)
         binding['source']['source_sha256']['dscg/pipelines/defended.py'] = '0' * 64
@@ -152,9 +152,12 @@ class ReuseIntegrationTests(unittest.TestCase):
         path = next(self.base.glob('tool_knowledge/workspace/user_task_*/tool_knowledge/*.json'))
         value = json.loads(path.read_text()); value['error'] = 'offline provider error'
         path.write_text(json.dumps(value)); before = path.read_bytes(); calls = len(self.executed)
-        self.assertEqual(self.run_benchmark(reuse=True), 0)
+        self.assertEqual(self.run_benchmark(reuse=True), 1)
         self.assertEqual(len(self.executed), calls)
         self.assertEqual(path.read_bytes(), before)
+        summary = json.loads((self.base / "tool_knowledge/workspace/summary.json").read_text())
+        self.assertEqual(summary["task_counts"]["execution_errors"], 1)
+        self.assertEqual(summary["task_counts"]["attacked_tasks"], 8)
 
     def test_native_incomplete_cache_is_preserved_before_task_reruns(self):
         self.assertEqual(self.run_benchmark(), 0)
@@ -191,7 +194,6 @@ class ReuseIntegrationTests(unittest.TestCase):
         self.assertEqual(self.run_benchmark(), 0)
         path = self.base / 'tool_knowledge/workspace/run_manifest.json'
         binding = json.loads(path.read_text()); binding.pop('agentdojo_defense', None)
-        binding['source'] = json.loads((Path(__file__).with_name('fixtures') / 'benchmark_reuse_source_20261017.json').read_text())
         path.write_text(json.dumps(binding)); summary_path = path.with_name('summary.json')
         summary = json.loads(summary_path.read_text()); summary['run_manifest'] = binding
         summary_path.write_text(json.dumps(summary)); original = path.read_bytes()
@@ -205,3 +207,14 @@ class ReuseIntegrationTests(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+# Explicitly retain historical upstream suites as generic offline fixtures.
+def setUpModule():
+    global _fixture_backend
+    from test_partial_agentdyn import legacy_fixture_backend
+    _fixture_backend = legacy_fixture_backend(globals())
+
+
+def tearDownModule():
+    _fixture_backend.close()

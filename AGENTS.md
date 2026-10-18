@@ -1,5 +1,20 @@
 # DSCG Research Handoff
 
+
+## Active dual benchmark integration (2026-10-18)
+
+This section supersedes the earlier AgentDyn-only execution restriction and older command examples for new runs. Preserve dated reports as historical evidence.
+
+- The same checkout automatically selects the installed backend: ipi is AgentDojo0.1.35/v1.2 with workspace/travel/banking/slack; ipi-agentdyn is fixed AgentDyn5353cf7615b135cace8d07c8f12dac53a16b6db3/v1.2 with shopping/github/dailylife. Never infer identity from conda name or shared distribution version. Use runtime get_backend()/get_suites() from dscg/benchmark_catalog.py; no import-time active-suite/backend snapshots.
+- AgentDojo has an official-wheel/112-source-file lock and a reviewed exact existing client variant (system role instead of developer). The official release and local variant have distinct runtime_variant/implementation hashes; no environment files are modified. AgentDyn retains its original1374-file source lock. Unknown origins, revisions, modified or added/deleted source files reject before model creation; help and history stay accessible.
+- Full clean totals are97/60; targeted pairs per attack949/560; typical3planned2847/1680. Partial retains registration-prefix3users x3targets per suite, clean12/9 and typical108/81. These are planning counts, not API calls or valid efficacy denominators. Native scoring/rawerror labels remain; derived error rows excluded with total/planned/valid/error/Token counts separate.
+- Both native baseline and DSCG use the selected backend; model/defense/router/retry defaults remain unchanged. Typical remains ignore_previous/important_instructions/tool_knowledge; explicit/all uses active registry excluding manual. No new L1 profile, audit bypass, handler/parameter/object authorization or recovery mechanism.
+- Metadata priority: explicit path > DSCG_TOOL_METADATA > config/tools.<backend>.local.toml > recognized compatible generic tools.local.toml > matching reviewed builtin. Exact semantic generic copies belong to that builtin backend; recognized other-backend copies are skipped transparently. Unknown custom generic catalogs reject; use explicit/backend-local configuration. Existing generic/local and builtin files are not overwritten. Generator defaults to backend-local output and protects generic/builtins.
+- New CLI/screen/dashboard directory identities contain actual backend ID. All manifests/cohorts/summaries/exports bind backend, source release/revision, runtimevariant and task/environment/attack/tool identities. Only new matched-identity runs support continuation; no oldcache/cohort migration or expansion of historical source-compatibility maps. Historical files remain readable without fabricated identity, crossbackend pooling or pairing.
+- Dashboard follows process backend automatically; switching the terminal environment does not change an already running service. Restart or use another process/PORT for simultaneous environments. API exposes actual catalog, metadata selection and diagnostics. Unknownbackend cannot execute but history remains available.
+- Validation uses both `conda run -n ipi python -B -m unittest discover -s tests -v` and the same command in ipi-agentdyn, plus `node --test tests/*.cjs`. Backend-specific native classes explicitly skip the other environment while the active backend is exercised with real tools/native predicates; no paid models or efficacy claims.
+- New task artifacts: workshop/artifacts/20261018_dual_benchmark/. Current docs describe both environments; preserve prior AgentDyn report/manifest as dated snapshots. Update implementation evidence only via sibling research status, without changing research gates.
+
 ## Project
 
 DSCG is a research prototype for defending tool-using LLM agents against indirect prompt injection (IPI). The intended project root is `/Users/luo/Desktop/AgentDefence`, with the implementation under `DSCG/` and a deliberately separate research directory under `research/`.

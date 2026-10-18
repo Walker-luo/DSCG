@@ -4,7 +4,7 @@ from io import StringIO
 import json
 import threading
 from pathlib import Path
-from tempfile import TemporaryDirectory
+from test_partial_agentdyn import TemporaryDirectory
 from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
@@ -52,7 +52,7 @@ class FakeSuite:
 class InjectionPrecheckTests(unittest.TestCase):
     def setUp(self):
         self.assertIsNotNone(precheck, 'standalone injection precheck entrypoint is missing')
-        artifacts = Path(__file__).resolve().parents[1] / 'workshop/artifacts/20261016_injection_progress/test_runs'
+        artifacts = Path(__file__).resolve().parents[1] / 'workshop/artifacts/20261018_dual_benchmark/runner/test_runs'
         artifacts.mkdir(parents=True, exist_ok=True)
         self.temp = TemporaryDirectory(dir=artifacts)
         self.addCleanup(self.temp.cleanup)
@@ -73,7 +73,7 @@ class InjectionPrecheckTests(unittest.TestCase):
 
     @property
     def output(self):
-        return self.root / 'screens' / 'offline_screen'
+        return self.root / 'screens' / 'offline_agentdojo_screen'
 
     def screen(self, **kwargs):
         with redirect_stdout(StringIO()):
@@ -140,7 +140,7 @@ class InjectionPrecheckTests(unittest.TestCase):
                 '--results-dir', str(self.root / 'screens')]), 130)
         self.assertIn('同一条 screen 命令续跑', stream.getvalue())
         self.assertFalse(any(t.name == 'injection-precheck-progress' for t in threading.enumerate()))
-        output = self.root / 'screens/offline_interrupt'
+        output = self.root / 'screens/offline_agentdojo_interrupt'
         self.assertFalse((output / 'cohort.json').exists())
         self.assertEqual(len(list(output.rglob('attempt.json'))), 1)
 
@@ -179,7 +179,7 @@ class InjectionPrecheckTests(unittest.TestCase):
         path.parent.mkdir(parents=True, exist_ok=True)
         source = precheck.source_revision()
         (suite_dir / 'run_manifest.json').write_text(json.dumps({
-            'profile': 'baseline', 'main_model': model or self.config.public_dict(),
+            'benchmark': __import__('test_partial_agentdyn').DOJO_IDENTITY, 'profile': 'baseline', 'main_model': model or self.config.public_dict(),
             'source': source, 'task_selection': {'suite_version': 'v1.2',
                 'injections': ['injection_task_0', 'injection_task_1'], 'users': list(self.suite.user_tasks)},
         }))
@@ -304,7 +304,7 @@ class InjectionPrecheckTests(unittest.TestCase):
         binding['screening_script_sha256'] = mapping['legacy_screening_script_sha256']
         return binding
 
-    def test_known_legacy_frozen_cohort_and_manifest_are_read_without_rewriting(self):
+    def test_old_agentdojo_frozen_cohort_and_manifest_reject_without_rewriting(self):
         self.screen()
         cohort = self.cohort(); binding = self.legacy_binding()
         cohort['binding'] = binding
@@ -313,13 +313,13 @@ class InjectionPrecheckTests(unittest.TestCase):
         cohort_path.write_text(json.dumps(cohort))
         manifest = self.output / 'screen_manifest.json'; manifest.write_text(json.dumps(binding))
         originals = {p: p.read_bytes() for p in [cohort_path, manifest, *self.output.rglob('attempt.json')]}
-        self.assertEqual(self.screen(), 0)
+        with self.assertRaises(ValueError):
+            self.screen()
         self.assertEqual(len(self.suite.executed), 3)
-        self.assertTrue(list((self.output / 'compatibility').glob('*.json')))
         for p, content in originals.items():
             self.assertEqual(p.read_bytes(), content)
 
-    def test_known_legacy_pending_screen_resumes_without_repeating_completed_goal(self):
+    def test_old_agentdojo_pending_screen_rejects_without_repeating_completed_goal(self):
         self.suite.outcomes[1] = [RuntimeError('offline'), False, False]
         self.assertEqual(self.screen(), 1)
         binding = self.legacy_binding()
@@ -328,11 +328,12 @@ class InjectionPrecheckTests(unittest.TestCase):
             record = json.loads(p.read_text()); record['binding_sha256'] = precheck._digest(binding)
             p.write_text(json.dumps(record))
         original = manifest.read_bytes()
-        self.assertEqual(self.screen(), 0)
+        with self.assertRaises(ValueError):
+            self.screen()
         self.assertEqual(self.suite.executed.count('injection_task_0'), 1)
         self.assertEqual(manifest.read_bytes(), original)
 
-    def test_known_previous_unified_screen_resumes_after_partial_cli_change(self):
+    def test_old_agentdojo_unified_screen_rejects_after_backend_change(self):
         self.suite.outcomes[1] = [RuntimeError('offline'), False, False]
         self.assertEqual(self.screen(), 1)
         mapping = json.loads(Path(cohort_module.__file__).with_name('injection_cohort_compatibility.json').read_text())
@@ -344,7 +345,8 @@ class InjectionPrecheckTests(unittest.TestCase):
             record = json.loads(p.read_text()); record['binding_sha256'] = precheck._digest(binding)
             p.write_text(json.dumps(record))
         originals = {p: p.read_bytes() for p in [manifest, *self.output.rglob('attempt.json')]}
-        self.assertEqual(self.screen(), 0)
+        with self.assertRaises(ValueError):
+            self.screen()
         self.assertEqual(self.suite.executed.count('injection_task_0'), 1)
         for p, content in originals.items():
             self.assertEqual(p.read_bytes(), content)
@@ -363,7 +365,7 @@ class InjectionPrecheckTests(unittest.TestCase):
             self.screen()
         self.assertEqual(len(self.suite.executed), 3)
 
-    def test_pre_relocation_cohort_resumes_without_rewriting_or_repeating_goals(self):
+    def test_old_agentdojo_pre_relocation_cohort_rejects_without_rewriting_or_repeating_goals(self):
         self.screen()
         previous = json.loads((Path(__file__).with_name('fixtures') /
                                'experiments_layout_source_20261017.json').read_text())
@@ -377,7 +379,8 @@ class InjectionPrecheckTests(unittest.TestCase):
         manifest = self.output / 'screen_manifest.json'
         manifest.write_text(json.dumps(binding))
         originals = {p: p.read_bytes() for p in [manifest, cohort_path, *self.output.rglob('attempt.json')]}
-        self.assertEqual(self.screen(), 0)
+        with self.assertRaises(ValueError):
+            self.screen()
         self.assertEqual(self.suite.executed, ['injection_task_0', 'injection_task_1', 'injection_task_1'])
         for p, data in originals.items():
             self.assertEqual(p.read_bytes(), data)
@@ -409,7 +412,7 @@ class InjectionPrecheckTests(unittest.TestCase):
                 self.assertEqual(precheck.run_screened(self.output / 'cohort.json', config_path=None,
                     run_name='mixed', origin=True, results_dir=self.root / 'benchmarks'), 0)
                 self.assertEqual(runner.call_args.kwargs['suites'], ['workspace'])
-        attachment = json.loads((self.root / 'benchmarks/offline_mixed/screened_cohort.json').read_text())
+        attachment = json.loads((self.root / 'benchmarks/offline_agentdojo_mixed/screened_cohort.json').read_text())
         self.assertEqual(attachment['skipped_suites'], ['travel'])
         self.assertEqual(attachment['counts']['travel']['planned_per_targeted_attack'], 0)
 
@@ -443,7 +446,7 @@ class InjectionPrecheckTests(unittest.TestCase):
             precheck.shared.benchmark, 'benchmark_suite_with_injections', side_effect=fake_results), redirect_stdout(StringIO()):
             self.assertEqual(full.main(cohort_path=self.output / 'cohort.json', config_path=None, run_name='selected',
                 results_dir=self.root / 'benchmarks', origin=True, attack=['ignore_previous']), 0)
-        base = self.root / 'benchmarks/offline_selected'
+        base = self.root / 'benchmarks/offline_agentdojo_selected'
         summary = json.loads((base / 'ignore_previous/workspace/summary.json').read_text())
         self.assertEqual(summary['task_counts']['planned_tasks'], 4)
         self.assertEqual(summary['task_selection']['injection_task_ids'], ['injection_task_0'])
@@ -473,3 +476,14 @@ class InjectionPrecheckTests(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+# Explicitly retain historical upstream suites as generic offline fixtures.
+def setUpModule():
+    global _fixture_backend
+    from test_partial_agentdyn import legacy_fixture_backend
+    _fixture_backend = legacy_fixture_backend(globals())
+
+
+def tearDownModule():
+    _fixture_backend.close()

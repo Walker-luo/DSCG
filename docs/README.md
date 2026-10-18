@@ -1,5 +1,7 @@
 # 当前文档
 
+新实验同时支持AgentDojo（ipi）与AgentDyn（ipi-agentdyn），只切换环境即可自动选择。安装、自检、两套full/partial/clean和baseline命令从[完整测试指南](./benchmark.md)开始。旧结果可读，本次不迁移旧缓存/cohort，跨基准不混用分母。
+
 | 入口 | 内容 |
 | --- | --- |
 | [项目 README](../README.md) | 当前three-layer-v3.1三层框架、使用命令和能力边界 |
@@ -8,7 +10,7 @@
 | [测试文件索引](./evaluation.md) | 测试指南、主要入口、配置与结果文件的用途 |
 | [完整任务测试指南](./benchmark.md) | run_benchmark的baseline/DSCG、clean、场景/cohort、公共攻击与指标口径 |
 | [小批量测试指南](./partial_benchmark.md) | run_partial_benchmark的3×3前缀、场景/cohort、shadow与续跑 |
-| [Injection 目标预检](./injection_precheck.md) | 实时进度、失败复测、旧状态续跑与冻结名单；full/partial各自支持cohort |
+| [Injection 目标预检](./injection_precheck.md) | 实时进度、失败复测、同基准状态续跑与冻结名单；full/partial各自支持cohort |
 | [框架与平台交接](./framework_updates.md) | 当前L2默认/可选能力、L1/L3后续修订、网页已接线与待办 |
 | [Dashboard 指南](./dashboard.md) | 历史筛选、多版本对比及分析导出 |
 | [Workshop 索引](../workshop/README.md) | 优化计划、调研、当前报告和历史归档 |

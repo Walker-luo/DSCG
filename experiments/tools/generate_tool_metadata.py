@@ -1,14 +1,13 @@
-"""Generate a validated local P0.5 catalog for AgentDojo v1.2."""
+"""Generate a validated backend-specific local P0.5 risk catalog."""
 
 from __future__ import annotations
 
 import argparse
-from importlib.metadata import version
 from pathlib import Path
 import shutil
 from typing import Mapping
 
-from agentdojo.task_suite import get_suite
+from dscg import benchmark_catalog
 
 from dscg.tool_metadata import (
     PROJECT_ROOT,
@@ -18,29 +17,21 @@ from dscg.tool_metadata import (
 )
 
 
-SUITE_NAMES = ("workspace", "travel", "banking", "slack")
-AGENTDOJO_PACKAGE_VERSION = "0.1.35"
-CATALOG_PATH = PROJECT_ROOT / "config" / "tools.agentdojo-v1.2.toml"
-DEFAULT_OUTPUT_PATH = PROJECT_ROOT / "config" / "tools.local.toml"
-
-
 def registered_tools() -> dict[str, set[str]]:
-    """Read the installed AgentDojo suite registry, without making API calls."""
+    """Read the validated active backend's tools without making API calls."""
 
-    installed_version = version("agentdojo")
-    if installed_version != AGENTDOJO_PACKAGE_VERSION:
-        raise ToolMetadataError(
-            f"expected agentdojo {AGENTDOJO_PACKAGE_VERSION}, found {installed_version}; "
-            "review the catalog before using a different package version"
-        )
+    try:
+        backend = benchmark_catalog.get_backend()
+    except benchmark_catalog.BenchmarkConfigurationError as exc:
+        raise ToolMetadataError(str(exc)) from exc
     return {
-        suite_name: {tool.name for tool in get_suite("v1.2", suite_name).tools}
-        for suite_name in SUITE_NAMES
+        suite_name: {tool.name for tool in benchmark_catalog.get_suite(backend.suite_version, suite_name).tools}
+        for suite_name in backend.suites
     }
 
 
 def validate_catalog(
-    path: str | Path = CATALOG_PATH,
+    path: str | Path | None = None,
     *,
     suites: Mapping[str, set[str]] | None = None,
 ) -> dict[str, ToolRiskMetadata]:
@@ -48,7 +39,8 @@ def validate_catalog(
 
     current_suites = registered_tools() if suites is None else suites
     expected = set().union(*current_suites.values())
-    raw = load_tool_metadata(path)
+    source = benchmark_catalog.get_backend().tool_metadata_path if path is None else path
+    raw = load_tool_metadata(source)
     missing = sorted(expected - raw.keys())
     extra = sorted(raw.keys() - expected)
     if missing or extra:
@@ -67,32 +59,44 @@ def validate_catalog(
     return validated
 
 
-def generate(output: str | Path = DEFAULT_OUTPUT_PATH, *, force: bool = False) -> Path:
+def generate(output: str | Path | None = None, *, force: bool = False) -> Path:
     """Copy the reviewed catalog only after validating installed suite coverage."""
 
-    validated = validate_catalog()
-    destination = Path(output).expanduser()
+    try:
+        backend = benchmark_catalog.get_backend()
+    except benchmark_catalog.BenchmarkConfigurationError as exc:
+        raise ToolMetadataError(str(exc)) from exc
+    source = Path(backend.tool_metadata_path)
+    if not source.is_absolute():
+        source = PROJECT_ROOT / source
+    validated = validate_catalog(source)
+    destination = Path(output).expanduser() if output is not None else PROJECT_ROOT / "config" / f"tools.{backend.id}.local.toml"
     if not destination.is_absolute():
         destination = PROJECT_ROOT / destination
-    if destination.resolve() == CATALOG_PATH.resolve():
+    if destination.resolve() in {
+        (PROJECT_ROOT / "config" / f"tools.{name}-v1.2.toml").resolve()
+        for name in ("agentdojo", "agentdyn")
+    }:
         raise ToolMetadataError("output must differ from the reviewed source catalog")
+    if destination.resolve() == (PROJECT_ROOT / "config" / "tools.local.toml").resolve():
+        raise ToolMetadataError("generic tools.local.toml is protected; choose a backend-specific output")
     if destination.exists() and not force:
         raise ToolMetadataError(f"output already exists: {destination}; use --force to replace it")
     destination.parent.mkdir(parents=True, exist_ok=True)
-    shutil.copyfile(CATALOG_PATH, destination)
+    shutil.copyfile(source, destination)
     print(f"Generated {destination} with {len(validated)} classified tools")
     return destination
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="Validate AgentDojo v1.2 tools and generate a local P0.5 metadata TOML."
+        description="Validate active benchmark tools and generate backend-specific P0.5 metadata TOML."
     )
     parser.add_argument(
         "--output",
-        default=str(DEFAULT_OUTPUT_PATH),
+        default=None,
         metavar="PATH",
-        help="destination TOML (default: config/tools.local.toml)",
+        help="destination TOML (default: config/tools.<active-backend>.local.toml)",
     )
     parser.add_argument("--force", action="store_true", help="replace an existing output")
     args = parser.parse_args()

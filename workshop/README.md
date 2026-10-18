@@ -1,5 +1,9 @@
 # Workshop 优化状态索引
 
+当前：[双基准自动切换](./completed/dual_benchmark_20261018.md)支持ipi/AgentDojo与ipi-agentdyn/AgentDyn，只切换环境；旧阶段的AgentDyn-only描述保留当时上下文，不再限制当前新实验。
+
+新增 [AgentDyn全流程接入](./completed/agentdyn_integration_20261017.md)：固定后端、新三个场景、风险目录、CLI/网页/历史身份、错误分母与离线模拟已完成；原四场景结果保持历史，真实攻击强度和模型TSR/ASR待验收。
+
 当前运行框架为 **three-layer-v3.1**。目录按工程落实状态管理：基础方案已实施的文件归入 completed；仍需实现的新机制留在顶层。完成工程不等于实验目标或研究闸门全部通过。
 
 ## 已完成与归档

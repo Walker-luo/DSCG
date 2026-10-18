@@ -19,7 +19,7 @@ function dashboard(fetch = async () => ({ok: true, json: async () => []})) {
   node('#selection-seed').value = '20260927';
   node('#attack-name').value = 'important_instructions';
   const context = {document: {addEventListener() {}, querySelector: node,
-    querySelectorAll: selector => selector.includes('.suite-cb') ? [{value: 'workspace'}] : []},
+    querySelectorAll: selector => selector.includes('.suite-cb') ? [{value: 'shopping'}] : []},
     fetch, console, alert() {}, bootstrap: {Tab: class {show() {}}},
     EventSource: class {}, setInterval() {}, setTimeout() {}};
   vm.createContext(context);
@@ -106,7 +106,7 @@ test('reports distinguish an unused auditor from unknown historical configuratio
 
 test('draft version follows server metadata and switches to the native loop for baseline', () => {
   const ui = dashboard();
-  ui.run("state.dashboardConfig = {framework_version: 'future-engine-version'}; updateRunPreview()");
+  ui.run("state.dashboardConfig = {framework_version: 'future-engine-version', benchmark_label: 'AgentDojo'}; updateRunPreview()");
   assert.equal(ui.node('#workspace-framework').textContent, 'future-engine-version');
   assert.equal(ui.node('#config-defense .framework-version').textContent, 'future-engine-version');
   ui.node('#pipeline-type').value = 'origin';
@@ -130,11 +130,84 @@ test('saved run keeps its own version and distinguishes router off from disabled
     framework_version: 'three-layer-v1', use_security_checker: true, audit_router_mode: 'off'},
     suites: [{suite_name: 'workspace', layer_stats: {l2_records: 1}, cost_comparison_ready: false}],
     display_metrics: {total_tasks: 2}})}));
-  ui.run("state.dashboardConfig = {framework_version: 'future-engine-version'}; updateRunPreview()");
+  ui.run("state.dashboardConfig = {framework_version: 'future-engine-version', benchmark_label: 'AgentDojo'}; updateRunPreview()");
   await ui.run("loadOverview('historical-run')");
   assert.match(ui.node('#overview-content').innerHTML, /result-version">three-layer-v1/);
   assert.match(ui.node('#overview-content').innerHTML, /off[^<]*仍启用 L3/);
   assert.match(ui.node('#overview-content').innerHTML, /L2 1 \/ 2/);
   assert.match(ui.node('#overview-content').innerHTML, /成本未标为可比较/);
   assert.equal(ui.node('#workspace-framework').textContent, 'future-engine-version');
+});
+
+test('task preview has no invented catalog counts before the backend loads', () => {
+  const ui = dashboard();
+  ui.run('updateRunPreview()');
+  assert.equal(ui.node('#preview-tasks').textContent, '未加载');
+  ui.run("state.dashboardConfig = {suites: [{id: 'shopping', user_tasks: 7, injection_tasks: 2}]}; updateRunPreview()");
+  assert.equal(ui.node('#preview-suites').textContent, '1 / 1');
+  assert.equal(ui.node('#preview-tasks').textContent, '14');
+});
+
+test('comparison rejection is shown instead of attempting to draw pooled results', async () => {
+  const ui = dashboard(async () => ({ok: false, json: async () => ({error: '基准任务目录未对齐'})}));
+  ui.context.document.querySelectorAll = () => [{value: 'a'}, {value: 'b'}];
+  ui.run('renderComparison = () => { throw new Error("should not render rejected comparison"); }');
+  await ui.run('runComparison()');
+  assert.match(ui.node('#compare-results').innerHTML, /基准任务目录未对齐/);
+});
+
+test('saved report displays recorded benchmark provenance without inventing legacy identity', async () => {
+  const ui = dashboard(async () => ({ok: true, json: async () => ({config: {benchmark: {
+    id: 'agentdyn', revision: 'fixed-revision', catalog_sha256: 'recorded-catalog'}}, suites: []})}));
+  ui.node('#report-data-source').value = 'fixture';
+  await ui.run('loadReport()');
+  assert.match(ui.node('#report-content').innerHTML, /fixed-revision/);
+  assert.match(ui.node('#report-content').innerHTML, /recorded-catalog/);
+});
+
+test('backend absence remains actionable and disables new execution in the page', async () => {
+  const ui = dashboard(async () => ({ok: true, json: async () => ({
+    suites: [], backend_ready: false, backend_error: 'Use the pinned ipi-agentdyn environment', suite_version: 'v1.2',
+  })}));
+  ui.context.document.querySelectorAll = () => [];
+  await ui.run('loadDashboardConfig()');
+  assert.equal(ui.node('#btn-run').disabled, true);
+  assert.match(ui.node('#backend-status').textContent, /ipi-agentdyn/);
+  assert.equal(ui.node('#suite-grid').innerHTML, '');
+  assert.equal(ui.node('#preview-tasks').textContent, '未加载');
+});
+
+test('overview distinguishes valid utility denominator from total and runtime errors', async () => {
+  const ui = dashboard(async () => ({ok: true, json: async () => ({
+    config: {origin: true, run_attack: true}, suites: [],
+    display_metrics: {avg_utility_rate: 100, utility_passed: 1, utility_valid: 1, total_tasks: 2, execution_errors: 1}
+  })}));
+  await ui.run('loadOverview("errors")');
+  const html = ui.node('#overview-content').innerHTML;
+  assert.match(html, /1 \/ 1 个有效任务成功/);
+  assert.match(html, /总任务 2/);
+  assert.match(html, /运行错误 1/);
+});
+
+test('native draft labels follow the active environment without a benchmark selector', () => {
+  const ui = dashboard();
+  ui.node('#pipeline-type').value = 'origin';
+  for (const label of ['AgentDojo', 'AgentDyn']) {
+    ui.run(`state.dashboardConfig = {benchmark_label: '${label}'}; updateRunPreview()`);
+    assert.equal(ui.node('#workspace-framework').textContent, `${label} 原生循环`);
+    assert.equal(ui.node('#config-defense .framework-version').textContent, label);
+    assert.match(ui.node('#framework-flow').textContent, new RegExp(label));
+  }
+});
+
+test('unknown backend page never defaults to a different benchmark label or risk catalog', async () => {
+  const ui = dashboard(async () => ({ok: true, json: async () => ({suites: [],
+    backend_ready: false, benchmark_id: 'unknown', benchmark_label: '未识别基准',
+    backend_error: 'Unrecognized backend', tool_metadata_path: null})}));
+  ui.context.document.querySelectorAll = () => [];
+  await ui.run('loadDashboardConfig()');
+  assert.match(ui.node('#benchmark-badge').textContent, /未识别基准/);
+  assert.doesNotMatch(ui.node('#benchmark-badge').textContent, /AgentDyn|AgentDojo/);
+  assert.equal(ui.node('#tool-metadata-path').placeholder, '后端未就绪');
+  assert.equal(ui.node('#btn-run').disabled, true);
 });

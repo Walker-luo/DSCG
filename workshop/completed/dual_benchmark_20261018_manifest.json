@@ -1,0 +1,202 @@
+{
+  "task": "dual-benchmark environment-selected integration",
+  "date": "2026-10-18",
+  "status": "engineering complete; offline acceptance; real-model efficacy not measured",
+  "base_revision": "2a2b17ce1275b9c8372814935989df5e6d9161e7",
+  "starting_tree": "dirty with prior AgentDyn integration retained",
+  "working_tree": "dirty on workshop; uncommitted; no merge/push/PR",
+  "changed_files_sha256": {
+    "AGENTS.md": "872f76c57966203d57b3f8e30fc08273a4c80801d28ee20fef2cf8fb967b1ce4",
+    "README.md": "910b8e3a7ebf0c69dafd046236a7acf667449c5bc5db14aa1d2ce0daef5a9525",
+    "config/agentdojo.lock.json": "2c21f1b82df9d0156b3911e8a3f528c74ed4d99ec3b3e71b96c62e4095c20c91",
+    "dashboard/app.py": "8ef88c0a8f233a6b6e7023a5f9e5da491267d8137f7859faab5cb0aeb13a8dc5",
+    "dashboard/evaluation.py": "81b54f1686b6bfcb3c48bef80c39319f572ff92869fd4f03c86d5e203c643b1b",
+    "dashboard/history_export.py": "e0b059fa1e25a9dc8885704e331f667e5b04a5ba84833fce0595036f3e5180eb",
+    "dashboard/static/js/app.js": "b643c4ce8c20316b9c30e9f775b6c9d0f3ea64ef85f7f44079f431e5dbc68008",
+    "dashboard/templates/index.html": "3b042bfe7ecfdb18028fc8ee72fc55acf0a6bba494acd8a95fdb6e4a1b8a1f82",
+    "docs/README.md": "f781a3f9df07d6c9ef7d1d40bf18fa26e80413a4f7ff3019e32092a01f3304b8",
+    "docs/benchmark.md": "f8de3f68728df9c52f79a70ae07155f1da8a62da2e4d9f23fe4235d852362a9e",
+    "docs/dashboard.md": "7b1d7310255014fe1cf2c2ca2ff9ef5558ba06212aa744f172948c2693de8f3b",
+    "docs/evaluation.md": "19898fbd0b05d118578f722a717e8d0ab5dc954b8094d148175c2363bc46367a",
+    "docs/framework_updates.md": "c94c9e7821161d0e33418c3ef3d6d94f6e4534c44b9bbb1e0e96df07ba9606e2",
+    "docs/injection_precheck.md": "9b36dfec025a47683b2ef2944600bf84e2fbd6395f3c229a343f513bb8283a5b",
+    "docs/model_tool_configuration.md": "d5f93b197639c2480afc0a4043152cdc5796c8c79313a0b30a6ed3b738cffe06",
+    "docs/partial_benchmark.md": "8a4d30f8c414e38da25916423936476fec570e860b390d36018075d9a45e2c13",
+    "dscg/benchmark_catalog.py": "1515b9fccec605911d56a1df44dc77b7b02d32c901c18717734888bf5a6bbda2",
+    "dscg/tool_metadata.py": "b3e20cacfd1eff3d870e85e71866d8a50aa4783bc50a8d489a506e7df990f992",
+    "experiments/README.md": "a809f148939f26f96ee51447d8929e7443eab6715c4903c297a7b056079cf515",
+    "experiments/common/benchmark_reuse.py": "406ea906a9d64a4f8edd2e4eb639e4e2b3723d61260e773f72a477477947030f",
+    "experiments/common/injection_cohort.py": "446115c19a566374c8c1d56503129f3d41d758e5e89863dabb3201ffd899231c",
+    "experiments/common/partial_controls.py": "8a45dd598622de72dcaa59dc39b4a43c6f6f54276b50fa14aa72f9e11efe1bfa",
+    "experiments/common/partial_reporting.py": "17ef0a0d135a0d8e2f9072a3b231009e549c17ab0599d753d9200701d6dabf59",
+    "experiments/run_benchmark.py": "29d49570bebea26bc6aed04d9a91ac87a3b117539f67ed7f75a8c28a362d341a",
+    "experiments/run_injection_precheck.py": "7977f12fd10bda7e0e25d184787f63a2a5ffcb6954500bf49fb072cbb3d48bc2",
+    "experiments/run_partial_benchmark.py": "ac0cd6e106ce6fffa8fe29dcfb1a3ee4c525f4ca5d7c3960c4d9e887b72a4593",
+    "experiments/tools/generate_tool_metadata.py": "5bb04352b2c1123e9ba45aa812257483e9ae09cb8d2083c98e972173d5f4d8dd",
+    "tests/test_agentdyn_catalog.py": "c5fe6ed4a23b9aa8eea2d1fd514ef917823f6e48ff3351a04dd9d65b0f55c541",
+    "tests/test_agentdyn_native.py": "8a6b6a9023bcb77a5bd6f2aab4dd60ee4a18f08c66be2e46e5db3341064c8ec4",
+    "tests/test_agentdyn_outcomes.py": "cd0f0489a922530aa0cb312b41952829b6890f75c32e4a5ab10490630d9fd2ee",
+    "tests/test_audit_tool_context.py": "e87ea40a5b4238534ef65910db2ba130b480b438fd63cf67fd332a3dae05185f",
+    "tests/test_benchmark_reuse.py": "a49420be5d38c1aa98b47afa392c9bdcb135be96cb1e8309ce5638bcffe9f1e0",
+    "tests/test_dashboard_config.py": "8270de23ac0b7fd6096039e74a7480961e31f31e4d7b7491efc4c460033819b7",
+    "tests/test_dashboard_evaluation.py": "af6f8fb681a81ba4e706c1a2f634de33378b2f0138f93f3aea36a1d891e3c31b",
+    "tests/test_dashboard_history.py": "8fb9e0d4e037d18dd5113a235936899b14cf96af182ae08984fd4c9e84e23665",
+    "tests/test_dashboard_ui.cjs": "df22402581b7a2aae55c8004ac20f7843bbd1ec2112fd44abfa5aefdb47ab01b",
+    "tests/test_full_benchmark.py": "5473fc5a84e2ec3177ad9d1745128034ec6db564a5cedce1cb900b273491f600",
+    "tests/test_full_suites.py": "4787fc7d79dd3d87a724204d2cdf8043f94d5a75e1da6281e67f98845bef1c40",
+    "tests/test_injection_precheck.py": "73684676d73a15221038f4a57d87e663baeafa9f329d62eed17c2535e60eb7f0",
+    "tests/test_l1_projection_controls.py": "64da7a4d9e3b218aaff813a1eda3cb6718ce9e44ae887335943f845960e083e9",
+    "tests/test_l2_controls.py": "b5f4e7bcd6547295ae869be83b54ef6cf9a66a02e9a24f2cc1901026f09e2e59",
+    "tests/test_partial_ablation.py": "03f2f7885ab245e34e0f0f7ce2d30eedb6b1cf641f5076333a30cc3ca9ff9165",
+    "tests/test_partial_agentdyn.py": "f2d33443c14a09ee0f2c08e72ddd2e5880f6420cf9724dd0626e20137491d3e6",
+    "tests/test_partial_attacks.py": "0da79f7ee320be3061f8e3c12010260d68ee96c78dbe91863dad063973e54694",
+    "tests/test_partial_baseline.py": "d210f3d378a15f4b2c59b7a467e1140404e45086bf30367f83007e55391639fc",
+    "tests/test_partial_cohort.py": "74b67fbae0341c71e38566e593ed09382fe66665e5022b35e017df30f9573c3a",
+    "tests/test_partial_reporting.py": "666f43895a062e81a4577b05bd63dd922e6bf2be6af461e0eaa278369e1caee9",
+    "tests/test_partial_suites.py": "e86351b8d01b81e7fd7044bbbc7c507eb6c825b519436ea4aecb30a7b07b16e8",
+    "tests/test_resume_diagnostics.py": "12d0ad162d65c799974e9ba2c9a8b77acfe9039ab2d6010ae437da9c9cfb8c4b",
+    "tests/test_tool_metadata.py": "0b35c95378b209d88b736cb599f29439e58bcb0e964395a7ea32b081800f1acc",
+    "workshop/README.md": "78eb6ca8af10bc954ab3e3671942cb481acb679a6fb3eb6c02d1d50922048070",
+    "workshop/completed/README.md": "efd4f76fd2384fe1d6e19be749d4725bb2d29c1cc60e346c46b34a5199ebdf46",
+    "workshop/completed/dual_benchmark_20261018.md": "a2ec257fd033754ffc6033bc8d3b0dd94843037a2514a4459ff6b387f4503bcf",
+    "workshop/completed/dual_benchmark_plan_20261018.md": "09164e6efcf551099e10598fd12f0885e942d69f385511f4287df4b19e7ce6a1"
+  },
+  "artifacts_sha256": {
+    "before.json": "fc78f87085c2128905b88fb614a688a19c5b79959272e5c52280c7e5981c0a27",
+    "wheel_download_retry.log": "760c0ea42797dccb2222a16db4ea82d45d91957db10b676e29487408d50c7337",
+    "existing_client_variant.diff": "d534bb532d4903b57ea5ae2f1de1d12ae34e12e1b77c5d687c573ac027ed47b9",
+    "agentdojo_catalog_final.json": "4b2289ecdfa9d4b181376852e5730c0cf604bda9d62114b9eefd76bbef37ae89",
+    "agentdyn_catalog_final.json": "99204ef4ee1c884cd6b64bc55ca1e2ea8d75855e5ffcaf285f053d9d1ce2d92f",
+    "full_dojo.json": "1fcd895a675ec56f885f5cf64977a1aab05d4184e6d985bc605e309289b75ae6",
+    "full_dyn.json": "e153fca5a52309ca69fc11ae1a3536bde793552c14ae0f69c9baa3fca91f5c1b",
+    "partial_dojo.json": "9bd850b81c0690236093e488fe45f9ec99605ccd774377d4ae658dd82f669297",
+    "partial_dyn.json": "545ffe95b57ff1e7091cd05a0ac7d6fc838c92f3b86ef3fdcc97407b88ce5eb9",
+    "canonical_release_probe_final.json": "f708b372b7d1759d3e63960806347e92a52aa689f355f318af4ec7cf5996ab1d",
+    "python_dojo_final.log": "39d636b9fe141e578811d75e4749d3ac7cb4d84539f219f7d885fcc2e77123f5",
+    "python_dyn_final.log": "53caf433e887c3c34e11fca8b18c881e6e39fbf3cceb0f5c9b55eb629eabb6e9",
+    "node_final.log": "fee97c6df0d2a982d5618d20ddfb24d99fe8d822aaca317f2c931271a9ac8cda",
+    "delivery_checks.json": "9e3a6dd100924e17d054ab358efe4059aac29020c05f7b792cedece452baaa89",
+    "verify_delivery.py": "7a4494f9c1d413aa385bd2f974993499b8a38c467fa128ff84f1843914cfea51",
+    "source_dojo.json": "8b494de53aac04a73675507b63f8551f0df196bdee711768b56fb2bf0607b2af",
+    "source_dyn.json": "146edf8863b6dcc35d50964bd77aa21d2102d974983e27e7c26f159d62d738d0",
+    "working_tree.patch": "e32f84654dbc7153e1fc610f6551b645bde814117b834a1d046e9f8e4d6ad50c",
+    "working_tree_status.txt": "298d066a046323674ef3a9db30b4621941440ee4ecaa5bf25feeb91e7c56f35a",
+    "diff_check.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "benchmarks": {
+    "agentdojo": {
+      "id": "agentdojo",
+      "repository": "https://github.com/ethz-spylab/agentdojo",
+      "revision": "pypi:agentdojo==0.1.35",
+      "suite_version": "v1.2",
+      "implementation_sha256": "ccf83e6598bbb6d33a2403e6b3cc57c1572b6237e07b885aa16b45e046280636",
+      "catalog_sha256": "aee2f21ec575e85d5f683d78407efdf827eb6050b5cff3731b41af4d9b2730b7",
+      "tasks_sha256": "1115cb6e7c2838539b18e0ad22fd721329c1682c87b666456a7097a09eca25dd",
+      "environments_sha256": "75807351af08346ecc2391b7a1a3c95cee25d40cdda9c3169255d22c34ca4c84",
+      "attacks_sha256": "bac1b932d19b75d897d250cadcf7ef21b4056b39da2ca2d3e7558c41419c4b3d",
+      "tools_sha256": "aae3930c51a9c811a20d6b4e9f1d314323e16f541638fa51597cea94b46d8c6f",
+      "package_version": "0.1.35",
+      "runtime_variant": "reviewed-local-system-role-v1",
+      "source_kind": "pypi-release",
+      "release_sha256": "364bea4219716b716bf639f504d195943f7f6a5535d312ca41d7098704a2affd"
+    },
+    "agentdyn": {
+      "id": "agentdyn",
+      "repository": "https://github.com/SaFo-Lab/AgentDyn",
+      "revision": "5353cf7615b135cace8d07c8f12dac53a16b6db3",
+      "suite_version": "v1.2",
+      "implementation_sha256": "1e77628087f338da47a1e577951890c55996ab47f8b55ba15dbeeae95a4723d5",
+      "catalog_sha256": "ee06e0ae6bc7c4ff57cd6fc9e4b53d55982ea77cec700746568450c377281869",
+      "tasks_sha256": "e9441cec065c5615692b5416f8bfcc8f102d92c1cc19158c45bc2880de6595b5",
+      "environments_sha256": "bae3d82be80a62c2bdb9f40970ca5a76e74e4e92742d593f82cde59fc8f4faf7",
+      "attacks_sha256": "bac1b932d19b75d897d250cadcf7ef21b4056b39da2ca2d3e7558c41419c4b3d",
+      "tools_sha256": "64fbb7024c6aee83e0ff9eb95b26b0e637ad96071f5eeae7a5faa74203d0b35b",
+      "package_version": "0.1.35",
+      "runtime_variant": "pinned-git",
+      "source_kind": "git"
+    }
+  },
+  "validation": {
+    "python_agentdojo": {
+      "tests_run": 466,
+      "result": "OK",
+      "skipped_other_backend_class": 1,
+      "exit_code": 0
+    },
+    "python_agentdyn": {
+      "tests_run": 470,
+      "result": "OK",
+      "skipped_other_backend_class": 1,
+      "exit_code": 0
+    },
+    "node": {
+      "tests": 41,
+      "passed": 41,
+      "exit_code": 0
+    },
+    "paid_model_requests": 0,
+    "real_model_rollouts": 0
+  },
+  "protection": {
+    "protected_user_outputs": 6674,
+    "protected_source_and_historical_files": 78,
+    "local_tool_bytes_unchanged": true,
+    "environments": {
+      "ipi": {
+        "files_verified": 112,
+        "source_bytes_unchanged": true
+      },
+      "ipi-agentdyn": {
+        "files_verified": 1374,
+        "source_bytes_unchanged": true
+      }
+    },
+    "documentation_links": 306,
+    "new_broken_links": [],
+    "anchor_errors": [],
+    "inherited_missing_links_preserved": [
+      [
+        "README.md",
+        "./plan.md"
+      ],
+      [
+        "README.md",
+        "./report/report.md"
+      ],
+      [
+        "README.md",
+        "./plan.md"
+      ],
+      [
+        "README.md",
+        "./report/report.md"
+      ],
+      [
+        "AGENTS.md",
+        "./report/report.md"
+      ],
+      [
+        "workshop/README.md",
+        "../report/report.md"
+      ],
+      [
+        "workshop/completed/README.md",
+        "../../report/report.md"
+      ]
+    ],
+    "paid_model_requests": 0,
+    "real_model_rollouts": 0
+  },
+  "review": {
+    "critical": 0,
+    "important": 0,
+    "deferred_minor": "Failure report repeats identity hash percase; ~0.113s per AgentDyn record; future per-invocation reuse possible."
+  },
+  "limits": [
+    "No oldcache/cohort migration or historicalcompat expansion",
+    "No GUIbrowser visual QA",
+    "No paidmodel/provider API validation",
+    "Official and exactreviewedlocalclient variants distinguished",
+    "No defenseboundary/defaultchanges or researchgate passage"
+  ]
+}
