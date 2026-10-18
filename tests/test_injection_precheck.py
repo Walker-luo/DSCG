@@ -63,6 +63,7 @@ class InjectionPrecheckTests(unittest.TestCase):
                          patch.object(cohort_module, 'get_suite', return_value=self.suite),
                          patch.object(precheck, 'resolve_model_config', return_value=self.config),
                          patch.object(cohort_module, 'resolve_model_config', return_value=self.config),
+                         patch.object(precheck.shared, '_describe_pipeline', side_effect=lambda *a, **kw: self.factory()[0]),
                          patch.object(precheck, 'make_openai_compatible_pipeline', side_effect=self.factory)]
         for p in self.patchers:
             p.start()
@@ -73,7 +74,7 @@ class InjectionPrecheckTests(unittest.TestCase):
 
     @property
     def output(self):
-        return self.root / 'screens' / 'offline_agentdojo_screen'
+        return self.root / 'screens' / 'agentdojo/offline_screen'
 
     def screen(self, **kwargs):
         with redirect_stdout(StringIO()):
@@ -140,7 +141,7 @@ class InjectionPrecheckTests(unittest.TestCase):
                 '--results-dir', str(self.root / 'screens')]), 130)
         self.assertIn('同一条 screen 命令续跑', stream.getvalue())
         self.assertFalse(any(t.name == 'injection-precheck-progress' for t in threading.enumerate()))
-        output = self.root / 'screens/offline_agentdojo_interrupt'
+        output = self.root / 'screens/agentdojo/offline_interrupt'
         self.assertFalse((output / 'cohort.json').exists())
         self.assertEqual(len(list(output.rglob('attempt.json'))), 1)
 
@@ -304,7 +305,7 @@ class InjectionPrecheckTests(unittest.TestCase):
         binding['screening_script_sha256'] = mapping['legacy_screening_script_sha256']
         return binding
 
-    def test_old_agentdojo_frozen_cohort_and_manifest_reject_without_rewriting(self):
+    def test_old_frozen_cohort_and_manifest_resume_without_rewriting(self):
         self.screen()
         cohort = self.cohort(); binding = self.legacy_binding()
         cohort['binding'] = binding
@@ -313,13 +314,12 @@ class InjectionPrecheckTests(unittest.TestCase):
         cohort_path.write_text(json.dumps(cohort))
         manifest = self.output / 'screen_manifest.json'; manifest.write_text(json.dumps(binding))
         originals = {p: p.read_bytes() for p in [cohort_path, manifest, *self.output.rglob('attempt.json')]}
-        with self.assertRaises(ValueError):
-            self.screen()
+        self.assertEqual(self.screen(), 0)
         self.assertEqual(len(self.suite.executed), 3)
         for p, content in originals.items():
             self.assertEqual(p.read_bytes(), content)
 
-    def test_old_agentdojo_pending_screen_rejects_without_repeating_completed_goal(self):
+    def test_old_pending_screen_resumes_without_repeating_completed_goal(self):
         self.suite.outcomes[1] = [RuntimeError('offline'), False, False]
         self.assertEqual(self.screen(), 1)
         binding = self.legacy_binding()
@@ -328,12 +328,30 @@ class InjectionPrecheckTests(unittest.TestCase):
             record = json.loads(p.read_text()); record['binding_sha256'] = precheck._digest(binding)
             p.write_text(json.dumps(record))
         original = manifest.read_bytes()
-        with self.assertRaises(ValueError):
-            self.screen()
+        self.assertEqual(self.screen(), 0)
         self.assertEqual(self.suite.executed.count('injection_task_0'), 1)
         self.assertEqual(manifest.read_bytes(), original)
 
-    def test_old_agentdojo_unified_screen_rejects_after_backend_change(self):
+    def test_pending_screen_preserves_previous_aggregates_and_configuration_only_record(self):
+        self.suite.outcomes[1] = [RuntimeError('offline'), False, False]
+        self.assertEqual(self.screen(), 1)
+        manifest = self.output / 'screen_manifest.json'
+        value = json.loads(manifest.read_text())
+        value['source']['source_sha256'] = {'old.py':'historical'}
+        manifest.write_text(json.dumps(value))
+        original_manifest = manifest.read_bytes()
+        originals = {name:(self.output/name).read_bytes() for name in ('status.json','summary.md')}
+        self.assertEqual(self.screen(), 0)
+        self.assertEqual(manifest.read_bytes(), original_manifest)
+        for name, data in originals.items():
+            snapshots = list((self.output/'compatibility').glob('*/snapshot/'+name))
+            self.assertTrue(snapshots, name)
+            self.assertTrue(any(p.read_bytes()==data for p in snapshots), name)
+        records = [json.loads(p.read_text()) for p in (self.output/'compatibility').glob('*/configuration.json')]
+        self.assertTrue(any(r.get('verification_mode')=='configuration_only'
+                            and r.get('source_equivalence_verified') is False for r in records))
+
+    def test_old_source_metadata_screen_resumes(self):
         self.suite.outcomes[1] = [RuntimeError('offline'), False, False]
         self.assertEqual(self.screen(), 1)
         mapping = json.loads(Path(cohort_module.__file__).with_name('injection_cohort_compatibility.json').read_text())
@@ -345,27 +363,25 @@ class InjectionPrecheckTests(unittest.TestCase):
             record = json.loads(p.read_text()); record['binding_sha256'] = precheck._digest(binding)
             p.write_text(json.dumps(record))
         originals = {p: p.read_bytes() for p in [manifest, *self.output.rglob('attempt.json')]}
-        with self.assertRaises(ValueError):
-            self.screen()
+        self.assertEqual(self.screen(), 0)
         self.assertEqual(self.suite.executed.count('injection_task_0'), 1)
         for p, content in originals.items():
             self.assertEqual(p.read_bytes(), content)
 
-    def test_unknown_legacy_script_or_changed_defense_runtime_is_not_accepted(self):
+    def test_script_and_source_hashes_are_informational(self):
         self.screen()
         binding = self.legacy_binding(); binding['screening_script_sha256'] = '0' * 64
         (self.output / 'screen_manifest.json').write_text(json.dumps(binding))
-        with self.assertRaises(ValueError):
-            self.screen()
+        self.assertEqual(self.screen(), 0)
         binding = self.legacy_binding()
         (self.output / 'screen_manifest.json').write_text(json.dumps(binding))
         current = precheck.source_revision()
-        current['source_sha256']['dscg/pipelines/baseline.py'] = '0' * 64
-        with patch.object(cohort_module, 'source_revision', return_value=current), self.assertRaises(ValueError):
-            self.screen()
+        current['source_sha256'] = {'dscg/pipelines/baseline.py': '0' * 64}
+        with patch.object(cohort_module, 'source_revision', return_value=current):
+            self.assertEqual(self.screen(), 0)
         self.assertEqual(len(self.suite.executed), 3)
 
-    def test_old_agentdojo_pre_relocation_cohort_rejects_without_rewriting_or_repeating_goals(self):
+    def test_old_cohort_provenance_does_not_repeat_goals(self):
         self.screen()
         previous = json.loads((Path(__file__).with_name('fixtures') /
                                'experiments_layout_source_20261017.json').read_text())
@@ -379,20 +395,19 @@ class InjectionPrecheckTests(unittest.TestCase):
         manifest = self.output / 'screen_manifest.json'
         manifest.write_text(json.dumps(binding))
         originals = {p: p.read_bytes() for p in [manifest, cohort_path, *self.output.rglob('attempt.json')]}
-        with self.assertRaises(ValueError):
-            self.screen()
+        self.assertEqual(self.screen(), 0)
         self.assertEqual(self.suite.executed, ['injection_task_0', 'injection_task_1', 'injection_task_1'])
         for p, data in originals.items():
             self.assertEqual(p.read_bytes(), data)
         current = precheck._binding(self.config, ['workspace'])
         binding['screening_script_sha256'] = '0' * 64
-        self.assertFalse(cohort_module._bindings_compatible(binding, current))
+        self.assertTrue(cohort_module._bindings_compatible(binding, current))
 
-    def test_legacy_compatibility_rejects_unknown_added_runtime_source(self):
+    def test_source_changes_do_not_block_identical_screen_configuration(self):
         binding = self.legacy_binding()
         current = precheck._binding(self.config, ['workspace'])
-        current['source']['source_sha256']['dscg/unknown_new_layer.py'] = '0' * 64
-        self.assertFalse(cohort_module._bindings_compatible(binding, current))
+        current['source']['source_sha256'] = {'dscg/unknown_new_layer.py': '0' * 64}
+        self.assertTrue(cohort_module._bindings_compatible(binding, current))
 
     def test_native_logged_context_error_is_not_a_valid_failure(self):
         self.suite.outcomes[1] = [('error', 'offline context_length_exceeded'), False, False]
@@ -415,20 +430,20 @@ class InjectionPrecheckTests(unittest.TestCase):
                 self.assertEqual(precheck.run_screened(self.output / 'cohort.json', config_path=None,
                     run_name='mixed', origin=True, results_dir=self.root / 'benchmarks'), 0)
                 self.assertEqual(runner.call_args.kwargs['suites'], ['workspace'])
-        attachment = json.loads((self.root / 'benchmarks/offline_agentdojo_mixed/screened_cohort.json').read_text())
+        attachment = json.loads((self.root / 'benchmarks/agentdojo/offline_mixed/screened_cohort.json').read_text())
         self.assertEqual(attachment['skipped_suites'], ['travel'])
         self.assertEqual(attachment['counts']['travel']['planned_per_targeted_attack'], 0)
 
     def test_incompatible_goal_model_source_or_corrupt_trace_is_not_reused(self):
-        for mismatch in ('goal', 'model', 'source', 'corrupt'):
+        for mismatch in ('goal', 'model', 'backend', 'corrupt'):
             with self.subTest(mismatch=mismatch):
                 self.suite.executed.clear()
                 self.suite.outcomes = {0: [True], 1: [False, False]}
                 root, trace = self.historical(goal='different' if mismatch == 'goal' else 'goal 0',
                                               model={'model_id': 'other'} if mismatch == 'model' else None)
-                if mismatch == 'source':
+                if mismatch == 'backend':
                     path = root / 'ignore_previous/workspace/run_manifest.json'
-                    value = json.loads(path.read_text()); value['source']['source_sha256'] = {}
+                    value = json.loads(path.read_text()); value['benchmark']['id'] = 'different-backend'
                     path.write_text(json.dumps(value))
                 if mismatch == 'corrupt':
                     trace.write_text('{')
@@ -449,7 +464,7 @@ class InjectionPrecheckTests(unittest.TestCase):
             precheck.shared.benchmark, 'benchmark_suite_with_injections', side_effect=fake_results), redirect_stdout(StringIO()):
             self.assertEqual(full.main(cohort_path=self.output / 'cohort.json', config_path=None, run_name='selected',
                 results_dir=self.root / 'benchmarks', origin=True, attack=['ignore_previous']), 0)
-        base = self.root / 'benchmarks/offline_agentdojo_selected'
+        base = self.root / 'benchmarks/agentdojo/offline_selected'
         summary = json.loads((base / 'ignore_previous/workspace/summary.json').read_text())
         self.assertEqual(summary['task_counts']['planned_tasks'], 4)
         self.assertEqual(summary['task_selection']['injection_task_ids'], ['injection_task_0'])

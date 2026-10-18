@@ -4,13 +4,13 @@
 
 ## 双后端平台交接（2026-10-18）
 
-同一个 Dashboard 入口按 Python 进程实际安装的来源与锁定源码自动识别后端：`ipi` 使用 AgentDojo，`ipi-agentdyn` 使用 AgentDyn，不增加后端选择器或额外参数。切换环境后须重启 Dashboard；需要并行查看时可在两个终端使用不同 `PORT`，各进程保持各自后端。启动命令见 [Dashboard 指南](./dashboard.md)。这替代 2026-10-17 仅允许 AgentDyn 新执行的接线限制；原始说明已保存在本次整理的原文归档中。
+同一个 Dashboard 入口按 Python 进程实际安装的加载路径、来源、版本及revision自动识别后端：`ipi` 使用 AgentDojo，`ipi-agentdyn` 使用 AgentDyn，不增加后端选择器或额外参数。切换环境后须重启 Dashboard；需要并行查看时可在两个终端使用不同 `PORT`，各进程保持各自后端。启动命令见 [Dashboard 指南](./dashboard.md)。这替代 2026-10-17 仅允许 AgentDyn 新执行的接线限制；原始说明已保存在本次整理的原文归档中。
 
 两边的 suite version 均为 `v1.2`。AgentDojo 注册 workspace/travel/banking/slack，用户/注入任务分别为 40/14、20/7、16/9、21/5；AgentDyn 注册 shopping/github/dailylife，分别为 20/9、20/9、20/10。全用户 clean 范围分别为 97 与 60 个原生用户任务，不是本次模型结果。网页场景、计数、预估任务、原生循环标签与攻击注册表来自当前已验证安装；任务上限、seed、模型连接、原生 baseline、三层开关及路由规则保持原设置。
 
-来源和源码按 [AgentDojo](../config/agentdojo.lock.json)与 [AgentDyn](../config/agentdyn.lock.json)两份锁定文件核对。AgentDyn 固定 Git 提交 `5353cf7615b135cace8d07c8f12dac53a16b6db3`；AgentDojo 记录 PyPI 版本、发行包哈希及被允许的已审阅本地变体。`runtime_variant` 和实际 `implementation_sha256` 保留变体差异，不能将审阅后的本地内容称作逐字节原发行版。
+当前只按[AgentDojo](../config/agentdojo.lock.json)与[AgentDyn](../config/agentdyn.lock.json)中的安装元数据核对来源、版本和revision，不扫描源码或读取历史兼容映射。新身份标记verification_mode=metadata_only、runtime_variant=unverified；旧源码锁和精确变体证据仍作为历史保留。
 
-`/api/config` 在未知安装或来源/字节不符时返回 `benchmark_id=unknown`、`backend_ready=false`、空场景/攻击及 `backend_error`，页面可打开且禁用启动。新执行在创建模型客户端前失败关闭，后台任务再次核对提交时身份；历史分析不依赖活动后端通过校验。新网页 ID 自动带实际 `agentdojo_` 或 `agentdyn_` 前缀。配置、summary、整体结果、报告和下载保留 `benchmark` 的 id、repository、revision、suite_version、implementation_sha256、catalog_sha256、任务/环境/攻击/工具哈希，以及 package_version、source_kind、runtime_variant；AgentDojo 另保留 release_sha256。
+`/api/config` 在未知安装或来源/revision/路径不符时返回 `benchmark_id=unknown`、`backend_ready=false`、空场景/攻击及 `backend_error`，页面可打开且禁用启动。新执行在创建模型客户端前失败关闭，后台任务再次核对提交时身份；历史分析不依赖活动后端通过校验。新网页 ID 自动带实际 `agentdojo_` 或 `agentdyn_` 前缀。配置、summary、整体结果、报告和下载保留benchmark的id、repository、revision、suite_version、package_version、source_kind、verification_mode及runtime_variant；新运行不生成源码哈希。
 
 风险目录按活动后端选择，`tool_metadata_selection`、`tool_metadata_path` 和单独的 `tool_metadata_error` 报告实际来源、路径与问题。已识别为相反基准的通用 local 目录会被跳过并给出 warning，保留用户原文件；未归属的自定义通用目录要求明确配置，不静默合并。后端就绪与风险配置错误分别报告，baseline 不使用 DSCG 风险目录；DSCG 在模型创建前验证目录覆盖及分类。
 
@@ -69,7 +69,7 @@ L1不增加独立模型调用：此前支持的明确原生银行月支出任务
 
 [app.js](../dashboard/static/js/app.js)区分待启动配置和保存的有效配置；HTML/TXT报告显示已保存开关。概览新增完整/可见工具累计量、编译器调用和文件展开，且只统计实际计分任务的 `dscg_l2` trace。编译器调用可能零模型调用；字符/工具定义数不是Tokens。旧记录缺字段显示未记录，不推定零；攻击生成预检不计进该trace统计。
 
-版本、开关、profile/reader身份、协议和任务输入边界进入pipeline/config/L3绑定；partial manifest继续绑定任务、模型、攻击与源码SHA。同名配置不兼容不能复用缓存，所有新对照使用新名称。旧L3校准artifact不得直接沿用，新有效任务应按实际审计packet独立标注并重新核查配置域。
+版本、开关、profile/reader身份、协议和任务输入边界进入pipeline/config/L3绑定；partial manifest继续绑定任务、模型、攻击、工具及有效防御配置；源码仅记录参考Git版本。同名配置不兼容不能复用缓存，所有新对照使用新名称。旧L3校准artifact不得直接沿用，新有效任务应按实际审计packet独立标注并重新核查配置域。
 
 ## 平台交接状态
 

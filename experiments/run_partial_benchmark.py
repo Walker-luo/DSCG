@@ -1,10 +1,11 @@
 import argparse
 import os
-import re
 from pathlib import Path
 import csv
 from time import monotonic
 from uuid import uuid4
+from types import SimpleNamespace
+from copy import copy
 
 from agentdojo import logging, benchmark, attacks
 from agentdojo.attacks.attack_registry import ATTACKS
@@ -17,7 +18,8 @@ from dscg.audit_router import summarize_events
 from dscg.input_isolation import FRAMEWORK_VERSION
 from dscg.l1_projection import MODES as L1_PROJECTION_MODES, PROFILE_SHA256 as L1_PROFILE_SHA256
 from dscg.pipelines.baseline import make_openai_compatible_pipeline
-from dscg.pipelines.defended import make_defended_pipeline
+from dscg.pipelines.defended import make_defended_pipeline, router_configuration_hash, defended_pipeline_name
+from dscg.audit_router import LocalAuditRouter
 from dscg.tool_metadata import ToolMetadataError, load_tool_metadata, validate_benchmark_tool_metadata, resolve_tool_metadata
 from experiments.diagnostics.harness_audit import rank_ids, security_result_fields
 from experiments.common.benchmark_outcomes import project_outcomes
@@ -26,8 +28,11 @@ from experiments.common.partial_controls import (validate_controls, make_task_ma
                                           select_tasks, guard_run, source_revision, preserve_cached_cost,
                                           RunConfigurationError)
 from experiments.common.benchmark_reuse import ReusePlan, execution_plan
+from experiments.common.result_paths import (
+    safe_result_component as _safe_result_component, run_component, resolve_run_path, result_layout,
+)
 from experiments.common.benchmark_execution import (
-    PreparedBindings, ApprovedBindings, run_lock, validate_workers, execute_groups,
+    PreparedBindings, ApprovedBindings, run_lock,
 )
 
 
@@ -36,27 +41,9 @@ TYPICAL_ATTACKS = (
 )
 
 
-def _safe_result_component(value: str | None, fallback: str) -> str:
-    """Return a path-safe component for a user-provided experiment name."""
-
-    component = str(value or "").strip()
-    # Model IDs such as ``Qwen/Qwen3-...`` are valid API identifiers but must
-    # not create nested result directories. Keep common readable characters
-    # and replace everything else with a single dash.
-    component = re.sub(r"[^\w.-]+", "-", component, flags=re.UNICODE)
-    component = component.strip(" .-_")
-    return component or fallback
-
-
 def _apply_run_name(pipeline, resolved_model_id: str | None, run_name: str | None) -> str:
-    """Namespace benchmark runs while retaining the model/run directory layout."""
-    backend = get_backend()
-    if run_name is None or not str(run_name).strip():
-        pipeline.name = f"{pipeline.name}_{backend.id}"
-    else:
-        model_component = _safe_result_component(resolved_model_id, "model")
-        name_component = _safe_result_component(run_name, "run")
-        pipeline.name = f"{model_component}_{backend.id}_{name_component}"
+    """Name a run; its backend is represented by the parent directory."""
+    pipeline.name = run_component(resolved_model_id, run_name, default_name=pipeline.name)
     return pipeline.name
 
 
@@ -129,6 +116,39 @@ def _router_trace_summary(suite_dir, task_keys, attack_name, run_attack):
             "scope":"recorded scored traces only; missing routing traces are unknown"}
 
 
+def _describe_pipeline(model_id, sec_model_id, *, origin, defense, **options):
+    """Resolve public identity without clients, pipelines, attacks or model requests."""
+    main = resolve_model_config(model_id, prefix='DSCG_MAIN', **{
+        k: options.get(k) for k in ('api_key', 'base_url', 'provider', 'api_key_env', 'config_path')})
+    name = f'{main.model_id}_{defense}' if origin and defense else main.model_id
+    security, optimization = {}, {}
+    if not origin:
+        checker, sandbox = options['use_security_checker'], options['use_sandbox']
+        isolation = bool(sandbox or checker)
+        projection = options['l1_projection_mode'] if isolation else 'off'
+        view, delegated = options['planning_tool_view'] and sandbox, options['delegated_tasks'] and sandbox
+        router, config_hash = None, None
+        if checker:
+            audit = resolve_model_config(sec_model_id, prefix='DSCG_SEC', fallback=main,
+                config_path=options.get('config_path'), **{
+                    k: options.get('sec_' + k) for k in ('api_key', 'base_url', 'provider', 'api_key_env')})
+            security = audit.public_dict()
+            config_hash = router_configuration_hash(main, audit, input_isolation=isolation,
+                authorization_precheck=sandbox, l1_projection_mode=projection,
+                planning_tool_view=view, delegated_tasks=delegated,
+                audit_retries=options['audit_retries'], completion_prompt=options['completion_prompt'])
+            if options['audit_router_mode'] != 'off':
+                router = LocalAuditRouter(options['audit_router_mode'], options['audit_router_artifact'], config_hash)
+        optimization = {'audit_router_config_sha256': config_hash,
+                        'audit_router_artifact_sha256': router.artifact_sha256 if router else None}
+        name = defended_pipeline_name(main.model_id, use_sandbox=sandbox, use_security_checker=checker,
+            input_isolation=isolation, authorization_precheck=sandbox, l1_projection_mode=projection,
+            planning_tool_view=view, delegated_tasks=delegated, audit_router_mode=options['audit_router_mode'],
+            audit_router=router, router_config_hash=config_hash)
+    return SimpleNamespace(name=name, dscg_model_config=main.public_dict(),
+                           dscg_security_model_config=security, dscg_optimization_config=optimization)
+
+
 def main(
     model_id: str | None = None,
     sec_model_id: str | None = None,
@@ -166,10 +186,8 @@ def main(
     use_sandbox: bool = True,
     cohort_sha256: str | None = None,
     cohort_path: str | Path | None = None,
-    workers: int = 1,
     _reuse_plan=None,
 ) -> int:
-    validate_workers(workers)
     backend = get_backend()
     if task_scope not in {'partial', 'full', 'screened', 'partial_screened'}:
         raise ValueError('unknown task scope')
@@ -185,7 +203,6 @@ def main(
             cohort_path, task_scope='partial_screened', suites=suites, model_id=model_id,
             sec_model_id=sec_model_id, origin=origin, defense=defense, config_path=config_path,
             run_name=run_name, results_dir=results_dir, attack=attack, force_rerun=force_rerun, reuse=reuse,
-            workers=workers,
             api_key=api_key, base_url=base_url, provider=provider, api_key_env=api_key_env,
             sec_api_key=sec_api_key, sec_base_url=sec_base_url, sec_provider=sec_provider,
             sec_api_key_env=sec_api_key_env, trace_level=trace_level, tool_metadata_path=tool_metadata_path,
@@ -200,7 +217,7 @@ def main(
     if reuse and resume is None:
         config = resolve_model_config(model_id, api_key=api_key, base_url=base_url, provider=provider,
                                       api_key_env=api_key_env, config_path=config_path)
-        base = logdir / (_safe_result_component(config.model_id, 'model') + '_' + backend.id + '_' + _safe_result_component(run_name, 'run'))
+        base = resolve_run_path(logdir, backend.id, config.model_id, run_name, allow_legacy=True)
         try:
             resume = ReusePlan(base, suites=suites, attack=attack, run_attack=run_attack,
                                task_scope=task_scope, resolve_attacks=resolve_attack_names)
@@ -237,8 +254,7 @@ def main(
     context = {'execution_plan': execution_plan(task_scope, suites, attack_names, cohort_sha256)}
     run_records = []
     report_sources = []
-    if run_attack:
-        print(f"本次攻击 ({len(attack_names)}): {', '.join(attack_names)}")
+    print(f"本次攻击 ({len(attack_names) if run_attack else 0}): {', '.join(attack_names) if run_attack else '无（clean）'}", flush=True)
     print(f"本次场景 ({len(suites)}): {', '.join(suites)}", flush=True)
 
     prepared = resume if resume is not None else PreparedBindings()
@@ -259,6 +275,7 @@ def main(
                 delegated_tasks=delegated_tasks and not origin and use_sandbox,
                 l1_projection_mode='off' if origin or not (use_sandbox or use_security_checker) else l1_projection_mode,
                 task_scope=task_scope, use_sandbox=use_sandbox, cohort_sha256=cohort_sha256,
+                run_base=resume.base if isinstance(resume, ReusePlan) else None,
 
         )
     try:
@@ -269,6 +286,13 @@ def main(
         print(f'❌ 配置绑定冲突: {exc}', flush=True)
         return 1
     base = context['base_output_dir']
+    print('缓存策略: ' + ('显式续跑' if reuse else '强制重跑' if force_rerun else '默认复用原生缓存'), flush=True)
+    print(f"模型: {context['model_id']}；后端: {backend.label}；审计: {context.get('security_model_id') or '无'}", flush=True)
+    selection, _ = resources.get('metadata', (None, None))
+    if selection:
+        print(f"工具分类目录: {selection['path']}；来源: {selection['source']}", flush=True)
+        if selection.get('warning'):
+            print(f"工具分类目录提示: {selection['warning']}", flush=True)
     with run_lock(base):
         try:
             if not set(base.glob('*/*/run_manifest.json')) <= prepared.checked.keys():
@@ -281,22 +305,32 @@ def main(
         jobs = [{'attack': name, 'suite': suite,
                  'options': group_options(name), 'bindings': approved,
                  'execution_plan': context['execution_plan'],
-                 'resources': resources if workers == 1 else None}
+                 'resources': resources}
                 for name in attack_names for suite in suites]
         invocation = uuid4().hex
         execution_dir = base / 'execution' / invocation
         execution_dir.mkdir(parents=True, exist_ok=True)
-        execution = {'mode': 'serial' if workers == 1 else 'spawn', 'unit': 'attack_suite',
-                     'workers_requested': workers, 'workers_effective': min(workers, len(jobs)),
+        execution = {'mode': 'serial', 'unit': 'attack_suite',
                      'planned_groups': len(jobs), 'invocation_id': invocation}
-        print(f"执行策略: {execution['mode']}；并发={execution['workers_effective']}；组数={len(jobs)}", flush=True)
+        print(f"结果目录: {base}；顺序执行 {len(jobs)} 组。", flush=True)
         started = monotonic()
         try:
-            group_results = execute_groups(jobs, workers, _execute_group, execution_dir)
+            group_results = []
+            for index, job in enumerate(jobs, 1):
+                print(f"[{index}/{len(jobs)}] {job['attack']}/{job['suite']} 开始", flush=True)
+                try:
+                    result = {'status': 'completed', 'result': _execute_group(job)}
+                except (RunConfigurationError, KeyboardInterrupt):
+                    raise
+                except Exception as exc:
+                    result = {'status': 'error', 'error_type': type(exc).__name__}
+                group_results.append(result)
+                print(f"[{index}/{len(jobs)}] {job['attack']}/{job['suite']} {result['status']}"
+                      + (f" ({result['error_type']})" if result['status'] == 'error' else ''), flush=True)
         except KeyboardInterrupt:
             execution.update(status='interrupted', wall_seconds=monotonic() - started)
             (execution_dir / 'execution.json').write_text(json.dumps(execution, indent=2) + '\n')
-            print('已中断并回收子进程；保留原参数、运行名并加 --reuse 续跑。', flush=True)
+            print('已中断；保留原参数、运行名并加 --reuse 续跑。', flush=True)
             return 130
         execution.update(status='error' if any(r['status'] == 'error' for r in group_results) else 'completed',
                          wall_seconds=monotonic() - started,
@@ -322,13 +356,13 @@ def main(
                 _write_combined_report(base / name, report_sources_for_attack)
                 report_sources.append((name, base / name / 'all_report.txt'))
 
-        fallback = logdir / (backend.id + "_" + _safe_result_component(run_name, "attack-run"))
+        fallback = resolve_run_path(logdir, backend.id, model_id, run_name)
         batch_dir = context.get("base_output_dir", fallback)
         batch_dir.mkdir(parents=True, exist_ok=True)
         manifest = {
             "schema_version": "dscg.attack-manifest.v2", "benchmark": benchmark_identity(),
             "task_scope": task_scope,
-            "result_layout": "model_run/attack/suite",
+            "result_layout": result_layout(logdir, backend.id, batch_dir),
             "pipeline_name": context.get("pipeline_name"),
             "model_id": context.get("model_id"),
             "attacks": attack_names if run_attack else [],
@@ -408,6 +442,7 @@ def _run_single_attack(
     only_suite=None,
     group_mode=False,
     resource_cache=None,
+    run_base=None,
 ):
     """
         model_id: 执行的llm的id
@@ -437,8 +472,9 @@ def _run_single_attack(
         if not origin:
             selection = resolve_tool_metadata(tool_metadata_path, backend=backend)
             metadata_selection = selection.public_dict()
-            print(f"工具分类目录: {metadata_selection['path']}；来源: {metadata_selection['source']}；基准: {backend.label}", flush=True)
-            if metadata_selection.get('warning'):
+            if not prepare_only:
+                print(f"工具分类目录: {metadata_selection['path']}；来源: {metadata_selection['source']}；基准: {backend.label}", flush=True)
+            if not prepare_only and metadata_selection.get('warning'):
                 print(f"工具分类目录提示: {metadata_selection['warning']}", flush=True)
             validate_benchmark_tool_metadata(selection.path)
             tool_metadata = load_tool_metadata(selection.path)
@@ -450,19 +486,30 @@ def _run_single_attack(
     report_sources: list[tuple[str, Path]] = []
     output_dir: Path | None = None
 
-    print(f"开始实验 - 模型: {model_id or '本地/环境配置'}, 攻击: {attack_name if run_attack else '无'}, 防御: {active_defense or '无（baseline）'}")
+    if not prepare_only and not group_mode:
+        print(f"开始实验 - 模型: {model_id or '本地/环境配置'}, 攻击: {attack_name if run_attack else '无'}, 防御: {active_defense or '无（baseline）'}")
 
     for suite_name in ([only_suite] if only_suite is not None else suites):
         if report_context is not None:
             report_context["active_suite"] = suite_name
-        print(f"\n正在测试套件: {suite_name}...")
-        cache_key = (attack_name, suite_name)
-        if resource_cache is not None and cache_key in resource_cache:
-            pipeline, main_tracker, sec_tracker, original_name = resource_cache[cache_key]
-            pipeline.name = original_name
+
+        if prepare_only:
+            if resource_cache is None:
+                resource_cache = {}
+            if 'descriptor' not in resource_cache:
+                resource_cache['descriptor'] = _describe_pipeline(
+                    model_id, sec_model_id, origin=origin, defense=defense,
+                    api_key=api_key, base_url=base_url, provider=provider, api_key_env=api_key_env,
+                    sec_api_key=sec_api_key, sec_base_url=sec_base_url, sec_provider=sec_provider,
+                    sec_api_key_env=sec_api_key_env, config_path=config_path,
+                    use_security_checker=use_security_checker, use_sandbox=use_sandbox,
+                    l1_projection_mode=l1_projection_mode, planning_tool_view=planning_tool_view,
+                    delegated_tasks=delegated_tasks, audit_router_mode=audit_router_mode,
+                    audit_router_artifact=audit_router_artifact, audit_retries=audit_retries,
+                    completion_prompt=completion_prompt)
+            pipeline = copy(resource_cache['descriptor'])
         else:
             sec_tracker = None
-        
             if origin:
                 pipeline, main_tracker = make_openai_compatible_pipeline(
                     model_id,
@@ -497,15 +544,17 @@ def _run_single_attack(
                     l1_projection_mode=l1_projection_mode,
                 )
 
-            if resource_cache is not None:
-                resource_cache[cache_key] = (pipeline, main_tracker, sec_tracker, pipeline.name)
 
         main_model_config = getattr(pipeline, "dscg_model_config", {})
         sec_model_config = getattr(pipeline, "dscg_security_model_config", {})
         resolved_model_id = main_model_config.get("model_id", model_id)
         resolved_sec_model_id = None if origin or not use_security_checker else sec_model_config.get("model_id", sec_model_id)
-        result_dir_name = _apply_run_name(pipeline, resolved_model_id, run_name)
-        base_output_dir = logdir / result_dir_name
+        original_name = pipeline.name
+        _apply_run_name(pipeline, resolved_model_id, run_name)
+        base_output_dir = Path(run_base) if run_base is not None else resolve_run_path(
+            logdir, backend.id, resolved_model_id, run_name, default_name=original_name)
+        result_dir_name = base_output_dir.name
+        pipeline.name = result_dir_name
         def bind(path, expected):
             if reuse_plan is not None:
                 return reuse_plan.check(path, expected) if prepare_only else reuse_plan.guard(path, expected)
@@ -525,28 +574,18 @@ def _run_single_attack(
         output_dir = base_output_dir / attack_component
         if report_context is not None:
             report_context.update(base_output_dir=base_output_dir,
-                                  pipeline_name=result_dir_name, model_id=resolved_model_id)
-        print(f"已解析模型配置 - 主模型: {resolved_model_id}, 审计模型: {resolved_sec_model_id or '无'}")
-        if run_name:
-            print(f"本次运行名称: {run_name}，结果目录: {output_dir}")
+                                  pipeline_name=result_dir_name, model_id=resolved_model_id,
+                                  security_model_id=resolved_sec_model_id)
+
+
         
         # 加载套件和攻击
         suite = get_suite("v1.2", suite_name)
         user_task_ids = list(suite.user_tasks.keys())
         injection_task_ids = list(suite.injection_tasks.keys())
         
-        print(f"\n--- 套件统计 [{suite_name}] ---")
-        print(f"总计 User Tasks 数量: {len(user_task_ids)}")
-        print(f"总计 Injection Tasks 数量: {len(injection_task_ids)}")
-
-        attack_key = ('attack', attack_name, suite_name)
-        if resource_cache is not None and attack_key in resource_cache:
-            attack = resource_cache[attack_key]
-        else:
-            attack = attacks.load_attack(attack_name, suite, pipeline) if run_attack else None
-            if resource_cache is not None:
-                resource_cache[attack_key] = attack
-        is_dos_attack = run_attack and attack.is_dos_attack
+        attack = None if not run_attack or prepare_only else attacks.load_attack(attack_name, suite, pipeline)
+        is_dos_attack = bool(run_attack and ATTACKS[attack_name].is_dos_attack)
 
         # Share the same scope/IDs across baseline and DSCG; only partial is capped.
         selected_users, selected_injections = select_tasks(
@@ -586,22 +625,11 @@ def _run_single_attack(
             if run_attack
             else len(selected_users)
         )
-        print(
-            f"本次评测任务数量 - User Tasks: {len(selected_users)}/{len(user_task_ids)}, "
-            f"Injection Tasks: {len(selected_injections)}/{len(injection_task_ids)}, "
-            f"预计任务组合: {planned_task_count}"
-        )
         if prepare_only:
             continue
-        
-        # 运行基准测试并记录日志
-        print(
-            f"缓存策略: {'强制重跑' if force_rerun else '复用已有结果'} "
-            "（可用 --force-rerun 或 DSCG_FORCE_RERUN=1 强制重跑）"
-        )
-        # AgentDojo prefixes traces, sidecars and cache lookups with pipeline.name.
-        # Infer attack/model names above first, then use the attack as the local
-        # storage component inside the model/run directory for the native loop.
+        print(f"用户任务={len(selected_users)}；注入目标={len(selected_injections)}；计划组合={planned_task_count}", flush=True)
+        if report_context is not None:
+            report_context['pipeline_name'] = result_dir_name
         pipeline.name = attack_component
         try:
             with logging.OutputLogger(str(base_output_dir)):
@@ -850,8 +878,6 @@ def cli(argv: list[str] | None = None, *, task_scope: str = 'partial', entrypoin
     )
     parser.add_argument('--suites', nargs='+', metavar='SUITE', default=None,
                         help='选择当前环境支持的场景；默认全部场景，full保留所选场景全部任务。')
-    parser.add_argument('--workers', type=int, default=1,
-                        help='攻击×场景分组的进程并发数，正整数；默认1，不是官方Batch API。')
     parser.add_argument(
         "--attack",
         nargs="+",
@@ -877,7 +903,7 @@ def cli(argv: list[str] | None = None, *, task_scope: str = 'partial', entrypoin
         "--name",
         dest="run_name",
         metavar="NAME",
-        help="本次运行名称；结果保存于 --results-dir 指定目录下的 <model_id>_<backend>_<NAME>/。",
+        help="本次运行名称；结果保存于 --results-dir 指定目录下的 <backend>/<model_id>_<NAME>/。",
     )
     parser.add_argument(
         "--trace-level",
@@ -926,8 +952,6 @@ def cli(argv: list[str] | None = None, *, task_scope: str = 'partial', entrypoin
         '冻结的 injection 预检名单；显式标为 screened，保留全部用户任务。' if full else
         '冻结的 injection 预检名单；保留每场景前3个用户，仅过滤原来前3个注入目标，不补位。'))
     args = parser.parse_args(argv)
-    if args.workers < 1:
-        parser.error('--workers must be a positive integer')
     if args.audit_router_mode is None:
         args.audit_router_mode = 'off' if args.baseline or args.no_checker else 'shadow'
     try:
@@ -990,7 +1014,6 @@ def cli(argv: list[str] | None = None, *, task_scope: str = 'partial', entrypoin
             defense=None,
             force_rerun=False if args.reuse else args.force_rerun or os.getenv("DSCG_FORCE_RERUN", "0").lower() in {"1", "true", "yes"},
             reuse=args.reuse,
-            workers=args.workers,
             run_name=args.run_name,
             trace_level="full" if args.include_extra_info else args.trace_level,
             tool_metadata_path=args.tool_metadata_path,

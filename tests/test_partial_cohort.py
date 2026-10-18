@@ -34,8 +34,9 @@ class PartialCohortTests(unittest.TestCase):
         factory = lambda *a, **kw: (SimpleNamespace(name='offline', dscg_model_config=self.config.public_dict()), tracker)
         self.factory = factory
         patches = [patch.object(module, 'get_suite', side_effect=lookup) for module in [runner, cohort, precheck]]
-        patches += [patch.object(module, 'resolve_model_config', return_value=self.config) for module in [cohort, precheck]]
+        patches += [patch.object(module, 'resolve_model_config', return_value=self.config) for module in [cohort, precheck, runner]]
         patches += [patch.object(module, 'make_openai_compatible_pipeline', side_effect=factory) for module in [runner, precheck]]
+        patches += [patch.object(runner, '_describe_pipeline', side_effect=lambda *a, **kw: factory()[0])]
         patches += [patch.object(runner.attacks, 'load_attack', return_value=SimpleNamespace(is_dos_attack=False)),
                     patch.object(runner.benchmark, 'benchmark_suite_with_injections', side_effect=self.scored_results),
                     redirect_stdout(StringIO())]
@@ -51,13 +52,13 @@ class PartialCohortTests(unittest.TestCase):
     def screen(self, names=None):
         self.assertEqual(precheck.screen(config_path=None, run_name='cohort', suites=names or list(self.suites),
                                          results_dir=self.root / 'screens'), 0)
-        return self.root / 'screens/offline_agentdojo_cohort/cohort.json'
+        return self.root / 'screens/agentdojo/offline_cohort/cohort.json'
 
     def test_cli_filters_original_injection_prefix_without_replacing_or_expanding_users(self):
         path = self.screen(); original = path.read_bytes()
         self.assertEqual(runner.cli(['--cohort', str(path), '--baseline', '--name', 'partial',
             '--suites', 'travel', 'banking', 'slack', '--results-dir', str(self.root / 'runs')]), 0)
-        base = self.root / 'runs/offline_agentdojo_partial'
+        base = self.root / 'runs/agentdojo/offline_partial'
         manifest = json.loads((base / 'attack_manifest.json').read_text())
         self.assertEqual(manifest['task_scope'], 'partial_screened')
         self.assertEqual(manifest['suites'], ['travel', 'banking', 'slack'])
@@ -83,7 +84,7 @@ class PartialCohortTests(unittest.TestCase):
         options = dict(origin=True, suites=['travel', 'banking'], attack='injecagent',
                        cohort_path=path, results_dir=self.root / 'runs', run_name='mixed')
         self.assertEqual(runner.main(**options), 0)
-        base = self.root / 'runs/offline_agentdojo_mixed'
+        base = self.root / 'runs/agentdojo/offline_mixed'
         attachment = json.loads((base / 'screened_cohort.json').read_text())
         self.assertEqual(attachment['skipped_suites'], ['travel'])
         self.assertEqual(attachment['counts']['travel']['planned_per_targeted_attack'], 0)
@@ -119,7 +120,7 @@ class PartialCohortTests(unittest.TestCase):
         self.assertEqual(full.cli(['--cohort', str(path), '--suites', 'travel', 'banking', 'slack',
             '--baseline', '--attack', 'injecagent', '--name', 'full_subset',
             '--results-dir', str(self.root / 'runs')]), 0)
-        base = self.root / 'runs/offline_agentdojo_full_subset'
+        base = self.root / 'runs/agentdojo/offline_full_subset'
         self.assertFalse((base / 'injecagent/workspace').exists())
         for name in ['travel', 'banking', 'slack']:
             data = json.loads((base / 'injecagent' / name / 'summary.json').read_text())
@@ -140,19 +141,19 @@ class PartialCohortTests(unittest.TestCase):
                                          '--audit-router-mode', 'shadow', '--trace-level', 'full']), 0)
         self.assertEqual(factory.call_args.kwargs['audit_router_mode'], 'shadow')
         self.assertEqual(factory.call_args.kwargs['trace_level'], 'full')
-        base = self.root / 'default_results/partial_benchmark/offline_agentdojo_shadow'
+        base = self.root / 'default_results/partial_benchmark/agentdojo/offline_shadow'
         self.assertTrue((base / 'attack_manifest.json').exists())
         self.assertEqual(json.loads((base / 'attack_manifest.json').read_text())['task_scope'], 'partial_screened')
 
-    def test_old_agentdojo_source_sets_are_rejected_after_backend_change(self):
+    def test_old_source_hash_sets_do_not_block_matching_cohort(self):
         mapping = json.loads(Path(cohort.__file__).with_name('injection_cohort_compatibility.json').read_text())
         current = precheck._binding(self.config, ['travel'])
         for hashes in mapping['equivalent_source_sha256']:
             recorded = json.loads(json.dumps(current))
             recorded['source']['source_sha256'] = hashes
-            self.assertFalse(cohort._bindings_compatible(recorded, current))
+            self.assertTrue(cohort._bindings_compatible(recorded, current))
             recorded['source']['source_sha256'] = {**hashes, 'dscg/pipelines/baseline.py': '0' * 64}
-            self.assertFalse(cohort._bindings_compatible(recorded, current))
+            self.assertTrue(cohort._bindings_compatible(recorded, current))
 
     def test_reuse_keeps_screened_scope_and_frozen_bindings_for_both_entrypoints(self):
         from experiments import run_benchmark as full
@@ -161,7 +162,7 @@ class PartialCohortTests(unittest.TestCase):
             options = dict(cohort_path=path, origin=True, suites=['travel', 'banking'],
                            attack='injecagent', run_name=scope, results_dir=self.root / 'runs')
             self.assertEqual(entry(**options), 0)
-            base = self.root / 'runs' / ('offline_agentdojo_' + scope)
+            base = self.root / 'runs' / ('agentdojo/offline_' + scope)
             bindings = {p: p.read_bytes() for p in base.rglob('*manifest.json') if p.name != 'attack_manifest.json'}
             self.assertEqual(entry(**{**options, 'suites': None, 'attack': None}, reuse=True), 0)
             self.assertEqual(json.loads((base / 'attack_manifest.json').read_text())['task_scope'], scope)
@@ -180,7 +181,7 @@ class PartialCohortTests(unittest.TestCase):
                            attack='injecagent', run_name=name, results_dir=self.root / 'runs')
             self.assertEqual(entry(**options), 0)
             self.assertEqual(entry(**{**options, 'suites': None, 'attack': None}, reuse=True), 0)
-            base = self.root / 'runs' / ('offline_agentdojo_' + name)
+            base = self.root / 'runs' / ('agentdojo/offline_' + name)
             self.assertEqual(json.loads((base / 'screened_run_manifest.json').read_text())['requested_suites'], ['travel', 'banking'])
             self.assertEqual(json.loads((base / 'attack_manifest.json').read_text())['suites'], ['banking'])
             self.assertFalse((base / 'injecagent/travel').exists())

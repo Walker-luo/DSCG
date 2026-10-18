@@ -107,7 +107,7 @@ class PartialBaselineTests(unittest.TestCase):
                     self.assertEqual(options["user_tasks"], expected["user_task_ids"])
                     self.assertEqual(options["injection_tasks"], expected["injection_task_ids"])
                     self.assertTrue(options["force_rerun"])
-                    report = json.loads((Path(directory) / f"offline-model_agentdojo_{mode}" / "important_instructions" / suite_name / "summary.json").read_text())
+                    report = json.loads((Path(directory) / f"agentdojo/offline-model_{mode}" / "important_instructions" / suite_name / "summary.json").read_text())
                     self.assertEqual(report["task_selection"], expected)
                     self.assertEqual(report["task_counts"]["total_tasks"], 9)
                     self.assertEqual(report["defense"], None if mode == "baseline" else "dscg")

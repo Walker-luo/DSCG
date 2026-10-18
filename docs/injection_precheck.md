@@ -19,43 +19,45 @@ AgentDojo默认覆盖workspace14/travel7/banking9/slack5共35目标；AgentDyn�
 实时输出总量、逐目标状态、耗时和已知Token；执行中每15秒等待提示不额外调用模型。默认输出：
 
 ```text
-results/injection_precheck/<model_id>_<benchmark_id>_injection_screen_01/
+results/injection_precheck/<benchmark_id>/<model_id>_injection_screen_01/
   screen_manifest.json
   status.json
   summary.md
   cohort.json  # 全部目标完成判定后生成
 ```
 
+results-dir表示预检分类根，程序追加`<backend>/<model>_<name>/`。相同screen命令优先使用新目录，新路径不存在时才查找旧`<model>_<backend>_<name>/`并原地续跑；新路径存在但绑定缺失/损坏/不符时拒绝，不回退旧目录。旧cohort与attempt不移动、不改写，证据中的绝对路径保持有效。
+
 具体尝试保留独立原生轨迹、原始错误与哈希，冻结名单引用证据。成本未知保持未知，screen成本与后续攻击原生预检分别记录。
 
-可选只读复用**本次交付后同一基准/源码身份**的baseline预检：
+可选只读复用同一后端、模型和任务配置的baseline预检（--reuse-from是证据来源，区别于测量入口的--reuse）：
 
 ```bash
 python -m experiments.run_injection_precheck screen \
   --model-config config/models.local.toml \
-  --reuse-from results/benchmarks/qwen3.7-flash_agentdyn_baseline_typical_01 \
+  --reuse-from results/benchmarks/agentdyn/qwen3.7-flash_baseline_typical_01 \
   --name injection_screen_02
 ```
 
-将目录换成实际模型/运行名。来源、固定提交、源码、任务/环境/攻击/工具、模型与证据必须匹配；相同文件不重复计数。交付前旧缓存/cohort不迁移，历史兼容映射不扩展；跨基准复用明确拒绝，不能只看agentdojo0.1.35判断相同。
+将目录换成实际模型/运行名。核对后端元数据、模型公开配置、版本、任务ID、GOAL和完整原生结果；相同轨迹不重复计数。源码哈希、预检脚本及任务实现源码变化不再成为兼容门槛，历史兼容映射不参与运行。原始轨迹、引用manifest及cohort哈希仍检查；跨基准或缺少必要身份时拒绝。
 
 ## 2. 中断和错误后续跑
 
-源码、配置、name和输出根保持不变，重新执行同一screen命令。已判定目标不重跑，不足两次有效失败的目标补测；错误/中断尝试原字节保留，新尝试用新目录。冻结cohort已生成则核验后直接返回，不改写名单。
+保持模型/后端/任务/GOAL/规则配置、name和输出根，重新执行同一screen命令。已判定目标不重跑，不足两次有效失败的目标补测；错误/中断尝试原字节保留，新尝试用新目录。冻结cohort已生成则核验后直接返回；旧manifest、attempt、cohort均不改写。源码差异另记configuration-only记录，不认证源码等价。
 
-screen没有force-rerun；需要全新预检使用新name。配置/源码冲突不覆盖原结果。缺少身份的历史记录应使用原代码继续，不能为兼容手改manifest或哈希。
+screen没有force-rerun；需要全新预检使用新name。配置冲突不覆盖原结果。仅记录Git/Python/包版本供追溯，不做工程源码扫描；缺少后端、模型或任务身份不能通过手改manifest补造。
 
 ## 3. 使用冻结名单测 baseline 和 DSCG
 
 ```bash
 python -m experiments.run_benchmark --baseline --attack typical --force-rerun \
   --model-config config/models.local.toml \
-  --cohort results/injection_precheck/qwen3.7-flash_agentdyn_injection_screen_01/cohort.json \
+  --cohort results/injection_precheck/agentdyn/qwen3.7-flash_injection_screen_01/cohort.json \
   --name baseline_screened_01
 
 python -m experiments.run_benchmark --attack typical --force-rerun \
   --model-config config/models.local.toml \
-  --cohort results/injection_precheck/qwen3.7-flash_agentdyn_injection_screen_01/cohort.json \
+  --cohort results/injection_precheck/agentdyn/qwen3.7-flash_injection_screen_01/cohort.json \
   --name dscg_screened_01
 ```
 

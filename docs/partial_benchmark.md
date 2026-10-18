@@ -27,24 +27,28 @@ python -m experiments.run_partial_benchmark --force-rerun \
 baseline使用当前基准原生工具循环，不创建DSCG或安全模型。DSCG默认自动匹配已审查工具目录，切换环境不需要额外参数；自定义目录按配置指南覆盖。默认输出：
 
 ```text
-results/partial_benchmark/<model_id>_<benchmark_id>_<name>/<attack>/<suite>/
+results/partial_benchmark/<benchmark_id>/<model_id>_<name>/<attack>/<suite>/
 ```
 
-根目录含攻击/执行计划、summary.md和failure_cases.jsonl；逐场景保留原生JSON、CSV及summary。错误、缺失与有效分母分别报告，不能把异常当成攻击失败或防御成功。格式、成本与续跑细节共用 [全量指南](./benchmark.md#结果文件)。
+分类根目录下先按agentdojo或agentdyn分层，运行目录中不再自动重复后端名；自定义results-dir同样追加该层。旧目录保留，显式reuse的新旧路径查找顺序见[完整指南](./benchmark.md#显式续跑示例)。
 
-## 并发运行
+运行目录含攻击/执行计划、summary.md和failure_cases.jsonl；逐场景保留原生JSON、CSV及summary。错误、缺失与有效分母分别报告，不能把异常当成攻击失败或防御成功。格式、成本与续跑细节共用 [全量指南](./benchmark.md#结果文件)。
 
-主模型和审计模型默认Qwen3.7-Flash、关闭思考。通过 `--workers 3` 开启攻击×场景的独立进程并发，默认1；每组内部仍顺序执行。AgentDojo typical有12组、AgentDyn有9组，clean分别4/3组，不改变默认每场景3×3任务范围。
+<a id="并发运行"></a>
+
+## 顺序运行
+
+主模型和审计模型默认Qwen3.7-Flash、关闭思考。按攻击、场景顺序执行，已删除workers参数。启动打印一次模型与范围；准备阶段静默核对绑定，每组执行时打印用户/目标数量及开始/完成状态。
 
 ```bash
-python -m experiments.run_partial_benchmark --baseline --workers 3 --force-rerun \
+python -m experiments.run_partial_benchmark --baseline --force-rerun \
   --model-config config/models.local.toml --name qwen37_baseline_01
 
-python -m experiments.run_partial_benchmark --workers 3 --force-rerun \
+python -m experiments.run_partial_benchmark --force-rerun \
   --model-config config/models.local.toml --name qwen37_dscg_01
 ```
 
-clean、cohort和reuse命令同样可加workers。该参数提速而不提供官方Batch折扣；单攻击单场景只产生一组。日志、运行锁、中断和成本解释见[公共并发说明](./benchmark.md#进程并发提速)。screen阶段保持顺序；此次接入前的旧名单/结果不自动迁移到新模型或新源码。
+默认每场景3×3任务范围不变；每个目标型攻击/场景组仍有额外原生GOAL预检。详见[顺序执行与准备信息](./benchmark.md#顺序执行与准备信息)。这不是官方Batch；减小本地开销不代表真实模型速度已经验证。
 
 ## 干净任务对照
 
@@ -65,11 +69,11 @@ AgentDojo默认每组12、AgentDyn每组9用户任务，无攻击与GOAL预检�
 
 ```bash
 python -m experiments.run_partial_benchmark --baseline --attack typical \
-  --cohort results/injection_precheck/qwen3.7-flash_agentdyn_injection_screen_01/cohort.json \
+  --cohort results/injection_precheck/agentdyn/qwen3.7-flash_injection_screen_01/cohort.json \
   --name partial_baseline_screened_01
 
 python -m experiments.run_partial_benchmark --attack typical \
-  --cohort results/injection_precheck/qwen3.7-flash_agentdyn_injection_screen_01/cohort.json \
+  --cohort results/injection_precheck/agentdyn/qwen3.7-flash_injection_screen_01/cohort.json \
   --name partial_dscg_screened_01
 ```
 
@@ -94,6 +98,6 @@ python -m experiments.run_partial_benchmark --reuse \
   --name partial_dscg_typical_01
 ```
 
-适用于本次交付后新生成的绑定；保持原name、根目录、攻击/场景、配置和后端。交付前旧运行只保留历史，不扩展兼容映射。未指定attack/suites恢复计划；clean仍需clean，cohort仍需同一文件。reuse与force-rerun互斥，不自动重试原生接受的错误缓存。配置冲突拒绝且不覆盖历史报告，缓存成本不能当成完整新鲜测量。详细说明见 [显式续跑](./benchmark.md#显式续跑示例)。
+保持原name、根目录、攻击/场景、模型和有效防御设置；旧运行配置一致也可续跑。未指定attack/suites恢复原计划；clean仍需clean，cohort仍需同一文件。源码哈希、Git commit、Python补丁版本不作为兼容门槛；旧绑定保留，规则变化另存记录。reuse与force-rerun互斥，不自动重试原生接受的错误缓存。配置冲突拒绝且不覆盖历史报告；缓存成本不能当作完整新鲜测量。见[显式续跑](./benchmark.md#显式续跑示例)。
 
 Agent临时测试必须用 `--results-dir workshop/artifacts/<YYYYMMDD>_<task>/partial_benchmark`。用户正式默认仍为results，不迁移旧数据。离线回归与原生模拟不能代替真实E0、重复模型对照或防御收益验证。

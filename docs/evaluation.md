@@ -1,13 +1,13 @@
 # 测试文件与入口索引
 
-从这里选择测试方式，具体运行命令由对应指南维护。所有命令从 `DSCG/` 执行：激活 `ipi` 使用AgentDojo，激活 `ipi-agentdyn` 使用AgentDyn。两个环境使用相同入口，按实际安装来源和源码识别后端，不根据环境名称猜测，也不合并两套场景。
+从这里选择测试方式，具体运行命令由对应指南维护。所有命令从 `DSCG/` 执行：激活 `ipi` 使用AgentDojo，激活 `ipi-agentdyn` 使用AgentDyn。两个环境使用相同入口，按实际导入路径、安装来源、版本和revision识别后端，不根据环境名称猜测，也不合并两套场景。
 
 ```bash
 conda activate ipi              # 或 conda activate ipi-agentdyn
 python -m dscg.benchmark_catalog
 ```
 
-最后一条命令只校验安装来源、固定源码哈希并列出场景，不调用模型。首次安装分别使用 [environment.yml](../environment.yml) 或 [environment-agentdyn.yml](../environment-agentdyn.yml)。AgentDojo固定官方0.1.35发行包及112个文件哈希；锁中另保留当前`ipi`的精确`reviewed-local-system-role-v1`客户端变体。AgentDyn固定commit `5353cf7615b135cace8d07c8f12dac53a16b6db3`及1374个源码/数据哈希。两者沿用`agentdojo`导入名和0.1.35发行版本，只核对版本号不足以确认后端。模型创建前拒绝未知来源、未审阅源码或混合变体；旧结果、cohort和任务清单不跨后端迁移/续跑。
+最后一条命令只检查安装来源、版本、revision、实际导入路径并列出场景，不调用模型。首次安装分别使用[environment.yml](../environment.yml)或[environment-agentdyn.yml](../environment-agentdyn.yml)。两者沿用agentdojo导入名及0.1.35版本；当前verification_mode=metadata_only、runtime_variant=unverified，不扫描源码或认证客户端变体。未知来源、错误revision/路径及跨后端场景仍拒绝。旧运行配置一致可续跑，cohort及预检证据继续验证哈希。
 
 ## 测试指南
 
@@ -46,7 +46,7 @@ full的cohort保留所选场景全部用户；partial的cohort只过滤原注入
 | --- | --- |
 | [models.example.toml](../config/models.example.toml) | 模型配置模板；复制为本地models.local.toml后配置服务。Key保留在本地/环境变量，不写公开报告 |
 | [tools.agentdojo-v1.2.toml](../config/tools.agentdojo-v1.2.toml)、[tools.agentdyn-v1.2.toml](../config/tools.agentdyn-v1.2.toml) | 各后端独立审核目录，不合并、不自动推断副作用 |
-| [agentdojo.lock.json](../config/agentdojo.lock.json)、[agentdyn.lock.json](../config/agentdyn.lock.json) | 固定发行/安装来源、revision和源码哈希；不是模型服务版本固定或完整依赖锁 |
+| [agentdojo.lock.json](../config/agentdojo.lock.json)、[agentdyn.lock.json](../config/agentdyn.lock.json) | 保留发行/安装来源、revision与历史源码哈希；当前只使用安装元数据，不扫描源码 |
 | 显式任务清单 | write-task-manifest离线导出，用于核对/冻结任务ID，不等同于能力预检名单 |
 | cohort.json | screen生成的不可覆盖名单；包含模型/任务身份、筛选结论和证据哈希，不手工修改 |
 
@@ -59,9 +59,11 @@ full的cohort保留所选场景全部用户；partial的cohort只过滤原注入
 | 测量目录的benchmark_plan.json、attack_manifest.json、suite_manifest.json | 攻击、场景及范围绑定；suite_manifest用于普通full/partial及partial筛选，full筛选由screened_run_manifest绑定 |
 | 测量目录的summary.md、all_report.txt | 各攻击/场景的完成情况、TSR/ASR分母与模型Tokens |
 | 测量目录的failure_cases.jsonl | 用户计分任务中的效用失败、攻击成功、缺失/错误与轨迹位置；片段不是原因证明 |
-| 场景内的run_manifest.json、summary.json、detailed_results.csv | 实际用户/注入ID、模型/源码和防御配置、计数与成本范围 |
+| 场景内的run_manifest.json、summary.json、detailed_results.csv | 实际用户/注入ID、模型和防御配置、参考Git版本、计数与成本范围 |
 | 原始任务JSON与full日志侧车 | 模型/工具交互、原生评分；路由与有界审计输入供复核，侧车仅详细日志时写入 |
 | 筛选测量的screened_run_manifest.json、screened_cohort.json、preflight_report.json | cohort身份、实际选择/跳过集合、分母和未计分原生预检记录 |
+
+CLI测量目录为`results/{partial_benchmark,benchmarks}/<backend>/<model>_<name>/`，screen为`results/injection_precheck/<backend>/<model>_<name>/`。原扁平运行目录保留并支持续跑，历史页不合并新旧路径。
 
 显式reuse的原汇总/不完整轨迹快照和兼容依据在测量目录的reuse子目录；参数规则见两份运行指南。
 

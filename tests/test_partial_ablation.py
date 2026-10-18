@@ -91,7 +91,7 @@ class MissingSecuritySummaryTests(unittest.TestCase):
 def setUpModule():
     global _fixture_backend
     from test_partial_agentdyn import legacy_fixture_backend
-    _fixture_backend = legacy_fixture_backend(globals())
+    _fixture_backend = legacy_fixture_backend(globals(), model="fixture")
 
 
 def tearDownModule():

@@ -84,8 +84,9 @@ class FullSelectionTests(unittest.TestCase):
             self.assertEqual(path.read_bytes(), original)
         self.assertEqual(len(make_task_manifest()['suites']['workspace']['user_task_ids']), 3)
 
-    def test_full_entry_is_in_source_binding(self):
-        self.assertIn('experiments/run_benchmark.py', source_revision()['source_sha256'])
+    def test_source_is_informational_metadata_without_source_hashes(self):
+        self.assertNotIn('source_sha256', source_revision())
+        self.assertIn('commit', source_revision())
 
 
 class FullCliTests(unittest.TestCase):
@@ -152,7 +153,7 @@ class FullExecutionTests(unittest.TestCase):
             for origin, name in ((True, 'baseline'), (False, 'defended')):
                 self.assertEqual(full.main(origin=origin, suites=list(SUITES), run_name=name,
                                            results_dir=directory, attack='injecagent', force_rerun=True), 0)
-                base = Path(directory) / f'offline-model_agentdojo_{name}'
+                base = Path(directory) / f'agentdojo/offline-model_{name}'
                 self.assertEqual(json.loads((base / 'attack_manifest.json').read_text())['task_scope'], 'full')
                 self.assertTrue((base / 'summary.md').exists())
                 self.assertTrue((base / 'failure_cases.jsonl').exists())
@@ -210,7 +211,7 @@ class FullExecutionTests(unittest.TestCase):
         ):
             self.assertEqual(full.main(origin=True, suites=['slack'], results_dir=directory, run_name='mixed',
                                        attack=['injecagent', 'dos']), 1)
-            base = Path(directory) / 'offline-model_agentdojo_mixed'
+            base = Path(directory) / 'agentdojo/offline-model_mixed'
             statuses = json.loads((base / 'attack_manifest.json').read_text())['runs']
             self.assertEqual([run['status'] for run in statuses], ['error', 'completed'])
             summary = json.loads((base / 'dos/slack/summary.json').read_text())
@@ -256,12 +257,12 @@ class FullExecutionTests(unittest.TestCase):
         with TemporaryDirectory() as directory, redirect_stdout(StringIO()), patch.object(
             shared, 'make_openai_compatible_pipeline', side_effect=factory,
         ), patch.object(type(suite), 'run_task_with_pipeline', autospec=True, side_effect=execute) as task:
-            options = dict(origin=True, suites=['slack'], results_dir=directory, run_name='native',
+            options = dict(model_id=model, origin=True, suites=['slack'], results_dir=directory, run_name='native',
                            attack='tool_knowledge')
             self.assertEqual(full.main(**options), 0)
             expected = len(suite.injection_tasks) * (len(suite.user_tasks) + 1)
             self.assertEqual(task.call_count, expected)  # Includes unscored injection-task preflights.
-            base = Path(directory) / f'{model}_agentdojo_native'
+            base = Path(directory) / f'agentdojo/{model}_native'
             output = base / 'tool_knowledge/slack'
             scored = list(output.glob('user_task_*/tool_knowledge/injection_task_*.json'))
             self.assertEqual(len(scored), len(suite.user_tasks) * len(suite.injection_tasks))
@@ -282,9 +283,9 @@ class FullExecutionTests(unittest.TestCase):
         ) as benchmark:
             options = dict(origin=True, suites=['slack'], results_dir=directory, run_name='same', attack='injecagent')
             self.assertEqual(shared.main(**options), 0)
-            path = Path(directory) / 'offline-model_agentdojo_same/injecagent/slack/run_manifest.json'
+            path = Path(directory) / 'agentdojo/offline-model_same/injecagent/slack/run_manifest.json'
             original = path.read_bytes()
-            root = Path(directory) / 'offline-model_agentdojo_same'
+            root = Path(directory) / 'agentdojo/offline-model_same'
             previous_reports = {p: p.read_bytes() for p in root.rglob('*') if p.is_file()}
             benchmark.reset_mock()
             self.assertEqual(full.main(**options, force_rerun=True), 1)

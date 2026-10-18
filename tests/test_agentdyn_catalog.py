@@ -43,29 +43,16 @@ class AgentDynCatalogTests(unittest.TestCase):
                     wrong='banking' if backend=='agentdyn' else 'shopping'
                     with self.assertRaises(catalog.BenchmarkConfigurationError):catalog.get_suite('v1.2',wrong)
 
-    def test_content_and_git_origin_are_both_verified(self):
-        with TemporaryDirectory() as directory:
-            root,path,lock,origin,dist=self.fixture(directory)
-            with patch.object(catalog,'_package_root',return_value=root),patch.object(catalog,'distribution',return_value=dist),patch.object(catalog,'_load_lock',return_value=lock,create=True):
-                identity=catalog.validate_backend()
-                self.assertEqual(identity['revision'],'a'*40)
-                for role in ('tasks','environments','attacks','tools'):
-                    self.assertRegex(identity[role+'_sha256'],r'^[a-f0-9]{64}$')
-                path.write_text('changed implementation')
-                with self.assertRaisesRegex(catalog.BenchmarkConfigurationError,'hash|哈希'):catalog.validate_backend()
-
-    def test_official_release_supports_only_exact_reviewed_client_variant(self):
-        with TemporaryDirectory() as directory:
-            root,path,lock,origin,dist=self.fixture(directory,'agentdojo')
-            original=catalog._digest(lock['source_sha256'])
-            path.write_text('reviewed local client')
-            lock['runtime_variants']={'local-client-reviewed':{'benchmark.py':hashlib.sha256(path.read_bytes()).hexdigest()}}
-            with patch.object(catalog,'_package_root',return_value=root),patch.object(catalog,'distribution',return_value=dist),patch.object(catalog,'_load_lock',return_value=lock,create=True):
-                identity=catalog.validate_backend()
-                self.assertEqual(identity['runtime_variant'],'local-client-reviewed')
-                self.assertNotEqual(identity['implementation_sha256'],original)
-                path.write_text('unknown client edit')
-                with self.assertRaises(catalog.BenchmarkConfigurationError):catalog.validate_backend()
+    def test_metadata_only_does_not_certify_content_or_client_variant(self):
+        for backend in ('agentdojo', 'agentdyn'):
+            with self.subTest(backend=backend), TemporaryDirectory() as directory:
+                root,path,lock,origin,dist=self.fixture(directory,backend)
+                with patch.object(catalog,'_package_root',return_value=root), patch.object(catalog,'distribution',return_value=dist), patch.object(catalog,'_load_lock',return_value=lock), patch.object(Path,'rglob',side_effect=AssertionError('source scan')):
+                    identity=catalog.validate_backend()
+                    self.assertEqual(identity['verification_mode'],'metadata_only')
+                    self.assertEqual(identity['runtime_variant'],'unverified')
+                    path.write_text('changed implementation')
+                    self.assertEqual(catalog.validate_backend(),identity)
 
     def test_unknown_git_origin_does_not_fall_back_to_official_release(self):
         with TemporaryDirectory() as directory:
@@ -85,10 +72,9 @@ class AgentDynCatalogTests(unittest.TestCase):
         with patch.object(catalog,'_load_lock',side_effect=catalog.BenchmarkConfigurationError('lock missing'),create=True):
             with self.assertRaisesRegex(catalog.BenchmarkConfigurationError,'lock'):catalog.validate_backend()
 
-    def test_added_source_file_cannot_silently_change_registered_catalog(self):
+    def test_additional_source_files_are_not_scanned(self):
         with TemporaryDirectory() as directory:
             root,path,lock,origin,dist=self.fixture(directory)
-            (root/'extra_task.py').write_text('unreviewed registration')
-            with patch.object(catalog,'_package_root',return_value=root),patch.object(catalog,'distribution',return_value=dist),patch.object(catalog,'_load_lock',return_value=lock):
-                with self.assertRaisesRegex(catalog.BenchmarkConfigurationError,'file set|source'):
-                    catalog.validate_backend()
+            (root/'extra_task.py').write_text('extra source')
+            with patch.object(catalog,'_package_root',return_value=root), patch.object(catalog,'distribution',return_value=dist), patch.object(catalog,'_load_lock',return_value=lock):
+                self.assertEqual(catalog.validate_backend()['id'],'agentdyn')

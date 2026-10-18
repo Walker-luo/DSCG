@@ -182,11 +182,13 @@ class AgentDynNativeTests(unittest.TestCase):
         root.mkdir(parents=True, exist_ok=True)
         output = StringIO()
         with TemporaryDirectory(dir=root) as directory, redirect_stdout(output), patch.object(
-                runner, 'make_openai_compatible_pipeline', return_value=(NativeErrorAgent(), tracker)):
+                runner, 'make_openai_compatible_pipeline', return_value=(NativeErrorAgent(), tracker)), patch.object(
+                runner, '_describe_pipeline', return_value=SimpleNamespace(
+                    name='gpt-4o', dscg_model_config=NativeErrorAgent.dscg_model_config)):
             status = runner.main(origin=True, suites=['shopping'], attack='important_instructions',
                                  run_name='native_error', results_dir=directory)
             self.assertEqual(status, 1)
-            paths = list(Path(directory).glob('*/*/shopping/summary.json'))
+            paths = list(Path(directory).glob('agentdyn/*/*/shopping/summary.json'))
             self.assertTrue(paths, output.getvalue())
             summary_path = paths[0]
             summary = json.loads(summary_path.read_text())

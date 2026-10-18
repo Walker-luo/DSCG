@@ -1,11 +1,11 @@
 """Matched benchmark controls, explicit task scopes and cache configuration binding."""
-import hashlib
 import json
 import platform
+from functools import lru_cache
 import subprocess
 from importlib.metadata import version
 from pathlib import Path
-from dscg.benchmark_catalog import get_backend, get_suites, SUITE_VERSION, get_suite, benchmark_identity
+from dscg.benchmark_catalog import get_backend, get_suites, SUITE_VERSION, get_suite, benchmark_identity, same_backend
 
 
 class RunConfigurationError(ValueError):
@@ -39,7 +39,7 @@ def load_task_manifest(path):
     result=json.loads(Path(path).read_text())
     if not isinstance(result,dict) or result.get('suite_version')!='v1.2' or not isinstance(result.get('suites'),dict):
         raise ValueError('invalid v1.2 task manifest')
-    if result.get('benchmark') != benchmark_identity() or result.get('schema_version') not in {
+    if not same_backend(result.get('benchmark'), benchmark_identity()) or result.get('schema_version') not in {
             'dscg.partial-tasks.v2', 'dscg.full-tasks.v2', 'dscg.injection-screen.v2'}:
         raise ValueError('task manifest benchmark identity/protocol differs; export a new manifest for the current backend')
     return result
@@ -54,7 +54,7 @@ def select_tasks(manifest,suite_name,users,injections,run_attack,is_dos,*,task_s
         selected_users = list(users) if task_scope == 'full' else users[:3]
         selected_injections = injections[:1] if is_dos else list(injections) if task_scope == 'full' else injections[:3]
         return selected_users, selected_injections if run_attack else []
-    if manifest.get('benchmark') != benchmark_identity():
+    if not same_backend(manifest.get('benchmark'), benchmark_identity()):
         raise ValueError('frozen manifest benchmark identity differs')
     if manifest.get('suite_version')!='v1.2' or suite_name not in manifest.get('suites',{}):
         raise ValueError('frozen manifest lacks current v1.2 suite')
@@ -96,18 +96,19 @@ def guard_run(path,manifest):
     path.write_text(json.dumps(manifest,ensure_ascii=False,indent=2)+'\n')
 
 
+@lru_cache(maxsize=1)
+def _source_metadata():
+    root = Path(__file__).resolve().parents[2]
+    try:
+        commit = subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=root, text=True).strip()
+    except (OSError, subprocess.CalledProcessError):
+        commit = None
+    return {'commit': commit, 'python': platform.python_version(), 'agentdojo': version('agentdojo')}
+
+
 def source_revision():
-    root=Path(__file__).resolve().parents[2]
-    paths=sorted((root/'dscg').rglob('*.py'))+[Path(__file__),root/'experiments/run_partial_benchmark.py',root/'experiments/run_benchmark.py']
-    paths += [root / 'experiments' / name for name in (
-        'run_injection_precheck.py', 'common/injection_cohort.py', 'common/injection_cohort_compatibility.json',
-        'common/benchmark_reuse.py', 'common/benchmark_reuse_compatibility.json',
-        'common/partial_reporting.py', 'common/benchmark_outcomes.py', 'common/benchmark_execution.py', 'diagnostics/harness_audit.py')
-        if (root / 'experiments' / name).exists()]
-    hashes={str(p.relative_to(root)):hashlib.sha256(p.read_bytes()).hexdigest() for p in paths}
-    try:commit=subprocess.check_output(['git','rev-parse','HEAD'],cwd=root,text=True).strip()
-    except (OSError,subprocess.CalledProcessError):commit=None
-    return {'commit':commit,'source_sha256':hashes,'python':platform.python_version(),'agentdojo':version('agentdojo'), 'benchmark':benchmark_identity()}
+    """Informational provenance only; never scan or hash implementation files."""
+    return {**_source_metadata(), 'benchmark': benchmark_identity(), 'verification_mode': 'metadata_only'}
 
 
 def preserve_cached_cost(summary,path,force_rerun):

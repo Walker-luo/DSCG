@@ -2584,6 +2584,69 @@ TASK_COMPLETION_PROMPT = (
 )
 
 
+def router_configuration_hash(main_config, sec_config, *, input_isolation, authorization_precheck,
+                              l1_projection_mode, planning_tool_view, delegated_tasks,
+                              profile_hash=None, reader_hash=None, audit_retries=0, completion_prompt=False):
+    """Describe the router request/configuration identity without creating clients."""
+    return router_digest({"main": main_config.public_dict(), "audit": sec_config.public_dict(),
+                                           "temperature": 0.0,
+                                           "reasoning_effort": [reasoning_effort_for_config(main_config),reasoning_effort_for_config(sec_config)],
+                                           "main_system_prompt_sha256": _hash_json(load_system_message(None)),
+                                           "audit_policy_sha256": _hash_json(ActionSecurityChecker.SYSTEM_POLICY),
+                                           "authorization_policy_sha256": _hash_json(ToolAuthorizationCompiler.SYSTEM_POLICY),
+                                           "isolation_rule_sha256": _hash_json(ISOLATION_RULE),
+                                           "completion_rule_sha256": _hash_json(TASK_COMPLETION_PROMPT),
+                                           "framework_version": FRAMEWORK_VERSION,
+                                           "input_isolation": input_isolation,"authorization_precheck": authorization_precheck,
+                                           'l1_projection_mode': l1_projection_mode,
+                                           'l1_projection_profile_sha256': L1_PROFILE_SHA256,
+                                           'planning_tool_view': planning_tool_view, 'delegated_tasks': delegated_tasks,
+                                           'authorization_profile_sha256': profile_hash,
+                                           'delegated_task_reader_sha256': reader_hash,
+                                           'bounded_authorization_policy_sha256': _hash_json(ToolAuthorizationCompiler.PROFILE_POLICY),
+                                           'delegated_task_bounds': [1536, 2048, 16384],
+                                           'delegated_task_protocol': DELEGATION_VERSION,
+                                           "audit_retries": audit_retries,"completion_prompt": completion_prompt,
+                                           "audit_timeout_seconds": AUDIT_TIMEOUT_SECONDS,
+                                           'audit_input_schema': AUDIT_INPUT_SCHEMA_VERSION,
+                                           'audit_evidence_version': EVIDENCE_VERSION,
+                                           'audit_evidence_bounds': [FACT_BUDGET, MAX_RESULTS, MAX_CALL_ARGUMENTS],
+                                           "input_bounds": [AUDIT_MAX_REQUEST_LENGTH,AUDIT_MAX_TOOL_DESCRIPTION_LENGTH,
+                                                            AUDIT_MAX_STRING_LENGTH,AUDIT_MAX_ARGUMENT_DEPTH,
+                                                            AUDIT_MAX_HISTORY_RECORDS,AUDIT_MAX_TOOL_RESULTS,AUDIT_MAX_TOOL_RESULT_LENGTH]})
+
+
+def defended_pipeline_name(model_id, *, use_sandbox, use_security_checker, input_isolation,
+                           authorization_precheck, l1_projection_mode, planning_tool_view,
+                           delegated_tasks, audit_router_mode, audit_router=None,
+                           router_config_hash=None, profile_hash=None, reader_hash=None):
+    """Pure naming shared by preflight descriptors and actual pipelines."""
+    # 5. 动态命名 Pipeline，方便看实验日志
+    ablation_suffix = ""
+    if not use_sandbox and not use_security_checker:
+        ablation_suffix = "-Baseline" # 两者都没开，等同于无防御基线
+    elif not use_sandbox:
+        ablation_suffix = "-NoSandbox"
+    elif not use_security_checker:
+        ablation_suffix = "-NoChecker"
+    else:
+        ablation_suffix = "-OursFull"
+
+    # Native full-run caches are keyed by this name. Keep new views/gates
+    # separate from historical V2 and from each other's API ablations.
+    version_suffix = (f"-{FRAMEWORK_VERSION}-L1{int(input_isolation)}-L2{int(authorization_precheck)}"
+                      f'-Projection{l1_projection_mode}-{L1_PROFILE_SHA256[:16]}'
+                      f'-View{int(planning_tool_view)}-Delegate{int(delegated_tasks)}')
+    if profile_hash:
+        version_suffix += '-Profile-' + profile_hash[:16]
+    if reader_hash:
+        version_suffix += '-Reader-' + reader_hash[:16]
+    name = f"{model_id}-newFrame{ablation_suffix}{version_suffix}"
+    if audit_router_mode != "off":
+        name += f"-CSA-{audit_router_mode}-{(audit_router.artifact_sha256 or 'uncalibrated')[:16]}-{router_config_hash[:16]}"
+    return name
+
+
 def make_qwen_newFrame_pipeline(
     model_id: str | None = None,
     sec_model_id: str | None = None,
@@ -2717,32 +2780,12 @@ def make_qwen_newFrame_pipeline(
             reasoning_effort=reasoning_effort_for_config(sec_config),
         )
         sec_llm.name = sec_config.model_id
-        router_config_hash = router_digest({"main": main_config.public_dict(), "audit": sec_config.public_dict(),
-                                           "temperature": 0.0,
-                                           "reasoning_effort": [reasoning_effort_for_config(main_config),reasoning_effort_for_config(sec_config)],
-                                           "main_system_prompt_sha256": _hash_json(load_system_message(None)),
-                                           "audit_policy_sha256": _hash_json(ActionSecurityChecker.SYSTEM_POLICY),
-                                           "authorization_policy_sha256": _hash_json(ToolAuthorizationCompiler.SYSTEM_POLICY),
-                                           "isolation_rule_sha256": _hash_json(ISOLATION_RULE),
-                                           "completion_rule_sha256": _hash_json(TASK_COMPLETION_PROMPT),
-                                           "framework_version": FRAMEWORK_VERSION,
-                                           "input_isolation": input_isolation,"authorization_precheck": authorization_precheck,
-                                           'l1_projection_mode': l1_projection_mode,
-                                           'l1_projection_profile_sha256': L1_PROFILE_SHA256,
-                                           'planning_tool_view': planning_tool_view, 'delegated_tasks': delegated_tasks,
-                                           'authorization_profile_sha256': profile_hash,
-                                           'delegated_task_reader_sha256': reader_hash,
-                                           'bounded_authorization_policy_sha256': _hash_json(ToolAuthorizationCompiler.PROFILE_POLICY),
-                                           'delegated_task_bounds': [1536, 2048, 16384],
-                                           'delegated_task_protocol': DELEGATION_VERSION,
-                                           "audit_retries": audit_retries,"completion_prompt": completion_prompt,
-                                           "audit_timeout_seconds": AUDIT_TIMEOUT_SECONDS,
-                                           'audit_input_schema': AUDIT_INPUT_SCHEMA_VERSION,
-                                           'audit_evidence_version': EVIDENCE_VERSION,
-                                           'audit_evidence_bounds': [FACT_BUDGET, MAX_RESULTS, MAX_CALL_ARGUMENTS],
-                                           "input_bounds": [AUDIT_MAX_REQUEST_LENGTH,AUDIT_MAX_TOOL_DESCRIPTION_LENGTH,
-                                                            AUDIT_MAX_STRING_LENGTH,AUDIT_MAX_ARGUMENT_DEPTH,
-                                                            AUDIT_MAX_HISTORY_RECORDS,AUDIT_MAX_TOOL_RESULTS,AUDIT_MAX_TOOL_RESULT_LENGTH]})
+        router_config_hash = router_configuration_hash(
+            main_config, sec_config, input_isolation=input_isolation,
+            authorization_precheck=authorization_precheck, l1_projection_mode=l1_projection_mode,
+            planning_tool_view=planning_tool_view, delegated_tasks=delegated_tasks,
+            profile_hash=profile_hash, reader_hash=reader_hash,
+            audit_retries=audit_retries, completion_prompt=completion_prompt)
         if audit_router_mode != "off":
             audit_router = LocalAuditRouter(audit_router_mode, audit_router_artifact, router_config_hash)
         security_checker = ActionSecurityChecker(
@@ -2781,29 +2824,13 @@ def make_qwen_newFrame_pipeline(
     ], executor=new_executor, monitor=reference_monitor,
        trackers=tuple(t for t in (main_tracker, sec_tracker) if t is not None))
 
-    # 5. 动态命名 Pipeline，方便看实验日志
-    ablation_suffix = ""
-    if not use_sandbox and not use_security_checker:
-        ablation_suffix = "-Baseline" # 两者都没开，等同于无防御基线
-    elif not use_sandbox:
-        ablation_suffix = "-NoSandbox"
-    elif not use_security_checker:
-        ablation_suffix = "-NoChecker"
-    else:
-        ablation_suffix = "-OursFull"
-
-    # Native full-run caches are keyed by this name. Keep new views/gates
-    # separate from historical V2 and from each other's API ablations.
-    version_suffix = (f"-{FRAMEWORK_VERSION}-L1{int(input_isolation)}-L2{int(authorization_precheck)}"
-                      f'-Projection{l1_projection_mode}-{L1_PROFILE_SHA256[:16]}'
-                      f'-View{int(planning_tool_view)}-Delegate{int(delegated_tasks)}')
-    if profile_hash:
-        version_suffix += '-Profile-' + profile_hash[:16]
-    if reader_hash:
-        version_suffix += '-Reader-' + reader_hash[:16]
-    pipeline.name = f"{llm.name}-newFrame{ablation_suffix}{version_suffix}"
-    if audit_router_mode != "off":
-        pipeline.name += f"-CSA-{audit_router_mode}-{(audit_router.artifact_sha256 or 'uncalibrated')[:16]}-{router_config_hash[:16]}"
+    pipeline.name = defended_pipeline_name(
+        main_config.model_id, use_sandbox=use_sandbox, use_security_checker=use_security_checker,
+        input_isolation=input_isolation, authorization_precheck=authorization_precheck,
+        l1_projection_mode=l1_projection_mode, planning_tool_view=planning_tool_view,
+        delegated_tasks=delegated_tasks, audit_router_mode=audit_router_mode,
+        audit_router=audit_router, router_config_hash=router_config_hash,
+        profile_hash=profile_hash, reader_hash=reader_hash)
     pipeline.dscg_optimization_config = {
         "framework_version": FRAMEWORK_VERSION,
         "input_isolation": input_isolation, "authorization_precheck": authorization_precheck,

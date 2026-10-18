@@ -1,5 +1,9 @@
 # Workshop 优化状态索引
 
+最新结果布局：[按后端分目录](./completed/backend_result_layout_20261018.md)。CLI测量/预检使用分类根/后端/运行目录；旧目录原地续跑，历史页兼容；网页发起实验布局不变。
+
+当前测试流程：[顺序执行与轻量校验](./completed/serial_lightweight_20261018.md)。已移除workers及源码扫描哈希；旧结果按配置续跑，cohort证据校验保留。此前并发实施报告保留为历史。
+
 当前：[双基准自动切换](./completed/dual_benchmark_20261018.md)支持ipi/AgentDojo与ipi-agentdyn/AgentDyn，只切换环境；旧阶段的AgentDyn-only描述保留当时上下文，不再限制当前新实验。
 
 新增 [AgentDyn全流程接入](./completed/agentdyn_integration_20261017.md)：固定后端、新三个场景、风险目录、CLI/网页/历史身份、错误分母与离线模拟已完成；原四场景结果保持历史，真实攻击强度和模型TSR/ASR待验收。
@@ -10,7 +14,7 @@
 
 | 方案 / 阶段 | 已完成 | 尚未完成或未采用 |
 | --- | --- | --- |
-| [Qwen接入与进程并发](./completed/qwen_parallel_20261018.md) | 双模型默认Qwen3.7-Flash关闭思考；full/partial/cohort按攻击×场景spawn并发、预校验/锁/续跑/中断回收 | 仅离线接线与调度验收；无官方Batch折扣、真实服务或防御收益验证 |
+| [Qwen接入与进程并发](./completed/qwen_parallel_20261018.md) | 双模型默认Qwen3.7-Flash关闭思考；该阶段并发实现已由后续顺序流程替代，原报告/证据保留 | 仅离线接线与调度验收；无官方Batch折扣、真实服务或防御收益验证 |
 | [服务器cohort续跑排错](./completed/cohort_resume_diagnostics_20261017.md) · [用法](../docs/benchmark.md#cohort-或续跑校验失败) | 定位服务器解析器改动；细化校验错误、修复兼容映射生成环境限制；413项离线回归 | 服务器需恢复已审核源码并保留旧路由off；无真实模型或完整服务器轨迹校验 |
 | [默认攻击与显式续跑](./completed/benchmark_reuse_20261017.md) · [用法](../docs/benchmark.md#显式续跑示例) | 新typical三攻击；full/partial/clean/cohort支持reuse、旧名单与严格兼容、快照；407项离线回归 | 原生错误缓存不自动重试；未知来源或旧baseline证据不足拒绝；无真实模型测量 |
 | [Experiments目录归类](./completed/experiments_layout_20261017.md) · [入口索引](../experiments/README.md) | 顶层三个日常入口；共享实现、诊断、校准与工具分目录，已知旧预检严格兼容；391项离线回归 | 无真实模型或费用/安全收益验证；专项fixture与历史证据保留 |

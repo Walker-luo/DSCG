@@ -1,15 +1,15 @@
 # 实验工具索引
 
-从DSCG目录执行，激活`ipi`使用AgentDojo，激活`ipi-agentdyn`使用AgentDyn。主目录只保留三个日常运行入口；相同命令按实际安装来源/源码选择后端，不根据环境名称猜测或混合两套场景。模型运行由用户显式启动。
+从DSCG目录执行，激活`ipi`使用AgentDojo，激活`ipi-agentdyn`使用AgentDyn。主目录只保留三个日常运行入口；相同命令按实际导入路径、安装来源/版本/revision选择后端，不根据环境名称猜测或混合两套场景。模型运行由用户显式启动。
 
-环境配置分别为 [environment.yml](../environment.yml) 与 [environment-agentdyn.yml](../environment-agentdyn.yml)。AgentDojo锁定官方0.1.35发行包和112个文件，另明确接受当前ipi的精确`reviewed-local-system-role-v1`客户端变体；AgentDyn固定commit `5353cf7615b135cace8d07c8f12dac53a16b6db3`和1374个源码/数据哈希。保留两个环境、原始客户端及历史结果。运行前可离线核验并列出实际目录：
+环境配置分别为[environment.yml](../environment.yml)与[environment-agentdyn.yml](../environment-agentdyn.yml)。AgentDojo使用0.1.35发行版本，AgentDyn固定commit 5353cf7615b135cace8d07c8f12dac53a16b6db3。历史源码锁保留，当前运行只核对元数据，不扫描后端与工程源码哈希。可离线列出实际目录：
 
 ```bash
 conda activate ipi              # 或 conda activate ipi-agentdyn
 python -m dscg.benchmark_catalog
 ```
 
-两个后端沿用agentdojo导入名及0.1.35发行版本；当前测量/预检入口在创建模型前核验来源和完整源码身份，拒绝未知来源或变体组合，不能只凭版本号确认后端。
+两个后端沿用agentdojo导入名及0.1.35发行版本，不能只凭版本号确认后端。metadata_only识别拒绝未知来源、错误revision或包路径；不认证源码内容和客户端变体。
 
 ## 日常测量
 
@@ -40,15 +40,16 @@ experiments/
 
 | 模块 | 用途 |
 | --- | --- |
-| [common/partial_controls.py](./common/partial_controls.py) | full/partial任务选择、冻结清单、源码身份和缓存绑定 |
+| [common/result_paths.py](./common/result_paths.py) | CLI后端子目录、运行名称及旧目录原地续跑定位 |
+| [common/partial_controls.py](./common/partial_controls.py) | full/partial任务选择、冻结清单、参考来源及缓存绑定 |
 | [common/partial_reporting.py](./common/partial_reporting.py) | 测量报告、失败索引和成本统计 |
-| [common/injection_cohort.py](./common/injection_cohort.py) | 冻结预检证据、恢复/复用与筛选测量；[兼容映射](./common/injection_cohort_compatibility.json)只允许已知源码集合 |
+| [common/injection_cohort.py](./common/injection_cohort.py) | 冻结名单/轨迹证据校验、恢复/复用与筛选测量；历史兼容映射不参与运行 |
 | [diagnostics/harness_audit.py](./diagnostics/harness_audit.py) | E0合成记录审计；也向runner/Dashboard提供原有评分辅助函数 |
 | [diagnostics/i3_p0_stress.py](./diagnostics/i3_p0_stress.py) | I3状态/边界fixture；当前partial证据见 [研究交接](../../research/Experiments/implementation_status.md) |
 | [diagnostics/trace_diagnostics.py](./diagnostics/trace_diagnostics.py) | 只读启发式轨迹标注，不改native评分，不作为独立安全oracle |
 | [calibration/l3_router_dataset.py](./calibration/l3_router_dataset.py) | 从显式独立标注准备L3数据集 |
 | [calibration/calibrate_l3_router.py](./calibration/calibrate_l3_router.py) | 使用独立分组数据生成冻结校准artifact |
-| [tools/generate_tool_metadata.py](./tools/generate_tool_metadata.py) | 离线核对当前后端源码和全工具覆盖；默认复制到config/tools.<backend>.local.toml，保护通用local和两份审核内置目录 |
+| [tools/generate_tool_metadata.py](./tools/generate_tool_metadata.py) | 离线核对当前后端元数据和全工具覆盖；默认复制到config/tools.<backend>.local.toml，保护通用local和两份审核内置目录 |
 
 ## 专项工具用法
 
@@ -66,10 +67,12 @@ python -m experiments.tools.generate_tool_metadata --help
 
 旧顶层专项模块不保留转发壳；历史报告中的旧命令保留当时上下文，复跑使用上述新路径。原始字节及路径/哈希映射见 [本次归档](../workshop/archive/experiments_layout_20261017/README.md)。先前移除的专用诊断/绘图代码仍在 [早期归档](../workshop/archive/experiments_docs_cleanup_20261017/README.md)，不恢复到当前目录。
 
-新测量、预检和cohort绑定实际后端及完整源码/目录和组件身份，结果目录包含后端名。旧screen、cohort、task manifest、测量缓存和兼容映射保留历史用途，不补写身份、不迁移或跨后端复用。旧manifest、attempt与名单不改写；新测量使用新name，`--force-rerun`不绕过配置绑定。
+full/partial/cohort按攻击、场景顺序执行，已删除workers和进程调度；准备静默核对配置，不创建pipeline。目录包含实际后端。旧运行配置一致可续跑，原manifest、attempt与cohort不改写；后端、模型、任务或有效防御配置变化仍拒绝。
 
 用户实验仍默认写入results。Agent临时检查显式写入新的workshop/artifacts任务目录，不改写历史实验。
 
-显式续跑：两个入口均支持 `--reuse --name <原名称>`，未指定attack/suites时恢复同后端且身份兼容的新计划；与显式force-rerun互斥并覆盖环境强制设置。共享校验位于 [common/benchmark_reuse.py](./common/benchmark_reuse.py)，独立[测量兼容映射](./common/benchmark_reuse_compatibility.json)不等同于预检资格。规则与命令见 [公共续跑说明](../docs/benchmark.md#显式续跑示例)。
+显式续跑：两入口支持`--reuse --name <原名称>`，省略attack/suites恢复原计划；与force-rerun互斥并覆盖环境强制设置。共享[续跑校验](./common/benchmark_reuse.py)按配置比较，不读取历史源码兼容映射。Git/Python版本仅供追溯；cohort/轨迹完整性仍校验哈希。见[公共续跑说明](../docs/benchmark.md#显式续跑示例)。
 
 AgentDyn动态页面handler可修改、外发或付款，OTP验证可执行排队动作；下载写文件，未读邮件读取会标记已读。风险目录按真实实现分类，没有增加对象/参数/收件人约束或新的免审规则。没有新增L1 profile，AgentDyn三个场景使用完整来源隔离。离线接入检查不证明模型效用、安全提升或真实E0通过，I3仍partial。
+
+CLI结果统一为`<results-dir>/<backend>/<model>_<name>/`，默认分类根保持不变；screen也按后端分层。旧目录不移动，测量reuse和screen重启优先新路径、仅在新路径不存在时查找旧目录；显式cohort/reuse-from路径可指向任一布局。Dashboard发起实验保存方式保持，历史页兼容两种布局。

@@ -1,6 +1,5 @@
 """Explicit task-cache resume: validate everything before touching run evidence."""
 from datetime import datetime, timezone
-import hashlib
 import json
 from pathlib import Path
 import shutil
@@ -10,7 +9,7 @@ from agentdojo.benchmark import load_task_results
 from pydantic import ValidationError
 
 from experiments.common.partial_controls import RunConfigurationError
-from dscg.benchmark_catalog import benchmark_identity
+from dscg.benchmark_catalog import benchmark_identity, same_backend
 
 
 def _read(path):
@@ -22,50 +21,35 @@ def _read(path):
         raise RunConfigurationError(f'invalid resume metadata: {path}') from exc
 
 
-def _hash(path):
-    return hashlib.sha256(path.read_bytes()).hexdigest()
-
-
 def compatible_source(old, current):
-    """Reviewed measurement transitions only; precheck eligibility is separate."""
-    if (not isinstance(old.get('benchmark'), dict)
-            or old.get('benchmark') != current.get('benchmark')
-            or current.get('benchmark') != benchmark_identity()):
-        return False
-    if any(old.get(k) != current.get(k) for k in ('python', 'agentdojo')):
-        return False
-    previous, target = old.get('source_sha256'), current.get('source_sha256')
-    if previous and previous == target:
-        return True
-    mapping = _read(Path(__file__).with_name('benchmark_reuse_compatibility.json'))
-    if (mapping.get('schema_version') != 'dscg.benchmark-reuse-compatibility.v2'
-            or mapping.get('benchmark') != current['benchmark']):
-        return False
-    # Runtime equality is enforced above. The mapping author's Python patch
-    # version does not restrict an otherwise identical old/current runtime.
-    known = [s['source_sha256'] for s in mapping['reviewed_sources']
-             if s.get('agentdojo') == old.get('agentdojo')]
-    root = Path(__file__).resolve().parents[2]
-    return bool(previous in known and set(target or {}) == set(mapping['current_source_paths'])
-                and all((root / p).is_file() and _hash(root / p) == h
-                        for p, h in mapping['current_harness_sha256'].items()))
+    """Source bytes and Python patch versions are informational only."""
+    return (isinstance(old, dict) and isinstance(current, dict)
+            and same_backend(old.get('benchmark'), current.get('benchmark'))
+            and same_backend(current.get('benchmark'), benchmark_identity())
+            and old.get('agentdojo') == current.get('agentdojo'))
+
+
+_PROVENANCE_FIELDS = {'source', 'screening_script_sha256', 'verification_mode', 'tool_metadata_selection'}
+
+
+def configuration(value):
+    """Normalize provenance out, retaining every effective configuration field."""
+    if not isinstance(value, dict):
+        return value
+    result = {key: item for key, item in value.items() if key not in _PROVENANCE_FIELDS}
+    if value.get('schema_version') == 'dscg.screened-run.v2':
+        # Effective tool contents are checked in every group binding.
+        result.pop('tool_metadata_sha256', None)
+        result.pop('tool_metadata_path', None)
+    if isinstance(value.get('benchmark'), dict):
+        result['benchmark'] = {key: value['benchmark'].get(key) for key in
+                               ('id', 'repository', 'revision', 'suite_version', 'package_version', 'source_kind')}
+    return result
 
 
 def _compatible_binding(old, current):
-    excluded = {'source', 'screening_script_sha256'}
-    if {k: v for k, v in old.items() if k not in excluded} != {
-        k: v for k, v in current.items() if k not in excluded
-    }:
-        return False
-    if 'source' not in old and 'source' not in current:
-        return old == current
-    if not compatible_source(old.get('source', {}), current.get('source', {})):
-        return False
-    if old.get('screening_script_sha256') == current.get('screening_script_sha256'):
-        return True
-    source = old.get('source', {}).get('source_sha256', {})
-    return old.get('screening_script_sha256') in [source[p] for p in (
-        'experiments/injection_cohort.py', 'experiments/common/injection_cohort.py') if p in source]
+    return old == current or (same_backend(old.get('benchmark'), current.get('benchmark'))
+            and configuration(old) == configuration(current))
 
 
 def execution_plan(task_scope, suites, attacks, cohort_sha256=None):
@@ -84,7 +68,7 @@ class ReusePlan:
         self.existing_runs = set(self.base.glob('*/*/run_manifest.json'))
         if not self.existing_runs:
             raise RunConfigurationError('--reuse requires existing verifiable run manifests')
-        self.checked = {}; self.pending = {}; self.hashes = {}; self.transitions = []
+        self.checked = {}; self.pending = {}; self.evidence = {}; self.transitions = []
         self.committed = False
         roots = [self.base / p for p in ('benchmark_plan.json', 'screened_run_manifest.json', 'attack_manifest.json', 'suite_manifest.json')]
         metadata = [(p.name, _read(p)) for p in roots if p.exists()]
@@ -93,7 +77,7 @@ class ReusePlan:
                   if screened is not None else None)
         recorded_attacks = []; recorded_suites = []
         for filename, item in metadata:
-            if item.get('benchmark') != benchmark_identity():
+            if not same_backend(item.get('benchmark'), benchmark_identity()):
                 raise RunConfigurationError('recorded benchmark identity differs; use a new run for the current backend')
             if 'task_scope' in item and item['task_scope'] != task_scope:
                 raise RunConfigurationError('--reuse task scope differs from original run')
@@ -144,7 +128,7 @@ class ReusePlan:
                     if summary.exists():
                         recorded = _read(summary)
                         if recorded.get('run_manifest') == previous and 'defense' in recorded:
-                            evidence.append(recorded['defense']); self.hashes[summary] = _hash(summary)
+                            evidence.append(recorded['defense']); self.evidence[summary] = summary.read_bytes()
                     screened = self.base / 'screened_run_manifest.json'
                     if screened in self.checked:
                         recorded = _read(screened)
@@ -157,7 +141,7 @@ class ReusePlan:
                     comparison['agentdojo_defense'] = None  # This option is unused by the defended factory.
             if previous != expected and not _compatible_binding(comparison, expected):
                 raise RunConfigurationError(f'run configuration changed: {path}; use a new --name')
-            self.hashes[path] = _hash(path)
+            self.evidence[path] = path.read_bytes()
             if previous != expected:
                 self.transitions.append({'path': str(path.relative_to(self.base)),
                                          'original_binding': previous, 'current_binding': expected})
@@ -179,7 +163,7 @@ class ReusePlan:
     def commit(self):
         if not self.existing_runs <= self.checked.keys():
             raise RunConfigurationError('existing task bindings fall outside the requested complete run plan')
-        if any(_hash(p) != h for p, h in self.hashes.items()):
+        if any(p.read_bytes() != h for p, h in self.evidence.items()):
             raise RunConfigurationError('run evidence changed during resume validation')
         identity = datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ') + '_' + uuid4().hex[:8]
         destination = self.base / 'reuse' / identity
@@ -190,9 +174,10 @@ class ReusePlan:
         def snapshot(path):
             target = destination / 'snapshot' / path.relative_to(self.base)
             target.parent.mkdir(parents=True, exist_ok=True); shutil.copyfile(path, target)
-            snapshots.append({'path': str(path.relative_to(self.base)), 'sha256': _hash(target)})
+            snapshots.append({'path': str(path.relative_to(self.base)), 'size_bytes': target.stat().st_size})
         for path in self.base.rglob('*'):
-            if not path.is_file() or path.is_relative_to(self.base / 'reuse'): continue
+            if (not path.is_file() or path.is_relative_to(self.base / 'reuse')
+                    or path.is_relative_to(self.base / 'validation')): continue
             if path.name not in aggregate_names and not path.name.endswith('_error.txt'): continue
             snapshot(path)
         # The native loader decides what is incomplete. Keep those original
@@ -212,7 +197,9 @@ class ReusePlan:
         record = {'scope': 'explicit native task-cache resume; errors are not automatically retried',
                   'attacks': self.attacks, 'suites': self.suites, 'transitions': self.transitions,
                   'previous_aggregate_snapshots': snapshots,
-                  'original_binding_and_evidence_sha256': {str(p.relative_to(self.base)): h for p, h in self.hashes.items()}}
+                  'verification_mode': 'configuration_only',
+                  'source_equivalence_verified': False,
+                  'original_evidence_paths': [str(p.relative_to(self.base)) for p in self.evidence]}
         (destination / 'compatibility.json').write_text(json.dumps(record, ensure_ascii=False, indent=2) + '\n')
         for path, value in self.pending.items():
             path.parent.mkdir(parents=True, exist_ok=True)

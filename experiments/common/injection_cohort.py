@@ -1,28 +1,30 @@
 """Shared frozen-cohort evidence and measurement; no independent model loop."""
 import fcntl
 import hashlib
-import inspect
 import json
 import os
+import shutil
+from uuid import uuid4
 from collections import Counter
 from contextlib import contextmanager
 from pathlib import Path
 
 from agentdojo.attacks.attack_registry import ATTACKS
-from dscg.benchmark_catalog import get_suite, benchmark_identity, validate_backend, get_backend, get_suites
+from dscg.benchmark_catalog import get_suite, benchmark_identity, validate_backend, get_backend, get_suites, same_backend
 from dscg.model_config import resolve_model_config
 from dscg.paths import BENCHMARK_RESULTS_DIR, RESULTS_DIR
 from experiments import run_partial_benchmark as shared
 from experiments.common.partial_controls import source_revision, guard_run, validate_controls, select_tasks
 from experiments.common.benchmark_reuse import ReusePlan
-from experiments.common.benchmark_execution import PreparedBindings, validate_workers
+from experiments.common.result_paths import resolve_run_path
+from experiments.common.benchmark_execution import PreparedBindings
 
 SCHEMA = 'dscg.injection-screen.v2'
 RULE = 'keep-any-valid-success; exclude-after-two-valid-failures; errors-unresolved'
 LIMITATIONS = [
     'Direct-goal failure does not prove an indirect attack cannot succeed.',
     'Native utility is retained; refusals, execution deviations and predicate ambiguity need trace review.',
-    'Historical prechecks lack independent task/environment hashes; reuse checks their available version, source and GOAL evidence.',
+    'Backend/source content is not verified; reuse checks declared backend, public model settings, task IDs and GOAL evidence.',
     'Provider model revisions may be unpinned. Reused attempt token cost is unknown.',
 ]
 
@@ -72,11 +74,7 @@ def _catalog(names):
         suite = get_suite('v1.2', name)
         tasks = {}
         for task_id, task in suite.injection_tasks.items():
-            try:
-                code = inspect.getsource(type(task))
-            except (OSError, TypeError):
-                code = type(task).__qualname__
-            tasks[task_id] = {'goal': task.GOAL, 'implementation_sha256': _digest(code)}
+            tasks[task_id] = {'goal': task.GOAL}
         catalog[name] = {'user_task_ids': list(suite.user_tasks), 'injection_tasks': tasks}
     return catalog
 
@@ -84,109 +82,58 @@ def _catalog(names):
 def _binding(config, names):
     return {'schema_version': SCHEMA, 'benchmark': benchmark_identity(), 'suite_version': 'v1.2', 'rule': RULE,
             'main_model': config.public_dict(), 'source': source_revision(),
-            'screening_script_sha256': _file_hash(Path(__file__).resolve().parents[1] / 'run_injection_precheck.py'),
             'catalog': _catalog(names)}
 
 
-def _mapping_mismatches(mapping):
-    root = Path(__file__).resolve().parents[2]
-    mismatches = []
-    for path, expected in mapping['current_harness_sha256'].items():
-        actual = _file_hash(root / path) if (root / path).is_file() else 'MISSING'
-        if actual != expected:
-            mismatches.append((path, expected, actual))
-    return mismatches
-
-
-def _legacy_mapping():
-    """An explicit, byte-bound equivalent transition, not a source-hash bypass."""
-    mapping = _read(Path(__file__).with_name('injection_cohort_compatibility.json'))
-    if (mapping.get('schema_version') != 'dscg.injection-compatibility.v2'
-            or mapping.get('benchmark') != benchmark_identity()):
-        return None
-    return None if _mapping_mismatches(mapping) else mapping
-
-
-def _source_compatible(recorded, current, *, check_python=True):
-    if (not isinstance(recorded.get('benchmark'), dict)
-            or recorded.get('benchmark') != current.get('benchmark')
-            or current.get('benchmark') != benchmark_identity()):
-        return False
-    if recorded.get('agentdojo') != current.get('agentdojo'):
-        return False
-    if check_python and recorded.get('python') != current.get('python'):
-        return False
-    old_hashes, new_hashes = recorded.get('source_sha256'), current.get('source_sha256')
-    if old_hashes == new_hashes and old_hashes:
-        return True  # A Git commit change alone is provenance, not behavior.
-    mapping = _legacy_mapping()
-    if not mapping or old_hashes not in [mapping['legacy_source']['source_sha256'],
-                                        *mapping.get('equivalent_source_sha256', [])]:
-        return False
-    if set(new_hashes) != set(mapping['current_source_paths']):
-        return False
-    changed_paths = (set(mapping['current_harness_sha256'])
-                     | set(mapping.get('relocated_source_paths', {}))
-                     | {'experiments/common/injection_cohort_compatibility.json',
-                        'experiments/common/benchmark_reuse_compatibility.json'})
-    # Compatibility registries evolve with reviewed code; measurement validates
-    # its independent registry when dispatching, not during direct-GOAL checks.
-    return all(new_hashes.get(p) == h for p, h in old_hashes.items() if p not in changed_paths)
+def _source_compatible(recorded, current, check_python=True):
+    return (same_backend(recorded.get('benchmark'), current.get('benchmark'))
+            and same_backend(current.get('benchmark'), benchmark_identity())
+            and recorded.get('agentdojo') == current.get('agentdojo'))
 
 
 def _bindings_compatible(recorded, current):
-    keys = set(recorded) | set(current)
-    if any(recorded.get(k) != current.get(k) for k in keys - {'source', 'screening_script_sha256'}):
-        return False
-    if not _source_compatible(recorded.get('source', {}), current['source']):
-        return False
-    if recorded.get('screening_script_sha256') == current['screening_script_sha256']:
-        return True
-    mapping = _legacy_mapping()
-    if not mapping:
-        return False
-    known = [(mapping['legacy_source']['source_sha256'], mapping['legacy_screening_script_sha256'])]
-    known += [(source, source.get('experiments/run_injection_precheck.py'))
-              for source in mapping.get('equivalent_source_sha256', [])]
-    return any(recorded.get('source', {}).get('source_sha256') == source
-               and recorded.get('screening_script_sha256') == script_hash
-               for source, script_hash in known if script_hash)
+    def normalize(binding):
+        return {'suite_version': binding.get('suite_version'), 'rule': binding.get('rule'),
+                'main_model': binding.get('main_model'),
+                'catalog': {name: {'user_task_ids': entry.get('user_task_ids'),
+                    'injection_task_ids': list(entry.get('injection_tasks', {})),
+                    'injection_tasks': {task_id: {'goal': task.get('goal')}
+                                       for task_id, task in entry.get('injection_tasks', {}).items()}}
+                    for name, entry in binding.get('catalog', {}).items()}}
+    return (same_backend(recorded.get('benchmark'), current.get('benchmark'))
+            and normalize(recorded) == normalize(current))
 
 
 def _binding_error(recorded, current):
-    """Explain a rejected binding without printing credentials or task text."""
-    details = []
-    old_source, new_source = recorded.get('source', {}), current.get('source', {})
-    for key in ('python', 'agentdojo'):
-        if old_source.get(key) != new_source.get(key):
-            details.append(f'{key}: recorded={old_source.get(key)}, current={new_source.get(key)}')
-    old_model, new_model = recorded.get('main_model', {}), current.get('main_model', {})
-    details.extend(f'main_model.{key} changed' for key in sorted(set(old_model) | set(new_model))
-                   if old_model.get(key) != new_model.get(key))
-    details.extend(f'{key} changed' for key in sorted(set(recorded) | set(current))
-                   if key not in {'source', 'main_model', 'screening_script_sha256'}
-                   and recorded.get(key) != current.get(key))
-    if old_source.get('source_sha256') != new_source.get('source_sha256'):
-        mapping = _read(Path(__file__).with_name('injection_cohort_compatibility.json'))
-        mismatches = _mapping_mismatches(mapping)
-        if mismatches:
-            details.extend(f'current source mismatch {p}: expected={expected[:12]}, actual={actual[:12]}'
-                           for p, expected, actual in mismatches)
-            details.append(f'import root={Path(__file__).resolve().parents[2]}; inspect git diff before restoring or updating code')
-        else:
-            details.append('source compatibility could not be verified against the reviewed mapping')
-    if not details:
-        details.append('screening script identity is not compatible')
-    return ('screening configuration/source/catalog changed; ' + '; '.join(details)
-            + '. Keep the original configuration and reviewed source, or use a new screen run.')
+    old, new = recorded.get('main_model', {}), current.get('main_model', {})
+    fields = [f'main_model.{key}' for key in sorted(set(old) | set(new)) if old.get(key) != new.get(key)]
+    if not same_backend(recorded.get('benchmark'), current.get('benchmark')):
+        fields.append('benchmark')
+    if recorded.get('catalog') != current.get('catalog'):
+        fields.append('catalog/GOAL')
+    return ('screening model/backend/task/GOAL/rule configuration changed: '
+            + ', '.join(fields or ['selection rule']) + '; use a new screen run')
 
 
 def _record_compatibility(root, recorded, current):
+    record = {'reason': 'configuration-only transition; source equivalence not verified',
+              'verification_mode': 'configuration_only', 'source_equivalence_verified': False,
+              'original_binding': recorded, 'current_binding': current}
+    # Pending screens rewrite these aggregates; retain each invocation's inputs
+    # even when its informational source metadata has not changed.
+    aggregates = [root / name for name in ('status.json', 'summary.md') if (root / name).is_file()]
+    if aggregates and not (root / 'cohort.json').exists():
+        destination = root / 'compatibility' / uuid4().hex
+        snapshots = []
+        for source in aggregates:
+            target = destination / 'snapshot' / source.name
+            target.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(source, target)
+            snapshots.append({'path': source.name, 'size_bytes': target.stat().st_size})
+        _write_new(destination / 'configuration.json', {**record, 'previous_aggregate_snapshots': snapshots})
     if recorded == current:
         return
-    record = {'reason': 'verified byte-bound harness transition or identical-source revision',
-              'original_binding': recorded, 'current_binding': current}
-    path = root / 'compatibility' / (_digest(current) + '.json')
+    path = root / 'compatibility' / (_digest(current) + '_configuration_only.json')
     if path.exists():
         if _read(path) != record:
             raise ValueError('compatibility provenance changed')
@@ -235,7 +182,7 @@ def _validate_cohort(path, config):
 
 def _validate_cohort_data(cohort, config):
     content = {k: v for k, v in cohort.items() if k != 'cohort_sha256'}
-    if (cohort.get('benchmark') != benchmark_identity() or cohort.get('schema_version') != SCHEMA or cohort.get('cohort_sha256') != _digest(content)
+    if (not same_backend(cohort.get('benchmark'), benchmark_identity()) or cohort.get('schema_version') != SCHEMA or cohort.get('cohort_sha256') != _digest(content)
             or cohort.get('selection_rule') != RULE):
         raise ValueError('invalid or changed frozen cohort')
     binding = cohort['binding']
@@ -307,8 +254,7 @@ def _preflight_report(base, cohort, active, attacks, selected_tasks=None):
 def run_screened(cohort_path, *, config_path=None, run_name=None, results_dir=None, origin=False,
                  attack=None, audit_router_mode='off', trace_level='summary', audit_router_artifact=None,
                  force_rerun=False, reuse=False, model_id=None, sec_model_id=None, defense=None, suites=None,
-                 task_scope='screened', workers=1, **controls):
-    validate_workers(workers)
+                 task_scope='screened', **controls):
     backend = get_backend()
     if task_scope not in {'screened', 'partial_screened'}:
         raise ValueError('unknown screened task scope')
@@ -322,7 +268,7 @@ def run_screened(cohort_path, *, config_path=None, run_name=None, results_dir=No
     cohort_path = Path(cohort_path).resolve()
     cohort = _validate_cohort(cohort_path, config)
     root = Path(results_dir) if results_dir else RESULTS_DIR / 'partial_benchmark' if partial else BENCHMARK_RESULTS_DIR
-    base = root / (shared._safe_result_component(config.model_id, 'model') + '_' + backend.id + '_' + shared._safe_result_component(run_name, 'run'))
+    base = resolve_run_path(root, backend.id, config.model_id, run_name, allow_legacy=reuse)
     resume = None
     if reuse:
         resume = ReusePlan(base, suites=suites, attack=attack, run_attack=True, task_scope=task_scope,
@@ -369,9 +315,9 @@ def run_screened(cohort_path, *, config_path=None, run_name=None, results_dir=No
                     'cohort_sha256': cohort['cohort_sha256'], 'main_model': config.public_dict(), 'security_model': security_model,
                     'baseline': origin, 'attacks': names, 'audit_router_mode': audit_router_mode,
                     'trace_level': trace_level, 'controls': effective, 'defense': defense,
-                    'tool_metadata_sha256': _file_hash(controls['tool_metadata_path']) if controls.get('tool_metadata_path') else None,
+                    'tool_metadata_path': str(controls['tool_metadata_path']) if controls.get('tool_metadata_path') else None,
                     'audit_router_artifact_sha256': _file_hash(audit_router_artifact) if audit_router_artifact else None,
-                    'source': source_revision(), 'screening_script_sha256': _file_hash(__file__)}
+                    'source': source_revision()}
         # Refuse to relabel existing ordinary runs as screened cohorts.
         if not (base / 'screened_run_manifest.json').exists() and any(base.glob('*/*/run_manifest.json')):
             raise ValueError('existing non-screened run; use a new --name')
@@ -402,7 +348,7 @@ def run_screened(cohort_path, *, config_path=None, run_name=None, results_dir=No
                                cohort_sha256=cohort['cohort_sha256'],
                                audit_router_mode=audit_router_mode, trace_level=trace_level,
                                audit_router_artifact=audit_router_artifact, force_rerun=force_rerun,
-                               reuse=reuse, _reuse_plan=prepared, workers=workers, **controls)
+                               reuse=reuse, _reuse_plan=prepared, **controls)
         finally:
             if prepared.committed:
                 _preflight_report(base, cohort, active, names, selected)

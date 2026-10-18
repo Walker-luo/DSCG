@@ -20,21 +20,13 @@ class ResumeDiagnosticsTests(unittest.TestCase):
                     self.assertEqual(cli(flags), 0)
                     self.assertEqual(run.call_args.kwargs['audit_router_mode'], expected)
 
-    def test_reviewed_code_accepts_matching_server_runtime_independently_of_mapping_runtime(self):
-        path = Path(reuse.__file__)
-        old = {'benchmark': __import__('test_partial_agentdyn').DOJO_IDENTITY, 'python': '3.10.19', 'agentdojo': '0.1.35', 'source_sha256': {'old.py': 'known'}}
-        current = {**old, 'source_sha256': {'new.py': 'current'}}
-        mapping = {'schema_version': 'dscg.benchmark-reuse-compatibility.v2', 'benchmark': __import__('test_partial_agentdyn').DOJO_IDENTITY,
-                   'reviewed_sources': [{**old, 'python': '3.10.21'}],
-                   'current_source_paths': ['new.py'],
-                   'current_harness_sha256': {'experiments/common/benchmark_reuse.py': hashlib.sha256(path.read_bytes()).hexdigest()}}
-        with patch.object(reuse, '_read', return_value=mapping):
+    def test_source_and_python_changes_do_not_read_compatibility_mapping(self):
+        identity = __import__('test_partial_agentdyn').DOJO_IDENTITY
+        old = {'benchmark': identity, 'python': '3.10.19', 'agentdojo': '0.1.35', 'source_sha256': {'old.py': 'known'}}
+        current = {**old, 'python': '3.10.21', 'source_sha256': {'new.py': 'unknown'}}
+        with patch.object(reuse, '_read', side_effect=AssertionError('compatibility map read')):
             self.assertTrue(reuse.compatible_source(old, current))
-            self.assertFalse(reuse.compatible_source(old, {**current, 'python': '3.10.21'}))
-            self.assertFalse(reuse.compatible_source({**old, 'source_sha256': {'unknown.py': 'unknown'}}, current))
             self.assertFalse(reuse.compatible_source(old, {**current, 'agentdojo': 'changed'}))
-            mapping['current_harness_sha256']['experiments/common/benchmark_reuse.py'] = '0' * 64
-            self.assertFalse(reuse.compatible_source(old, current))
 
     def rejected_cohort(self, recorded, current):
         frozen = {'schema_version': cohort.SCHEMA, 'benchmark': __import__('test_partial_agentdyn').DOJO_IDENTITY, 'selection_rule': cohort.RULE, 'binding': recorded}
@@ -49,12 +41,10 @@ class ResumeDiagnosticsTests(unittest.TestCase):
                 'source': {'benchmark': __import__('test_partial_agentdyn').DOJO_IDENTITY, 'python': '3.10.19', 'agentdojo': '0.1.35', 'source_sha256': {'old.py': 'known'}},
                 'screening_script_sha256': 'old'}
 
-    def test_cohort_error_reports_runtime_versions(self):
+    def test_python_patch_differences_do_not_change_screen_configuration(self):
         old = self.binding(); current = deepcopy(old)
         current['source']['python'] = '3.10.21'
-        message = self.rejected_cohort(old, current)
-        self.assertIn('3.10.19', message)
-        self.assertIn('3.10.21', message)
+        self.assertTrue(cohort._bindings_compatible(old, current))
 
     def test_cohort_error_names_model_fields_without_exposing_values(self):
         old = self.binding(); current = deepcopy(old)
@@ -63,17 +53,11 @@ class ResumeDiagnosticsTests(unittest.TestCase):
         self.assertIn('main_model.base_url', message)
         self.assertNotIn('private-url', message)
 
-    def test_cohort_error_identifies_modified_server_file(self):
+    def test_source_hash_changes_do_not_change_screen_configuration(self):
         old = self.binding(); current = deepcopy(old)
         current['source']['source_sha256'] = {'new.py': 'current'}
-        path = 'experiments/run_partial_benchmark.py'
-        mapping = {'schema_version': 'dscg.injection-compatibility.v1',
-                   'current_harness_sha256': {path: 'f' * 64}}
-        with patch.object(cohort, '_read', return_value=mapping), patch.object(cohort, '_file_hash', return_value='a' * 64):
-            message = self.rejected_cohort(old, current)
-        self.assertIn(path, message)
-        self.assertIn('ffffffffffff', message)
-        self.assertIn('aaaaaaaaaaaa', message)
+        with patch.object(cohort, '_file_hash', side_effect=AssertionError('source hash read')):
+            self.assertTrue(cohort._bindings_compatible(old, current))
 
     def test_cohort_error_is_not_reported_as_missing_model_configuration(self):
         for cli in (partial.cli, full.cli):

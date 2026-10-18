@@ -75,13 +75,13 @@ class ProjectionControlTests(unittest.TestCase):
             return pipeline,tracker,None
         with TemporaryDirectory() as directory, redirect_stdout(StringIO()), patch.object(
             runner,'make_defended_pipeline',side_effect=factory
-        ) as build, patch.object(runner.attacks,'load_attack',side_effect=partial_fixture.fake_attack), patch.object(
+        ) as build, patch.object(runner, '_describe_pipeline', side_effect=lambda *a, **k: partial_fixture.fake_pipeline()[0]), patch.object(runner.attacks,'load_attack',side_effect=partial_fixture.fake_attack), patch.object(
             runner.benchmark,'benchmark_suite_with_injections',side_effect=partial_fixture.fake_results
         ):
             args=dict(suites=[get_backend().suites[0]],results_dir=directory,run_name='bound',attack='tool_knowledge',
                       tool_metadata_path=get_backend().tool_metadata_path)
             self.assertEqual(runner.main(**args,l1_projection_mode='shadow'),0)
-            manifest=json.loads((Path(directory)/f'offline-model_{get_backend().id}_bound/tool_knowledge/{get_backend().suites[0]}/run_manifest.json').read_text())
+            manifest=json.loads((Path(directory)/f'{get_backend().id}/offline-model_bound/tool_knowledge/{get_backend().suites[0]}/run_manifest.json').read_text())
             self.assertIn('shadow',str(manifest));self.assertIn(PROFILE_SHA256,str(manifest))
             self.assertEqual(build.call_args.kwargs['l1_projection_mode'],'shadow')
             self.assertEqual(runner.main(**args,l1_projection_mode='projected',force_rerun=True),1)

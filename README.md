@@ -9,9 +9,9 @@ DSCG 是工具使用型 LLM Agent 的间接提示词注入（IPI）防御研究�
 | `ipi` | AgentDojo v1.2：workspace、travel、banking、slack | 97 | 12 / 108 |
 | `ipi-agentdyn` | AgentDyn v1.2：shopping、github、dailylife | 60 | 9 / 81 |
 
-启动按实际安装来源和完整源码识别，不依赖环境名称或同为0.1.35的版本号。两套新实验、预检、报告及网页使用各自目录与工具风险配置；旧结果仍可读，基准/任务/实现身份不同不能直接配对或合并分母。详见 [全量测试指南](./docs/benchmark.md)。
+启动按实际Python加载路径、安装来源、版本和revision识别后端，不依赖环境名称。当前使用metadata_only校验，不扫描源码哈希；不同后端或任务范围不能合并分母。详见[全量测试指南](./docs/benchmark.md)。
 
-当前测试的主模型与审计模型默认 **Qwen3.7-Flash（关闭思考）**，保留DeepSeek等显式配置。full/partial入口可加 `--workers 3` 按攻击×场景进程并发，默认1；这是在线并发，不是官方Batch折扣。见[模型配置](./docs/model_tool_configuration.md#24-最小可运行配置与角色复用)与[并发运行](./docs/benchmark.md#进程并发提速)。
+当前测试的主模型与审计模型默认 **Qwen3.7-Flash（关闭思考）**，保留DeepSeek等显式配置。full/partial/cohort恢复顺序执行，已删除workers；准备阶段静默核对配置，执行时逐组输出进度。见[模型配置](./docs/model_tool_configuration.md#24-最小可运行配置与角色复用)与[运行流程](./docs/benchmark.md#顺序执行与准备信息)。
 
 ## 当前框架与工作流程
 
@@ -164,7 +164,7 @@ conda activate ipi                     # 或 conda activate ipi-agentdyn
 python -m dscg.benchmark_catalog
 ```
 
-项目使用Python3.10。AgentDojo固定官方0.1.35发行包及112个源码/数据文件；AgentDyn固定提交`5353cf7615b135cace8d07c8f12dac53a16b6db3`及1374个文件。本机旧ipi的单文件system角色适配另记实际runtime_variant，不冒充官方原版，也不修改环境。未知源码变化拒绝执行。
+项目使用Python3.10。AgentDojo使用0.1.35发行版本；AgentDyn固定提交`5353cf7615b135cace8d07c8f12dac53a16b6db3`。当前检查安装来源、版本、revision和实际包路径，不扫描源码文件；runtime_variant记为unverified。历史源码锁和客户端变体证据保留。
 
 保留已有 `config/models.local.toml` 和Key；首次配置参考example。模型与安全模型默认不变。风险目录自动按基准选择；现有通用tools.local与AgentDojo内置目录相同，会在AgentDojo使用，在AgentDyn选用对应内置目录并明确提示。自定义配置可使用基准专用local文件或显式参数，未知通用目录不静默忽略。详情见[模型、工具与运行参数详解](./docs/model_tool_configuration.md)及[测试文件索引](./docs/evaluation.md)。
 
@@ -191,17 +191,17 @@ baseline使用当前基准的原生工具循环，不启用DSCG或安全模型�
 
 `injecagent`已退出默认typical，仍可用 `--attack injecagent` 或 `all` 运行。典型集用于控制测试规模，不表示已验证攻击强度。可用 `--attack NAME [NAME ...]` 指定攻击，或 `--attack all` 显式运行全部自动攻击；`manual` 不可选。完整攻击表、消融和指标口径见[benchmark指南](./docs/benchmark.md#攻击选择)。
 
-中断续跑可在原命令中去掉force-rerun、加 `--reuse` 并保留原name；本次交付后同一基准/配置/源码身份的新运行恢复原名单；交付前缓存/cohort只保留历史，不做迁移或扩展旧兼容映射，新实验typical为三种。原生接受的错误缓存不会自动重试，兼容边界见[续跑说明](./docs/benchmark.md#显式续跑示例)。
+中断后在原命令中去掉force-rerun、加`--reuse`并保留原name。旧实验按模型、后端、任务、攻击、工具和有效防御配置核对，源码哈希或Python补丁版本变化不再阻止续跑；旧绑定保留并记录校验规则变化。cohort及预检证据仍校验哈希。原生接受的错误缓存不会自动重试，见[续跑说明](./docs/benchmark.md#显式续跑示例)。
 
 默认 `summary` 足够用于对比。`--trace-level full` 保存详细诊断及压缩侧车，增加序列化和写入开销；按需排错时使用。正式对照还需匹配任务 ID、攻击、模型配置及预检口径，历史结果仅作参照。
 
 用户运行的结果保存到：
 
 ```text
-results/partial_benchmark/<model_id>_<benchmark_id>_<name>/<attack>/<suite>/
+results/partial_benchmark/<benchmark_id>/<model_id>_<name>/<attack>/<suite>/
 ```
 
-每次 partial 运行还会在 `<model_id>_<benchmark_id>_<name>/` 下生成 `summary.md`（attack × 场景指标、分母、Token 和失败案例位置）与 `failure_cases.jsonl`（逐例的失败标签、原始路径与有界片段）。TSR=false 和 ASR=true 分别记录；指标缺失/运行错误单列。详见[结果文件说明](./docs/benchmark.md#结果文件)。
+每次 partial 运行还会在 `<benchmark_id>/<model_id>_<name>/` 下生成 `summary.md`（attack × 场景指标、分母、Token 和失败案例位置）与 `failure_cases.jsonl`（逐例的失败标签、原始路径与有界片段）。TSR=false 和 ASR=true 分别记录；指标缺失/运行错误单列。详见[结果文件说明](./docs/benchmark.md#结果文件)。
 
 ## Dashboard
 

@@ -9,7 +9,7 @@ conda activate ipi              # 或 conda activate ipi-agentdyn
 python -m dscg.benchmark_catalog
 ```
 
-离线检查会验证安装来源和当前后端锁，再显示实际场景目录。[AgentDojo锁](../config/agentdojo.lock.json)绑定官方0.1.35发行包和112个文件哈希，并明确记录当前`ipi`的精确`reviewed-local-system-role-v1`客户端变体；[AgentDyn锁](../config/agentdyn.lock.json)绑定commit `5353cf7615b135cace8d07c8f12dac53a16b6db3`及1374个源码/数据哈希。它们都使用`agentdojo`导入名与0.1.35发行版本，版本号、环境名称均不足以认证后端。当前测量/预检入口在创建模型前拒绝未知来源、源码或未经审核的变体组合，不要求新增backend参数。锁不固定远端模型服务版本，也不替代完整依赖锁。
+离线检查核对实际导入路径、安装来源、版本和固定revision，再显示场景；不遍历源码、不计算后端哈希。两份[AgentDojo锁](../config/agentdojo.lock.json)、[AgentDyn锁](../config/agentdyn.lock.json)保留历史源码证据，当前仅使用元数据。新记录verification_mode=metadata_only、runtime_variant=unverified。未知来源/revision/路径冲突仍拒绝；不要求新增backend参数。
 
 ## 1. 测试者需要准备哪些信息
 
@@ -127,7 +127,7 @@ print(json.dumps(tool.parameters.model_json_schema(), ensure_ascii=False, indent
 
 AgentDojo可选workspace、travel、banking、slack，工具数24、28、11、11，同名去重69个；AgentDyn可选shopping、github、dailylife，工具数39、34、27，同名去重65个，不跨后端混选。核对实际schema：AgentDojo的`get_file_by_id`使用file_id，AgentDyn的`read_file`/`create_file`使用path；GitHub的`input_to_webpage`接收inputs映射，购物/日常场景接收input_ids和input_values列表。required表示调用时必须提供；schema不包含未来任务的真实收件人、文件ID或金额，这些值由任务/环境及必要读取获得。
 
-若要查看宿主实现，可用inspect.getsource(tool.run)，或在当前后端的suite工具模块中读源码；与已验证的发行/源码身份匹配，不能只照抄另一后端或版本的参数表。description/参数schema不是输出schema，也不能据其推断完整事实来源或对象权限。
+若要查看宿主实现，可用inspect.getsource(tool.run)，或在当前后端的suite工具模块中读源码；与当前安装版本及实际工具实现匹配，不能只照抄另一后端或版本的参数表。description/参数schema不是输出schema，也不能据其推断完整事实来源或对象权限。
 
 必须按实际副作用审阅：`browse_webpage`和`input_to_webpage`会调用页面handler，可修改状态、发送数据或付款；OTP验证工具会执行先前排队的callback。因此它们按critical、非幂等分类并接受审计，不能当普通网页读取。`get_invoice`会创建托管附件并发邮件；`git_get_linked_ssh_keys`在未验证分支发OTP、排队请求。下载和git clone/pull写入模拟文件系统；未读邮件接口会标记已读。相反，`add_calendar_event_participants`的当前实现只追加参与人，不像描述声称的那样发邮件；分类以实现为准。
 
@@ -187,7 +187,7 @@ reversible = false
 python -m experiments.tools.generate_tool_metadata
 ```
 
-该命令先核对当前后端来源/源码与全部注册工具覆盖，再**复制该后端审核目录**，不调用模型、不通过训练或工具名猜分类。默认目标为config/tools.agentdojo.local.toml或config/tools.agentdyn.local.toml，后续同后端会优先加载它；已有目标默认拒绝覆盖。可显式指定新输出路径；--force仅替换允许的输出文件，通用tools.local.toml及两份审核内置目录始终受保护，不能用force覆盖。生成不会合并或导入另一后端分类。
+该命令先核对当前后端安装元数据与全部注册工具覆盖，再**复制该后端审核目录**，不调用模型、不通过训练或工具名猜分类。默认目标为config/tools.agentdojo.local.toml或config/tools.agentdyn.local.toml，后续同后端会优先加载它；已有目标默认拒绝覆盖。可显式指定新输出路径；--force仅替换允许的输出文件，通用tools.local.toml及两份审核内置目录始终受保护，不能用force覆盖。生成不会合并或导入另一后端分类。
 
 只读检查所用目录（不生成文件、不调用模型）：
 
@@ -224,9 +224,9 @@ print("classified tools:", len(catalog))
 
 --model-config/--tool-metadata是输入配置路径；--name标识实验；--results-dir是输出根；--task-manifest仅用于显式冻结任务ID，默认无需导入。修改任何有效配置/策略后使用新name，--force-rerun不绕过旧manifest绑定。成本比较采用新name并force-rerun，仍核查API usage/样本分母，不能只凭flag保证可比。
 
-两测量入口支持 `--workers N`（API：workers=1），按攻击×场景独立进程并发，默认顺序执行；详见[并发运行](./benchmark.md#进程并发提速)。并发数不是模型/防御身份的一部分，同版本续跑可调整，但源码、模型和后端等绑定仍须一致。
+两测量入口和cohort恢复顺序执行，已删除workers参数与进程调度。准备阶段静默核对全部配置，不创建pipeline；每组执行时再创建独立pipeline及tracker。见[运行流程](./benchmark.md#顺序执行与准备信息)。
 
-两测量入口支持显式 `--reuse`（API：reuse=True，默认False）：沿用身份相符的任务级缓存，未指定攻击/场景时读取原计划。reuse要求原name和可核验目录，与显式force-rerun/清单导出互斥，并覆盖环境强制重跑。新计划/目录绑定实际后端与完整源码/目录及组件身份，目录包含后端名；旧缓存、cohort、任务清单和兼容映射不被自动赋予新身份或跨后端迁移。模型/防御/任务等配置也须匹配，缺少必要绑定证据时拒绝。具体命令见 [续跑指南](./benchmark.md#显式续跑示例)。
+两测量入口支持显式`--reuse`（API：reuse=True，默认False），未指定攻击/场景时恢复原计划。要求原name和可核验目录，与force-rerun/清单导出互斥，并覆盖环境强制重跑。核对后端、模型、完整任务、攻击、工具元数据内容和有效防御设置；源码哈希、Git commit及Python补丁版本不作为续跑门槛。旧绑定保持原字节，规则变化另存configuration_only记录；缺少必要配置时拒绝。cohort及预检证据仍检查哈希。见[续跑指南](./benchmark.md#显式续跑示例)。
 
 保留的L1银行投影适配器针对AgentDojo原生银行月支出请求与完整Transaction返回，最多32768 UTF-8字节、500行；没有为AgentDyn三个场景新增profile，使用完整来源隔离。原生callable/code/schema和元数据不兼容、错误/截断或未知字段均回退，不把旧适配器结果视为新场景已验证。模式/适配器身份影响缓存和L3 artifact兼容，切换用新run名；细节见 [L1说明](../README.md#l1-优化任务限定的结构化投影)。
 
@@ -245,10 +245,12 @@ print("classified tools:", len(catalog))
 | METADATA_MISSING / METADATA_INVALID | 实际选中的工具目录、覆盖、六个字段/布尔/枚举/多余字段；本地目录是否遮蔽内置分类 |
 | benchmark tool metadata missing classifications | 核对显式/环境/专用local选中的目录是否覆盖当前后端；不通过合并另一目录补齐 |
 | unassigned custom generic tool metadata | 通用tools.local.toml不是任何审核目录的语义相同副本；保留文件，显式选择它或维护后端专用local |
-| source/revision或source hash mismatch | 核对当前后端的发行/commit与安装来源；不要只看agentdojo==0.1.35，也不要改锁接受未知源码 |
+| 来源/revision/包路径不匹配 | 核对当前Python、实际导入路径、发行/commit与安装来源；源码哈希已不作为启动条件 |
 | AUTH_CATALOG_CHANGED | schema、描述、callable/依赖或元数据在任务内改变，旧授权不能继续；用新可信任务边界，不把错误文本作为补权依据 |
 | AUTH_CONSTRAINT_CONFLICT | host profile禁止能力与必要读取闭包冲突；不是简单多加权限，需核对独立任务/规则 |
 | DELEGATED_* | 有限执行句式/限制、注册reader、源是否唯一且成功监控读取、1536/2048/16384长度；仅总结文件不会展开权限 |
 | router设off仍有审计成本 | off只关新增免审路由；关闭整个L3需NoChecker对照，不能混淆两种实验 |
 
 先完成无需API的配置解析/schema/风险目录检查，再由测试者运行有限的干净工具任务与JSON协议检查，最后做匹配attack对照。以上离线检查只确认字段/覆盖，不证明模型理解正确、任务完成或安全有效。其他攻击选择、结果目录和评分口径见 [测试文件索引](./evaluation.md)。
+
+CLI结果按分类根/后端/运行目录保存：`results/partial_benchmark/agentdojo/qwen3.7-flash_baseline/`。results-dir仍指分类根；full、partial、screen/cohort共用路径规则。已有旧目录通过reuse原地恢复，选择顺序与限制见[结果指南](./benchmark.md#显式续跑示例)。

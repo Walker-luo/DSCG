@@ -30,6 +30,34 @@ def summary(suite, utility, attack, defense):
 
 
 class DashboardHistoryTests(unittest.TestCase):
+    def test_backend_folders_and_legacy_results_stay_separate_in_history_and_export(self):
+        sources=[]
+        for backend,suite in [('agentdojo','workspace'),('agentdyn','shopping')]:
+            identity={'id':backend,'revision':'revision-'+backend,'suite_version':'v1.2',
+                      'verification_mode':'metadata_only','runtime_variant':'unverified'}
+            payload={**summary(suite,.5,0,1),'benchmark':identity,
+                     'task_selection':{'attack':'tool_knowledge','user_task_ids':['u1'],'injection_task_ids':['i1']}}
+            for run in (f'{backend}/qwen_baseline',f'qwen_{backend}_baseline'):
+                source=f'partial_benchmark/{run}/tool_knowledge';sources.append(source)
+                write_json(self.results_root/source/suite/'summary.json',payload)
+        with patch('dashboard.app.RESULTS_DIR',self.results_root):
+            catalog=self.client.get('/api/history/catalog').get_json()
+            rows=[row for row in catalog if row['source'] in sources]
+            self.assertEqual(len(rows),4)
+            self.assertEqual(len({row['id'] for row in rows}),4)
+            self.assertEqual(len({row['model_group'] for row in rows}),4)
+            self.assertTrue(all(row['result_folder']=='partial_benchmark' for row in rows))
+            ids=[row['id'] for row in rows]
+            analyzed=self.client.post('/api/history/analyze',json={'run_ids':ids}).get_json()
+            self.assertFalse(analyzed['paired_comparison_ready'])
+            response=self.client.post('/api/history/export',json={'run_ids':ids})
+            self.assertEqual(response.status_code,200)
+        with zipfile.ZipFile(io.BytesIO(response.data)) as archive:
+            data=json.loads(archive.read('analysis.json'))
+        self.assertEqual(len(data['experiments']),4)
+        self.assertEqual({row['source'] for row in data['experiments']},set(sources))
+        self.assertEqual({row['benchmark']['id'] for row in data['experiments']},{'agentdojo','agentdyn'})
+
     def test_history_preserves_dynamic_suites_and_recorded_benchmark_identity(self):
         identity = {"id": "agentdyn", "catalog_sha256": "catalog-a", "revision": "revision-a"}
         payload = {**summary("shopping", .5, 0, 1), "benchmark": identity,

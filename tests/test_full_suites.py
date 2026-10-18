@@ -33,7 +33,7 @@ class FullSuiteTests(unittest.TestCase):
             self.offline(stack)
             self.assertEqual(full.cli(['--baseline', '--suites', 'travel', 'banking', 'slack',
                 '--attack', 'injecagent', '--name', 'subset', '--results-dir', str(self.root)]), 0)
-            base = self.root / 'offline-model_agentdojo_subset'
+            base = self.root / 'agentdojo/offline-model_subset'
             self.assertFalse((base / 'injecagent/workspace').exists())
             manifest = json.loads((base / 'attack_manifest.json').read_text())
             self.assertEqual(manifest['suites'], ['travel', 'banking', 'slack'])
@@ -56,7 +56,7 @@ class FullSuiteTests(unittest.TestCase):
             self.offline(stack)
             self.assertEqual(full.cli(['--baseline', '--clean', '--suites', 'banking',
                 '--name', 'clean', '--results-dir', str(self.root)]), 0)
-            base = self.root / 'offline-model_agentdojo_clean/none'
+            base = self.root / 'agentdojo/offline-model_clean/none'
             self.assertEqual([p.name for p in base.iterdir() if p.is_dir()], ['banking'])
             summary = json.loads((base / 'banking/summary.json').read_text())
             self.assertEqual(summary['task_selection']['user_task_ids'], list(get_suite('v1.2', 'banking').user_tasks))

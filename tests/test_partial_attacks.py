@@ -120,7 +120,7 @@ class PartialAttackTests(unittest.TestCase):
                 self.assertEqual(runner.main(origin=origin, suites=["workspace"], run_name=mode,
                                              results_dir=directory, force_rerun=True,
                                              **({"attack": "all"} if preset == "all" else {})), 0)
-                base = Path(directory) / f"offline-model_agentdojo_{mode}"
+                base = Path(directory) / f"agentdojo/offline-model_{mode}"
                 manifest = json.loads((base / "attack_manifest.json").read_text())
                 self.assertEqual(manifest["attacks"], selected_attacks)
                 self.assertEqual(manifest["excluded_from_all"], {"manual": "requires interactive input"})
@@ -158,10 +158,10 @@ class PartialAttackTests(unittest.TestCase):
         ):
             self.assertEqual(runner.main(origin=True, suites=["workspace"], run_name="partial",
                                          results_dir=directory, attack=["tool_knowledge", "injecagent"]), 1)
-            manifest = json.loads((Path(directory) / "offline-model_agentdojo_partial" / "attack_manifest.json").read_text())
+            manifest = json.loads((Path(directory) / "agentdojo/offline-model_partial" / "attack_manifest.json").read_text())
             self.assertEqual([run["status"] for run in manifest["runs"]], ["error", "completed"])
             self.assertEqual(manifest["runs"][0]["error_type"], "ValueError")
-            self.assertTrue((Path(directory) / "offline-model_agentdojo_partial/injecagent/workspace/summary.json").exists())
+            self.assertTrue((Path(directory) / "agentdojo/offline-model_partial/injecagent/workspace/summary.json").exists())
 
     def test_native_traces_sidecars_and_cache_use_the_nested_attack_directory(self):
         # Real AgentDojo logger/cache, with task execution replaced by an offline oracle.
@@ -185,11 +185,11 @@ class PartialAttackTests(unittest.TestCase):
         with TemporaryDirectory() as directory, redirect_stdout(StringIO()), patch.object(
             runner, "make_openai_compatible_pipeline", side_effect=pipeline_factory
         ), patch.object(type(suite), "run_task_with_pipeline", autospec=True, side_effect=execute) as task:
-            options = dict(origin=True, suites=["workspace"], run_name="baseline",
+            options = dict(model_id=model_id, origin=True, suites=["workspace"], run_name="baseline",
                            results_dir=directory, attack=attack_name)
             self.assertEqual(runner.main(**options), 0)
             self.assertEqual(task.call_count, 12)  # 3 prechecks + 9 attacked tasks.
-            root = Path(directory) / f"{model_id}_agentdojo_baseline"
+            root = Path(directory) / f"agentdojo/{model_id}_baseline"
             result = root / attack_name / "workspace"
             injection = next(iter(suite.injection_tasks))
             trace = result / "user_task_0" / attack_name / f"{injection}.json"

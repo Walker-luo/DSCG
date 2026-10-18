@@ -9,12 +9,13 @@ import threading
 import time
 
 from agentdojo import benchmark, logging
-from dscg.benchmark_catalog import get_suite, benchmark_identity, validate_backend, get_backend, get_suites
+from dscg.benchmark_catalog import get_suite, benchmark_identity, validate_backend, get_backend, get_suites, same_backend
 from dscg.model_config import resolve_model_config
 from dscg.paths import RESULTS_DIR
 from dscg.pipelines.baseline import make_openai_compatible_pipeline
 from experiments import run_partial_benchmark as shared
 from experiments.common.partial_controls import source_revision, guard_run
+from experiments.common.result_paths import resolve_run_path
 from experiments.common.injection_cohort import (
     SCHEMA, RULE, LIMITATIONS, _digest, _file_hash, _read, _write_new, _replace,
     _lock, _binding, _trace_status, _decision, _validate_cohort, _validate_cohort_data,
@@ -59,7 +60,7 @@ def _reuse(reuse_from, suite_name, task, binding):
             manifest_path = path.parents[2] / 'run_manifest.json'
             manifest = _read(manifest_path)
             selection = manifest['task_selection']
-            if (manifest.get('benchmark') != benchmark_identity() or manifest.get('profile') != 'baseline' or manifest.get('main_model') != binding['main_model']
+            if (not same_backend(manifest.get('benchmark'), benchmark_identity()) or manifest.get('profile') != 'baseline' or manifest.get('main_model') != binding['main_model']
                     or not _source_compatible(manifest['source'], binding['source'], check_python=False)
                     or selection.get('suite_version') != 'v1.2' or task.ID not in selection.get('injections', [])):
                 raise ValueError('historical configuration mismatch')
@@ -73,7 +74,7 @@ def _reuse(reuse_from, suite_name, task, binding):
             compatible.append({'origin': 'reused', 'status': status, 'native_utility': utility,
                     'trace_path': str(path.resolve()), 'trace_sha256': trace_hash,
                     'manifest_path': str(manifest_path.resolve()), 'manifest_sha256': _file_hash(manifest_path),
-                    'reuse_checks': ['baseline', 'public-model-config', 'runtime-source-hashes',
+                    'reuse_checks': ['baseline', 'public-model-config', 'backend-metadata',
                                      'agentdojo-version', 'suite-version', 'task-id', 'GOAL', 'complete-native-result'],
                     'api_accounting': None, 'total_tokens': None})
         except (OSError, ValueError, KeyError, TypeError, AttributeError):
@@ -189,8 +190,10 @@ def screen(*, config_path, run_name, results_dir=None, reuse_from=None, suites=N
     progress.emit('启动，正在读取配置与任务目录。')
     config = resolve_model_config(config_path=config_path)
     current_binding = _binding(config, suites)
-    root = Path(results_dir or RESULTS_DIR / 'injection_precheck') / (
-        shared._safe_result_component(config.model_id, 'model') + '_' + backend.id + '_' + shared._safe_result_component(run_name, 'screen'))
+    root = resolve_run_path(results_dir or RESULTS_DIR / 'injection_precheck', backend.id,
+                            config.model_id, run_name, allow_legacy=True)
+    if root.exists() and not (root / 'screen_manifest.json').is_file():
+        raise ValueError('existing screen directory lacks a complete binding; use a new screen name')
     if reuse_from is not None and not Path(reuse_from).is_dir():
         raise ValueError('--reuse-from must be an existing benchmark run directory')
     with _lock(root):

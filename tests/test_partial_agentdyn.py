@@ -35,13 +35,13 @@ def profile(identity):
 
 
 class DualBackendRunnerContracts(unittest.TestCase):
-    def test_run_namespace_changes_at_call_time_without_reimport(self):
+    def test_run_component_does_not_repeat_backend_identity(self):
         for identity in (DOJO_IDENTITY, IDENTITY):
             with self.subTest(backend=identity['id']), patch.object(runner, 'get_backend', create=True, return_value=profile(identity)):
                 pipeline = SimpleNamespace(name='native')
-                self.assertEqual(runner._apply_run_name(pipeline, 'model/id', 'run'), f"model-id_{identity['id']}_run")
+                self.assertEqual(runner._apply_run_name(pipeline, 'model/id', 'run'), "model-id_run")
                 pipeline.name = 'native'
-                self.assertEqual(runner._apply_run_name(pipeline, 'model/id', None), f"native_{identity['id']}")
+                self.assertEqual(runner._apply_run_name(pipeline, 'model/id', None), "native")
 
     def test_exports_resolve_runtime_catalog_without_reimport(self):
         suite = SimpleNamespace(user_tasks=dict.fromkeys(['u0', 'u1', 'u2', 'u3']), injection_tasks=dict.fromkeys(['i0', 'i1', 'i2', 'i3']))
@@ -108,9 +108,9 @@ class AgentDynRunnerContracts(unittest.TestCase):
 
     def test_explicit_and_default_names_are_namespaced(self):
         pipeline = SimpleNamespace(name='native-model')
-        self.assertEqual(runner._apply_run_name(pipeline, 'model/id', 'trial'), 'model-id_agentdyn_trial')
+        self.assertEqual(runner._apply_run_name(pipeline, 'model/id', 'trial'), 'model-id_trial')
         pipeline.name = 'native-model'
-        self.assertEqual(runner._apply_run_name(pipeline, 'model/id', None), 'native-model_agentdyn')
+        self.assertEqual(runner._apply_run_name(pipeline, 'model/id', None), 'native-model')
 
     def test_backend_rejected_before_model_or_output_creation(self):
         with patch.object(runner, 'get_backend', create=True, side_effect=ValueError('wrong fork')), \
@@ -159,6 +159,10 @@ class AgentDynOfflineExecution(unittest.TestCase):
     def setUp(self):
         stack = fixture_backend(IDENTITY)
         self.addCleanup(stack.close)
+        description = SimpleNamespace(name='provider/model', dscg_model_config={'model_id': 'provider/model'},
+                                      dscg_security_model_config={}, dscg_optimization_config={})
+        patcher = patch.object(runner, '_describe_pipeline', return_value=description)
+        patcher.start(); self.addCleanup(patcher.stop)
         self.suite = SimpleNamespace(user_tasks={f'user_task_{i}': None for i in range(4)},
                                      injection_tasks={f'injection_task_{i}': None for i in range(4)})
         patcher = patch.object(runner, 'get_suite', return_value=self.suite)
@@ -188,7 +192,7 @@ class AgentDynOfflineExecution(unittest.TestCase):
                 patch.object(runner, 'make_defended_pipeline', side_effect=lambda *a, **k: (*self.factory(), None)), \
                 patch.object(runner.benchmark, 'benchmark_suite_without_injections', side_effect=results):
             self.assertEqual(runner.main(run_attack=False, results_dir=root, run_name='metadata', suites=['shopping']), 0)
-            summary = json.loads((Path(root) / 'provider-model_agentdyn_metadata/none/shopping/summary.json').read_text())
+            summary = json.loads((Path(root) / 'agentdyn/provider-model_metadata/none/shopping/summary.json').read_text())
             self.assertEqual(summary['run_manifest'].get('tool_metadata_selection'), record)
             self.assertEqual(summary.get('tool_metadata_selection'), record)
             self.assertIn(record['path'], output.getvalue())
@@ -219,7 +223,7 @@ class AgentDynOfflineExecution(unittest.TestCase):
                         for attacked in (False, True):
                             name = f'{scope}_{attacked}'
                             self.assertEqual(entry(origin=True, run_attack=attacked, run_name=name, results_dir=directory), 0)
-                            base = Path(directory) / ('provider-model_' + identity['id'] + '_' + name)
+                            base = Path(directory) / (identity['id'] + '/provider-model_' + name)
                             manifest = json.loads((base / 'attack_manifest.json').read_text())
                             self.assertEqual(manifest['benchmark'], identity)
                             self.assertEqual(manifest['suites'], list(profile(identity).suites))
@@ -257,7 +261,7 @@ def fixture_backend(identity=DOJO_IDENTITY, *, native_legacy=False):
     return stack
 
 
-def legacy_fixture_backend(namespace):
+def legacy_fixture_backend(namespace, model="offline-model"):
     """Exercise historical generic native tasks with a synthetic AgentDojo profile.
 
     AgentDyn still ships the old suites, allowing the same generic logging and
@@ -266,4 +270,9 @@ def legacy_fixture_backend(namespace):
     """
     suites = profile(DOJO_IDENTITY).suites
     if 'SUITES' in namespace and namespace['SUITES'] != list(suites): namespace['SUITES'] = suites
-    return fixture_backend(DOJO_IDENTITY, native_legacy=True)
+    stack = fixture_backend(DOJO_IDENTITY, native_legacy=True)
+    if 'serial_fixture' not in namespace:
+        stack.enter_context(patch.object(runner, '_describe_pipeline', side_effect=lambda *a, **k:
+            SimpleNamespace(name=a[0] or model, dscg_model_config={'model_id': a[0] or model},
+                            dscg_security_model_config={}, dscg_optimization_config={})))
+    return stack

@@ -64,7 +64,7 @@ class ReuseIntegrationTests(unittest.TestCase):
 
     @property
     def base(self):
-        return self.root / 'offline-model_agentdojo_old'
+        return self.root / 'agentdojo/offline-model_old'
 
     def run_benchmark(self, entry=runner.main, **overrides):
         options = dict(origin=True, suites=['workspace'], results_dir=self.root, run_name='old',
@@ -126,19 +126,19 @@ class ReuseIntegrationTests(unittest.TestCase):
         self.assertEqual(len(self.executed), calls)
         self.assertTrue((self.base / 'benchmark_plan.json').exists())
 
-    def test_old_agentdojo_source_rejects_without_changing_manifest(self):
+    def test_source_changes_resume_without_changing_manifest(self):
         self.assertEqual(self.run_benchmark(), 0)
         fixture = json.loads((Path(__file__).with_name('fixtures') / 'benchmark_reuse_source_20261017.json').read_text())
         path = self.base / 'tool_knowledge/workspace/run_manifest.json'
         binding = json.loads(path.read_text()); binding['source'] = fixture
         path.write_text(json.dumps(binding)); original = path.read_bytes(); calls = len(self.executed)
-        self.assertEqual(self.run_benchmark(reuse=True), 1)
+        self.assertEqual(self.run_benchmark(reuse=True), 0)
         self.assertEqual(path.read_bytes(), original)
         self.assertEqual(len(self.executed), calls)
         binding['source']['source_sha256']['dscg/pipelines/defended.py'] = '0' * 64
         path.write_text(json.dumps(binding)); before = self.files()
-        self.assertEqual(self.run_benchmark(reuse=True), 1)
-        self.assertEqual(self.files(), before)
+        self.assertEqual(self.run_benchmark(reuse=True), 0)
+        self.assertEqual(path.read_bytes(), before[path.relative_to(self.base)])
 
     def test_clean_reuse_rebuilds_missing_user_only(self):
         self.assertEqual(self.run_benchmark(run_attack=False), 0)

@@ -24,31 +24,31 @@ python -m dscg.benchmark_catalog
 | ipi | 官方AgentDojo0.1.35发行包，suitev1.2 | workspace/travel/banking/slack |
 | ipi-agentdyn | AgentDyn提交5353cf7615b135cace8d07c8f12dac53a16b6db3，suitev1.2 | shopping/github/dailylife |
 
-两个包都声明agentdojo0.1.35，不能只看版本或环境名。启动按安装来源及完整文件集合/哈希识别；未知fork、提交、增删或修改源码在创建模型前拒绝。AgentDojo锁定官方wheel与112个源码/数据文件，身份使用PyPI发行标识而不虚构Git提交；AgentDyn保留1374文件的Git锁。环境定义固定顶层依赖，不是完整传递依赖锁。
+两个包都声明agentdojo0.1.35，不能只看版本或环境名。当前按实际加载路径、安装来源、版本和固定revision自动识别；未知来源、错误revision、包路径冲突或不支持的场景在模型创建前拒绝。运行时不遍历后端源码、不计算源码哈希。两份lock保留历史哈希及发行元数据，当前只读取元数据；不是完整依赖锁。
 
-本机ipi的openai_llm.py与官方发行包只有一处角色适配：system消息发送为system而不是developer。此确切文件作为`reviewed-local-system-role-v1`单独校验和记录；干净发行版为official-release。不会修改环境或接受其他未知补丁。不同runtime_variant/实现哈希不能自动配对；同轮baseline/DSCG必须使用同一环境。远端模型真实修订和服务鉴权仍需实际测试。
+当前记录`verification_mode=metadata_only`、`runtime_variant=unverified`。不再验证官方源码与本地system角色适配的逐字节差异；同轮baseline/DSCG仍应使用相同安装环境。远端模型真实修订和服务表现需实际测试。
 
 模型配置及Key继续使用本地文件/环境变量，不覆盖已有配置。工具目录按当前后端自动选择，显式参数/环境覆盖、基准专用local目录仍可使用；当前通用tools.local是AgentDojo内置目录的相同副本，在AgentDyn自动选用对应内置目录并给出提示。未知自定义通用目录报错，不悄悄忽略。细则见配置指南；baseline不使用防御风险目录。
 
-## 进程并发提速
+<a id="进程并发提速"></a>
 
-主模型、授权编译和审计默认使用 Qwen3.7-Flash，显式关闭思考；本地配置、环境变量和显式参数仍可覆盖。配置方法见[模型指南](./model_tool_configuration.md#24-最小可运行配置与角色复用)。原DeepSeek凭证可继续保存在其provider共享段。
+## 顺序执行与准备信息
 
-`--workers N` 控制“攻击×场景”组的独立进程数，默认1；clean每场景一组。实际并发不超过非空组数，组内沿用原生顺序工具循环和GOAL预检。可用于full/partial、baseline/DSCG、clean及cohort，不增加任务或重试，不修改评分。一个场景、一个攻击只有一组，加大workers也不能拆分其中的任务。
+主模型、授权编译和审计默认使用 Qwen3.7-Flash，显式关闭思考；本地配置、环境变量和显式参数仍可覆盖。配置方法见[模型指南](./model_tool_configuration.md#24-最小可运行配置与角色复用)。
+
+full、partial和cohort均按攻击、场景顺序执行，已删除workers参数及进程并发。旧命令需去掉该参数。准备阶段静默核对完整任务范围与已有配置绑定，不创建pipeline或发起模型请求；启动一次打印模型、后端、攻击、场景、结果目录和缓存策略，每组再打印任务数与开始/完成状态。原生任务对话、错误和必要警告继续输出。
 
 ```bash
-python -m experiments.run_benchmark --baseline --workers 3 --force-rerun \
+python -m experiments.run_benchmark --baseline --force-rerun \
   --model-config config/models.local.toml --name qwen37_full_baseline_01
 
-python -m experiments.run_benchmark --workers 3 --force-rerun \
+python -m experiments.run_benchmark --force-rerun \
   --model-config config/models.local.toml --name qwen37_full_dscg_01
 ```
 
-这是在线并发调用，不是[百炼异步Batch API](https://help.aliyun.com/zh/model-studio/batch-inference)，不享受Batch折扣，也不保证总Tokens下降。过高并发可能触发服务限流；不会因并发新增自动重试。正式对照使用相同并发设置，并分别报告API累计延迟和本次实际总耗时。
+每个目标型攻击/场景分组仍先执行原生GOAL预检，再执行用户×注入目标组合；一次任务通常包含多次模型/工具交互，DSCG还包括授权和审计。减小本地准备开销不保证Qwen服务响应加快，也不享受官方Batch折扣。
 
-父进程先核验全部绑定，再调度；同目录重复启动会被运行锁拒绝。子进程只写各自攻击/场景结果，父进程统一生成根报告。`attack_manifest.json.execution` 和 `execution/<本次ID>/execution.json` 记录并发、组状态及wall_seconds；并发组的详细输出在该目录的group日志。失败组单列，其他组继续；中断会回收子进程，使用原参数加reuse恢复，workers可调整。
-
-本次模型/源码变更要求新运行名和新预检名单；不迁移旧缓存、扩展历史兼容名单或改写历史证据。screen仍顺序运行。Python API对应 `workers=1`。
+同目录运行锁防止重复写入。`attack_manifest.json.execution`与`execution/<本次ID>/execution.json`记录serial、组状态及wall_seconds；历史并发记录保持原样。失败组单列，其他组继续；中断保留原生结果，使用原参数加reuse恢复。API不再提供workers参数。
 
 ## 1. 使用哪个入口
 
@@ -133,19 +133,30 @@ python -m experiments.run_injection_precheck screen \
 
 ```bash
 python -m experiments.run_benchmark --baseline --attack typical \
-  --cohort results/injection_precheck/qwen3.7-flash_agentdyn_injection_screen_01/cohort.json \
+  --cohort results/injection_precheck/agentdyn/qwen3.7-flash_injection_screen_01/cohort.json \
   --name baseline_screened_01
 
 python -m experiments.run_benchmark --attack typical \
-  --cohort results/injection_precheck/qwen3.7-flash_agentdyn_injection_screen_01/cohort.json \
+  --cohort results/injection_precheck/agentdyn/qwen3.7-flash_injection_screen_01/cohort.json \
   --name dscg_screened_01
 ```
 
-示例使用AgentDyn路径；AgentDojo输出路径中为agentdojo。必须换成当前环境实际生成的模型/运行目录，不交叉读取名单。screened保留全部所选用户任务，仅筛选目标，结果不能标成当前基准的完整结果。名单绑定当前后端、模型、任务/环境/攻击/工具及证据哈希。本轮支持新生成名单和同身份续跑，不迁移交付前的缓存/cohort，也不扩展旧源码兼容映射。两套后端名单不可互换。细则见 [预检指南](./injection_precheck.md)。
+示例使用AgentDyn路径；AgentDojo输出路径中为agentdojo。使用当前环境实际生成的模型/运行目录，名单不能跨后端读取。screened保留全部所选用户任务，仅筛选目标；名单核对后端元数据、模型、任务ID、GOAL、筛选规则及证据哈希，源码变化本身不再阻止读取。细则见[预检指南](./injection_precheck.md)。
 
 ## 结果文件
 
-默认根目录保持 `results/benchmarks/`，partial为 `results/partial_benchmark/`；新运行自动使用 `<model_id>_<benchmark_id>_<name>/`。内部布局：
+CLI测量和screen在分类根目录下新增后端子目录，模型/运行名称中不再自动重复后端：
+
+```text
+results/partial_benchmark/agentdojo/qwen3.7-flash_baseline/
+results/partial_benchmark/agentdyn/qwen3.7-flash_baseline/
+results/benchmarks/agentdojo/qwen3.7-flash_baseline/
+results/injection_precheck/agentdojo/qwen3.7-flash_injection_screen_01/
+```
+
+`--results-dir DIR`仍表示分类根，实际保存为`DIR/<backend>/<model>_<name>/`，不会自动判断DIR末尾是否已有后端名。未传name时保留原pipeline默认名称，去掉原先额外追加的后端后缀。Dashboard发起实验仍保存在原dashboard目录；历史页支持两种CLI布局，按实际路径分别展示。
+
+默认根目录保持 `results/benchmarks/`，partial为 `results/partial_benchmark/`；新运行自动使用 `<benchmark_id>/<model_id>_<name>/`。内部布局：
 
 ```text
 <run>/
@@ -154,12 +165,12 @@ python -m experiments.run_benchmark --attack typical \
   summary.json / summary.md / failure_cases.jsonl
   <attack>/<suite>/
     run_manifest.json / summary.json / summary.md
-    <user_task>/<injection_task>/<attack>.json
+    <user_task>/<attack>/<injection_task>.json
 ```
 
 clean使用 `none/<suite>/<user_task>/none/none.json`。原生JSON与full trace压缩侧车保留；`summary.md`便于阅读，JSONL按原路径定位失败，片段只是排查线索。缺失/非布尔安全标签、API/运行错误单列，不能当成攻击失败或防御成功；中断任务不能补造标签。计分分母和错误数必须一起报告。
 
-manifest、cohort、summary和导出记录 `benchmark`：仓库、完整revision、suite_version、整体实现/目录及tasks/environments/attacks/tools哈希；本地配置/工具元数据与防御源码另有绑定。不同后端、任务集合或不明身份不能自动配对或合并分母。旧记录缺失身份时显示历史/未确认，不反推AgentDyn身份。
+manifest、cohort、summary和导出记录`benchmark`的id、repository、revision、suite_version、package_version、source_kind及`verification_mode=metadata_only`。新结果不生成后端实现/目录/组件源码哈希，也不认证runtime_variant。模型公开请求配置、完整任务集合、攻击、工具元数据内容及有效防御设置仍绑定；不同后端或任务集合不能合并分母。旧记录中的哈希保留，缺少必要身份的历史目录不能推断补齐。
 
 成本核对主模型、安全模型、合计Token和调用次数；攻击目标预检与独立screen成本分别注明，不能重复累加。缓存复用后不等于一次完整新鲜测量；检查 `cost_scope`、`invocation_cost`、`cost_comparison_ready`，缺少usage保留未知。
 
@@ -176,15 +187,17 @@ python -m experiments.run_benchmark --reuse \
   --name dscg_typical_01
 ```
 
-未指定attack/suites时恢复本轮交付后、同一基准身份的新运行完整计划；显式提供必须一致。clean仍需clean，screened仍需同一cohort。reuse不与force-rerun或离线manifest导出混用，覆盖DSCG_FORCE_RERUN的强制设置。配置冲突先拒绝，不覆盖旧报告；force-rerun也不能绕过绑定。本次不迁移旧目录/cohort或扩展旧源码兼容映射；交付前实验用原代码继续或新name重做，不补造身份、推断原范围或改写旧报告。
+未指定attack/suites时恢复原运行的完整计划；显式提供必须一致。clean仍需clean，screened仍需同一cohort。reuse与force-rerun或离线manifest导出互斥，并覆盖DSCG_FORCE_RERUN。新旧运行均按后端来源/版本、模型公开请求配置、完整任务ID、攻击/场景、cohort、工具元数据内容及有效防御配置核对；源码哈希、Git commit、Python补丁版本和旧并发设置不作为续跑门槛。缺少必要绑定或原范围不能核验时拒绝，不补造身份。
 
-原生接受的成功、失败及错误缓存不会自动重试；reuse补跑缺失或原生不完整任务，不恢复单个工具动作。报告更新前保存快照，需替换的不完整轨迹先保存原字节。保持旧文件与哈希，不手改manifest/cohort/兼容映射。源码或模型设置变化使用新name。
+原生接受的成功、失败及错误缓存不会自动重试；reuse只补跑缺失或原生不完整任务，不恢复单个工具动作。更新汇总前保存快照，需要替换的不完整轨迹先保留原字节。旧run/cohort/attempt绑定不改写；规则变化另存configuration_only记录，明确source_equivalence_verified=false。配置一致续跑并不证明源码等价，正式比较仍需自行保持代码与环境一致。
 
 退出0表示流程正常结束，不表示任务全成功或安全验收通过；退出1表示配置/执行/攻击异常，错误保留并继续可执行的后续攻击；退出2常为CLI参数错误。
 
+新旧目录续跑：`--reuse`先定位新`<backend>/<model>_<name>/`；仅在新路径不存在时查找原`<model>_<backend>_<name>/`，并在旧目录原地续跑。新路径存在但绑定不完整/配置不符时直接拒绝，不回退；两者同时存在时优先新目录。不传reuse的测量只定位新结构并使用其中的原生缓存。原结果不移动，旧cohort/轨迹引用不改写。
+
 ## cohort 或续跑校验失败
 
-来源/revision/hash或配置冲突表示证据身份不一致，不等于模型配置文件缺失。先核对所选环境、已验证的发行/提交、模型公开配置、工具目录和原防御参数；交付前的名单需使用原代码继续或按当前基准重新生成，不能编辑兼容映射/manifest绕过检查。CLI路由解析器保留default=None，按profile解析shadow/off，不要在服务器手改成固定字符串。
+来源/revision、模型、任务、GOAL或防御配置冲突不等于模型配置文件缺失。先核对实际Python与包路径、安装来源、模型公开配置、工具目录和原防御参数；cohort文件/轨迹哈希不符仍拒绝。当前已取消源码兼容映射检查，不需要为单纯源码变化修改映射或manifest。CLI路由解析器保留default=None，按profile解析shadow/off。
 
 ## 可选控制与日志
 
