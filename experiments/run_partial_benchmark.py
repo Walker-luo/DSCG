@@ -3,6 +3,8 @@ import os
 import re
 from pathlib import Path
 import csv
+from time import monotonic
+from uuid import uuid4
 
 from agentdojo import logging, benchmark, attacks
 from agentdojo.attacks.attack_registry import ATTACKS
@@ -24,6 +26,9 @@ from experiments.common.partial_controls import (validate_controls, make_task_ma
                                           select_tasks, guard_run, source_revision, preserve_cached_cost,
                                           RunConfigurationError)
 from experiments.common.benchmark_reuse import ReusePlan, execution_plan
+from experiments.common.benchmark_execution import (
+    PreparedBindings, ApprovedBindings, run_lock, validate_workers, execute_groups,
+)
 
 
 TYPICAL_ATTACKS = (
@@ -161,8 +166,10 @@ def main(
     use_sandbox: bool = True,
     cohort_sha256: str | None = None,
     cohort_path: str | Path | None = None,
+    workers: int = 1,
     _reuse_plan=None,
 ) -> int:
+    validate_workers(workers)
     backend = get_backend()
     if task_scope not in {'partial', 'full', 'screened', 'partial_screened'}:
         raise ValueError('unknown task scope')
@@ -178,6 +185,7 @@ def main(
             cohort_path, task_scope='partial_screened', suites=suites, model_id=model_id,
             sec_model_id=sec_model_id, origin=origin, defense=defense, config_path=config_path,
             run_name=run_name, results_dir=results_dir, attack=attack, force_rerun=force_rerun, reuse=reuse,
+            workers=workers,
             api_key=api_key, base_url=base_url, provider=provider, api_key_env=api_key_env,
             sec_api_key=sec_api_key, sec_base_url=sec_base_url, sec_provider=sec_provider,
             sec_api_key_env=sec_api_key_env, trace_level=trace_level, tool_metadata_path=tool_metadata_path,
@@ -233,15 +241,17 @@ def main(
         print(f"本次攻击 ({len(attack_names)}): {', '.join(attack_names)}")
     print(f"本次场景 ({len(suites)}): {', '.join(suites)}", flush=True)
 
-    def execute(attack_name, prepare_only=False):
-        return _run_single_attack(
-                model_id, sec_model_id, suites, run_attack, origin, defense,
+    prepared = resume if resume is not None else PreparedBindings()
+    resources = {}
+    def group_options(attack_name):
+        return dict(
+                model_id=model_id, sec_model_id=sec_model_id, suites=suites, run_attack=run_attack, origin=origin, defense=defense,
                 api_key=api_key, base_url=base_url, provider=provider, api_key_env=api_key_env,
                 sec_api_key=sec_api_key, sec_base_url=sec_base_url, sec_provider=sec_provider,
                 sec_api_key_env=sec_api_key_env, config_path=config_path, force_rerun=force_rerun,
                 run_name=run_name, trace_level=trace_level, tool_metadata_path=tool_metadata_path,
                 results_dir=logdir, attack_name=attack_name,
-                report_context=context, use_security_checker=use_security_checker,
+                use_security_checker=use_security_checker,
                 audit_retries=audit_retries, completion_prompt=completion_prompt,
                 task_manifest_path=task_manifest_path,
                 audit_router_mode=audit_router_mode,audit_router_artifact=audit_router_artifact,
@@ -249,75 +259,112 @@ def main(
                 delegated_tasks=delegated_tasks and not origin and use_sandbox,
                 l1_projection_mode='off' if origin or not (use_sandbox or use_security_checker) else l1_projection_mode,
                 task_scope=task_scope, use_sandbox=use_sandbox, cohort_sha256=cohort_sha256,
-                reuse_plan=resume, prepare_only=prepare_only,
-            )
-    if reuse:
-        try:
-            for attack_name in attack_names:
-                execute(attack_name, prepare_only=True)
-            resume.commit()
-        except RunConfigurationError as exc:
-            print(f'❌ 续跑校验失败: {exc}', flush=True)
-            return 1
-    for attack_name in attack_names:
-        context["active_suite"] = None
-        try:
-            output_dir = execute(attack_name)
-        except RunConfigurationError as exc:
-            print(f"❌ 配置绑定冲突: {exc}")
-            return 1
-        except (ModelConfigurationError, ToolMetadataError):
-            raise
-        except Exception as exc:
-            # Keep the other attacks runnable without turning a failed attack
-            # into a zero-ASR result. Avoid persisting raw provider exceptions.
-            run_records.append({"attack": attack_name, "status": "error", "error_type": type(exc).__name__,
-                                "failed_suite": context.get("active_suite")})
-            print(f"❌ [{attack_name}] 运行失败: {type(exc).__name__}；保留已有结果并继续其他攻击。")
-        else:
-            run_records.append({
-                "attack": attack_name, "status": "completed",
-                "output_dir": str(output_dir) if output_dir is not None else None,
-            })
-            if output_dir is not None:
-                report_sources.append((attack_name, output_dir / "all_report.txt"))
 
-    fallback = logdir / (backend.id + "_" + _safe_result_component(run_name, "attack-run"))
-    batch_dir = context.get("base_output_dir", fallback)
-    batch_dir.mkdir(parents=True, exist_ok=True)
-    manifest = {
-        "schema_version": "dscg.attack-manifest.v2", "benchmark": benchmark_identity(),
-        "task_scope": task_scope,
-        "result_layout": "model_run/attack/suite",
-        "pipeline_name": context.get("pipeline_name"),
-        "model_id": context.get("model_id"),
-        "attacks": attack_names if run_attack else [],
-        "suites": suites,
-        "suite_scope": "all_registered" if set(suites) == set(backend.suites) else "selected",
-        "excluded_from_all": {"manual": "requires interactive input"},
-        "runs": run_records,
-    }
-    if cohort_sha256 is not None:
-        manifest['cohort_sha256'] = cohort_sha256
-    manifest_path = batch_dir / "attack_manifest.json"
-    manifest_path.write_text(json.dumps(manifest, indent=2, ensure_ascii=False), encoding="utf-8")
-    if multiple:
-        for record in run_records:
-            if record["status"] == "error":
-                error_path = batch_dir / f"{_safe_result_component(record['attack'], 'attack')}_error.txt"
-                error_path.write_text(f"运行失败: {record['error_type']}；未生成完整指标，已有逐任务结果可能不完整。\n", encoding="utf-8")
-                report_sources.append((record["attack"], error_path))
-    if report_sources:
-        _write_combined_report(batch_dir, report_sources)
-    overview_path, failures_path = write_run_overview(
-        batch_dir, attack_names, suites, run_records, context.get("suite_reports", []),
-        model_id=context.get("model_id", model_id), task_scope=task_scope,
-    )
-    print(f"📝 紧凑摘要: {overview_path}")
-    print(f"🔎 失败片段: {failures_path}")
-    print(f"📋 攻击执行清单: {manifest_path}")
-    return 1 if (any(record["status"] == "error" for record in run_records) or
-                 any(report.get("task_errors") for report in context.get("suite_reports", []))) else 0
+        )
+    try:
+        for attack_name in attack_names:
+            _run_single_attack(**group_options(attack_name), report_context=context,
+                               reuse_plan=prepared, prepare_only=True, resource_cache=resources)
+    except RunConfigurationError as exc:
+        print(f'❌ 配置绑定冲突: {exc}', flush=True)
+        return 1
+    base = context['base_output_dir']
+    with run_lock(base):
+        try:
+            if not set(base.glob('*/*/run_manifest.json')) <= prepared.checked.keys():
+                raise RunConfigurationError('existing task bindings fall outside the complete requested plan')
+            prepared.commit()
+        except RunConfigurationError as exc:
+            print(f'❌ 配置绑定冲突: {exc}', flush=True)
+            return 1
+        approved = ApprovedBindings(prepared)
+        jobs = [{'attack': name, 'suite': suite,
+                 'options': group_options(name), 'bindings': approved,
+                 'execution_plan': context['execution_plan'],
+                 'resources': resources if workers == 1 else None}
+                for name in attack_names for suite in suites]
+        invocation = uuid4().hex
+        execution_dir = base / 'execution' / invocation
+        execution_dir.mkdir(parents=True, exist_ok=True)
+        execution = {'mode': 'serial' if workers == 1 else 'spawn', 'unit': 'attack_suite',
+                     'workers_requested': workers, 'workers_effective': min(workers, len(jobs)),
+                     'planned_groups': len(jobs), 'invocation_id': invocation}
+        print(f"执行策略: {execution['mode']}；并发={execution['workers_effective']}；组数={len(jobs)}", flush=True)
+        started = monotonic()
+        try:
+            group_results = execute_groups(jobs, workers, _execute_group, execution_dir)
+        except KeyboardInterrupt:
+            execution.update(status='interrupted', wall_seconds=monotonic() - started)
+            (execution_dir / 'execution.json').write_text(json.dumps(execution, indent=2) + '\n')
+            print('已中断并回收子进程；保留原参数、运行名并加 --reuse 续跑。', flush=True)
+            return 130
+        execution.update(status='error' if any(r['status'] == 'error' for r in group_results) else 'completed',
+                         wall_seconds=monotonic() - started,
+                         groups=[{'attack': j['attack'], 'suite': j['suite'],
+                                  **{k: v for k, v in r.items() if k != 'result'}}
+                                 for j, r in zip(jobs, group_results)])
+        (execution_dir / 'execution.json').write_text(json.dumps(execution, indent=2) + '\n')
+        for name in attack_names:
+            entries = [(j, r) for j, r in zip(jobs, group_results) if j['attack'] == name]
+            errors = [(j, r) for j, r in entries if r['status'] == 'error']
+            report_sources_for_attack = []
+            for job, result in entries:
+                if result['status'] == 'completed':
+                    context.setdefault('suite_reports', []).extend(result['result']['suite_reports'])
+                    report_sources_for_attack.append((job['suite'], base / name / job['suite'] / 'report.txt'))
+            if errors:
+                for job, result in errors:
+                    run_records.append({'attack': name, 'status': 'error', 'failed_suite': job['suite'],
+                                        'error_type': result['error_type']})
+            else:
+                run_records.append({'attack': name, 'status': 'completed', 'output_dir': str(base / name)})
+            if report_sources_for_attack:
+                _write_combined_report(base / name, report_sources_for_attack)
+                report_sources.append((name, base / name / 'all_report.txt'))
+
+        fallback = logdir / (backend.id + "_" + _safe_result_component(run_name, "attack-run"))
+        batch_dir = context.get("base_output_dir", fallback)
+        batch_dir.mkdir(parents=True, exist_ok=True)
+        manifest = {
+            "schema_version": "dscg.attack-manifest.v2", "benchmark": benchmark_identity(),
+            "task_scope": task_scope,
+            "result_layout": "model_run/attack/suite",
+            "pipeline_name": context.get("pipeline_name"),
+            "model_id": context.get("model_id"),
+            "attacks": attack_names if run_attack else [],
+            "suites": suites,
+            "suite_scope": "all_registered" if set(suites) == set(backend.suites) else "selected",
+            "excluded_from_all": {"manual": "requires interactive input"},
+            "runs": run_records, "execution": execution,
+        }
+        if cohort_sha256 is not None:
+            manifest['cohort_sha256'] = cohort_sha256
+        manifest_path = batch_dir / "attack_manifest.json"
+        manifest_path.write_text(json.dumps(manifest, indent=2, ensure_ascii=False), encoding="utf-8")
+        if multiple:
+            for record in run_records:
+                if record["status"] == "error":
+                    error_path = batch_dir / f"{_safe_result_component(record['attack'], 'attack')}_error.txt"
+                    error_path.write_text(f"运行失败: {record['error_type']}；未生成完整指标，已有逐任务结果可能不完整。\n", encoding="utf-8")
+                    report_sources.append((record["attack"], error_path))
+        if report_sources:
+            _write_combined_report(batch_dir, report_sources)
+        overview_path, failures_path = write_run_overview(
+            batch_dir, attack_names, suites, run_records, context.get("suite_reports", []),
+            model_id=context.get("model_id", model_id), task_scope=task_scope,
+        )
+        print(f"📝 紧凑摘要: {overview_path}")
+        print(f"🔎 失败片段: {failures_path}")
+        print(f"📋 攻击执行清单: {manifest_path}")
+        return 1 if (any(record["status"] == "error" for record in run_records) or
+                     any(report.get("task_errors") for report in context.get("suite_reports", []))) else 0
+
+
+def _execute_group(job):
+    context = {'execution_plan': job['execution_plan']}
+    _run_single_attack(**job['options'], only_suite=job['suite'], group_mode=True,
+                       reuse_plan=job['bindings'], report_context=context, resource_cache=job.get('resources'))
+    return {'suite_reports': context.get('suite_reports', [])}
 
 
 def _run_single_attack(
@@ -358,6 +405,9 @@ def _run_single_attack(
     cohort_sha256: str | None = None,
     reuse_plan=None,
     prepare_only=False,
+    only_suite=None,
+    group_mode=False,
+    resource_cache=None,
 ):
     """
         model_id: 执行的llm的id
@@ -379,16 +429,21 @@ def _run_single_attack(
                       audit_retries=audit_retries, completion_prompt=completion_prompt)
     frozen_tasks = load_task_manifest(task_manifest_path)
     selection_seed = None if task_scope in {'full', 'screened'} else frozen_tasks.get("seed", 7) if frozen_tasks else 7
-    metadata_selection = None
-    tool_metadata = None
-    if not origin:
-        selection = resolve_tool_metadata(tool_metadata_path, backend=backend)
-        metadata_selection = selection.public_dict()
-        print(f"工具分类目录: {metadata_selection['path']}；来源: {metadata_selection['source']}；基准: {backend.label}", flush=True)
-        if metadata_selection.get('warning'):
-            print(f"工具分类目录提示: {metadata_selection['warning']}", flush=True)
-        validate_benchmark_tool_metadata(selection.path)
-        tool_metadata = load_tool_metadata(selection.path)
+    if resource_cache is not None and 'metadata' in resource_cache:
+        metadata_selection, tool_metadata = resource_cache['metadata']
+    else:
+        metadata_selection = None
+        tool_metadata = None
+        if not origin:
+            selection = resolve_tool_metadata(tool_metadata_path, backend=backend)
+            metadata_selection = selection.public_dict()
+            print(f"工具分类目录: {metadata_selection['path']}；来源: {metadata_selection['source']}；基准: {backend.label}", flush=True)
+            if metadata_selection.get('warning'):
+                print(f"工具分类目录提示: {metadata_selection['warning']}", flush=True)
+            validate_benchmark_tool_metadata(selection.path)
+            tool_metadata = load_tool_metadata(selection.path)
+        if resource_cache is not None:
+            resource_cache['metadata'] = (metadata_selection, tool_metadata)
     active_defense = defense if origin else "dscg"
     logdir = Path(results_dir) if results_dir is not None else BENCHMARK_RESULTS_DIR if task_scope in {'full', 'screened'} else RESULTS_DIR / "partial_benchmark"
     logdir.mkdir(parents=True, exist_ok=True)
@@ -397,45 +452,53 @@ def _run_single_attack(
 
     print(f"开始实验 - 模型: {model_id or '本地/环境配置'}, 攻击: {attack_name if run_attack else '无'}, 防御: {active_defense or '无（baseline）'}")
 
-    for suite_name in suites:
+    for suite_name in ([only_suite] if only_suite is not None else suites):
         if report_context is not None:
             report_context["active_suite"] = suite_name
         print(f"\n正在测试套件: {suite_name}...")
-        sec_tracker = None
-        
-        if origin:
-            pipeline, main_tracker = make_openai_compatible_pipeline(
-                model_id,
-                ad_defense=defense,
-                api_key=api_key,
-                base_url=base_url,
-                provider=provider,
-                api_key_env=api_key_env,
-                config_path=config_path,
-            )
-
+        cache_key = (attack_name, suite_name)
+        if resource_cache is not None and cache_key in resource_cache:
+            pipeline, main_tracker, sec_tracker, original_name = resource_cache[cache_key]
+            pipeline.name = original_name
         else:
-            pipeline, main_tracker, sec_tracker = make_defended_pipeline(
-                model_id,
-                sec_model_id,
-                api_key=api_key,
-                base_url=base_url,
-                provider=provider,
-                api_key_env=api_key_env,
-                sec_api_key=sec_api_key,
-                sec_base_url=sec_base_url,
-                sec_provider=sec_provider,
-                sec_api_key_env=sec_api_key_env,
-                config_path=config_path,
-                trace_level=trace_level,
-                tool_metadata=tool_metadata,
-                use_security_checker=use_security_checker,
-                use_sandbox=use_sandbox,
-                audit_retries=audit_retries, completion_prompt=completion_prompt,
-                audit_router_mode=audit_router_mode,audit_router_artifact=audit_router_artifact,
-                planning_tool_view=planning_tool_view, delegated_tasks=delegated_tasks,
-                l1_projection_mode=l1_projection_mode,
-            )
+            sec_tracker = None
+        
+            if origin:
+                pipeline, main_tracker = make_openai_compatible_pipeline(
+                    model_id,
+                    ad_defense=defense,
+                    api_key=api_key,
+                    base_url=base_url,
+                    provider=provider,
+                    api_key_env=api_key_env,
+                    config_path=config_path,
+                )
+
+            else:
+                pipeline, main_tracker, sec_tracker = make_defended_pipeline(
+                    model_id,
+                    sec_model_id,
+                    api_key=api_key,
+                    base_url=base_url,
+                    provider=provider,
+                    api_key_env=api_key_env,
+                    sec_api_key=sec_api_key,
+                    sec_base_url=sec_base_url,
+                    sec_provider=sec_provider,
+                    sec_api_key_env=sec_api_key_env,
+                    config_path=config_path,
+                    trace_level=trace_level,
+                    tool_metadata=tool_metadata,
+                    use_security_checker=use_security_checker,
+                    use_sandbox=use_sandbox,
+                    audit_retries=audit_retries, completion_prompt=completion_prompt,
+                    audit_router_mode=audit_router_mode,audit_router_artifact=audit_router_artifact,
+                    planning_tool_view=planning_tool_view, delegated_tasks=delegated_tasks,
+                    l1_projection_mode=l1_projection_mode,
+                )
+
+            if resource_cache is not None:
+                resource_cache[cache_key] = (pipeline, main_tracker, sec_tracker, pipeline.name)
 
         main_model_config = getattr(pipeline, "dscg_model_config", {})
         sec_model_config = getattr(pipeline, "dscg_security_model_config", {})
@@ -476,7 +539,13 @@ def _run_single_attack(
         print(f"总计 User Tasks 数量: {len(user_task_ids)}")
         print(f"总计 Injection Tasks 数量: {len(injection_task_ids)}")
 
-        attack = attacks.load_attack(attack_name, suite, pipeline) if run_attack else None
+        attack_key = ('attack', attack_name, suite_name)
+        if resource_cache is not None and attack_key in resource_cache:
+            attack = resource_cache[attack_key]
+        else:
+            attack = attacks.load_attack(attack_name, suite, pipeline) if run_attack else None
+            if resource_cache is not None:
+                resource_cache[attack_key] = attack
         is_dos_attack = run_attack and attack.is_dos_attack
 
         # Share the same scope/IDs across baseline and DSCG; only partial is capped.
@@ -762,7 +831,7 @@ def _run_single_attack(
         print(f"📊 数据表格(用于画图): {csv_file_path}")
         print(f"📈 得分汇总: {summary_file_path}\n")
 
-    if output_dir is not None and report_sources:
+    if output_dir is not None and report_sources and not group_mode:
         combined_report_path = _write_combined_report(output_dir, report_sources)
         print("✅ 所选场景的报告已合并")
         print(f"📚 总报告: {combined_report_path}\n")
@@ -781,6 +850,8 @@ def cli(argv: list[str] | None = None, *, task_scope: str = 'partial', entrypoin
     )
     parser.add_argument('--suites', nargs='+', metavar='SUITE', default=None,
                         help='选择当前环境支持的场景；默认全部场景，full保留所选场景全部任务。')
+    parser.add_argument('--workers', type=int, default=1,
+                        help='攻击×场景分组的进程并发数，正整数；默认1，不是官方Batch API。')
     parser.add_argument(
         "--attack",
         nargs="+",
@@ -855,6 +926,8 @@ def cli(argv: list[str] | None = None, *, task_scope: str = 'partial', entrypoin
         '冻结的 injection 预检名单；显式标为 screened，保留全部用户任务。' if full else
         '冻结的 injection 预检名单；保留每场景前3个用户，仅过滤原来前3个注入目标，不补位。'))
     args = parser.parse_args(argv)
+    if args.workers < 1:
+        parser.error('--workers must be a positive integer')
     if args.audit_router_mode is None:
         args.audit_router_mode = 'off' if args.baseline or args.no_checker else 'shadow'
     try:
@@ -917,6 +990,7 @@ def cli(argv: list[str] | None = None, *, task_scope: str = 'partial', entrypoin
             defense=None,
             force_rerun=False if args.reuse else args.force_rerun or os.getenv("DSCG_FORCE_RERUN", "0").lower() in {"1", "true", "yes"},
             reuse=args.reuse,
+            workers=args.workers,
             run_name=args.run_name,
             trace_level="full" if args.include_extra_info else args.trace_level,
             tool_metadata_path=args.tool_metadata_path,
@@ -941,7 +1015,7 @@ def cli(argv: list[str] | None = None, *, task_scope: str = 'partial', entrypoin
     except ValueError as exc:
         print(f"测量配置或证据校验失败: {exc}", flush=True)
         return 1
-    return 1 if status == 1 else 0
+    return status if status in (1, 130) else 0
 
 
 if __name__ == "__main__":

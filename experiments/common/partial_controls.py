@@ -102,7 +102,7 @@ def source_revision():
     paths += [root / 'experiments' / name for name in (
         'run_injection_precheck.py', 'common/injection_cohort.py', 'common/injection_cohort_compatibility.json',
         'common/benchmark_reuse.py', 'common/benchmark_reuse_compatibility.json',
-        'common/partial_reporting.py', 'common/benchmark_outcomes.py', 'diagnostics/harness_audit.py')
+        'common/partial_reporting.py', 'common/benchmark_outcomes.py', 'common/benchmark_execution.py', 'diagnostics/harness_audit.py')
         if (root / 'experiments' / name).exists()]
     hashes={str(p.relative_to(root)):hashlib.sha256(p.read_bytes()).hexdigest() for p in paths}
     try:commit=subprocess.check_output(['git','rev-parse','HEAD'],cwd=root,text=True).strip()

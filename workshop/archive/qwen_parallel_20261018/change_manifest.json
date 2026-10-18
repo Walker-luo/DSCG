@@ -1,0 +1,199 @@
+{
+  "task": "QWEN-PARALLEL",
+  "base_revision": "fd4de3ec13412be0230e86653feb2b5b90014d38",
+  "initial_status": " M config/models.example.toml\n",
+  "originals": [
+    {
+      "path": "dscg/model_config.py",
+      "sha256": "fb2d7bf48d6507dbcbb15ffc15f3f05582ceefd6e376a4e0d2d7b37f4f83f620",
+      "original_storage": "workshop/archive/qwen_parallel_20261018/originals/dscg/model_config.py",
+      "sha256_after": "3579e7299d70aed4baa4fbad1b4f0ec6901df719f25c526439bcb6edacbb1b8c"
+    },
+    {
+      "path": "experiments/run_partial_benchmark.py",
+      "sha256": "ac0cd6e106ce6fffa8fe29dcfb1a3ee4c525f4ca5d7c3960c4d9e887b72a4593",
+      "original_storage": "workshop/archive/qwen_parallel_20261018/originals/experiments/run_partial_benchmark.py",
+      "sha256_after": "22efc0aea4faf9e27845a49d303043f5dd263e3099aace2490b0c5ecb75c7ac6"
+    },
+    {
+      "path": "experiments/run_benchmark.py",
+      "sha256": "29d49570bebea26bc6aed04d9a91ac87a3b117539f67ed7f75a8c28a362d341a",
+      "original_storage": "workshop/archive/qwen_parallel_20261018/originals/experiments/run_benchmark.py",
+      "sha256_after": "b802e6354a50c3fe865af73ace7e302adfb68fc00ba7f0c45a8db4bb0a17ee99"
+    },
+    {
+      "path": "experiments/common/partial_controls.py",
+      "sha256": "8a45dd598622de72dcaa59dc39b4a43c6f6f54276b50fa14aa72f9e11efe1bfa",
+      "original_storage": "workshop/archive/qwen_parallel_20261018/originals/experiments/common/partial_controls.py",
+      "sha256_after": "7ad81d4014f611da7cf7df3f3e0649fafe87ef2b4adf8bf540dbb3d1b1a7ae16"
+    },
+    {
+      "path": "experiments/common/injection_cohort.py",
+      "sha256": "446115c19a566374c8c1d56503129f3d41d758e5e89863dabb3201ffd899231c",
+      "original_storage": "workshop/archive/qwen_parallel_20261018/originals/experiments/common/injection_cohort.py",
+      "sha256_after": "832730d5646063b949aa2da9fbe17a4e646f049dd94a6fbf05fd9231e9a397d3"
+    },
+    {
+      "path": "dashboard/app.py",
+      "sha256": "8ef88c0a8f233a6b6e7023a5f9e5da491267d8137f7859faab5cb0aeb13a8dc5",
+      "original_storage": "workshop/archive/qwen_parallel_20261018/originals/dashboard/app.py",
+      "sha256_after": "5897ca1fae74ab85630a5df14469bb37376ff4436c5c2074d8e032de71fa78a6"
+    },
+    {
+      "path": "docs/model_tool_configuration.md",
+      "sha256": "d5f93b197639c2480afc0a4043152cdc5796c8c79313a0b30a6ed3b738cffe06",
+      "original_storage": "workshop/archive/qwen_parallel_20261018/originals/docs/model_tool_configuration.md",
+      "sha256_after": "ab3fc232523dcabaf5167ec47703b51f6414fde5d0b202ca9225ca736d75e119"
+    },
+    {
+      "path": "docs/benchmark.md",
+      "sha256": "f8de3f68728df9c52f79a70ae07155f1da8a62da2e4d9f23fe4235d852362a9e",
+      "original_storage": "workshop/archive/qwen_parallel_20261018/originals/docs/benchmark.md",
+      "sha256_after": "eb0921e9095ac2cd461e50baf09651b9e6a846660b6d51fb47fc30eadc798f5c"
+    },
+    {
+      "path": "docs/partial_benchmark.md",
+      "sha256": "8a4d30f8c414e38da25916423936476fec570e860b390d36018075d9a45e2c13",
+      "original_storage": "workshop/archive/qwen_parallel_20261018/originals/docs/partial_benchmark.md",
+      "sha256_after": "0e9d4e99dc4f0ba3eeb8344cda21af2241e2a226af5513587651841e3e8cd54d"
+    },
+    {
+      "path": "README.md",
+      "sha256": "910b8e3a7ebf0c69dafd046236a7acf667449c5bc5db14aa1d2ce0daef5a9525",
+      "original_storage": "workshop/archive/qwen_parallel_20261018/originals/README.md",
+      "sha256_after": "b4f7afbc0dab873eccb0f059a39e8a5486ed781e7ead773273df8a97e2dcb4f5"
+    },
+    {
+      "path": "workshop/README.md",
+      "sha256": "78eb6ca8af10bc954ab3e3671942cb481acb679a6fb3eb6c02d1d50922048070",
+      "original_storage": "workshop/archive/qwen_parallel_20261018/originals/workshop/README.md",
+      "sha256_after": "abceaced866d3438fd4463f228575cb345c377fe72eb69f76603eade1f37582f"
+    },
+    {
+      "path": "workshop/completed/README.md",
+      "sha256": "efd4f76fd2384fe1d6e19be749d4725bb2d29c1cc60e346c46b34a5199ebdf46",
+      "original_storage": "workshop/archive/qwen_parallel_20261018/originals/workshop/completed/README.md",
+      "sha256_after": "8a4164959e66b76d621f63e2bd714d4741170d55810b1f5680eaa1b1a802d7be"
+    },
+    {
+      "path": "experiments/common/partial_reporting.py",
+      "sha256": "17ef0a0d135a0d8e2f9072a3b231009e549c17ab0599d753d9200701d6dabf59",
+      "original_storage": "workshop/archive/qwen_parallel_20261018/originals/experiments/common/partial_reporting.py",
+      "sha256_after": "b27aea860b76bd17b3dafebb72bea526bdd76b3dd7b047bbec4e25927bf2c3ff"
+    },
+    {
+      "path": "docs/injection_precheck.md",
+      "sha256": "9b36dfec025a47683b2ef2944600bf84e2fbd6395f3c229a343f513bb8283a5b",
+      "original_storage": "workshop/archive/qwen_parallel_20261018/originals/docs/injection_precheck.md",
+      "sha256_after": "e828a17db67dc3a71f4f81429594d172dfc812ffff01da29b4e3e3742d1e156d"
+    }
+  ],
+  "changed_files": [
+    {
+      "path": "README.md",
+      "sha256": "b4f7afbc0dab873eccb0f059a39e8a5486ed781e7ead773273df8a97e2dcb4f5"
+    },
+    {
+      "path": "config/models.example.toml",
+      "sha256": "11f0bacf049779bd9ef94a149ca54619f70a72c272a93da9c463ccd075ff98c4"
+    },
+    {
+      "path": "dashboard/app.py",
+      "sha256": "5897ca1fae74ab85630a5df14469bb37376ff4436c5c2074d8e032de71fa78a6"
+    },
+    {
+      "path": "docs/benchmark.md",
+      "sha256": "eb0921e9095ac2cd461e50baf09651b9e6a846660b6d51fb47fc30eadc798f5c"
+    },
+    {
+      "path": "docs/injection_precheck.md",
+      "sha256": "e828a17db67dc3a71f4f81429594d172dfc812ffff01da29b4e3e3742d1e156d"
+    },
+    {
+      "path": "docs/model_tool_configuration.md",
+      "sha256": "ab3fc232523dcabaf5167ec47703b51f6414fde5d0b202ca9225ca736d75e119"
+    },
+    {
+      "path": "docs/partial_benchmark.md",
+      "sha256": "0e9d4e99dc4f0ba3eeb8344cda21af2241e2a226af5513587651841e3e8cd54d"
+    },
+    {
+      "path": "dscg/model_config.py",
+      "sha256": "3579e7299d70aed4baa4fbad1b4f0ec6901df719f25c526439bcb6edacbb1b8c"
+    },
+    {
+      "path": "experiments/common/injection_cohort.py",
+      "sha256": "832730d5646063b949aa2da9fbe17a4e646f049dd94a6fbf05fd9231e9a397d3"
+    },
+    {
+      "path": "experiments/common/partial_controls.py",
+      "sha256": "7ad81d4014f611da7cf7df3f3e0649fafe87ef2b4adf8bf540dbb3d1b1a7ae16"
+    },
+    {
+      "path": "experiments/common/partial_reporting.py",
+      "sha256": "b27aea860b76bd17b3dafebb72bea526bdd76b3dd7b047bbec4e25927bf2c3ff"
+    },
+    {
+      "path": "experiments/run_benchmark.py",
+      "sha256": "b802e6354a50c3fe865af73ace7e302adfb68fc00ba7f0c45a8db4bb0a17ee99"
+    },
+    {
+      "path": "experiments/run_partial_benchmark.py",
+      "sha256": "22efc0aea4faf9e27845a49d303043f5dd263e3099aace2490b0c5ecb75c7ac6"
+    },
+    {
+      "path": "tests/test_injection_precheck.py",
+      "sha256": "4ffffcca6bdc6f85e7ecd75975ee66b474ba0de2ac9dbb0e7524b0c9ec22940b"
+    },
+    {
+      "path": "tests/test_l2_controls.py",
+      "sha256": "8b16ee2dad56fb2aaa6816905b305d499faeb220edee418436befc9477e8c9c5"
+    },
+    {
+      "path": "tests/test_partial_reporting.py",
+      "sha256": "9cb5b9da67f21607e0892295e85bb9f52610ed6b621282bd4d48d0f1a73734f9"
+    },
+    {
+      "path": "tests/test_partial_router.py",
+      "sha256": "2281c60e3fb53c07f290f1cf1628964298f14cec47f143d3e320c478da4ecf45"
+    },
+    {
+      "path": "workshop/README.md",
+      "sha256": "abceaced866d3438fd4463f228575cb345c377fe72eb69f76603eade1f37582f"
+    },
+    {
+      "path": "workshop/completed/README.md",
+      "sha256": "8a4164959e66b76d621f63e2bd714d4741170d55810b1f5680eaa1b1a802d7be"
+    }
+  ],
+  "new_files": [
+    {
+      "path": "experiments/common/benchmark_execution.py",
+      "sha256": "3c07f31acc5f3fced913f640700ae570298bc6faecae656907a773b8015118f2"
+    },
+    {
+      "path": "tests/parallel_fixture.py",
+      "sha256": "3db8c9f69c66c9d4320264eed3b128407fca84d9e001d0d5adb9997bd5fc4b13"
+    },
+    {
+      "path": "tests/test_benchmark_execution.py",
+      "sha256": "19bde2a04caef50793504f9339620691af345b1cc31f88b749688ce268f68d10"
+    },
+    {
+      "path": "tests/test_parallel_runner.py",
+      "sha256": "09a95eb864e7641d506f9316b8737bf81c6ca2dfee4e0fa84f321aadb5c0a6f9"
+    },
+    {
+      "path": "tests/test_qwen_model.py",
+      "sha256": "862597d03e3b3ae13dc30ee5d5264bacfc7e17a4ae956c8a590c2ea83ab06de7"
+    },
+    {
+      "path": "workshop/completed/qwen_parallel_20261018.md",
+      "sha256": "786310120b7352c496e55a96318365c7e98ac6665b6c7833f3bf07764bebe7b0"
+    }
+  ],
+  "privacy": "Credential-bearing initial example/local bytes intentionally not archived; private role/provider repair is described without values.",
+  "unchanged_compatibility_maps": true,
+  "real_model_requests": 0,
+  "real_benchmark_rollouts": 0
+}

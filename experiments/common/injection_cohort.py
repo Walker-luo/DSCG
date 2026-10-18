@@ -15,6 +15,7 @@ from dscg.paths import BENCHMARK_RESULTS_DIR, RESULTS_DIR
 from experiments import run_partial_benchmark as shared
 from experiments.common.partial_controls import source_revision, guard_run, validate_controls, select_tasks
 from experiments.common.benchmark_reuse import ReusePlan
+from experiments.common.benchmark_execution import PreparedBindings, validate_workers
 
 SCHEMA = 'dscg.injection-screen.v2'
 RULE = 'keep-any-valid-success; exclude-after-two-valid-failures; errors-unresolved'
@@ -306,7 +307,8 @@ def _preflight_report(base, cohort, active, attacks, selected_tasks=None):
 def run_screened(cohort_path, *, config_path=None, run_name=None, results_dir=None, origin=False,
                  attack=None, audit_router_mode='off', trace_level='summary', audit_router_artifact=None,
                  force_rerun=False, reuse=False, model_id=None, sec_model_id=None, defense=None, suites=None,
-                 task_scope='screened', **controls):
+                 task_scope='screened', workers=1, **controls):
+    validate_workers(workers)
     backend = get_backend()
     if task_scope not in {'screened', 'partial_screened'}:
         raise ValueError('unknown screened task scope')
@@ -357,6 +359,7 @@ def run_screened(cohort_path, *, config_path=None, run_name=None, results_dir=No
     active = [name for name, entry in selected.items() if entry['injection_task_ids']]
     if not active:
         raise ValueError('no injection targets remain in the requested task scope; benchmark not started')
+    prepared = resume if resume is not None else PreparedBindings()
     with _lock(base):
         effective = {k: controls.get(k, default) for k, default in {
             'use_sandbox': True, 'use_security_checker': True, 'planning_tool_view': True,
@@ -372,11 +375,7 @@ def run_screened(cohort_path, *, config_path=None, run_name=None, results_dir=No
         # Refuse to relabel existing ordinary runs as screened cohorts.
         if not (base / 'screened_run_manifest.json').exists() and any(base.glob('*/*/run_manifest.json')):
             raise ValueError('existing non-screened run; use a new --name')
-        if resume is not None:
-            resume.check(base / 'screened_run_manifest.json', identity)
-        else:
-            guard_run(base / 'screened_run_manifest.json', identity)
-            _record_compatibility(base, cohort['binding'], _binding(config, list(cohort['binding']['catalog'])))
+        prepared.check(base / 'screened_run_manifest.json', identity)
         attachment = {'schema_version': 'dscg.screened-cohort.v2', 'benchmark': benchmark_identity(), 'scope': 'capability-conditioned screened subset', 'task_scope': task_scope,
                       'cohort_path': str(cohort_path), 'cohort': cohort,
                       'selected_tasks': selected, 'requested_suites': requested,
@@ -391,7 +390,7 @@ def run_screened(cohort_path, *, config_path=None, run_name=None, results_dir=No
                       'cost_scope': 'native per-attack preflight retained; not scored attack samples; screening cost separate'}
         attachment_path = base / 'screened_cohort.json'
         if not attachment_path.exists() and resume is None:
-            _write_new(attachment_path, attachment)
+            prepared.check(attachment_path, attachment)
         for name in attachment['skipped_suites']:
             print(f'{name}: {"原前3个注入目标中" if partial else ""}无通过目标，明确跳过。')
         try:
@@ -403,7 +402,7 @@ def run_screened(cohort_path, *, config_path=None, run_name=None, results_dir=No
                                cohort_sha256=cohort['cohort_sha256'],
                                audit_router_mode=audit_router_mode, trace_level=trace_level,
                                audit_router_artifact=audit_router_artifact, force_rerun=force_rerun,
-                               reuse=reuse, _reuse_plan=resume, **controls)
+                               reuse=reuse, _reuse_plan=prepared, workers=workers, **controls)
         finally:
-            if resume is None or resume.committed:
+            if prepared.committed:
                 _preflight_report(base, cohort, active, names, selected)

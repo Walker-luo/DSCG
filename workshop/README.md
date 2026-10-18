@@ -10,6 +10,7 @@
 
 | 方案 / 阶段 | 已完成 | 尚未完成或未采用 |
 | --- | --- | --- |
+| [Qwen接入与进程并发](./completed/qwen_parallel_20261018.md) | 双模型默认Qwen3.7-Flash关闭思考；full/partial/cohort按攻击×场景spawn并发、预校验/锁/续跑/中断回收 | 仅离线接线与调度验收；无官方Batch折扣、真实服务或防御收益验证 |
 | [服务器cohort续跑排错](./completed/cohort_resume_diagnostics_20261017.md) · [用法](../docs/benchmark.md#cohort-或续跑校验失败) | 定位服务器解析器改动；细化校验错误、修复兼容映射生成环境限制；413项离线回归 | 服务器需恢复已审核源码并保留旧路由off；无真实模型或完整服务器轨迹校验 |
 | [默认攻击与显式续跑](./completed/benchmark_reuse_20261017.md) · [用法](../docs/benchmark.md#显式续跑示例) | 新typical三攻击；full/partial/clean/cohort支持reuse、旧名单与严格兼容、快照；407项离线回归 | 原生错误缓存不自动重试；未知来源或旧baseline证据不足拒绝；无真实模型测量 |
 | [Experiments目录归类](./completed/experiments_layout_20261017.md) · [入口索引](../experiments/README.md) | 顶层三个日常入口；共享实现、诊断、校准与工具分目录，已知旧预检严格兼容；391项离线回归 | 无真实模型或费用/安全收益验证；专项fixture与历史证据保留 |

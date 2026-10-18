@@ -172,7 +172,7 @@ def write_run_overview(base_dir: Path, attack_names: list[str], suites: list[str
     summary_path = base_dir / "summary.md"
     detail_path = base_dir / "failure_cases.jsonl"
     reports = {(report["attack"], report["suite"]): report for report in suite_reports}
-    runs = {record["attack"]: record for record in run_records}
+    runs = {(record["attack"], record.get('failed_suite')): record for record in run_records}
     cases = [dict(case) for report in suite_reports for case in report["cases"]]
     for run in run_records:
         if run["status"] == "error":
@@ -204,7 +204,7 @@ def write_run_overview(base_dir: Path, attack_names: list[str], suites: list[str
         for suite in suites:
             report = reports.get((attack, suite))
             if report is None:
-                run = runs.get(attack, {})
+                run = runs.get((attack, suite), runs.get((attack, None), {}))
                 status = f"run_error ({run.get('error_type', 'unknown')})" if run.get("status") == "error" else "not_reported"
                 row = [attack, suite, status, "N/A", "N/A", "N/A", "N/A", "N/A", "N/A", "N/A", "N/A", "N/A", "—"]
             else:

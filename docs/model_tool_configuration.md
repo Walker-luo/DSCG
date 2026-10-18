@@ -30,7 +30,7 @@ python -m dscg.benchmark_catalog
 - `[main]`：主模型规划/最终回答，以及L2任务开始时的授权编译。攻击评测还会有攻击生成/预检，按实际运行计费。
 - `[security]`：L3当前动作语义审计，可以与main同模型/同服务，也可以独立配置。它不一定是小模型，不是需要训练的分类器。
 - 主模型接口需要支持当前Chat Completions消息格式、tools/function calling，以及L2使用的JSON输出；审计接口需要支持JSON输出。仅有普通聊天可用并不能证明工具循环和授权/审计协议可用。
-- 当前主规划、授权、审计使用temperature=0；DeepSeek设置reasoning_effort="none"，沿用当前兼容工具回合的适配。两项由源码设置，**不是**models.local.toml中的可调字段；仅写入temperature/max_tokens等额外键不会让流水线采用它们。切换AgentDyn没有修改模型配置或这两项默认值。
+- 主模型与审计模型默认均为 `qwen3.7-flash`，流水线沿用temperature=0配置（实际序列化由锁定的后端适配器决定）、reasoning_effort="none"，显式关闭思考；实际设置记录在模型公开配置中。DeepSeek仍保持none适配。两项由源码设置，**不是**models.local.toml中的可调字段；仅写入temperature/max_tokens等额外键不会让流水线采用它们。两个后端共用模型接入。
 
 连接参数由 [model_config.py](../dscg/model_config.py)解析，授权/审计请求由 [defended.py](../dscg/pipelines/defended.py)构造。
 
@@ -50,8 +50,8 @@ python -m dscg.benchmark_catalog
 
 | 服务 | 获取步骤与官方说明 | 仓库默认连接示例 |
 | --- | --- | --- |
-| DeepSeek | 按[官方API认证说明](https://api-docs.deepseek.com/api/deepseek-api/)到控制台创建Key；从[Chat Completions参考](https://api-docs.deepseek.com/api/create-chat-completion/)核对model、tools与JSON支持 | provider=deepseek，base_url=https://api.deepseek.com；模板使用deepseek-flash，运行前确认账号可用 |
-| 阿里云百炼/Qwen | 按[获取API Key](https://help.aliyun.com/zh/model-studio/get-api-key)选择地域/业务空间；按[首次调用文档](https://help.aliyun.com/zh/model-studio/first-api-call-to-qwen)核对模型ID和OpenAI兼容地址 | provider=dashscope；模板qwen-plus、https://dashscope.aliyuncs.com/compatible-mode/v1；其他地域需按官方接入信息修改 |
+| DeepSeek | 按[官方API认证说明](https://api-docs.deepseek.com/api/deepseek-api/)到控制台创建Key；从[Chat Completions参考](https://api-docs.deepseek.com/api/create-chat-completion/)核对model、tools与JSON支持 | provider=deepseek，base_url=https://api.deepseek.com；可显式使用deepseek-flash，运行前确认账号可用 |
+| 阿里云百炼/Qwen | 按[获取API Key](https://help.aliyun.com/zh/model-studio/get-api-key)选择地域/业务空间；按[首次调用文档](https://help.aliyun.com/zh/model-studio/first-api-call-to-qwen)核对模型ID和OpenAI兼容地址 | provider=dashscope；模板qwen3.7-flash；使用公共OpenAI兼容地址或本地配置的北京业务空间地址，Key须匹配该空间 |
 | 其他兼容服务 | 从该服务官方API文档获取完整base_url、实际model_id与Key；不要只依据模型品牌猜endpoint | 显式填写provider/model_id/base_url和独立Key变量 |
 
 百炼Key、模型和endpoint有地域/业务空间范围，不能混用；以[当前官方Key说明](https://help.aliyun.com/zh/model-studio/get-api-key)为准。官方链接核查于2026-10-13，模型可用性以后仍应由测试者确认。
@@ -62,29 +62,28 @@ python -m dscg.benchmark_catalog
 
 ```toml
 [main]
-provider = "deepseek"
-model_id = "deepseek-flash"
-base_url = "https://api.deepseek.com"
-api_key_env = "DEEPSEEK_API_KEY"
+provider = "dashscope"
+model_id = "qwen3.7-flash"
+
+[security]
+provider = "dashscope"
+model_id = "qwen3.7-flash"
+
+[providers.dashscope]
+base_url = "https://dashscope.aliyuncs.com/compatible-mode/v1"
+api_key_env = "DASHSCOPE_API_KEY"
+# api_key = "YOUR_DASHSCOPE_API_KEY"
 ```
 
 ```bash
-export DEEPSEEK_API_KEY='填入自己的API Key'
+export DASHSCOPE_API_KEY='填入自己的API Key'
 ```
 
-省略security角色设置、且没有DSCG_SEC_*覆盖时，审计角色通过fallback复用主模型配置。**仓库模板本身包含独立的[security]：仅不填审计Key不会自动变成单模型。** 如果希望复用，应移除该段并检查现有SEC环境覆盖；不要清空其他实验仍需要的配置。
+如使用北京子业务空间，保留控制台给出的 `https://<WorkspaceId>.cn-beijing.maas.aliyuncs.com/compatible-mode/v1` 地址及其对应Key，不要换成其他空间地址。`api_key_env` 是**变量名**，不能填密钥；希望直接填写时放在被Git忽略的local文件的 `api_key` 中。配置模板和日志中不要放入真实密钥。
 
-独立审计模型可追加：
+省略security段、且没有DSCG_SEC_*覆盖时，审计角色通过fallback复用主模型配置；模板则显式将两者均设为千问。需要独立审计模型时修改该角色的provider/model_id及对应provider连接。角色中不要保留另一个服务的base_url/api_key/api_key_env；provider共享段有助于避免切换后误用凭证。
 
-```toml
-[security]
-provider = "dashscope"
-model_id = "qwen-plus"
-base_url = "https://dashscope.aliyuncs.com/compatible-mode/v1"
-api_key_env = "DASHSCOPE_API_KEY"
-```
-
-然后设置DASHSCOPE_API_KEY。换成不同provider/endpoint时不要沿用另一服务的Key。`[providers.<provider>]`可设置该provider共享的base_url/api_key_env/api_key默认值；main/security角色自己的设置更优先。security兼容别名sec/audit按源码顺序选用，普通配置建议统一写security。
+DeepSeek仍可使用：将main/security都改为provider=deepseek、model_id=deepseek-flash，并在 `[providers.deepseek]` 中设置其地址和Key；保留千问共享段便于切回。也可通过现有角色环境变量覆盖模型和provider。多个服务的Key各自留在对应provider段，不共用。
 
 ### 2.5 配置优先级与实际生效检查
 
@@ -224,6 +223,8 @@ print("classified tools:", len(catalog))
 这些控制不会从模型连接TOML读取。NoL2同时关闭前置检查、授权工具视图与委托展开；L2/L3均关时L1也关闭。shadow/selective要求L2和L3同时开启，baseline使用原生循环。L3真实阈值/epsilon/delta/grid仍待独立数据与选择，见 [README待决定项](../README.md#l3-仍需确定什么)，不能用一个自填tau替代兼容artifact。authorization_profile/delegated_task_reader是受信host API对象，不是普通测试必填项或TOML新增段，详见 [L2方案](../workshop/L2_opt.md)。
 
 --model-config/--tool-metadata是输入配置路径；--name标识实验；--results-dir是输出根；--task-manifest仅用于显式冻结任务ID，默认无需导入。修改任何有效配置/策略后使用新name，--force-rerun不绕过旧manifest绑定。成本比较采用新name并force-rerun，仍核查API usage/样本分母，不能只凭flag保证可比。
+
+两测量入口支持 `--workers N`（API：workers=1），按攻击×场景独立进程并发，默认顺序执行；详见[并发运行](./benchmark.md#进程并发提速)。并发数不是模型/防御身份的一部分，同版本续跑可调整，但源码、模型和后端等绑定仍须一致。
 
 两测量入口支持显式 `--reuse`（API：reuse=True，默认False）：沿用身份相符的任务级缓存，未指定攻击/场景时读取原计划。reuse要求原name和可核验目录，与显式force-rerun/清单导出互斥，并覆盖环境强制重跑。新计划/目录绑定实际后端与完整源码/目录及组件身份，目录包含后端名；旧缓存、cohort、任务清单和兼容映射不被自动赋予新身份或跨后端迁移。模型/防御/任务等配置也须匹配，缺少必要绑定证据时拒绝。具体命令见 [续跑指南](./benchmark.md#显式续跑示例)。
 

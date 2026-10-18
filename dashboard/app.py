@@ -82,6 +82,7 @@ DEEPSEEK_MODELS = [
 
 AVAILABLE_MODELS = [
     {"id": "", "label": "Local/Env 配置", "provider": None, "base_url": None},
+    {"id": "qwen3.7-flash", "label": "Qwen3.7-Flash", "provider": "dashscope", "base_url": None},
     {"id": "qwen3-max", "label": "Qwen3-Max", "provider": "dashscope", "base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1"},
     {"id": "qwen-flash-2025-07-28", "label": "Qwen-Flash", "provider": "dashscope", "base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1"},
     {"id": "qwen-plus", "label": "Qwen-Plus", "provider": "dashscope", "base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1"},
@@ -95,6 +96,7 @@ AVAILABLE_MODELS = [
 
 AVAILABLE_SEC_MODELS = [
     {"id": "", "label": "Local/Env 配置", "provider": None, "base_url": None},
+    {"id": "qwen3.7-flash", "label": "Qwen3.7-Flash", "provider": "dashscope", "base_url": None},
     {"id": "qwen3.5-plus", "label": "Qwen3.5-Plus", "provider": "dashscope", "base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1"},
     {"id": "qwen-flash-2025-07-28", "label": "Qwen-Flash", "provider": "dashscope", "base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1"},
     {"id": "qwen-turbo", "label": "Qwen-Turbo (轻量)", "provider": "dashscope", "base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1"},

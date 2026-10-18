@@ -33,7 +33,7 @@ results/injection_precheck/<model_id>_<benchmark_id>_injection_screen_01/
 ```bash
 python -m experiments.run_injection_precheck screen \
   --model-config config/models.local.toml \
-  --reuse-from results/benchmarks/deepseek-flash_agentdyn_baseline_typical_01 \
+  --reuse-from results/benchmarks/qwen3.7-flash_agentdyn_baseline_typical_01 \
   --name injection_screen_02
 ```
 
@@ -50,12 +50,12 @@ screen没有force-rerun；需要全新预检使用新name。配置/源码冲突�
 ```bash
 python -m experiments.run_benchmark --baseline --attack typical --force-rerun \
   --model-config config/models.local.toml \
-  --cohort results/injection_precheck/deepseek-flash_agentdyn_injection_screen_01/cohort.json \
+  --cohort results/injection_precheck/qwen3.7-flash_agentdyn_injection_screen_01/cohort.json \
   --name baseline_screened_01
 
 python -m experiments.run_benchmark --attack typical --force-rerun \
   --model-config config/models.local.toml \
-  --cohort results/injection_precheck/deepseek-flash_agentdyn_injection_screen_01/cohort.json \
+  --cohort results/injection_precheck/qwen3.7-flash_agentdyn_injection_screen_01/cohort.json \
   --name dscg_screened_01
 ```
 

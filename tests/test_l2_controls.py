@@ -47,7 +47,9 @@ class L2ControlTests(unittest.TestCase):
             self.pipeline(use_sandbox=False, authorization_profile=profile)
 
     def test_partial_api_and_cli_forward_controls_for_every_attack(self):
-        with tempfile.TemporaryDirectory() as output, patch.object(partial, '_run_single_attack', return_value=None) as run:
+        import parallel_fixture
+        with tempfile.TemporaryDirectory() as output, parallel_fixture.patched(), \
+             patch.object(partial, 'make_defended_pipeline', side_effect=parallel_fixture.defended) as run:
             partial.main(run_attack=False, results_dir=output, planning_tool_view=False, delegated_tasks=False)
             self.assertFalse(run.call_args.kwargs['planning_tool_view'])
             self.assertFalse(run.call_args.kwargs['delegated_tasks'])

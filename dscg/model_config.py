@@ -9,6 +9,7 @@ No API key is ever included in ``public_dict`` or log-friendly descriptions.
 from __future__ import annotations
 
 import os
+import re
 from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
@@ -34,7 +35,7 @@ ROLE_CONFIG_SECTIONS = {
     "DSCG_MAIN": ("main",),
     "DSCG_SEC": ("security", "sec", "audit"),
 }
-DEFAULT_MAIN_MODEL_ID = "deepseek-flash"
+DEFAULT_MAIN_MODEL_ID = "qwen3.7-flash"
 DEEPSEEK_MODEL_IDS = ("deepseek-flash", "deepseek-v4-pro")
 
 
@@ -64,6 +65,7 @@ class ModelConfig:
             "provider": self.provider,
             "base_url": self.base_url,
             "api_key_env": self.api_key_env,
+            "reasoning_effort": reasoning_effort_for_config(self),
         }
 
 
@@ -76,7 +78,9 @@ def reasoning_effort_for_config(config: ModelConfig) -> str | None:
     thinking until the message adapter explicitly round-trips that field.
     """
 
-    if config.provider == "deepseek":
+    if config.provider == "deepseek" or (
+        config.provider == "dashscope" and config.model_id.startswith('qwen3.7-flash')
+    ):
         return "none"
     return None
 
@@ -356,6 +360,8 @@ def resolve_model_config(
         resolved_key_env = preset.api_key_env
     if resolved_key_env is None and fallback and resolved_model_id == fallback.model_id:
         resolved_key_env = fallback.api_key_env
+    if resolved_key_env is not None and not re.fullmatch(r'[A-Za-z_][A-Za-z0-9_]*', resolved_key_env):
+        raise ModelConfigurationError('api_key_env must be an environment variable name; put the credential in api_key instead.')
 
     resolved_api_key = _clean(api_key) or _env(environ, f"{prefix}_API_KEY")
     if resolved_api_key is None:

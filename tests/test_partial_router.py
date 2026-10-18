@@ -3,12 +3,14 @@ import unittest
 import test_partial_agentdyn as tempfile
 from unittest.mock import patch
 from experiments import run_partial_benchmark as p
+import parallel_fixture
 
 
 class PartialRouterTests(unittest.TestCase):
     def test_modes_reach_every_attack_and_baseline_rejects(self):
         self.assertIn('audit_router_mode',inspect.signature(p.main).parameters,'runner routing controls missing')
-        with tempfile.TemporaryDirectory() as out,patch.object(p,'_run_single_attack',return_value=None) as run:
+        with tempfile.TemporaryDirectory() as out, parallel_fixture.patched(), \
+             patch.object(p,'make_defended_pipeline',side_effect=parallel_fixture.defended) as run:
             self.assertEqual(p.main(run_attack=False,results_dir=out,audit_router_mode='shadow',audit_router_artifact='/tmp/router.json'),0)
             self.assertEqual(run.call_args.kwargs['audit_router_mode'],'shadow')
             self.assertEqual(run.call_args.kwargs['audit_router_artifact'],'/tmp/router.json')

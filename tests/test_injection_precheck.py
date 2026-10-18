@@ -408,7 +408,10 @@ class InjectionPrecheckTests(unittest.TestCase):
         with patch.object(precheck, 'get_suite', side_effect=lookup), patch.object(cohort_module, 'get_suite', side_effect=lookup), redirect_stdout(StringIO()):
             self.assertEqual(precheck.screen(config_path=None, run_name='screen', suites=['workspace', 'travel'],
                 results_dir=self.root / 'screens'), 0)
-            with patch.object(precheck.shared, 'main', return_value=0) as runner:
+            def prepared_stub(**options):
+                options['_reuse_plan'].commit()
+                return 0
+            with patch.object(precheck.shared, 'main', side_effect=prepared_stub) as runner:
                 self.assertEqual(precheck.run_screened(self.output / 'cohort.json', config_path=None,
                     run_name='mixed', origin=True, results_dir=self.root / 'benchmarks'), 0)
                 self.assertEqual(runner.call_args.kwargs['suites'], ['workspace'])

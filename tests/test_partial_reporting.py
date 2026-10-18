@@ -192,8 +192,11 @@ class PartialReportingTests(unittest.TestCase):
             return task_results(pipeline, suite, attack, *args, **kwargs)
 
         with TemporaryDirectory() as directory:
+            # Establish a verifiable binding before inserting a stale aggregate.
+            self.assertEqual(self.run_fixture(directory, suites=['workspace', 'travel'],
+                attack=['tool_knowledge', 'injecagent']), 0)
             stale = Path(directory) / "offline_agentdojo_report/tool_knowledge/travel/summary.json"
-            stale.parent.mkdir(parents=True)
+            stale.parent.mkdir(parents=True, exist_ok=True)
             stale.write_text(json.dumps({"metrics": {"utility_rate": 0.123456}}))
             self.assertEqual(self.run_fixture(directory, results=results,
                                               suites=["workspace", "travel"],

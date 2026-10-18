@@ -30,6 +30,26 @@ python -m dscg.benchmark_catalog
 
 模型配置及Key继续使用本地文件/环境变量，不覆盖已有配置。工具目录按当前后端自动选择，显式参数/环境覆盖、基准专用local目录仍可使用；当前通用tools.local是AgentDojo内置目录的相同副本，在AgentDyn自动选用对应内置目录并给出提示。未知自定义通用目录报错，不悄悄忽略。细则见配置指南；baseline不使用防御风险目录。
 
+## 进程并发提速
+
+主模型、授权编译和审计默认使用 Qwen3.7-Flash，显式关闭思考；本地配置、环境变量和显式参数仍可覆盖。配置方法见[模型指南](./model_tool_configuration.md#24-最小可运行配置与角色复用)。原DeepSeek凭证可继续保存在其provider共享段。
+
+`--workers N` 控制“攻击×场景”组的独立进程数，默认1；clean每场景一组。实际并发不超过非空组数，组内沿用原生顺序工具循环和GOAL预检。可用于full/partial、baseline/DSCG、clean及cohort，不增加任务或重试，不修改评分。一个场景、一个攻击只有一组，加大workers也不能拆分其中的任务。
+
+```bash
+python -m experiments.run_benchmark --baseline --workers 3 --force-rerun \
+  --model-config config/models.local.toml --name qwen37_full_baseline_01
+
+python -m experiments.run_benchmark --workers 3 --force-rerun \
+  --model-config config/models.local.toml --name qwen37_full_dscg_01
+```
+
+这是在线并发调用，不是[百炼异步Batch API](https://help.aliyun.com/zh/model-studio/batch-inference)，不享受Batch折扣，也不保证总Tokens下降。过高并发可能触发服务限流；不会因并发新增自动重试。正式对照使用相同并发设置，并分别报告API累计延迟和本次实际总耗时。
+
+父进程先核验全部绑定，再调度；同目录重复启动会被运行锁拒绝。子进程只写各自攻击/场景结果，父进程统一生成根报告。`attack_manifest.json.execution` 和 `execution/<本次ID>/execution.json` 记录并发、组状态及wall_seconds；并发组的详细输出在该目录的group日志。失败组单列，其他组继续；中断会回收子进程，使用原参数加reuse恢复，workers可调整。
+
+本次模型/源码变更要求新运行名和新预检名单；不迁移旧缓存、扩展历史兼容名单或改写历史证据。screen仍顺序运行。Python API对应 `workers=1`。
+
 ## 1. 使用哪个入口
 
 | 入口 | 用户任务与目标 | 用途 |
@@ -113,11 +133,11 @@ python -m experiments.run_injection_precheck screen \
 
 ```bash
 python -m experiments.run_benchmark --baseline --attack typical \
-  --cohort results/injection_precheck/deepseek-flash_agentdyn_injection_screen_01/cohort.json \
+  --cohort results/injection_precheck/qwen3.7-flash_agentdyn_injection_screen_01/cohort.json \
   --name baseline_screened_01
 
 python -m experiments.run_benchmark --attack typical \
-  --cohort results/injection_precheck/deepseek-flash_agentdyn_injection_screen_01/cohort.json \
+  --cohort results/injection_precheck/qwen3.7-flash_agentdyn_injection_screen_01/cohort.json \
   --name dscg_screened_01
 ```
 
