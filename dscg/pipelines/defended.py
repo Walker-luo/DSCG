@@ -2005,10 +2005,10 @@ class ReferenceMonitor(agent_pipeline.BasePipelineElement):
                               final_monitor_reason=(pending_actions[0].reason_code if len(pending_actions)==1 else
                                                     "POLICY_ALLOW" if approved_count==len(pending_actions) else "BATCH_DENY"))
             _sync_trace_context(extra_args)
-        print(
-            f"[DSCG MEDIATION] batch={batch_id} proposed={len(pending_actions)} "
-            f"approved={approved_count} blocked={len(pending_actions) - approved_count}"
-        )
+        # print(
+        #     f"[DSCG MEDIATION] batch={batch_id} proposed={len(pending_actions)} "
+        #     f"approved={approved_count} blocked={len(pending_actions) - approved_count}"
+        # )
         return query, runtime, env, messages, extra_args
 
 
