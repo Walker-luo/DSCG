@@ -428,8 +428,9 @@ class InjectionPrecheckTests(unittest.TestCase):
                 return 0
             with patch.object(precheck.shared, 'main', side_effect=prepared_stub) as runner:
                 self.assertEqual(precheck.run_screened(self.output / 'cohort.json', config_path=None,
-                    run_name='mixed', origin=True, results_dir=self.root / 'benchmarks'), 0)
+                    run_name='mixed', origin=True, results_dir=self.root / 'benchmarks', progress=True), 0)
                 self.assertEqual(runner.call_args.kwargs['suites'], ['workspace'])
+                self.assertTrue(runner.call_args.kwargs['progress'])
         attachment = json.loads((self.root / 'benchmarks/agentdojo/offline_mixed/screened_cohort.json').read_text())
         self.assertEqual(attachment['skipped_suites'], ['travel'])
         self.assertEqual(attachment['counts']['travel']['planned_per_targeted_attack'], 0)

@@ -38,7 +38,7 @@ python -m dscg.benchmark_catalog
 
 主模型、授权编译和审计默认使用 Qwen3.7-Flash，显式关闭思考；本地配置、环境变量和显式参数仍可覆盖。配置方法见[模型指南](./model_tool_configuration.md#24-最小可运行配置与角色复用)。
 
-full、partial和cohort均按攻击、场景顺序执行，已删除workers参数及进程并发。旧命令需去掉该参数。准备阶段静默核对完整任务范围与已有配置绑定，不创建pipeline或发起模型请求；启动一次打印模型、后端、攻击、场景、结果目录和缓存策略，每组再打印任务数与开始/完成状态。原生任务对话、错误和必要警告继续输出。
+full、partial和cohort均按攻击、场景顺序执行，已删除workers参数及进程并发。旧命令需去掉该参数。准备阶段静默核对完整任务范围与已有配置绑定，不创建pipeline或发起模型请求；启动一次打印模型、后端、攻击、场景、结果目录和缓存策略。默认每组打印开始/完成状态；加`--progress`后，每个攻击/场景组显示独立进度条，完成的组保留最终状态。原生错误和必要警告继续输出。
 
 ```bash
 python -m experiments.run_benchmark --baseline --force-rerun \
@@ -47,6 +47,15 @@ python -m experiments.run_benchmark --baseline --force-rerun \
 python -m experiments.run_benchmark --force-rerun \
   --model-config config/models.local.toml --name qwen37_full_dscg_01
 ```
+
+需要实时查看进度时，在原命令后加`--progress`，例如：
+
+```bash
+python -m experiments.run_benchmark --baseline --suites travel banking slack \
+  --progress --name qwen37_baseline_progress_01
+```
+
+目标型攻击的每组进度分别标为`GOAL 已完成/目标数`和`任务 已完成/用户×目标组合数`；clean只显示用户任务，DoS不做GOAL预检。百分比按已完成执行项数计算，缓存命中也会计入；它不是有效计分分母、模型请求数或剩余时间预测。交互终端显示动态条和已耗时，重定向日志写入无控制字符的阶段与少量里程碑行。`--progress`只控制显示，可在同名`--reuse`时开启或关闭，不改变配置绑定或缓存。
 
 每个目标型攻击/场景分组仍先执行原生GOAL预检，再执行用户×注入目标组合；一次任务通常包含多次模型/工具交互，DSCG还包括授权和审计。减小本地准备开销不保证Qwen服务响应加快，也不享受官方Batch折扣。
 
@@ -211,6 +220,7 @@ python -m experiments.run_benchmark --reuse \
 | `--baseline` | 原生AgentDyn工具循环，无DSCG与安全模型 |
 | `--clean` | 无攻击用户任务效用对照 |
 | `--suites NAME [NAME ...]` | 默认当前基准全部场景；full全部注册ID，partial前3×3 |
+| `--progress` | 按攻击/场景显示GOAL预检与计分任务进度；默认关闭 |
 | `--attack NAME [NAME ...]` | 默认typical，可重复指定；all查询固定注册表 |
 | `--cohort PATH` | 冻结筛选名单，不能与clean/task manifest混用 |
 | `--name NAME` / `--results-dir DIR` | 独立运行名和结果根目录 |

@@ -1,5 +1,11 @@
 # DSCG Research Handoff
 
+## L3 candidate calibration preset (2026-10-19)
+
+- config/l3_router.calibration.json is a development_candidate only: grid [.65,.70,.75], reference .70, epsilon/delta .05/.05. Offline calibrator --preset explicitly loads it; conflicts with any grid/epsilon/delta flags, while the legacy complete explicit trio remains supported. The reference is metadata, never a fallback/selected deployment threshold.
+- Current CLI shadow/API off, formulas, eligibility, models, identities and fail-closed behavior remain unchanged. Never pass this preset as a router artifact or manufacture labels/independence from audit decisions. Historical two-run observations are exploratory; v1 locally misses20/1167 traces and both repeat16 Slack user tasks. New independent calibration is required, with null threshold when infeasible.
+- Evidence: workshop/artifacts/20261019_l3_preset/ and workshop/completed/l3_preset_20261019.md. Preserve concurrent progress changes and all original user results. No model calls or efficacy claims.
+
 ## Current compact results and L3 reports (2026-10-19)
 
 - New full/partial/cohort runs stop writing scene report.txt, attack/root all_report.txt and standalone attack-error TXT. Root summary.md has one attack/suite row and at most10 failure links; failure_cases.jsonl remains complete. Preserve all native JSON/full sidecars, CSV, manifests/cohort/execution records, snapshots and old reports; reporting format is not a defense/cache identity change.

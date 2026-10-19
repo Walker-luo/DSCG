@@ -4,6 +4,29 @@ import json
 from pathlib import Path
 from dscg.audit_router import SCHEMA,FEATURE_VERSION,INPUT_SCHEMA,LABELS,LABEL_SOURCES,calibrate,digest,load_json,validate_artifact
 
+PRESET_SCHEMA = 'dscg.router-calibration-preset.v1'
+
+
+def load_preset(path):
+    """Load offline candidate parameters; the reference is never a threshold."""
+    preset, _ = load_json(path)
+    if not isinstance(preset, dict) or preset.get('schema_version') != PRESET_SCHEMA:
+        raise ValueError('unsupported calibration preset schema')
+    if preset.get('status') != 'development_candidate':
+        raise ValueError('calibration preset must be a development_candidate')
+    try:
+        parameters = {key: preset[key] for key in ('grid', 'epsilon', 'delta')}
+        reference = preset['reference_threshold']
+    except KeyError as exc:
+        raise ValueError('missing calibration preset parameter') from exc
+    if (not isinstance(parameters['grid'], list)
+            or type(reference) not in (int, float)
+            or reference not in parameters['grid']
+            or any(type(parameters[key]) not in (int, float) for key in ('epsilon', 'delta'))):
+        raise ValueError('invalid calibration preset parameters or reference')
+    calibrate([], **parameters)  # Reuse finite/range/unique-grid validation.
+    return parameters
+
 
 def calibrate_dataset(dataset_dir,grid,epsilon,delta,output,attest_independent_groups=False):
     out=Path(output)
@@ -43,11 +66,20 @@ def calibrate_dataset(dataset_dir,grid,epsilon,delta,output,attest_independent_g
 
 def main(argv=None):
     parser=argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--dataset-dir',required=True);parser.add_argument('--grid',type=float,nargs='+',required=True)
-    parser.add_argument('--epsilon',type=float,required=True);parser.add_argument('--delta',type=float,required=True)
+    parser.add_argument('--dataset-dir',required=True)
+    parser.add_argument('--preset',help='Offline candidate JSON; cannot combine with grid/epsilon/delta')
+    parser.add_argument('--grid',type=float,nargs='+')
+    parser.add_argument('--epsilon',type=float);parser.add_argument('--delta',type=float)
     parser.add_argument('--output',required=True);parser.add_argument('--attest-independent-groups',action='store_true')
     args=parser.parse_args(argv)
-    try:a=calibrate_dataset(args.dataset_dir,args.grid,args.epsilon,args.delta,args.output,args.attest_independent_groups)
+    explicit = {key: getattr(args, key) for key in ('grid', 'epsilon', 'delta')}
+    if args.preset is not None and any(value is not None for value in explicit.values()):
+        parser.error('--preset cannot be combined with --grid, --epsilon or --delta')
+    if args.preset is None and any(value is None for value in explicit.values()):
+        parser.error('provide --preset or all of --grid, --epsilon and --delta')
+    try:
+        parameters = load_preset(args.preset) if args.preset is not None else explicit
+        a=calibrate_dataset(args.dataset_dir,parameters['grid'],parameters['epsilon'],parameters['delta'],args.output,args.attest_independent_groups)
     except (OSError,ValueError,KeyError,TypeError) as e:parser.error(str(e))
     print(json.dumps({'threshold':a['calibration']['threshold'],'valid_groups':a['calibration']['valid_groups'],'output':args.output}));return 0
 

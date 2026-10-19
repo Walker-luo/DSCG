@@ -222,7 +222,22 @@ print("classified tools:", len(catalog))
 | completion_prompt | false | factory/API、partial --completion-prompt；历史可选提示，当前普通比较保持关闭 |
 | trace_level | summary | factory/API、网页、partial --trace-level；standard逐条紧凑记录，full压缩诊断增加序列化/写盘成本 |
 
-这些控制不会从模型连接TOML读取。NoL2同时关闭前置检查、授权工具视图与委托展开；L2/L3均关时L1也关闭。shadow/selective要求L2和L3同时开启，baseline使用原生循环。L3真实阈值/epsilon/delta/grid仍待独立数据与选择，见 [README待决定项](../README.md#l3-仍需确定什么)，不能用一个自填tau替代兼容artifact。authorization_profile/delegated_task_reader是受信host API对象，不是普通测试必填项或TOML新增段，详见 [L2方案](../workshop/L2_opt.md)。
+这些控制不会从模型连接TOML读取。NoL2同时关闭前置检查、授权工具视图与委托展开；L2/L3均关时L1也关闭。shadow/selective要求L2和L3同时开启，baseline使用原生循环。L3候选参数已初始化，真实部署阈值仍待独立数据校准，见下方预设说明；不能用一个自填tau替代兼容artifact。authorization_profile/delegated_task_reader是受信host API对象，不是普通测试必填项或TOML新增段，详见 [L2方案](../workshop/L2_opt.md)。
+
+### L3校准候选预设
+
+[config/l3_router.calibration.json](../config/l3_router.calibration.json)仅供离线校准入口显式读取，不是模型连接配置，也不是`--audit-router-artifact`。初始网格`[0.65,0.70,0.75]`、参考值`0.70`、epsilon/delta均`0.05`，状态`development_candidate`；参考值不参与阈值选择。普通测量CLI仍默认shadow，API/factory仍off，baseline/NoChecker仍off。
+
+准备好含独立标签、证据引用和不跨分组的真实数据集后，从DSCG目录执行以下命令（路径为待替换示意；本轮没有生成该数据集或部署artifact）：
+
+```bash
+python -m experiments.calibration.calibrate_l3_router \
+  --dataset-dir /absolute/path/to/reviewed_dataset \
+  --preset config/l3_router.calibration.json \
+  --attest-independent-groups --output /absolute/path/to/new_router.json
+```
+
+`--preset`不能与`--grid`、`--epsilon`或`--delta`任意一个混用；原来的三项显式参数命令仍可使用。不传预设时必须给全三项。预设不会自动确认标签/组独立性，也不改变数据检查及artifact绑定；缺少独立证据时不要作上述attest。无可行阈值仍输出`threshold=null`，不会回退到参考值0.70。具体统计含义和历史观察见[L3方案](../workshop/L3_checker_opt.md#0-候选参数初始化2026-10-19)。
 
 --model-config/--tool-metadata是输入配置路径；--name标识实验；--results-dir是输出根；--task-manifest仅用于显式冻结任务ID，默认无需导入。修改任何有效配置/策略后使用新name，--force-rerun不绕过旧manifest绑定。成本比较采用新name并force-rerun，仍核查API usage/样本分母，不能只凭flag保证可比。
 

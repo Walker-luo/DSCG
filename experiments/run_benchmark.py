@@ -25,6 +25,7 @@ def main(
     use_security_checker: bool = True,
     cohort_path: str | Path | None = None,
     reuse: bool = False,
+    progress: bool = False,
     **options,
 ) -> int:
     """Run all tasks within selected suites, retaining shared controls and defaults."""
@@ -38,7 +39,8 @@ def main(
         from experiments.common.injection_cohort import run_screened
         return run_screened(cohort_path, model_id=model_id, sec_model_id=sec_model_id,
                             origin=origin, defense=defense, use_sandbox=use_sandbox,
-                            use_security_checker=use_security_checker, suites=suites, reuse=reuse, **options)
+                            use_security_checker=use_security_checker, suites=suites, reuse=reuse,
+                            progress=progress, **options)
     results_dir = options.pop('results_dir', None)
     return runner.main(
         model_id=model_id, sec_model_id=sec_model_id, suites=suites,
@@ -46,6 +48,7 @@ def main(
         use_sandbox=use_sandbox, use_security_checker=use_security_checker,
         task_scope='full',
         reuse=reuse,
+        progress=progress,
         results_dir=results_dir if results_dir is not None else BENCHMARK_RESULTS_DIR,
         **options,
     )

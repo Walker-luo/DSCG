@@ -6,6 +6,16 @@
 
 本优化属于 L3 内部的审计调度。既有授权、Monitor、ticket 和读取 deny 例外继续执行。没有新增对象/数据权限、来源认证、恢复动作或第四层；正式 research 路线不改变。默认 `off`、`audit_retries=0`、`completion_prompt=false`。没有随代码附带一个可以部署的非空阈值。
 
+## 0. 候选参数初始化（2026-10-19）
+
+已初始化[离线校准预设](../config/l3_router.calibration.json)：`grid=[0.65,0.70,0.75]`、`reference_threshold=0.70`、`epsilon=0.05`、`delta=0.05`，状态`development_candidate`。校准CLI新增`--preset PATH`，与任一显式grid/epsilon/delta参数冲突；原三项显式参数命令保持。参考值不参与选择，只有通过原分组校准的阈值才可进入部署artifact；当前未生成真实部署artifact。用法见[配置指南](../docs/model_tool_configuration.md#l3校准候选预设)。
+
+两轮`qwen3.7-flash_DSCG`与`qwen3.7-flash_DSCG_v1`是探索来源，计划均1167条，当前本地读取1167/1147条，第二轮缺20条。适用事件429/407条，全部Slack、两轮都只覆盖同一16个用户任务；不能当成两份独立校准/测试集。按严格`score<0.70`，命中178/179条，包含审计deny/abstain 19/25条；这些判断不是独立安全标签。历史命中约占原语义审计调用7.1%、已知审计Token4.4%，不是实际selective节省；banking/travel当前没有合格事件，不推断其节省。
+
+此网格是在查看上述历史结果后选出的候选，不是对历史数据预注册的检验。后续应在新独立标签/分组上冻结验证。epsilon是“至少一次免审的独立组中，至少一次动作不应免审”的条件风险目标，delta是统计错误水平，不是全局ASR。三阈值、epsilon/delta均5%时，即使零错误，也至少需要80个被选中的独立校准组；重复rollout不增加任务独立性，若有错误则需更多证据。样本不足保持`threshold=null`。
+
+此次初始化不改变运行默认值：测量CLI为shadow，API/factory为off；旧文中的默认off指API。评分公式、适用门槛、模型/提示、权限、Monitor与缓存身份均保持。旧结果不改写；独立标签/部署收益仍未完成。工程证据见[初始化报告](./completed/l3_preset_20261019.md)。
+
 ## 1. 不依靠小模型：硬条件、固定分数和校准阈值
 
 在线计算只用 Python 标准库，不训练分类器，不请求 embedding、小语言模型或主模型隐藏状态。昂贵语义审计器仍处理需要审计的动作。

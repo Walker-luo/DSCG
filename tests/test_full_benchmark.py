@@ -123,6 +123,16 @@ class FullCliTests(unittest.TestCase):
             self.assertEqual(shared.cli([]), 0)
             self.assertEqual(run.call_args.kwargs['task_scope'], 'partial')
 
+    def test_progress_flag_reaches_full_and_partial_python_runner(self):
+        import inspect
+        self.assertIs(inspect.signature(full.main).parameters['progress'].default, False)
+        self.assertIs(inspect.signature(shared.main).parameters['progress'].default, False)
+        with patch.object(shared, 'main', return_value=0) as run:
+            self.assertEqual(full.cli(['--progress']), 0)
+            self.assertTrue(run.call_args.kwargs['progress'])
+            self.assertEqual(shared.cli(['--progress']), 0)
+            self.assertTrue(run.call_args.kwargs['progress'])
+
     def test_cli_returns_failure_and_rejects_interactive_attack_without_models(self):
         with patch.object(shared, 'main', return_value=1) as run, redirect_stderr(StringIO()):
             self.assertEqual(full.cli(['--attack', 'injecagent']), 1)
@@ -272,8 +282,20 @@ class FullExecutionTests(unittest.TestCase):
             self.assertEqual(full.main(**options), 0)
             self.assertEqual(task.call_count, expected)
             self.assertEqual(last.read_bytes(), original)
-            self.assertEqual(full.main(**options, force_rerun=True), 0)
+            self.assertEqual(full.main(**options, progress=True), 0)
+            self.assertEqual(task.call_count, expected)
+            self.assertEqual(last.read_bytes(), original)
+            progress_options = {**options, 'run_name': 'native_progress', 'progress': True}
+            self.assertEqual(full.main(**progress_options), 0)
             self.assertEqual(task.call_count, 2 * expected)
+            progress_summary = json.loads((base.parent / f'{model}_native_progress' /
+                'tool_knowledge/slack/summary.json').read_text())
+            standard_summary = json.loads((output / 'summary.json').read_text())
+            self.assertEqual(progress_summary['task_selection'], standard_summary['task_selection'])
+            self.assertEqual(progress_summary['task_counts'], standard_summary['task_counts'])
+            self.assertEqual(progress_summary['metrics'], standard_summary['metrics'])
+            self.assertEqual(full.main(**options, force_rerun=True, progress=True), 0)
+            self.assertEqual(task.call_count, 3 * expected)
 
     def test_scope_binding_rejects_partial_cache_and_preserves_existing_manifest(self):
         with TemporaryDirectory() as directory, redirect_stdout(StringIO()), patch.object(

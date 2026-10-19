@@ -114,7 +114,7 @@ python -m experiments.run_partial_benchmark --name l3_shadow_new --audit-router-
 
 #### L3 仍需确定什么
 
-**路由实现已接入，部署条件尚未完成。** 风险目标 `epsilon`、统计错误水平 `delta`、候选网格和独立校准数据仍待确定，当前没有可部署阈值。未通过校准时保持 `threshold=null` 并继续完整审计。
+**候选参数已初始化，部署校准尚未完成。** [校准预设](./config/l3_router.calibration.json)保存网格 `[0.65, 0.70, 0.75]`、开发参考值 `0.70`、`epsilon=0.05`、`delta=0.05`。参考值不直接用于免审，预设也不是部署artifact；独立标签与校准数据仍待准备，未通过校准保持 `threshold=null`。加载方法见[配置指南](./docs/model_tool_configuration.md#l3校准候选预设)。
 
 参数含义、样本量算例、shadow → 校准 → selective 验证顺序，以及各层增量与后续优化优先级统一见 [参数确定与优化计划](./plan.md)。固定源码边界见 [配置详解](./docs/model_tool_configuration.md)。
 

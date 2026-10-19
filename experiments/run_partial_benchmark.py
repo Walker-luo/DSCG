@@ -35,6 +35,7 @@ from experiments.common.result_paths import (
 from experiments.common.benchmark_execution import (
     PreparedBindings, ApprovedBindings, run_lock,
 )
+from experiments.common.benchmark_progress import GroupProgress, run_suite_with_progress
 
 
 TYPICAL_ATTACKS = (
@@ -155,6 +156,7 @@ def main(
     config_path: str | Path | None = None,
     force_rerun: bool = False,
     reuse: bool = False,
+    progress: bool = False,
     run_name: str | None = None,
     trace_level: str = "summary",
     tool_metadata_path: str | Path | None = None,
@@ -191,6 +193,7 @@ def main(
             cohort_path, task_scope='partial_screened', suites=suites, model_id=model_id,
             sec_model_id=sec_model_id, origin=origin, defense=defense, config_path=config_path,
             run_name=run_name, results_dir=results_dir, attack=attack, force_rerun=force_rerun, reuse=reuse,
+            progress=progress,
             api_key=api_key, base_url=base_url, provider=provider, api_key_env=api_key_env,
             sec_api_key=sec_api_key, sec_base_url=sec_base_url, sec_provider=sec_provider,
             sec_api_key_env=sec_api_key_env, trace_level=trace_level, tool_metadata_path=tool_metadata_path,
@@ -253,6 +256,7 @@ def main(
                 api_key=api_key, base_url=base_url, provider=provider, api_key_env=api_key_env,
                 sec_api_key=sec_api_key, sec_base_url=sec_base_url, sec_provider=sec_provider,
                 sec_api_key_env=sec_api_key_env, config_path=config_path, force_rerun=force_rerun,
+                progress=progress,
                 run_name=run_name, trace_level=trace_level, tool_metadata_path=tool_metadata_path,
                 results_dir=logdir, attack_name=attack_name,
                 use_security_checker=use_security_checker,
@@ -306,7 +310,8 @@ def main(
         try:
             group_results = []
             for index, job in enumerate(jobs, 1):
-                print(f"[{index}/{len(jobs)}] {job['attack']}/{job['suite']} 开始", flush=True)
+                if not progress:
+                    print(f"[{index}/{len(jobs)}] {job['attack']}/{job['suite']} 开始", flush=True)
                 try:
                     result = {'status': 'completed', 'result': _execute_group(job)}
                 except (RunConfigurationError, KeyboardInterrupt):
@@ -314,8 +319,9 @@ def main(
                 except Exception as exc:
                     result = {'status': 'error', 'error_type': type(exc).__name__}
                 group_results.append(result)
-                print(f"[{index}/{len(jobs)}] {job['attack']}/{job['suite']} {result['status']}"
-                      + (f" ({result['error_type']})" if result['status'] == 'error' else ''), flush=True)
+                if not progress or result['status'] == 'error':
+                    print(f"[{index}/{len(jobs)}] {job['attack']}/{job['suite']} {result['status']}"
+                          + (f" ({result['error_type']})" if result['status'] == 'error' else ''), flush=True)
         except KeyboardInterrupt:
             execution.update(status='interrupted', wall_seconds=monotonic() - started)
             (execution_dir / 'execution.json').write_text(json.dumps(execution, indent=2) + '\n')
@@ -410,6 +416,7 @@ def _run_single_attack(
     sec_api_key_env: str | None = None,
     config_path: str | Path | None = None,
     force_rerun: bool = False,
+    progress: bool = False,
     run_name: str | None = None,
     trace_level: str = "summary",
     tool_metadata_path: str | Path | None = None,
@@ -621,13 +628,22 @@ def _run_single_attack(
         )
         if prepare_only:
             continue
-        print(f"用户任务={len(selected_users)}；注入目标={len(selected_injections)}；计划组合={planned_task_count}", flush=True)
+        if not progress:
+            print(f"用户任务={len(selected_users)}；注入目标={len(selected_injections)}；计划组合={planned_task_count}", flush=True)
         if report_context is not None:
             report_context['pipeline_name'] = result_dir_name
         pipeline.name = attack_component
         try:
             with logging.OutputLogger(str(base_output_dir)):
-                if run_attack:
+                if progress:
+                    with GroupProgress(f"{attack_name if run_attack else 'none'}/{suite_name}",
+                                       goal_total=len(selected_injections) if run_attack and not is_dos_attack else 0,
+                                       score_total=planned_task_count) as display:
+                        results = run_suite_with_progress(
+                            pipeline, suite, attack, base_output_dir, force_rerun,
+                            user_tasks=selected_users, injection_tasks=selected_injections,
+                            benchmark_version=SUITE_VERSION, on_step=display.advance)
+                elif run_attack:
                     results = benchmark.benchmark_suite_with_injections(
                         pipeline,
                         suite,
@@ -654,7 +670,8 @@ def _run_single_attack(
         # 结果分析
         utility_results = results["utility_results"]
         security_results = results.get("security_results", {})
-        print(f"实际完成评测任务数量: {len(utility_results)}")
+        if not progress:
+            print(f"实际完成评测任务数量: {len(utility_results)}")
 
         # 1. 确保目录存在 (避免 FileNotFoundError)
         suite_output_dir = output_dir / suite_name
@@ -797,9 +814,10 @@ def _run_single_attack(
 
 
         # 写完文件后，在控制台给个提示
-        print(f"✅ [{suite_name}] 测试完成！")
-        print(f"📊 数据表格(用于画图): {csv_file_path}")
-        print(f"📈 得分汇总: {summary_file_path}\n")
+        if not progress:
+            print(f"✅ [{suite_name}] 测试完成！")
+            print(f"📊 数据表格(用于画图): {csv_file_path}")
+            print(f"📈 得分汇总: {summary_file_path}\n")
 
     return output_dir
 
@@ -829,6 +847,8 @@ def cli(argv: list[str] | None = None, *, task_scope: str = 'partial', entrypoin
         action="store_true",
         help="运行无防御原生基线；与默认 DSCG 使用相同任务范围和注入攻击。",
     )
+    parser.add_argument('--progress', action='store_true',
+                        help='按攻击/场景显示进度条；分别计数原生GOAL预检与计分任务。')
     cache_policy = parser.add_mutually_exclusive_group()
     cache_policy.add_argument('--reuse', action='store_true',
         help='按原name显式续跑，保留原名单与原生缓存规则；覆盖DSCG_FORCE_RERUN，不自动重试错误。')
@@ -955,6 +975,7 @@ def cli(argv: list[str] | None = None, *, task_scope: str = 'partial', entrypoin
             defense=None,
             force_rerun=False if args.reuse else args.force_rerun or os.getenv("DSCG_FORCE_RERUN", "0").lower() in {"1", "true", "yes"},
             reuse=args.reuse,
+            progress=args.progress,
             run_name=args.run_name,
             trace_level="full" if args.include_extra_info else args.trace_level,
             tool_metadata_path=args.tool_metadata_path,

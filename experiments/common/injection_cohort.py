@@ -253,7 +253,7 @@ def _preflight_report(base, cohort, active, attacks, selected_tasks=None):
 
 def run_screened(cohort_path, *, config_path=None, run_name=None, results_dir=None, origin=False,
                  attack=None, audit_router_mode='off', trace_level='summary', audit_router_artifact=None,
-                 force_rerun=False, reuse=False, model_id=None, sec_model_id=None, defense=None, suites=None,
+                 force_rerun=False, reuse=False, progress=False, model_id=None, sec_model_id=None, defense=None, suites=None,
                  task_scope='screened', **controls):
     backend = get_backend()
     if task_scope not in {'screened', 'partial_screened'}:
@@ -351,7 +351,7 @@ def run_screened(cohort_path, *, config_path=None, run_name=None, results_dir=No
                                cohort_sha256=cohort['cohort_sha256'],
                                audit_router_mode=audit_router_mode, trace_level=trace_level,
                                audit_router_artifact=audit_router_artifact, force_rerun=force_rerun,
-                               reuse=reuse, _reuse_plan=prepared, **controls)
+                               reuse=reuse, progress=progress, _reuse_plan=prepared, **controls)
         finally:
             if prepared.committed:
                 _preflight_report(base, cohort, active, names, selected)
