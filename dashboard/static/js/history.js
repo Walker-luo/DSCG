@@ -3,7 +3,7 @@
   const historyCharts = window.DSCGHistoryCharts;
   const historySelection = window.DSCGHistorySelection;
   const analysisRequests = historySelection.createRequestGate();
-  let filters = { folder: "all", models: null, attack: "all" };
+  let filters = { folder: "all", backend: "all", models: null, attack: "all" };
   let catalog = [];
   let loaded = false;
   let charts = [];
@@ -23,7 +23,7 @@
       updateSelection();
     });
     document.querySelector("#history-run-list").addEventListener("change", updateSelection);
-    ["folder", "attack"].forEach((key) => {
+    ["folder", "backend", "attack"].forEach((key) => {
       document.querySelector("#history-" + key + "-select").addEventListener("change", () => {
         filters[key] = document.querySelector("#history-" + key + "-select").value;
         refreshFilterResults(true);
@@ -124,11 +124,13 @@
     const resolved = historySelection.resolveFilters(catalog, filters);
     filters = resolved.filters;
     [["folder", resolved.folders, "全部目录"],
+      ["backend", resolved.backends, "全部基准"],
       ["attack", resolved.attacks, "全部攻击"]].forEach(([key, values, allLabel]) => {
       const select = document.querySelector("#history-" + key + "-select");
       select.replaceChildren();
       addOption(select, "all", allLabel);
-      values.forEach(value => addOption(select, value, key === "attack" ? historySelection.attackLabel(value) : value));
+      values.forEach(value => addOption(select, value, key === "attack" ? historySelection.attackLabel(value)
+        : key === "backend" ? historySelection.backendLabel(value) : value));
       select.value = filters[key];
     });
     renderModelChoices(resolved.models);

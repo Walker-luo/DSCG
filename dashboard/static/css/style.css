@@ -474,6 +474,7 @@ button, input, select { letter-spacing: 0; }
 .history-version-badge { display: inline-grid; place-items: center; min-width: 24px; height: 24px; padding: 0 3px; border-radius: 4px; flex-shrink: 0; color: #101813; font: 800 12px sans-serif; vertical-align: middle; }
 .history-filter-grid { display: grid; gap: 8px; margin: 12px 0; }
 .history-filter-grid .field-group { margin: 0; min-width: 0; }
+.history-directory-filters { display: grid; align-content: start; gap: 8px; }
 .history-run-group-title { padding: 8px 10px; color: var(--text-secondary); background: var(--surface-soft); font-size: 11px; font-weight: 650; overflow-wrap: anywhere; border-bottom: 1px solid var(--border); }
 .history-list-heading, .history-select-actions, .history-chart-heading {
   display: flex;

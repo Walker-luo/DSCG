@@ -20,7 +20,10 @@
               <span id="history-selection-count" aria-live="polite">0 项已选</span>
             </div>
             <div class="history-filter-grid">
-              <div class="field-group"><label class="form-label" for="history-folder-select">结果目录</label><select id="history-folder-select" class="form-select form-select-sm"><option value="all">全部目录</option></select></div>
+              <div class="field-group history-directory-filters">
+                <div class="field-group"><label class="form-label" for="history-folder-select">结果目录</label><select id="history-folder-select" class="form-select form-select-sm"><option value="all">全部目录</option></select></div>
+                <div class="field-group"><label class="form-label" for="history-backend-select">基准</label><select id="history-backend-select" class="form-select form-select-sm"><option value="all">全部基准</option></select></div>
+              </div>
               <fieldset class="field-group history-model-filter" aria-describedby="history-model-hint">
                 <legend class="form-label">模型 / 运行名称（可多选）</legend>
                 <div class="history-model-actions"><button type="button" class="btn btn-sm btn-outline-secondary" id="history-model-select-all">全选模型</button><button type="button" class="btn btn-sm btn-outline-secondary" id="history-model-clear">清空模型</button><span id="history-model-count" aria-live="polite"></span></div>

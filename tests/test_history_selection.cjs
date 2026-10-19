@@ -35,6 +35,44 @@ test("catalog refresh preserves an explicit empty model selection and removes un
   assert.deepEqual(selection.resolveFilters(catalog, {models: []}).filters.models, []);
   assert.deepEqual(selection.resolveFilters(catalog, {folder: "partial_benchmark", models: ["model_baseline", "deleted"]}).filters.models, ["model_baseline"]);
 });
+const dualCatalog = [
+  {id: "dojo-new", result_folder: "benchmarks", benchmark_id: "agentdojo", model_group: "agentdojo/qwen_baseline", attack_name: "tool_knowledge"},
+  {id: "dyn-new", result_folder: "benchmarks", benchmark_id: "agentdyn", model_group: "agentdyn/qwen_baseline", attack_name: "important_instructions"},
+  {id: "dyn-old", result_folder: "benchmarks", benchmark_id: "agentdyn", model_group: "qwen_agentdyn_baseline", attack_name: "tool_knowledge"},
+  {id: "unrecorded", result_folder: "benchmarks", model_group: "agentdyn/legacy", attack_name: "unknown"},
+  {id: "incomplete", result_folder: "benchmarks", benchmark_id: "mixed", model_group: "legacy_mixed", attack_name: "mixed"},
+  {id: "dojo-partial", result_folder: "partial_benchmark", benchmark_id: "agentdojo", model_group: "qwen_partial", attack_name: "ignore_previous"},
+];
+test("backend filtering uses recorded identity, keeps old/new runs and never infers from paths", () => {
+  assert.deepEqual(selection.filterRuns(dualCatalog, {folder: "benchmarks", backend: "agentdyn"}).map(r => r.id), ["dyn-new", "dyn-old"]);
+  assert.deepEqual(selection.filterRuns(dualCatalog, {backend: "unknown"}).map(r => r.id), ["unrecorded"]);
+  assert.deepEqual(selection.filterRuns(dualCatalog, {backend: "mixed"}).map(r => r.id), ["incomplete"]);
+  assert.deepEqual(selection.filterRuns(dualCatalog, {folder: "benchmarks", backend: "agentdyn", models: ["agentdyn/qwen_baseline"], attack: "important_instructions"}).map(r => r.id), ["dyn-new"]);
+});
+test("backend options depend on folder and restrict downstream model and attack choices", () => {
+  const state = selection.resolveFilters(dualCatalog, {folder: "benchmarks", backend: "agentdyn", models: ["agentdojo/qwen_baseline"], attack: "ignore_previous"});
+  assert.deepEqual(state.backends, ["agentdojo", "agentdyn", "mixed", "unknown"]);
+  assert.deepEqual(state.models, ["agentdyn/qwen_baseline", "qwen_agentdyn_baseline"]);
+  assert.deepEqual(state.attacks, ["important_instructions", "tool_knowledge"]);
+  assert.equal(state.filters.backend, "agentdyn");
+  assert.equal(state.filters.models, null);
+  assert.equal(state.filters.attack, "all");
+  const partial = selection.resolveFilters(dualCatalog, {...state.filters, folder: "partial_benchmark"});
+  assert.deepEqual(partial.backends, ["agentdojo"]);
+  assert.equal(partial.filters.backend, "all");
+  assert.deepEqual(partial.models, ["qwen_partial"]);
+});
+test("backend refresh preserves exclusions and explicit empty models, including an empty catalog", () => {
+  const state = selection.resolveFilters(dualCatalog, {folder: "benchmarks", backend: "agentdyn", models: []});
+  assert.deepEqual(state.filters.models, []);
+  assert.deepEqual(selection.filterRuns(dualCatalog, state.filters), []);
+  const visible = selection.filterRuns(dualCatalog, {...state.filters, models: null});
+  assert.deepEqual(selection.visibleSelection(visible, ["dyn-old", "dojo-new"]), ["dyn-old"]);
+  const empty = selection.resolveFilters([], state.filters);
+  assert.deepEqual(empty.backends, []);
+  assert.equal(empty.filters.backend, "all");
+  assert.deepEqual(empty.filters.models, []);
+});
 test("pending analyses cannot restore results hidden by a new filter and the newest request wins", async () => {
   const gate = selection.createRequestGate();
   let rendered = [];
