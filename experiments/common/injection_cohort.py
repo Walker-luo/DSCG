@@ -280,6 +280,7 @@ def run_screened(cohort_path, *, config_path=None, run_name=None, results_dir=No
     use_checker = controls.get('use_security_checker', True)
     use_sandbox = controls.get('use_sandbox', True)
     shared._validate_router_controls(origin, use_checker, audit_router_mode, use_sandbox)
+    shared._validate_prompt_profile(origin, use_sandbox, use_checker, controls.get('prompt_profile', 'legacy'))
     validate_controls(origin=origin, use_security_checker=use_checker,
                       audit_retries=controls.get('audit_retries', 0), completion_prompt=controls.get('completion_prompt', False))
     security_model = None
@@ -311,7 +312,9 @@ def run_screened(cohort_path, *, config_path=None, run_name=None, results_dir=No
             'use_sandbox': True, 'use_security_checker': True, 'planning_tool_view': True,
             'delegated_tasks': True, 'l1_projection_mode': 'projected', 'audit_retries': 0,
             'completion_prompt': False}.items()}
-        identity = {'schema_version': 'dscg.screened-run.v2', 'benchmark': benchmark_identity(), 'task_scope': task_scope, 'requested_suites': requested, 'selected_tasks': selected,
+        from dscg.prompt_profiles import profile_binding
+        identity = {**profile_binding(controls.get('prompt_profile', 'legacy')),
+                    'schema_version': 'dscg.screened-run.v2', 'benchmark': benchmark_identity(), 'task_scope': task_scope, 'requested_suites': requested, 'selected_tasks': selected,
                     'cohort_sha256': cohort['cohort_sha256'], 'main_model': config.public_dict(), 'security_model': security_model,
                     'baseline': origin, 'attacks': names, 'audit_router_mode': audit_router_mode,
                     'trace_level': trace_level, 'controls': effective, 'defense': defense,

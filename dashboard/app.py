@@ -285,6 +285,7 @@ def run_test_thread(run_id: str, config: dict):
                         use_security_checker=use_security_checker,
                         input_isolation=config.get("input_isolation", True),
                         l1_projection_mode=config.get('l1_projection_mode', 'projected'),
+                        prompt_profile=config.get('prompt_profile', 'legacy'),
                         authorization_precheck=config.get("authorization_precheck", True),
                         planning_tool_view=config.get('planning_tool_view', True),
                         delegated_tasks=config.get('delegated_tasks', True),
@@ -1466,6 +1467,7 @@ def download_report(run_id: str):
     if not config.get("origin"):
         lines.append(f"  框架版本: {config.get('framework_version', '未记录')}")
         lines.append(f"  L1 投影模式: {config.get('l1_projection_mode', '未记录')}")
+        lines.append(f"  提示候选: {config.get('prompt_profile', 'legacy')}")
         for key, label in (("input_isolation", "L1 工具返回隔离"), ("use_sandbox", "L2 工具授权"),
                            ("authorization_precheck", "L2 前置检查"), ('planning_tool_view', 'L2 授权工具视图'),
                            ('delegated_tasks', '显式任务文件展开'), ("use_security_checker", "L3 动作审计")):

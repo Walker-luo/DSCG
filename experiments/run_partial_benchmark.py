@@ -19,6 +19,7 @@ from dscg.input_isolation import FRAMEWORK_VERSION
 from dscg.l1_projection import MODES as L1_PROJECTION_MODES, PROFILE_SHA256 as L1_PROFILE_SHA256
 from dscg.pipelines.baseline import make_openai_compatible_pipeline
 from dscg.pipelines.defended import make_defended_pipeline, router_configuration_hash, defended_pipeline_name
+from dscg.prompt_profiles import PROFILES as PROMPT_PROFILES, validate_profile, profile_binding
 from dscg.audit_router import LocalAuditRouter
 from dscg.tool_metadata import ToolMetadataError, load_tool_metadata, validate_benchmark_tool_metadata, resolve_tool_metadata
 from experiments.diagnostics.harness_audit import rank_ids, security_result_fields
@@ -100,6 +101,12 @@ def _validate_router_controls(origin, use_security_checker, mode, use_sandbox=Tr
         raise ValueError("audit routing requires the defended pipeline with L2 and checker")
 
 
+def _validate_prompt_profile(origin, use_sandbox, use_checker, profile):
+    validate_profile(profile)
+    if profile != 'legacy' and (origin or not use_sandbox or not use_checker):
+        raise ValueError('candidate prompt profiles require the defended pipeline with L2 and checker')
+
+
 def _router_trace_summary(suite_dir, task_keys, attack_name, run_attack):
     events=[];recorded=0
     for key in task_keys:
@@ -118,6 +125,8 @@ def _router_trace_summary(suite_dir, task_keys, attack_name, run_attack):
 
 def _describe_pipeline(model_id, sec_model_id, *, origin, defense, **options):
     """Resolve public identity without clients, pipelines, attacks or model requests."""
+    prompt_profile = options.get('prompt_profile', 'legacy')
+    _validate_prompt_profile(origin, options['use_sandbox'], options['use_security_checker'], prompt_profile)
     main = resolve_model_config(model_id, prefix='DSCG_MAIN', **{
         k: options.get(k) for k in ('api_key', 'base_url', 'provider', 'api_key_env', 'config_path')})
     name = f'{main.model_id}_{defense}' if origin and defense else main.model_id
@@ -136,15 +145,17 @@ def _describe_pipeline(model_id, sec_model_id, *, origin, defense, **options):
             config_hash = router_configuration_hash(main, audit, input_isolation=isolation,
                 authorization_precheck=sandbox, l1_projection_mode=projection,
                 planning_tool_view=view, delegated_tasks=delegated,
-                audit_retries=options['audit_retries'], completion_prompt=options['completion_prompt'])
+                audit_retries=options['audit_retries'], completion_prompt=options['completion_prompt'],
+                prompt_profile=prompt_profile)
             if options['audit_router_mode'] != 'off':
                 router = LocalAuditRouter(options['audit_router_mode'], options['audit_router_artifact'], config_hash)
         optimization = {'audit_router_config_sha256': config_hash,
-                        'audit_router_artifact_sha256': router.artifact_sha256 if router else None}
+                        'audit_router_artifact_sha256': router.artifact_sha256 if router else None,
+                        **profile_binding(prompt_profile)}
         name = defended_pipeline_name(main.model_id, use_sandbox=sandbox, use_security_checker=checker,
             input_isolation=isolation, authorization_precheck=sandbox, l1_projection_mode=projection,
             planning_tool_view=view, delegated_tasks=delegated, audit_router_mode=options['audit_router_mode'],
-            audit_router=router, router_config_hash=config_hash)
+            audit_router=router, router_config_hash=config_hash, prompt_profile=prompt_profile)
     return SimpleNamespace(name=name, dscg_model_config=main.public_dict(),
                            dscg_security_model_config=security, dscg_optimization_config=optimization)
 
@@ -182,6 +193,7 @@ def main(
     planning_tool_view: bool = True,
     delegated_tasks: bool = True,
     l1_projection_mode: str = 'projected',
+    prompt_profile: str = 'legacy',
     task_scope: str = 'partial',
     use_sandbox: bool = True,
     cohort_sha256: str | None = None,
@@ -210,7 +222,7 @@ def main(
             audit_retries=audit_retries, completion_prompt=completion_prompt,
             audit_router_mode=audit_router_mode, audit_router_artifact=audit_router_artifact,
             planning_tool_view=planning_tool_view, delegated_tasks=delegated_tasks,
-            l1_projection_mode=l1_projection_mode,
+            l1_projection_mode=l1_projection_mode, prompt_profile=prompt_profile,
         )
     logdir = Path(results_dir) if results_dir is not None else BENCHMARK_RESULTS_DIR if task_scope in {'full', 'screened'} else RESULTS_DIR / "partial_benchmark"
     resume = _reuse_plan
@@ -230,6 +242,7 @@ def main(
         raise ValueError(f'suites must be a nonempty, unique selection of {", ".join(backend.suites)}')
     if not isinstance(l1_projection_mode, str) or l1_projection_mode not in L1_PROJECTION_MODES:
         raise ValueError('invalid L1 projection mode')
+    _validate_prompt_profile(origin, use_sandbox, use_security_checker, prompt_profile)
     _validate_router_controls(origin,use_security_checker,audit_router_mode,use_sandbox)
     validate_controls(origin=origin, use_security_checker=use_security_checker,
                       audit_retries=audit_retries, completion_prompt=completion_prompt)
@@ -273,6 +286,7 @@ def main(
                 audit_router_mode=audit_router_mode,audit_router_artifact=audit_router_artifact,
                 planning_tool_view=planning_tool_view and not origin and use_sandbox,
                 delegated_tasks=delegated_tasks and not origin and use_sandbox,
+                prompt_profile=prompt_profile,
                 l1_projection_mode='off' if origin or not (use_sandbox or use_security_checker) else l1_projection_mode,
                 task_scope=task_scope, use_sandbox=use_sandbox, cohort_sha256=cohort_sha256,
                 run_base=resume.base if isinstance(resume, ReusePlan) else None,
@@ -434,6 +448,7 @@ def _run_single_attack(
     planning_tool_view: bool = True,
     delegated_tasks: bool = True,
     l1_projection_mode: str = 'projected',
+    prompt_profile: str = 'legacy',
     task_scope: str = 'partial',
     use_sandbox: bool = True,
     cohort_sha256: str | None = None,
@@ -459,6 +474,7 @@ def _run_single_attack(
     suites = list(backend.suites if suites is None else suites)
     if not suites or len(set(suites)) != len(suites) or not set(suites) <= set(backend.suites):
         raise ValueError('invalid suite selection for current backend')
+    _validate_prompt_profile(origin, use_sandbox, use_security_checker, prompt_profile)
     _validate_router_controls(origin,use_security_checker,audit_router_mode,use_sandbox)
     validate_controls(origin=origin, use_security_checker=use_security_checker,
                       audit_retries=audit_retries, completion_prompt=completion_prompt)
@@ -506,7 +522,7 @@ def _run_single_attack(
                     l1_projection_mode=l1_projection_mode, planning_tool_view=planning_tool_view,
                     delegated_tasks=delegated_tasks, audit_router_mode=audit_router_mode,
                     audit_router_artifact=audit_router_artifact, audit_retries=audit_retries,
-                    completion_prompt=completion_prompt)
+                    completion_prompt=completion_prompt, prompt_profile=prompt_profile)
             pipeline = copy(resource_cache['descriptor'])
         else:
             sec_tracker = None
@@ -541,7 +557,7 @@ def _run_single_attack(
                     audit_retries=audit_retries, completion_prompt=completion_prompt,
                     audit_router_mode=audit_router_mode,audit_router_artifact=audit_router_artifact,
                     planning_tool_view=planning_tool_view, delegated_tasks=delegated_tasks,
-                    l1_projection_mode=l1_projection_mode,
+                    l1_projection_mode=l1_projection_mode, prompt_profile=prompt_profile,
                 )
 
 
@@ -616,6 +632,8 @@ def _run_single_attack(
             "audit_router_artifact_sha256": getattr(pipeline,"dscg_optimization_config",{}).get("audit_router_artifact_sha256"),
             "audit_router_config_sha256": getattr(pipeline,"dscg_optimization_config",{}).get("audit_router_config_sha256"),
         }
+        if not origin:
+            run_binding.update(profile_binding(prompt_profile))
         if cohort_sha256 is not None:
             run_binding['cohort_sha256'] = cohort_sha256
         recorded_binding = bind(output_dir / suite_name / "run_manifest.json", run_binding)
@@ -937,6 +955,8 @@ def cli(argv: list[str] | None = None, *, task_scope: str = 'partial', entrypoin
     parser.add_argument("--no-checker", action="store_true", help="P0 消融：保留授权/monitor/ticket，关闭语义审计。")
     parser.add_argument('--no-tool-view', action='store_true', help='L2 对照：规划器展示完整工具目录，保留执行权限检查。')
     parser.add_argument('--no-delegated-tasks', action='store_true', help='关闭显式任务文件展开，用于原任务编译对照。')
+    parser.add_argument('--prompt-profile', choices=PROMPT_PROFILES, default='legacy',
+                        help='Explicit staged utility candidate; legacy keeps the current default policy')
     parser.add_argument('--l1-projection-mode', choices=('off','shadow','projected'), default='projected',
                         help='L1有限交易投影，默认projected；off保留旧来源封装，shadow只观察。')
     # None selects the profile default below: DSCG shadow, baseline/NoChecker off.
@@ -976,6 +996,7 @@ def cli(argv: list[str] | None = None, *, task_scope: str = 'partial', entrypoin
     try:
         validate_controls(origin=args.baseline, use_security_checker=not args.no_checker,
                           audit_retries=args.audit_retries, completion_prompt=args.completion_prompt)
+        _validate_prompt_profile(args.baseline, True, not args.no_checker, args.prompt_profile)
         _validate_router_controls(args.baseline,not args.no_checker,args.audit_router_mode)
         if args.write_task_manifest:
             path = Path(args.write_task_manifest)
@@ -1025,6 +1046,7 @@ def cli(argv: list[str] | None = None, *, task_scope: str = 'partial', entrypoin
             audit_router_mode=args.audit_router_mode,audit_router_artifact=args.audit_router_artifact,
             planning_tool_view=not args.no_tool_view and not args.baseline,
             delegated_tasks=not args.no_delegated_tasks and not args.baseline,
+            prompt_profile=args.prompt_profile,
             l1_projection_mode='off' if args.baseline else args.l1_projection_mode,
             **dispatch_options,
         )

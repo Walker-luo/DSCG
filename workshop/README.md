@@ -1,5 +1,7 @@
 # Workshop 优化状态索引
 
+2026-10-19：[Qwen候选验收计划](./qwen_utility_20261019.md)、[已完成工程报告](./completed/qwen_utility_20261019.md)与[使用指南](../docs/qwen_utility.md)。协议诊断和分阶段候选工程已接线，默认legacy保留；模型协议/语义配对、37/97clean与冻结cohort攻击验收待授权，尚未证明TSR恢复。L1未改。
+
 最新结果布局：[按后端分目录](./completed/backend_result_layout_20261018.md)。CLI测量/预检使用分类根/后端/运行目录；旧目录原地续跑，历史页兼容；网页发起实验布局不变。
 
 当前测试流程：[顺序执行与轻量校验](./completed/serial_lightweight_20261018.md)。已移除workers及源码扫描哈希；旧结果按配置续跑，cohort证据校验保留。此前并发实施报告保留为历史。

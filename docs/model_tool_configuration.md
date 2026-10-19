@@ -25,6 +25,8 @@ python -m dscg.benchmark_catalog
 
 ## 2. 主模型和审计模型
 
+Qwen banking/Slack的协议诊断、`--prompt-profile`阶段候选、日志字段及配对测试见[效用诊断指南](./qwen_utility.md)。该开关属于防御策略，不是模型TOML参数；默认legacy，不更换主/安全模型。JSON输出可用仍需严格字段校验，普通聊天成功不代表审计协议稳定。
+
 ### 2.1 两种角色及能力要求
 
 - `[main]`：主模型规划/最终回答，以及L2任务开始时的授权编译。攻击评测还会有攻击生成/预检，按实际运行计费。

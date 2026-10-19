@@ -41,6 +41,8 @@ from dscg.audit_router import (LocalAuditRouter, RouterReceiptVerifier, argument
                                catalog_snapshot as router_catalog_snapshot)
 from dscg.audit_context import (INPUT_SCHEMA as AUDIT_INPUT_SCHEMA_VERSION, EVIDENCE_VERSION,
                                 FACT_BUDGET, MAX_RESULTS, MAX_CALL_ARGUMENTS, select_tool_evidence)
+from dscg.prompt_profiles import (validate_profile, semantic_catalog, audit_policy,
+                                  authorization_policy, profile_binding, CATALOG_SCHEMA)
 from dscg.model_config import (
     ModelConfig,
     create_openai_client,
@@ -170,13 +172,31 @@ TRACE_ARTIFACT_SCHEMA_VERSION = "dscg.security-trace.v1"
 class AuditSchemaError(ValueError):
     """Raised when a security model response does not match the audit schema."""
 
+    def __init__(self, message, failure_type='POLICY_CONFIGURATION', *, content=None,
+                 finish_reason=None, refusal_present=False):
+        super().__init__(message)
+        self.failure_type = failure_type
+        self.content = content
+        self.finish_reason = finish_reason
+        self.refusal_present = refusal_present
+
+
+class _AuditResponse(str):
+    """String-compatible response with safe transport metadata, never SDK repr."""
+
+    def __new__(cls, content, finish_reason=None, refusal_present=False):
+        value = super().__new__(cls, content or '')
+        value.finish_reason = finish_reason
+        value.refusal_present = refusal_present
+        return value
+
 
 @dataclass(frozen=True)
 class AuditDecision:
     """Validated, non-sensitive result of one semantic audit request.
 
-    The raw prompt and raw model response are intentionally not stored. Their
-    hashes are enough to correlate a decision with an external secure trace.
+    This record never stores raw prompts or responses. Explicit full tracing
+    can separately store a bounded failed-response preview in its sidecar.
     The Reference Monitor may use ``decision=deny`` as an additional signal,
     but an ``allow`` result never grants a tool that deterministic policy did
     not already authorize.
@@ -342,34 +362,34 @@ def _parse_audit_payload(content: str | None) -> tuple[str, tuple[str, ...], flo
     """Strictly validate the four-field audit response schema."""
 
     if not isinstance(content, str) or not content.strip():
-        raise AuditSchemaError("audit response is empty")
+        raise AuditSchemaError("audit response is empty", 'EMPTY_RESPONSE')
     try:
         payload = json.loads(content)
     except (TypeError, json.JSONDecodeError) as exc:
-        raise AuditSchemaError("audit response is not JSON") from exc
+        raise AuditSchemaError("audit response is not JSON", 'INVALID_JSON') from exc
     if not isinstance(payload, dict) or set(payload) != AUDIT_REQUIRED_FIELDS:
-        raise AuditSchemaError("audit response fields do not match the schema")
+        raise AuditSchemaError("audit response fields do not match the schema", 'FIELDS_MISMATCH')
 
     decision = payload.get("decision")
     violations = payload.get("violations")
     confidence = payload.get("confidence")
     reason_code = payload.get("reason_code")
-    if decision not in AUDIT_DECISIONS:
-        raise AuditSchemaError("audit decision is not allow, deny, or abstain")
+    if not isinstance(decision, str) or decision not in AUDIT_DECISIONS:
+        raise AuditSchemaError("audit decision is not allow, deny, or abstain", 'INVALID_DECISION')
     if not isinstance(violations, list) or not all(
         isinstance(item, str) and item.strip() for item in violations
     ) or len(violations) > 32:
-        raise AuditSchemaError("audit violations must be a bounded string list")
+        raise AuditSchemaError("audit violations must be a bounded string list", 'INVALID_VIOLATIONS')
     if isinstance(confidence, bool) or not isinstance(confidence, (int, float)):
-        raise AuditSchemaError("audit confidence must be numeric")
+        raise AuditSchemaError("audit confidence must be numeric", 'INVALID_CONFIDENCE')
     confidence = float(confidence)
     if not math.isfinite(confidence) or not 0.0 <= confidence <= 1.0:
-        raise AuditSchemaError("audit confidence must be between 0 and 1")
+        raise AuditSchemaError("audit confidence must be between 0 and 1", 'INVALID_CONFIDENCE')
     if (
         not isinstance(reason_code, str)
         or not re.fullmatch(r"[A-Za-z0-9_.:-]{1,96}", reason_code)
     ):
-        raise AuditSchemaError("audit reason_code must be a bounded string")
+        raise AuditSchemaError("audit reason_code must be a bounded string", 'INVALID_REASON_CODE')
     return decision, tuple(_normalise_text(item, 96) for item in violations), confidence, _normalise_text(reason_code, 96)
 
 
@@ -506,6 +526,7 @@ def _compact_audit_record(record: dict) -> dict:
         "final_reason_code",
         "approved_actions",
         "blocked_actions",
+        "protocol_diagnostics",
     )
     return {key: deepcopy(record[key]) for key in keys if key in record}
 
@@ -545,6 +566,8 @@ def _audit_summary(records: list[dict]) -> dict:
     parser_statuses = Counter()
     reason_codes = Counter()
     final_decisions = Counter()
+    protocol_failures, finish_reasons, validations = Counter(), Counter(), Counter()
+    refusal_count = 0
     approved_actions = 0
     blocked_actions = 0
     latency_ms = 0.0
@@ -555,6 +578,13 @@ def _audit_summary(records: list[dict]) -> dict:
         parser_statuses[str(record.get("parser_status", "unknown"))] += 1
         reason_codes[str(record.get("reason_code", "unknown"))] += 1
         final_decisions[str(record.get("final_policy_decision", "unknown"))] += 1
+        diagnostic = record.get('protocol_diagnostics', {})
+        if diagnostic:
+            if diagnostic.get('failure_type'):
+                protocol_failures[diagnostic['failure_type']] += 1
+            finish_reasons[diagnostic.get('finish_reason', 'unknown')] += 1
+            validations[diagnostic.get('field_validation', 'not_checked')] += 1
+            refusal_count += diagnostic.get('refusal_present') is True
         approved_actions += int(record.get("approved_actions") or 0)
         blocked_actions += int(record.get("blocked_actions") or 0)
         try:
@@ -568,6 +598,10 @@ def _audit_summary(records: list[dict]) -> dict:
         "parser_status_counts": dict(parser_statuses),
         "reason_code_counts": dict(reason_codes),
         "final_policy_decision_counts": dict(final_decisions),
+        "protocol_failure_counts": dict(protocol_failures),
+        "finish_reason_counts": dict(finish_reasons),
+        "field_validation_counts": dict(validations),
+        "refusal_count": refusal_count,
         "approved_actions": approved_actions,
         "blocked_actions": blocked_actions,
         "total_latency_ms": round(latency_ms, 2),
@@ -963,12 +997,36 @@ class ToolAuthorizationCompiler:
         'Return empty arrays if no tools or prohibitions are supported. No explanation outside JSON.'
     )
 
-    def __init__(self, llm: agent_pipeline.OpenAILLM, tool_metadata=None, authorization_profile=None):
+    def __init__(self, llm: agent_pipeline.OpenAILLM, tool_metadata=None, authorization_profile=None,
+                 prompt_profile='legacy'):
         if authorization_profile is not None and not isinstance(authorization_profile, ToolAuthorizationProfile):
             raise TypeError('authorization_profile must be a trusted ToolAuthorizationProfile')
         self.llm = llm
         self.tool_metadata = dict(tool_metadata or {})
         self.authorization_profile = authorization_profile
+        self.prompt_profile = validate_profile(prompt_profile)
+
+    def _catalog(self, runtime, metadata):
+        if not semantic_catalog(self.prompt_profile):
+            return {name: str(getattr(runtime.functions[name], 'description', 'No description')).strip()
+                    for name in sorted(runtime.functions)}
+        result = {}
+        for name in sorted(runtime.functions):
+            function = runtime.functions[name]
+            status = metadata[name]
+            risk = status.metadata
+            schema = function.parameters.model_json_schema()
+            result[name] = {
+                'schema_version': CATALOG_SCHEMA,
+                'description': str(getattr(function, 'description', 'No description')).strip(),
+                'parameters': schema,
+                'metadata_state': status.public_dict()['metadata_state'],
+                'effect': risk.effect if risk is not None else 'unknown',
+                'source': risk.source if risk is not None else 'unknown',
+                'sink': risk.sink if risk is not None else 'unknown',
+                'risk_level': status.risk_level,
+            }
+        return result
 
     def _runtime_metadata(self, runtime):
         if self.tool_metadata:
@@ -996,10 +1054,7 @@ class ToolAuthorizationCompiler:
         all_tools = sorted(runtime.functions)
         metadata = self._runtime_metadata(runtime)
         allowed = set()
-        catalog = {
-            name: str(getattr(runtime.functions[name], "description", "No description")).strip()
-            for name in all_tools
-        }
+        catalog = self._catalog(runtime, metadata)
 
         # 1. Explicitly classified reads are capabilities needed to inspect
         # state. Granting them at the tool level preserves normal AgentDojo
@@ -1028,7 +1083,8 @@ class ToolAuthorizationCompiler:
                 profile = None
                 profile_status = 'unsupported_task_fallback'
         prohibited, prepared, evidence_refs = frozenset(), frozenset(), ()
-        policy = self.PROFILE_POLICY if profile is not None else self.SYSTEM_POLICY
+        policy = authorization_policy(self.PROFILE_POLICY if profile is not None else self.SYSTEM_POLICY,
+                                      self.prompt_profile)
         authorization_mode = 'bounded-profile-v1' if profile is not None else 'legacy'
         if profile is not None:
             if not requires_model:
@@ -1174,11 +1230,13 @@ class OurFrameExecutor(agent_pipeline.BasePipelineElement):
         delegated_tasks: bool = True,
         delegated_task_reader=None,
         l1_projection_mode: str = 'projected',
+        prompt_profile: str = 'legacy',
     ):
         self.llm = llm
         self.sandbox = sandbox
         self.authorization_compiler = ToolAuthorizationCompiler(llm, tool_metadata=tool_metadata,
-                                                               authorization_profile=authorization_profile)
+                                                               authorization_profile=authorization_profile,
+                                                               prompt_profile=prompt_profile)
         self.trace_level = _normalise_trace_level(trace_level)
         self._authorization_cache_key = None
         self._authorization_cache_contract = None
@@ -2194,6 +2252,7 @@ class ActionSecurityChecker(agent_pipeline.BasePipelineElement):
         precheck: ToolAuthorizationPrecheck | None = None,
         audit_router=None,
         router_verifier=None,
+        prompt_profile='legacy',
     ):
         self.small_llm = small_llm
         self.intention = user_intention
@@ -2206,6 +2265,8 @@ class ActionSecurityChecker(agent_pipeline.BasePipelineElement):
         self.precheck = precheck
         self.audit_router = audit_router
         self.router_verifier = router_verifier
+        self.prompt_profile = validate_profile(prompt_profile)
+        self.SYSTEM_POLICY = audit_policy(type(self).SYSTEM_POLICY, self.prompt_profile)
 
     def _handoff_record(self,query,runtime,calls,messages,extra_args,record):
         # Active routing authenticates every checker outcome, so a public
@@ -2354,7 +2415,7 @@ class ActionSecurityChecker(agent_pipeline.BasePipelineElement):
             response = client.chat.completions.create(**request_kwargs)
             choices = response.get("choices") if isinstance(response, dict) else getattr(response, "choices", None)
             if not isinstance(choices, (list, tuple)) or not choices:
-                raise AuditSchemaError("audit response has no choices")
+                raise AuditSchemaError("audit response has no choices", 'NO_CHOICES')
             choice = choices[0]
             finish_reason = (
                 choice.get("finish_reason")
@@ -2363,11 +2424,15 @@ class ActionSecurityChecker(agent_pipeline.BasePipelineElement):
             )
             message = choice.get("message") if isinstance(choice, dict) else getattr(choice, "message", None)
             refusal = message.get("refusal") if isinstance(message, dict) else getattr(message, "refusal", None)
+            text = _extract_content_text(response)
+            finish_reason = finish_reason if finish_reason in (None, 'stop', 'length', 'content_filter', 'tool_calls', 'function_call') else 'other'
             if refusal:
-                raise AuditSchemaError("audit model refused the request")
+                raise AuditSchemaError("audit model refused the request", 'MODEL_REFUSAL',
+                                       content=text, finish_reason=finish_reason, refusal_present=True)
             if finish_reason not in (None, "stop"):
-                raise AuditSchemaError("audit response is incomplete")
-            return _extract_content_text(response)
+                raise AuditSchemaError("audit response is incomplete", 'INCOMPLETE_RESPONSE',
+                                       content=text, finish_reason=finish_reason)
+            return _AuditResponse(text, finish_reason)
         response = self._fallback_query(query, env, prompt)
         return _extract_content_text(response)
 
@@ -2514,14 +2579,20 @@ class ActionSecurityChecker(agent_pipeline.BasePipelineElement):
             _routing_count(extra_args, "semantic_audit_calls")
             started = time.perf_counter()
             content = None
+            failure_type, validation = None, 'not_checked'
+            finish_reason, refusal_present = None, False
             raw_hash = _hash_json("missing-audit-response")
             try:
                 audit_client = getattr(self.small_llm, "client", None)
                 with (audit_client.phase("audit_retry" if attempt else "audit")
                       if isinstance(audit_client, TokenTrackerClient) else nullcontext()):
                     content = self._request_audit(query, env, packet)
+                finish_reason = getattr(content, 'finish_reason', None)
+                refusal_present = getattr(content, 'refusal_present', False)
                 raw_hash = _hash_json(content if content is not None else "missing-audit-response")
+                validation = 'failed'
                 decision_value, violations, confidence, reason_code = _parse_audit_payload(content)
+                validation = 'passed'
                 decision = AuditDecision(
                     batch_fingerprint=batch_fingerprint,
                     decision=decision_value,
@@ -2539,6 +2610,14 @@ class ActionSecurityChecker(agent_pipeline.BasePipelineElement):
                 failure_code = "AUDIT_TIMEOUT" if "timeout" in error_name else (
                     "AUDIT_SCHEMA_INVALID" if isinstance(exc, AuditSchemaError) else "AUDIT_MODEL_ERROR"
                 )
+                failure_type = exc.failure_type if isinstance(exc, AuditSchemaError) else (
+                    'TIMEOUT' if failure_code == 'AUDIT_TIMEOUT' else 'MODEL_ERROR')
+                if isinstance(exc, AuditSchemaError) and validation == 'not_checked':
+                    content, finish_reason = exc.content, exc.finish_reason
+                    refusal_present = exc.refusal_present
+                    raw_hash = _hash_json(content if content is not None else "missing-audit-response")
+                if failure_type in ('EMPTY_RESPONSE', 'INVALID_JSON'):
+                    validation = 'not_checked'
                 decision = self._make_failure_decision(
                     batch_fingerprint,
                     input_hash,
@@ -2547,6 +2626,20 @@ class ActionSecurityChecker(agent_pipeline.BasePipelineElement):
                     round((time.perf_counter() - started) * 1000, 2),
                 )
             record = decision.public_dict()
+            record['protocol_diagnostics'] = {
+                'schema_version': 'dscg.audit-protocol.v1',
+                'failure_type': failure_type,
+                'finish_reason': finish_reason or 'unknown',
+                'refusal_present': bool(refusal_present),
+                'field_validation': validation,
+            }
+            if failure_type and isinstance(content, str) and _trace_level(extra_args) == 'full':
+                _append_full_trace(extra_args, 'audit_protocol_response', {
+                    'batch_fingerprint': batch_fingerprint, 'semantic_attempt': attempt + 1,
+                    'protocol_diagnostics': record['protocol_diagnostics'],
+                    'raw_response_sha256': raw_hash,
+                    'response_preview': content[:2048], 'response_truncated': len(content) > 2048,
+                })
             record["semantic_attempt"] = attempt + 1
             self._handoff_record(query,runtime,tool_calls,messages,extra_args,record)
             if (attempt >= self.max_semantic_retries
@@ -2586,14 +2679,15 @@ TASK_COMPLETION_PROMPT = (
 
 def router_configuration_hash(main_config, sec_config, *, input_isolation, authorization_precheck,
                               l1_projection_mode, planning_tool_view, delegated_tasks,
-                              profile_hash=None, reader_hash=None, audit_retries=0, completion_prompt=False):
+                              profile_hash=None, reader_hash=None, audit_retries=0, completion_prompt=False,
+                              prompt_profile='legacy'):
     """Describe the router request/configuration identity without creating clients."""
-    return router_digest({"main": main_config.public_dict(), "audit": sec_config.public_dict(),
+    return router_digest({**profile_binding(prompt_profile), "main": main_config.public_dict(), "audit": sec_config.public_dict(),
                                            "temperature": 0.0,
                                            "reasoning_effort": [reasoning_effort_for_config(main_config),reasoning_effort_for_config(sec_config)],
                                            "main_system_prompt_sha256": _hash_json(load_system_message(None)),
-                                           "audit_policy_sha256": _hash_json(ActionSecurityChecker.SYSTEM_POLICY),
-                                           "authorization_policy_sha256": _hash_json(ToolAuthorizationCompiler.SYSTEM_POLICY),
+                                           "audit_policy_sha256": _hash_json(audit_policy(ActionSecurityChecker.SYSTEM_POLICY, prompt_profile)),
+                                           "authorization_policy_sha256": _hash_json(authorization_policy(ToolAuthorizationCompiler.SYSTEM_POLICY, prompt_profile)),
                                            "isolation_rule_sha256": _hash_json(ISOLATION_RULE),
                                            "completion_rule_sha256": _hash_json(TASK_COMPLETION_PROMPT),
                                            "framework_version": FRAMEWORK_VERSION,
@@ -2619,7 +2713,8 @@ def router_configuration_hash(main_config, sec_config, *, input_isolation, autho
 def defended_pipeline_name(model_id, *, use_sandbox, use_security_checker, input_isolation,
                            authorization_precheck, l1_projection_mode, planning_tool_view,
                            delegated_tasks, audit_router_mode, audit_router=None,
-                           router_config_hash=None, profile_hash=None, reader_hash=None):
+                           router_config_hash=None, profile_hash=None, reader_hash=None,
+                           prompt_profile='legacy'):
     """Pure naming shared by preflight descriptors and actual pipelines."""
     # 5. 动态命名 Pipeline，方便看实验日志
     ablation_suffix = ""
@@ -2642,6 +2737,8 @@ def defended_pipeline_name(model_id, *, use_sandbox, use_security_checker, input
     if reader_hash:
         version_suffix += '-Reader-' + reader_hash[:16]
     name = f"{model_id}-newFrame{ablation_suffix}{version_suffix}"
+    if profile_binding(prompt_profile):
+        name += '-Prompt-' + prompt_profile + '-' + profile_binding(prompt_profile)['prompt_profile_sha256'][:16]
     if audit_router_mode != "off":
         name += f"-CSA-{audit_router_mode}-{(audit_router.artifact_sha256 or 'uncalibrated')[:16]}-{router_config_hash[:16]}"
     return name
@@ -2666,6 +2763,7 @@ def make_qwen_newFrame_pipeline(
     delegated_task_reader=None,
     *,
     l1_projection_mode: str = 'projected',
+    prompt_profile: str = 'legacy',
     api_key: str | None = None,
     base_url: str | None = None,
     provider: str | None = None,
@@ -2689,6 +2787,9 @@ def make_qwen_newFrame_pipeline(
     :param trace_level: 任务 JSON 中 DSCG 记录级别：summary、standard 或 full
     :param tool_metadata: 可选的工具名到显式风险元数据的映射
     """
+    validate_profile(prompt_profile)
+    if prompt_profile != 'legacy' and (not use_sandbox or not use_security_checker):
+        raise ValueError('candidate prompt profiles require L2 and checker')
     if audit_router_mode not in {"off", "shadow", "selective"}:
         raise ValueError("audit_router_mode must be off/shadow/selective")
     if not isinstance(l1_projection_mode, str) or l1_projection_mode not in L1_PROJECTION_MODES:
@@ -2749,6 +2850,7 @@ def make_qwen_newFrame_pipeline(
         l1_projection_mode=l1_projection_mode,
         planning_tool_view=planning_tool_view, authorization_profile=authorization_profile,
         delegated_tasks=delegated_tasks, delegated_task_reader=delegated_task_reader,
+        prompt_profile=prompt_profile,
     )
 
     precheck = ToolAuthorizationPrecheck(my_sandbox) if authorization_precheck else None
@@ -2785,7 +2887,7 @@ def make_qwen_newFrame_pipeline(
             authorization_precheck=authorization_precheck, l1_projection_mode=l1_projection_mode,
             planning_tool_view=planning_tool_view, delegated_tasks=delegated_tasks,
             profile_hash=profile_hash, reader_hash=reader_hash,
-            audit_retries=audit_retries, completion_prompt=completion_prompt)
+            audit_retries=audit_retries, completion_prompt=completion_prompt, prompt_profile=prompt_profile)
         if audit_router_mode != "off":
             audit_router = LocalAuditRouter(audit_router_mode, audit_router_artifact, router_config_hash)
         security_checker = ActionSecurityChecker(
@@ -2795,6 +2897,7 @@ def make_qwen_newFrame_pipeline(
             max_semantic_retries=audit_retries,
             precheck=precheck,
             audit_router=audit_router, router_verifier=router_verifier,
+            prompt_profile=prompt_profile,
         )
 
     # 3. Every candidate batch passes through the same monitor and ticketed executor.
@@ -2830,8 +2933,9 @@ def make_qwen_newFrame_pipeline(
         l1_projection_mode=l1_projection_mode, planning_tool_view=planning_tool_view,
         delegated_tasks=delegated_tasks, audit_router_mode=audit_router_mode,
         audit_router=audit_router, router_config_hash=router_config_hash,
-        profile_hash=profile_hash, reader_hash=reader_hash)
+        profile_hash=profile_hash, reader_hash=reader_hash, prompt_profile=prompt_profile)
     pipeline.dscg_optimization_config = {
+        **profile_binding(prompt_profile),
         "framework_version": FRAMEWORK_VERSION,
         "input_isolation": input_isolation, "authorization_precheck": authorization_precheck,
         'l1_projection_mode': l1_projection_mode, 'l1_projection_profile_sha256': L1_PROFILE_SHA256,

@@ -7,6 +7,7 @@ from pathlib import Path
 from dscg.benchmark_catalog import get_suites
 from dscg.input_isolation import FRAMEWORK_VERSION
 from dscg.l1_projection import MODES as L1_PROJECTION_MODES
+from dscg.prompt_profiles import validate_profile, profile_binding
 
 ROUTING_KEYS = ("candidate_batches", "precheck_allowed_batches", "precheck_rejected_batches",
                 "public_read_bypass_batches", "semantic_audit_calls")
@@ -57,6 +58,12 @@ def normalize_config(payload):
         raise ValueError('l1_projection_mode 必须为 off/shadow/projected')
     config['l1_projection_mode'] = mode if config['input_isolation'] else 'off'
     config["framework_version"] = None if config["origin"] else FRAMEWORK_VERSION
+    profile = validate_profile(config.get('prompt_profile', 'legacy'))
+    if profile != 'legacy' and (config['origin'] or not config['use_sandbox'] or not config['use_security_checker']):
+        raise ValueError('candidate prompt profiles require the defended pipeline with L2 and checker')
+    config['prompt_profile'] = profile
+    config.pop('prompt_profile_sha256', None)
+    config.update(profile_binding(profile))
     return config
 
 

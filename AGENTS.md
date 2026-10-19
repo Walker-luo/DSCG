@@ -1,5 +1,12 @@
 # DSCG Research Handoff
 
+## Qwen utility diagnostic candidates (2026-10-19)
+
+- Default remains three-layer-v3.1 / prompt_profile=legacy. Protocol diagnostics are additive and never change native labels/denominators or fail-closed mediation. Full-only failed-response previews are bounded to2048 characters in sidecars, never in default summary/standard; no SDK/client exception text.
+- Explicit cumulative candidates: protocol-v1 (output contract), tool-semantics-v1 (host schema/effect/source/sink catalogue), source-context-v1 (current-action/source-fact clarification). No new model calls, retries, L1 profile, audit bypass or permission mechanism. Candidates require L2+L3; defaults are not promoted without real model/attack validation.
+- Full/partial/cohort and Dashboard API bind candidate names/content identities; never reuse another candidate's cache or calibration. Legacy adds no candidate binding fields to historical manifests. No source scan is added.
+- New evidence uses workshop/artifacts/20261019_qwen_utility/. Guide: docs/qwen_utility.md. Synthetic authored packets are diagnostics only;37/97clean and matched attack controls remain pending paid-call authorization. E0/I3/I2 gates unchanged.
+
 
 ## Current CLI backend result folders (2026-10-18)
 
