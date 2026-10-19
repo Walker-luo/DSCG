@@ -2,6 +2,12 @@
 
 更新时间：2026-10-19（新增显式Qwen效用候选和协议诊断；AgentDojo / AgentDyn 按环境自动识别；三层防御规则及默认开关保持）。当前默认版本 **three-layer-v3.1**。此前用户授权实现有限L1结构化投影，沿用L2工具视图/任务文件与L3动作正文审查；默认投影已接入factory、partial和网页API，架构说明同步。Spotlighting风格来源封装仍是不适用输入的回退。正式研究路线和闸门不改变。
 
+## 运行报告精简与L3汇总（2026-10-19）
+
+CLI full/partial/cohort与Dashboard共享离线路由汇总器；Dashboard正常完成后保存根summary.md、完整failure_cases.jsonl与l3_router_summary.md/json。原CSV、overall_results、历史分析和报告下载API保留；没有新增网页控件或改变实际路由模式。新运行不再写重复TXT，旧文件不清理。CLI中断生成部分报告，缺失轨迹显示未知；网页服务若异常退出，可停止后手动生成L3报告。
+
+汇总只读取已声明计分任务，排除GOAL预检/快照，不依赖当前后端；按实际模式、配置和提示候选区分。缺校准/不完整轨迹的shadow有效节省为未知，公开读取免审与selective新增免审分开；判断交叉不是安全真值，实际节省无反事实不估算。离线旧目录默认只新增两份L3报告，refresh仅替换本工具产物；详见[结果文件指南](./result_files.md)。用户原始结果及评分身份不改。
+
 ## Qwen效用候选与审计协议诊断（2026-10-19）
 
 普通网页保持legacy。API配置可显式传`prompt_profile=legacy|protocol-v1|tool-semantics-v1|source-context-v1`，服务端校验候选要求L2与L3，并从宿主计算候选哈希，忽略客户端伪造的哈希。有效配置、任务framework记录和文本报告可追踪候选；本轮未新增页面选择控件。CLI/full/partial/cohort与Python使用相同候选及缓存绑定。

@@ -125,7 +125,9 @@ class PartialAttackTests(unittest.TestCase):
                 self.assertEqual(manifest["attacks"], selected_attacks)
                 self.assertEqual(manifest["excluded_from_all"], {"manual": "requires interactive input"})
                 self.assertEqual(len(manifest["runs"]), len(selected_attacks))
-                combined = (base / "all_report.txt").read_text()
+                combined = (base / "summary.md").read_text()
+                self.assertFalse(list(base.rglob('all_report.txt')))
+                self.assertFalse(list(base.rglob('report.txt')))
                 for attack_name in selected_attacks:
                     output = base / attack_name / "workspace"
                     report = json.loads((output / "summary.json").read_text())
@@ -138,7 +140,7 @@ class PartialAttackTests(unittest.TestCase):
                     self.assertEqual(report["task_counts"]["planned_tasks"], 3 if is_dos else 9)
                     self.assertEqual(report["task_counts"]["total_tasks"], 3 if is_dos else 9)
                     self.assertIn(attack_name, (output / "detailed_results.csv").read_text())
-                    self.assertIn(f"[{attack_name}]", combined)
+                    self.assertIn(attack_name, combined)
                     self.assertEqual(Path(manifest["runs"][selected_attacks.index(attack_name)]["output_dir"]), base / attack_name)
                 self.assertTrue(all(run["status"] == "completed" for run in manifest["runs"]))
             self.assertEqual(load.call_count, 2 * sum(len(names) for names in selections.values()))
@@ -205,9 +207,13 @@ class PartialAttackTests(unittest.TestCase):
             with gzip.open(trace.with_suffix(".dscg_trace.jsonl.gz"), "rt") as stream:
                 self.assertEqual(json.loads(stream.readline())["event"], "fixture")
             self.assertTrue((result / "summary.json").exists())
-            self.assertTrue((root / "all_report.txt").exists())
+            self.assertTrue((root / "summary.md").exists())
+            self.assertFalse((root / "all_report.txt").exists())
+            legacy_report = root / 'all_report.txt'
+            legacy_report.write_text('Historical report: preserve original bytes.')
             before = trace.read_bytes()
             self.assertEqual(runner.main(**options), 0)
+            self.assertEqual(legacy_report.read_text(), 'Historical report: preserve original bytes.')
             self.assertEqual(task.call_count, 12)  # All raw results reused from the new path.
             self.assertEqual(trace.read_bytes(), before)
             self.assertEqual(runner.main(**options, force_rerun=True), 0)

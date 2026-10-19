@@ -40,6 +40,8 @@ experiments/
 
 | 模块 | 用途 |
 | --- | --- |
+| [common/routing_reports.py](./common/routing_reports.py) | 无后端依赖的运行级L3分组、完整性与成本统计 |
+| [diagnostics/summarize_results.py](./diagnostics/summarize_results.py) | 只新增旧目录的两份L3报告；默认拒绝覆盖，显式refresh限自有产物；[指南](../docs/result_files.md) |
 | [common/result_paths.py](./common/result_paths.py) | CLI后端子目录、运行名称及旧目录原地续跑定位 |
 | [common/partial_controls.py](./common/partial_controls.py) | full/partial任务选择、冻结清单、参考来源及缓存绑定 |
 | [common/partial_reporting.py](./common/partial_reporting.py) | 测量报告、失败索引和成本统计 |

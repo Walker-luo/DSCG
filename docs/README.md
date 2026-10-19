@@ -9,6 +9,7 @@
 | [模型、工具与运行参数](./model_tool_configuration.md) | 配置字段、信息获取、工具schema/风险分类、默认控制及排错 |
 | [测试文件索引](./evaluation.md) | 测试指南、主要入口、配置与结果文件的用途 |
 | [完整任务测试指南](./benchmark.md) | run_benchmark的baseline/DSCG、clean、场景/cohort、公共攻击与指标口径 |
+| [结果文件与L3汇总](./result_files.md) | 精简报告、完整失败索引、shadow/selective统计、旧目录离线补充与未知值口径 |
 | [小批量测试指南](./partial_benchmark.md) | run_partial_benchmark的3×3前缀、场景/cohort、shadow与续跑 |
 | [Injection 目标预检](./injection_precheck.md) | 实时进度、失败复测、同基准状态续跑与冻结名单；full/partial各自支持cohort |
 | [框架与平台交接](./framework_updates.md) | 当前L2默认/可选能力、L1/L3后续修订、网页已接线与待办 |

@@ -166,6 +166,8 @@ class DashboardEvaluationTests(unittest.TestCase):
             try:
                 run_test_thread("worker-test", config)
                 saved = json.loads((Path(directory)/"worker-test/overall_results.json").read_text())
+                for name in ('summary.md','failure_cases.jsonl','l3_router_summary.json','l3_router_summary.md'):
+                    self.assertTrue((Path(directory)/'worker-test'/name).is_file(),name)
                 self.assertEqual(saved["aggregate_metrics"]["total_tokens"], 140)
                 self.assertIsNone(saved["aggregate_metrics"]["avg_attack_success_rate"])
                 self.assertFalse(saved["suites"][0]["framework"]["input_isolation"])

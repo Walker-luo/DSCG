@@ -1,5 +1,7 @@
 # Workshop 优化状态索引
 
+新增[结果精简与L3运行级汇总](./completed/result_reports_20261019.md)：共享离线报告、紧凑摘要与完整失败索引已接线；指定旧目录仅新增两份报告，1279原文件SHA256不变。两环境/网页回归通过，无模型调用或防御策略变化；[使用指南](../docs/result_files.md)。
+
 2026-10-19：[Qwen候选验收计划](./qwen_utility_20261019.md)、[已完成工程报告](./completed/qwen_utility_20261019.md)与[使用指南](../docs/qwen_utility.md)。协议诊断和分阶段候选工程已接线，默认legacy保留；模型协议/语义配对、37/97clean与冻结cohort攻击验收待授权，尚未证明TSR恢复。L1未改。
 
 最新结果布局：[按后端分目录](./completed/backend_result_layout_20261018.md)。CLI测量/预检使用分类根/后端/运行目录；旧目录原地续跑，历史页兼容；网页发起实验布局不变。

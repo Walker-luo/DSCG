@@ -166,11 +166,15 @@ def _rate(passed: int, denominator: int, *, enabled: bool = True) -> str:
 
 def write_run_overview(base_dir: Path, attack_names: list[str], suites: list[str],
                        run_records: list[dict], suite_reports: list[dict], *, model_id=None,
-                       task_scope='partial') -> tuple[Path, Path]:
+                       task_scope='partial', routing_summary=None) -> tuple[Path, Path]:
     """Write two additive run artifacts. Native traces and metrics stay untouched."""
     backend = get_backend()
     summary_path = base_dir / "summary.md"
     detail_path = base_dir / "failure_cases.jsonl"
+    metadata = ('overall_results.json' if task_scope == 'dashboard' else
+                'attack_manifest.json' if (base_dir/'attack_manifest.json').exists() else
+                'screened_run_manifest.json' if (base_dir/'screened_run_manifest.json').exists() else
+                'benchmark_plan.json')
     reports = {(report["attack"], report["suite"]): report for report in suite_reports}
     runs = {(record["attack"], record.get('failed_suite')): record for record in run_records}
     cases = [dict(case) for report in suite_reports for case in report["cases"]]
@@ -181,7 +185,7 @@ def write_run_overview(base_dir: Path, attack_names: list[str], suites: list[str
                           "failure_types": ["run_error"], "sample_status": "infrastructure_error",
                           "error_type": run["error_type"], "trace_path": None, "trace_exists": False,
                           "excerpt_status": "run_aborted", "excerpts": [],
-                          "source_path": "attack_manifest.json"})
+                          "source_path": metadata})
     for line, case in enumerate(cases, 1):
         case.update(schema_version="dscg.partial-failure.v2", benchmark=benchmark_identity(), case_id=f"F{line:04d}", detail_line=line)
     with detail_path.open("w", encoding="utf-8") as stream:
@@ -189,6 +193,7 @@ def write_run_overview(base_dir: Path, attack_names: list[str], suites: list[str
             stream.write(json.dumps(case, ensure_ascii=False) + "\n")
 
     title = {'full': '全量评测摘要', 'screened': '筛选目标评测摘要（全部用户任务）',
+             'dashboard': '网页评测摘要',
              'partial_screened': '小批量筛选目标评测摘要（每场景前 3 个用户，原前 3 个注入目标内筛选）'}.get(task_scope, '小批量评测摘要')
     if task_scope == 'full' and set(suites) != set(backend.suites):
         title = '所选场景全任务评测摘要'
@@ -228,7 +233,7 @@ def write_run_overview(base_dir: Path, attack_names: list[str], suites: list[str
     for report in suite_reports:
         data = report["summary"]
         new_cost = data.get("invocation_cost", {})
-        new_tokens = new_cost.get("overhead", {}).get("total_tokens", 0) + new_cost.get("sec_overhead", {}).get("total_tokens", 0)
+        new_tokens = (new_cost.get("overhead", {}).get("total_tokens", 0) + new_cost.get("sec_overhead", {}).get("total_tokens", 0)) if new_cost else 'unknown'
         lines.append(f"- {_cell(report['attack'])} / {_cell(report['suite'])}：{_cell(data.get('cost_scope', 'unknown'))}；本次新增 Token={new_tokens}。")
     lines.extend(["", "## 失败与缺失案例索引", "",
                   f"详情：{_link('failure_cases.jsonl')}（每行一个案例，最多 {MAX_EXCERPTS} 个片段，每片最多 {MAX_EXCERPT_CHARS} 字符）。",
@@ -242,7 +247,7 @@ def write_run_overview(base_dir: Path, attack_names: list[str], suites: list[str
         labels = {"tsr_failure": "TSR失败", "asr_success": "ASR成功（防御失败）",
                   "asr_unavailable": "ASR缺失/无效", "result_missing": "结果缺失",
                   "task_error": "任务运行错误", "run_error": "运行中断"}
-        for case in cases:
+        for case in cases[:10]:
             task = f"{case.get('user_task_id') or '—'} / {case.get('injection_task_id') or 'none'}"
             location = case.get("trace_path") or case.get("source_path")
             types = ", ".join(labels[kind] for kind in case["failure_types"])
@@ -250,5 +255,16 @@ def write_run_overview(base_dir: Path, attack_names: list[str], suites: list[str
                 types += f" ({case['error_type']})"
             row = [f"{case['case_id']} / {case['detail_line']}", case["attack"], case.get("suite") or "—", task, types]
             lines.append("| " + " | ".join(_cell(value) for value in row) + " | " + _link(location) + " | " + case["excerpt_status"] + " |")
+        if len(cases) > 10:
+            lines.extend(['', f'仅展示前10个入口，共{len(cases)}个案例；其余请查看failure_cases.jsonl。'])
+    lines.extend(['', '## L3路由', '',
+                  '[查看运行级路由汇总](l3_router_summary.md) · [结构化统计](l3_router_summary.json)',
+                  '路由汇总区分未校准、无候选与缺失记录；shadow不实际免审，selective实际节省Token仍未知。'])
+    if routing_summary is not None:
+        t = routing_summary['totals']
+        modes = sorted({r['configuration']['mode'] for r in routing_summary['configurations']})
+        savings = t['shadow_would_save_tokens']
+        lines.extend(['', f"实际模式：{', '.join(modes) or '未知'}；已记录候选批次{t['candidate_batches']}，适用{t['eligible_batches']}，原公开免审{t['original_public_bypass_batches']}，新增实际免审{t['actual_bypass_batches']}；shadow有效模拟节省Token：{savings if savings is not None else '未知'}。"])
+    lines.extend(['', f'完整运行配置与范围见 {_link(metadata)}；保留场景summary.json、CSV和原始任务JSON用于核查。'])
     summary_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
     return summary_path, detail_path

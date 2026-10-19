@@ -81,7 +81,7 @@ class MissingSecuritySummaryTests(unittest.TestCase):
         with TemporaryDirectory() as directory,redirect_stdout(StringIO()),patch.object(runner,'make_openai_compatible_pipeline',return_value=(pipeline,tracker)),patch.object(runner.attacks,'load_attack',return_value=SimpleNamespace(is_dos_attack=False)),patch.object(runner.benchmark,'benchmark_suite_with_injections',return_value=results):
             runner.main(origin=True,suites=['workspace'],run_name='missing',results_dir=directory)
             summary=json.loads(next(Path(directory).rglob('summary.json')).read_text())
-            report=next(Path(directory).rglob('report.txt')).read_text()
+            report=next(Path(directory).rglob('summary.md')).read_text()
             self.assertIsNone(summary['metrics']['attack_success_rate'])
             self.assertNotIn('ASR): 0.00%',report)
             self.assertNotIn('Defense Rate): 100.00%',report)

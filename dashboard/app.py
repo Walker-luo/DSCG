@@ -250,6 +250,7 @@ def run_test_thread(run_id: str, config: dict):
 
         all_summaries = []
         all_structured_records = []
+        overview_reports = []
 
         try:
             for suite_index, suite_name in enumerate(suites):
@@ -469,6 +470,9 @@ def run_test_thread(run_id: str, config: dict):
                 # JSON summary
                 with open(suite_output_dir / "summary.json", "w", encoding="utf-8") as f:
                     json.dump(summary, f, indent=4, ensure_ascii=False)
+                from dashboard.evaluation import build_suite_report
+                overview_reports.append(build_suite_report(run_dir, summary,
+                    [r for r in all_structured_records if r['suite_name'] == suite_name], suite, config))
 
         finally:
             sys.stdout = old_stdout
@@ -489,6 +493,13 @@ def run_test_thread(run_id: str, config: dict):
         # 保存整体结果
         with open(run_dir / "overall_results.json", "w", encoding="utf-8") as f:
             json.dump(overall, f, indent=4, ensure_ascii=False, default=str)
+
+        from experiments.common.routing_reports import write_routing_summary
+        routing_summary = write_routing_summary(run_dir, refresh=True, check_running=False)
+        from experiments.common.partial_reporting import write_run_overview
+        write_run_overview(run_dir, [attack_name if run_attack else 'none'], suites,
+            [{'attack': attack_name if run_attack else 'none', 'status':'completed'}], overview_reports,
+            model_id=config.get('model_id'), task_scope='dashboard', routing_summary=routing_summary)
 
         with _store_lock:
             runs_store[run_id] = overall

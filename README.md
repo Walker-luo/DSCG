@@ -203,7 +203,7 @@ baseline使用当前基准的原生工具循环，不启用DSCG或安全模型�
 results/partial_benchmark/<benchmark_id>/<model_id>_<name>/<attack>/<suite>/
 ```
 
-每次 partial 运行还会在 `<benchmark_id>/<model_id>_<name>/` 下生成 `summary.md`（attack × 场景指标、分母、Token 和失败案例位置）与 `failure_cases.jsonl`（逐例的失败标签、原始路径与有界片段）。TSR=false 和 ASR=true 分别记录；指标缺失/运行错误单列。详见[结果文件说明](./docs/benchmark.md#结果文件)。
+full / partial / cohort 在运行根目录生成精简 `summary.md`（每攻击/场景一行，最多10个失败入口）、完整 `failure_cases.jsonl`，以及 `l3_router_summary.md/json`（运行级 shadow / selective 路由统计）。新运行不再生成重复的多层TXT；原始JSON、full附件、CSV和配置/续跑记录保留。旧结果仅按需新增L3报告，不清理旧文件；缺少校准或轨迹时模拟节省为未知。用法见[结果文件与离线汇总](./docs/result_files.md)。
 
 ## Dashboard
 

@@ -159,6 +159,9 @@ class SerialRunnerTests(unittest.TestCase):
                 self.assertEqual(partial.main(**options), 130)
             first_calls = len(calls)
             self.assertEqual(first_calls, 12)
+            stored = Path(temp)/get_backend().id/'offline-model_interrupt'
+            self.assertTrue((stored/'summary.md').exists())
+            self.assertTrue((stored/'l3_router_summary.json').exists())
             self.assertEqual(partial.main(**options, reuse=True), 0)
             self.assertEqual(sum(name == names[0] for name, _ in calls), first_calls)
             self.assertEqual(len(calls), 24)

@@ -48,30 +48,6 @@ def _apply_run_name(pipeline, resolved_model_id: str | None, run_name: str | Non
     return pipeline.name
 
 
-def _write_combined_report(output_dir: Path, report_sources: list[tuple[str, Path]]) -> Path:
-    """Concatenate each suite report into one easy-to-scan text report."""
-
-    combined_report_path = output_dir / "all_report.txt"
-    with combined_report_path.open("w", encoding="utf-8") as combined:
-        combined.write("DSCG 评测总报告\n")
-        combined.write("=" * 70 + "\n")
-        combined.write("本文件按攻击或场景合并报告，具体任务结果见对应标题下的内容。\n")
-
-        for suite_name, report_path in report_sources:
-            combined.write("\n\n")
-            combined.write("[" + suite_name + "]\n")
-            combined.write("-" * 70 + "\n")
-            if report_path.exists():
-                content = report_path.read_text(encoding="utf-8").strip()
-                if content:
-                    combined.write(content)
-                    combined.write("\n")
-            else:
-                combined.write(f"报告文件不存在：{report_path}\n")
-
-    return combined_report_path
-
-
 def resolve_attack_names(selection: str | list[str] = "typical") -> list[str]:
     """Resolve automatic attacks without starting a model or prompting for input."""
     available = sorted(name for name in ATTACKS if name != "manual")
@@ -266,7 +242,6 @@ def main(
     multiple = len(attack_names) > 1
     context = {'execution_plan': execution_plan(task_scope, suites, attack_names, cohort_sha256)}
     run_records = []
-    report_sources = []
     print(f"本次攻击 ({len(attack_names) if run_attack else 0}): {', '.join(attack_names) if run_attack else '无（clean）'}", flush=True)
     print(f"本次场景 ({len(suites)}): {', '.join(suites)}", flush=True)
 
@@ -344,6 +319,19 @@ def main(
         except KeyboardInterrupt:
             execution.update(status='interrupted', wall_seconds=monotonic() - started)
             (execution_dir / 'execution.json').write_text(json.dumps(execution, indent=2) + '\n')
+            # Derive partial reports from completed groups and already committed
+            # task bindings. No model calls, new scores or cache rewrites.
+            completed_reports = [report for result in group_results if result['status'] == 'completed'
+                                 for report in result['result']['suite_reports']]
+            try:
+                from experiments.common.routing_reports import write_routing_summary
+                routing_summary = write_routing_summary(base, refresh=True, check_running=False)
+                write_run_overview(base, attack_names, suites,
+                    [{'attack': name, 'status': 'error', 'error_type': 'KeyboardInterrupt'} for name in attack_names],
+                    completed_reports, model_id=context.get('model_id', model_id), task_scope=task_scope,
+                    routing_summary=routing_summary)
+            except (OSError, ValueError, KeyError, TypeError):
+                print('部分汇总未完成；原始结果与执行状态已保留，可离线重新汇总。', flush=True)
             print('已中断；保留原参数、运行名并加 --reuse 续跑。', flush=True)
             return 130
         execution.update(status='error' if any(r['status'] == 'error' for r in group_results) else 'completed',
@@ -355,20 +343,15 @@ def main(
         for name in attack_names:
             entries = [(j, r) for j, r in zip(jobs, group_results) if j['attack'] == name]
             errors = [(j, r) for j, r in entries if r['status'] == 'error']
-            report_sources_for_attack = []
             for job, result in entries:
                 if result['status'] == 'completed':
                     context.setdefault('suite_reports', []).extend(result['result']['suite_reports'])
-                    report_sources_for_attack.append((job['suite'], base / name / job['suite'] / 'report.txt'))
             if errors:
                 for job, result in errors:
                     run_records.append({'attack': name, 'status': 'error', 'failed_suite': job['suite'],
                                         'error_type': result['error_type']})
             else:
                 run_records.append({'attack': name, 'status': 'completed', 'output_dir': str(base / name)})
-            if report_sources_for_attack:
-                _write_combined_report(base / name, report_sources_for_attack)
-                report_sources.append((name, base / name / 'all_report.txt'))
 
         fallback = resolve_run_path(logdir, backend.id, model_id, run_name)
         batch_dir = context.get("base_output_dir", fallback)
@@ -389,17 +372,11 @@ def main(
             manifest['cohort_sha256'] = cohort_sha256
         manifest_path = batch_dir / "attack_manifest.json"
         manifest_path.write_text(json.dumps(manifest, indent=2, ensure_ascii=False), encoding="utf-8")
-        if multiple:
-            for record in run_records:
-                if record["status"] == "error":
-                    error_path = batch_dir / f"{_safe_result_component(record['attack'], 'attack')}_error.txt"
-                    error_path.write_text(f"运行失败: {record['error_type']}；未生成完整指标，已有逐任务结果可能不完整。\n", encoding="utf-8")
-                    report_sources.append((record["attack"], error_path))
-        if report_sources:
-            _write_combined_report(batch_dir, report_sources)
+        from experiments.common.routing_reports import write_routing_summary
+        routing_summary = write_routing_summary(batch_dir, refresh=True, check_running=False)
         overview_path, failures_path = write_run_overview(
             batch_dir, attack_names, suites, run_records, context.get("suite_reports", []),
-            model_id=context.get("model_id", model_id), task_scope=task_scope,
+            model_id=context.get("model_id", model_id), task_scope=task_scope, routing_summary=routing_summary,
         )
         print(f"📝 紧凑摘要: {overview_path}")
         print(f"🔎 失败片段: {failures_path}")
@@ -499,7 +476,6 @@ def _run_single_attack(
     active_defense = defense if origin else "dscg"
     logdir = Path(results_dir) if results_dir is not None else BENCHMARK_RESULTS_DIR if task_scope in {'full', 'screened'} else RESULTS_DIR / "partial_benchmark"
     logdir.mkdir(parents=True, exist_ok=True)
-    report_sources: list[tuple[str, Path]] = []
     output_dir: Path | None = None
 
     if not prepare_only and not group_mode:
@@ -685,10 +661,8 @@ def _run_single_attack(
         suite_output_dir.mkdir(parents=True, exist_ok=True)
         
         # 定义各类文件保存路径
-        # report_file_path = output_dir / f"{suite_name}_report.txt"
         # csv_file_path = output_dir / f"{suite_name}_detailed_results.csv"
         # summary_file_path = output_dir / f"{suite_name}_summary.json"
-        report_file_path = suite_output_dir / "report.txt"
         csv_file_path = suite_output_dir / "detailed_results.csv"
         summary_file_path = suite_output_dir / "summary.json"
 
@@ -805,54 +779,6 @@ def _run_single_attack(
             sec_total_tokens = summary_data["sec_overhead"]["total_tokens"]
 
         # 4. 写入文件 (TXT, CSV, JSON)
-        # 4.1 保存供人类阅读的 TXT 报告
-        with open(report_file_path, "w", encoding="utf-8") as f:
-            f.write("\n" + "="*50 + "\n")
-            f.write(f"Pipeline: {summary_data['pipeline_name']} | Model: {resolved_model_id}, Sec Model:{resolved_sec_model_id}\n")
-            f.write(f"Attack: {attack_name if run_attack else 'none'} | Kind: {summary_data['attack_kind']}\n")
-            if is_dos_attack:
-                f.write("DoS ASR 使用 AgentDojo 的任务失败口径（not utility），不等于目标工具攻击成功率。\n")
-            f.write(f"📊 [{suite_name}] 任务详细执行报告\n")
-            f.write("="*50 + "\n")
-
-            for record in structured_records:
-                util_str = "⚪ 无效/错误" if record["utility_success"] is None else "✅ 成功 (True)" if record["utility_success"] else "❌ 失败 (False)"
-                
-                if run_attack:
-                    if record["sample_status"] != "valid":
-                        sec_str = f"⚪ 无效样本 ({record['sample_status']})"
-                    else:
-                        sec_str = "🛡️ 防御成功 (True)" if record["defense_success"] else "⚠️ 被攻破 (False)"
-                    f.write(f"📌 [用户任务]: {record['user_task_id']:<25} | [注入攻击]: {record['injection_task_id']:<25}\n")
-                    f.write(f"   -> 功能性 (Utility): {util_str:<15} | 安全性 (Security): {sec_str}\n")
-                else:
-                    f.write(f"📌 [用户任务]: {record['user_task_id']:<25}\n")
-                    f.write(f"   -> 功能性 (Utility): {util_str}\n")
-                f.write("-" * 50 + "\n")
-
-            f.write("\n🏆 总体评测得分汇总:\n")
-            f.write(f"👉 实际评测任务数量: {len(utility_results)}\n")
-            f.write(f"👉 User Tasks: {len(selected_users)}/{len(user_task_ids)}\n")
-            f.write(f"👉 Injection Tasks: {len(selected_injections)}/{len(injection_task_ids)}\n")
-            f.write(f"👉 [{suite_name}] 整体可用性 (Utility): " + (f"{utility_score:.2%}" if utility_score is not None else "N/A") + "\n")
-            if run_attack and security_score is not None:
-                f.write(f"👉 [{suite_name}] 攻击成功率 (ASR): {security_score:.2%}\n")
-                f.write(f"👉 [{suite_name}] 整体安全性 (Defense Rate): {defense_score:.2%}\n")
-
-
-            f.write("\n💰 系统开销评估 (Overhead):\n")
-            f.write(f"统计范围: {summary_data['cost_scope']}；本次新增调用 Token: {summary_data['invocation_cost']['overhead']['total_tokens']}\n")
-            f.write(f"👉 任务 Input Tokens: {prompt_tokens:.1f}\n")
-            f.write(f"👉 任务 Output Tokens: {completion_tokens:.1f}\n")
-            f.write(f"👉 任务总计 Tokens: {total_tokens:.1f}\n")
-            if sec_tracker:            
-                f.write("\n💰 安全模型开销评估 (Overhead):\n")
-                f.write(f"👉 Sec Input Tokens: {sec_prompt_tokens:.1f}\n")
-                f.write(f"👉 Sec Output Tokens: {sec_completion_tokens:.1f}\n")
-                f.write(f"👉 Sec Tokens: {sec_total_tokens:.1f}\n")
-
-            f.write("="*50 + "\n\n")
-
         # 4.2 保存用于画图和数据分析的 CSV 详细表格
         if structured_records:
             with open(csv_file_path, "w", encoding="utf-8", newline="") as f:
@@ -869,18 +795,12 @@ def _run_single_attack(
                 base_output_dir, suite_output_dir, summary_data, structured_records, suite,
             ))
 
-        report_sources.append((suite_name, report_file_path))
 
         # 写完文件后，在控制台给个提示
         print(f"✅ [{suite_name}] 测试完成！")
-        print(f"📄 文本报告: {report_file_path}")
         print(f"📊 数据表格(用于画图): {csv_file_path}")
         print(f"📈 得分汇总: {summary_file_path}\n")
 
-    if output_dir is not None and report_sources and not group_mode:
-        combined_report_path = _write_combined_report(output_dir, report_sources)
-        print("✅ 所选场景的报告已合并")
-        print(f"📚 总报告: {combined_report_path}\n")
     return output_dir
 
 

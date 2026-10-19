@@ -1,5 +1,12 @@
 # DSCG Research Handoff
 
+## Current compact results and L3 reports (2026-10-19)
+
+- New full/partial/cohort runs stop writing scene report.txt, attack/root all_report.txt and standalone attack-error TXT. Root summary.md has one attack/suite row and at most10 failure links; failure_cases.jsonl remains complete. Preserve all native JSON/full sidecars, CSV, manifests/cohort/execution records, snapshots and old reports; reporting format is not a defense/cache identity change.
+- Shared experiments/common/routing_reports.py reads declared scored task IDs only, without importing the active backend/model. Root l3_router_summary.md/json separates actual mode/config/profile, public and selective bypass, and records completeness. Missing calibration/scope/traces makes effective shadow savings unknown; known subtotals do not certify total savings. Cross-decisions are not safety labels; selective actual Token savings remain unknown. Exclude GOAL preflight and snapshots; do not double-count audit Tokens into run costs.
+- Dashboard normal completion uses the same collector without adding controls/changing routing. CLI interruption reports partial data. Offline python -m experiments.diagnostics.summarize_results --run-dir PATH defaults to adding only the two reports; --refresh replaces only tool-marked reports under a directory lock, atomic per file. Stop active runs first, especially Dashboard. Never infer missing benchmark identity from directory names.
+- This task backfills only results/benchmarks/agentdojo/qwen3.7-flash_DSCG. Protect all1279 original file hashes; other user results are untouched. Evidence: workshop/artifacts/20261019_result_reports/; guide docs/result_files.md; completed report workshop/completed/result_reports_20261019.md. No paid calls, defense changes or efficacy claims.
+
 ## Qwen utility diagnostic candidates (2026-10-19)
 
 - Default remains three-layer-v3.1 / prompt_profile=legacy. Protocol diagnostics are additive and never change native labels/denominators or fail-closed mediation. Full-only failed-response previews are bounded to2048 characters in sidecars, never in default summary/standard; no SDK/client exception text.

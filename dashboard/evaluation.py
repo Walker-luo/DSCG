@@ -163,3 +163,26 @@ def trace_stats(root, pipeline_name, suite, attack, task_keys):
                 if isinstance(value, int) and not isinstance(value, bool) and value >= 0:
                     stats[target][key] += value
     return stats
+
+
+def build_suite_report(root, summary, records, suite, config):
+    """Adapt stored Dashboard fields to the common overview, without mutation."""
+    from experiments.common.partial_reporting import collect_suite_report
+    root = Path(root)
+    data = deepcopy(summary)
+    attacked = config.get('run_attack') is True
+    attack = config.get('attack_name') if attacked else 'none'
+    data['attack_kind'] = 'targeted' if attacked else 'none'
+    data['security_definition'] = 'injection task predicate' if attacked else None
+    data['model_id'] = next((r.get('model_id') for r in records if r.get('model_id')), config.get('model_id'))
+    data['task_selection']['attack'] = attack if attacked else None
+    counts = data['task_counts']
+    counts['planned_tasks'] = len(data['task_selection']['user_task_ids']) * (
+        len(data['task_selection']['injection_task_ids']) if attacked else 1)
+    # This report's ASR denominator uses valid booleans, while the original
+    # Dashboard summary/native labels stay byte-for-byte logically unchanged.
+    counts['attacked_tasks'] = counts.get('security_valid', sum(isinstance(r.get('attack_success'),bool) for r in records)) if attacked else 0
+    native_dir = root / data['pipeline_name'].replace('/', '_') / data['suite_name']
+    report = collect_suite_report(root, native_dir, data, records, suite)
+    report['summary_path'] = (Path(data['suite_name'])/'summary.json').as_posix()
+    return report

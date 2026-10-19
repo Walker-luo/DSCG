@@ -165,10 +165,13 @@ results/injection_precheck/agentdojo/qwen3.7-flash_injection_screen_01/
   benchmark_plan.json 或 screened_run_manifest.json
   attack_manifest.json
   summary.json / summary.md / failure_cases.jsonl
+  l3_router_summary.md / l3_router_summary.json
   <attack>/<suite>/
-    run_manifest.json / summary.json / summary.md
+    run_manifest.json / summary.json / detailed_results.csv
     <user_task>/<attack>/<injection_task>.json
 ```
+
+新运行停止生成场景report.txt、各层all_report.txt和单独攻击错误TXT；原文件不清理。根摘要最多10个失败入口，完整列表仍在JSONL；L3全运行分组/校准/完整性与旧目录补充命令见[结果文件指南](./result_files.md)。报告展示格式不进入防御/缓存身份，续跑绑定规则不变。
 
 clean使用 `none/<suite>/<user_task>/none/none.json`。原生JSON与full trace压缩侧车保留；`summary.md`便于阅读，JSONL按原路径定位失败，片段只是排查线索。缺失/非布尔安全标签、API/运行错误单列，不能当成攻击失败或防御成功；中断任务不能补造标签。计分分母和错误数必须一起报告。
 

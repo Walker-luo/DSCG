@@ -31,6 +31,26 @@ def task_results(pipeline, suite, attack, logdir, **kwargs):
 
 
 class PartialReportingTests(unittest.TestCase):
+    def test_compact_summary_limits_links_but_keeps_all_failure_records(self):
+        def failures(*args, **kwargs):
+            data = task_results(*args, **kwargs)
+            data['utility_results'] = dict.fromkeys(data['utility_results'], False)
+            data['security_results'] = dict.fromkeys(data['security_results'], False)
+            return data
+        with TemporaryDirectory() as directory:
+            self.assertEqual(self.run_fixture(directory, results=failures,
+                suites=['workspace', 'travel'], attack=['injecagent', 'tool_knowledge']), 0)
+            root, summary, cases = self.read_outputs(directory)
+            self.assertEqual(len(cases), 36)
+            self.assertIn('F0010', summary)
+            self.assertNotIn('F0011', summary)
+            self.assertIn('共36个案例', summary)
+            self.assertIn('已记录候选批次', summary)
+            self.assertTrue((root/'l3_router_summary.md').exists())
+            self.assertTrue((root/'l3_router_summary.json').exists())
+            self.assertFalse(list(root.rglob('report.txt')))
+            self.assertFalse(list(root.rglob('all_report.txt')))
+
     def run_fixture(self, directory, *, results=task_results, **options):
         with redirect_stdout(StringIO()), patch.object(
             runner, "make_openai_compatible_pipeline", side_effect=pipeline_factory
