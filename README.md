@@ -11,6 +11,8 @@ DSCG 是工具使用型 LLM Agent 的间接提示词注入（IPI）防御研究�
 
 启动按实际Python加载路径、安装来源、版本和revision识别后端，不依赖环境名称。当前使用metadata_only校验，不扫描源码哈希；不同后端或任务范围不能合并分母。详见[全量测试指南](./docs/benchmark.md)。
 
+DashScope/Qwen的Chat请求由公共客户端统一适配：将上游生成的developer角色转换成system，baseline、DSCG、预检及网页共用，不需修改conda包。适配版本进入公开请求配置；更新后用新运行名，旧缓存/校准文件不自动复用。AgentDyn首请求400的定位与复测见[兼容性排错](./docs/model_tool_configuration.md#dashscope消息角色兼容与400排错)。
+
 当前测试的主模型与审计模型默认 **Qwen3.7-Flash（关闭思考）**，保留DeepSeek等显式配置。full/partial/cohort恢复顺序执行，已删除workers；准备阶段静默核对配置，执行时逐组输出进度。见[模型配置](./docs/model_tool_configuration.md#24-最小可运行配置与角色复用)与[运行流程](./docs/benchmark.md#顺序执行与准备信息)。
 
 ## 当前框架与工作流程

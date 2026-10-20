@@ -1,5 +1,7 @@
 # 完整任务测试：AgentDojo 与 AgentDyn
 
+DashScope/Qwen请求角色由DSCG公共客户端统一适配，不修改conda包；更新后使用新运行名。AgentDyn首次请求BadRequestError的定位、受限诊断字段和partial clean恢复命令见[消息角色兼容排错](./model_tool_configuration.md#dashscope消息角色兼容与400排错)。旧缓存/cohort与新增请求身份不一致时拒绝复用，旧数据保留。
+
 同一份代码在两个conda环境中自动选择基准，正常测试不需要`--benchmark`或额外工具目录参数。模型/风险配置见 [配置指南](./model_tool_configuration.md)，小规模排错见 [partial](./partial_benchmark.md)。
 
 2026-10-19的[Qwen效用诊断指南](./qwen_utility.md)提供分阶段`--prompt-profile`候选、37/97项clean对照与同cohort攻击命令。默认legacy；候选未获真实模型验收，不能同名复用旧策略缓存。协议错误分类不会改变原生标签或评分分母。

@@ -27,6 +27,28 @@ python -m dscg.benchmark_catalog
 
 Qwen banking/Slack的协议诊断、`--prompt-profile`阶段候选、日志字段及配对测试见[效用诊断指南](./qwen_utility.md)。该开关属于防御策略，不是模型TOML参数；默认legacy，不更换主/安全模型。JSON输出可用仍需严格字段校验，普通聊天成功不代表审计协议稳定。
 
+### DashScope消息角色兼容与400排错
+
+DSCG公共客户端对实际provider=dashscope的同步`chat.completions.create`启用`dashscope-system-v1`：把结构化developer消息转换成system，保留消息正文/顺序、user/assistant/tool角色、工具schema、参数、temperature和reasoning设置；不原地修改消息，不新增重试或降级。其他provider保持原客户端。两套后端的baseline、DSCG、GOAL预检、screen和Dashboard均从此入口创建客户端；不需改site-packages。此兼容策略对应[百炼Chat Completions系统消息协议](https://help.aliyun.com/zh/model-studio/qwen-api-via-openai-chat-completions/)，不涉及Responses API。
+
+`chat_request_adapter`由宿主计算，写入DashScope主/审计模型的公开配置，进入原有manifest、cohort测量配置和路由身份。更新后需新run名；缺少该身份的旧运行/旧cohort配置与当前设置不一致时会拒绝复用，不补造兼容性。旧结果仍可查看，已绑定旧模型配置的名单须重新预检/冻结；原名单与证据不改写。L3的开发候选预设仍不是部署artifact。
+
+已核对`results/partial_benchmark/agentdyn/qwen3.7-flash_test`：9个攻击/场景组均在第一个GOAL预检的首个generation请求失败，L2成功、L3未触发，没有81条有效计分轨迹。本机原生消息捕获为AgentDojo system/user、AgentDyn developer/user；角色差异与失败位置一致。旧文件未保存400详情，因此不能排除服务端其他校验错误；不把它标为TSR=0或防御成功。
+
+新API失败诊断`api_error`只含schema版本、http_status、provider_error_code、provider_error_param和request_role_counts；code/param采用受限字符集和长度，角色仅计数。CLI输出同一受限结构，执行记录、attack_manifest、failure_cases.jsonl及screen的attempt.json保留；TokenTracker各失败phase记录last_api_error。默认不保存请求正文、响应message、凭据或完整SDK异常。Dashboard API失败仅输出受限结构并尽力保存execution_error.json，不推造成功指标。
+
+服务器更新后先做小批量clean（以下命令会请求真实模型；本轮离线验收没有执行，名称替换为未使用的新值）：
+
+```bash
+conda activate ipi-agentdyn
+python -m experiments.run_partial_benchmark --clean --baseline --name qwen_rolefix_clean_base_01
+python -m experiments.run_partial_benchmark --clean --name qwen_rolefix_clean_dscg_01
+# 两组各9项，先确认无请求级400，再恢复攻击测量
+python -m experiments.run_partial_benchmark --attack typical --name qwen_rolefix_attack_01
+```
+
+不使用旧test目录做reuse/force-rerun。若仍400，先查看新api_error的状态/code/param/角色计数：system/user只说明角色已适配，不能证明工具schema、JSON输出及服务部署都兼容。保持原错误/费用分母并按具体参数继续定位，不自动删工具、改模型或放宽审计。
+
 ### 2.1 两种角色及能力要求
 
 - `[main]`：主模型规划/最终回答，以及L2任务开始时的授权编译。攻击评测还会有攻击生成/预检，按实际运行计费。

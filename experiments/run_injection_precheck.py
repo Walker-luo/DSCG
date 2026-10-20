@@ -113,6 +113,10 @@ def _native_attempt(directory, suite, task, config, binding):
     except Exception as exc:
         # Preserve native traces; provider exception text can contain private input.
         record['error_type'] = type(exc).__name__
+        from dscg.request_compatibility import api_error_diagnostics
+        diagnostic = api_error_diagnostics(exc)
+        if diagnostic is not None:
+            record['api_error'] = diagnostic
     finally:
         trace = directory / 'direct_goal' / suite.name / task.ID / 'none' / 'none.json'
         if trace.exists():

@@ -1,5 +1,12 @@
 # DSCG Research Handoff
 
+## DashScope Chat role compatibility (2026-10-19)
+
+- Common create_openai_client wraps DashScope synchronous chat.completions.create with dashscope-system-v1: developer→system only, preserving input objects/content/order/tools/arguments and all other providers. Baseline/DSCG/preflight/screen/Dashboard share it. Never edit conda site-packages, spoof model names, add fallback requests or weaken tool/audit boundaries for provider errors.
+- Host-computed chat_request_adapter enters DashScope public model settings and existing manifest/cohort/router binding. Use new run names; old missing/incompatible request identities cannot be silently reused or patched. Old cohorts may require new preflight/freezing; preserve originals.
+- API error diagnostics whitelist http_status, bounded code/param and effective request-role counts, never request content/response message/credentials/SDK repr. Store in phase last_api_error, CLI group execution/manifests/failure JSONL and screen attempts. Dashboard API errors use safe SSE/log plus execution_error.json; native labels/valid denominators remain unchanged.
+- Original failure directory results/partial_benchmark/agentdyn/qwen3.7-flash_test and both installed native adapters are protected. Evidence workshop/artifacts/20261019_agentdyn_qwen_roles/; completed report workshop/completed/agentdyn_qwen_roles_20261019.md. No paid model calls or remote-fix/efficacy claims; first server retest partial clean with new names.
+
 ## L3 candidate calibration preset (2026-10-19)
 
 - config/l3_router.calibration.json is a development_candidate only: grid [.65,.70,.75], reference .70, epsilon/delta .05/.05. Offline calibrator --preset explicitly loads it; conflicts with any grid/epsilon/delta flags, while the legacy complete explicit trio remains supported. The reference is metadata, never a fallback/selected deployment threshold.

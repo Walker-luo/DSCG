@@ -185,7 +185,8 @@ def write_run_overview(base_dir: Path, attack_names: list[str], suites: list[str
                           "failure_types": ["run_error"], "sample_status": "infrastructure_error",
                           "error_type": run["error_type"], "trace_path": None, "trace_exists": False,
                           "excerpt_status": "run_aborted", "excerpts": [],
-                          "source_path": metadata})
+                          "source_path": metadata,
+                          **({'api_error': run['api_error']} if 'api_error' in run else {})})
     for line, case in enumerate(cases, 1):
         case.update(schema_version="dscg.partial-failure.v2", benchmark=benchmark_identity(), case_id=f"F{line:04d}", detail_line=line)
     with detail_path.open("w", encoding="utf-8") as stream:

@@ -508,10 +508,25 @@ def run_test_thread(run_id: str, config: dict):
         push_log(run_id, "info", f"🏁 测试全部完成! 结果已保存至 {run_dir}")
 
     except Exception as e:
-        import traceback
-        push_log(run_id, "error", f"❌ 测试异常: {str(e)}")
-        push_log(run_id, "error", traceback.format_exc())
-        push_done(run_id, {"error": str(e)})
+        from dscg.request_compatibility import api_error_diagnostics
+        diagnostic = api_error_diagnostics(e)
+        if diagnostic is not None:
+            error = {'error': type(e).__name__, 'api_error': diagnostic}
+            push_log(run_id, 'error', f"❌ API请求失败: {json.dumps(error, ensure_ascii=False)}")
+            with _store_lock:
+                if run_id in runs_store:
+                    runs_store[run_id].update(error, status='error')
+            push_done(run_id, error)
+            if 'run_dir' in locals():
+                try:
+                    (run_dir/'execution_error.json').write_text(json.dumps(error, ensure_ascii=False, indent=2)+'\n')
+                except OSError:
+                    push_log(run_id, 'error', 'API错误记录写入失败；终态和受限诊断已发送。')
+        else:
+            import traceback
+            push_log(run_id, "error", f"❌ 测试异常: {str(e)}")
+            push_log(run_id, "error", traceback.format_exc())
+            push_done(run_id, {"error": str(e)})
     finally:
         # 清理队列（延迟，让 SSE 客户端有机会读取完）
         def _cleanup():

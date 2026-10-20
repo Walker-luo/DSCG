@@ -318,6 +318,11 @@ def main(
                     raise
                 except Exception as exc:
                     result = {'status': 'error', 'error_type': type(exc).__name__}
+                    from dscg.request_compatibility import api_error_diagnostics
+                    diagnostic = api_error_diagnostics(exc)
+                    if diagnostic is not None:
+                        result['api_error'] = diagnostic
+                        print(f"API诊断: {json.dumps(diagnostic, ensure_ascii=False)}", flush=True)
                 group_results.append(result)
                 if not progress or result['status'] == 'error':
                     print(f"[{index}/{len(jobs)}] {job['attack']}/{job['suite']} {result['status']}"
@@ -355,7 +360,8 @@ def main(
             if errors:
                 for job, result in errors:
                     run_records.append({'attack': name, 'status': 'error', 'failed_suite': job['suite'],
-                                        'error_type': result['error_type']})
+                                        'error_type': result['error_type'],
+                                        **({'api_error': result['api_error']} if 'api_error' in result else {})})
             else:
                 run_records.append({'attack': name, 'status': 'completed', 'output_dir': str(base / name)})
 

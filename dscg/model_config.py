@@ -14,6 +14,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
+from dscg.request_compatibility import DASHSCOPE_ADAPTER, DashScopeChatClient
 
 
 class ModelConfigurationError(ValueError):
@@ -66,6 +67,7 @@ class ModelConfig:
             "base_url": self.base_url,
             "api_key_env": self.api_key_env,
             "reasoning_effort": reasoning_effort_for_config(self),
+            **({'chat_request_adapter': DASHSCOPE_ADAPTER} if self.provider == 'dashscope' else {}),
         }
 
 
@@ -397,4 +399,5 @@ def create_openai_client(config: ModelConfig):
 
     import openai
 
-    return openai.OpenAI(**config.client_kwargs())
+    client = openai.OpenAI(**config.client_kwargs())
+    return DashScopeChatClient(client) if config.provider == 'dashscope' else client

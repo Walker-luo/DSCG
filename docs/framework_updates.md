@@ -1,5 +1,12 @@
 # 当前框架与平台展示交接
 
+## DashScope消息角色兼容（2026-10-19）
+
+公共客户端将DashScope同步Chat请求的developer角色转换为system，主/审计模型、baseline和预检均共用；网页无需新增控件，不改模型、三层默认策略或路由模式。适配身份chat_request_adapter进入实际公开模型配置及缓存/路由绑定，更新后新建运行；服务需重启。元数据来源/版本校验不变，不修改conda上游代码。
+
+API失败时页面日志/SSE只返回类型与受限api_error，不再输出SDK异常正文/traceback；运行目录尽力保存execution_error.json，保留错误状态，不生成效用/安全成功标签。CLI执行与失败索引、screen尝试和phase账本同样记录诊断。非API异常沿用原排错路径。离线传输fixture及两套环境回归不证明远端服务已经恢复；复测步骤见[配置指南](./model_tool_configuration.md#dashscope消息角色兼容与400排错)。
+
+
 更新时间：2026-10-19（新增显式Qwen效用候选和协议诊断；AgentDojo / AgentDyn 按环境自动识别；三层防御规则及默认开关保持）。当前默认版本 **three-layer-v3.1**。此前用户授权实现有限L1结构化投影，沿用L2工具视图/任务文件与L3动作正文审查；默认投影已接入factory、partial和网页API，架构说明同步。Spotlighting风格来源封装仍是不适用输入的回退。正式研究路线和闸门不改变。
 
 ## 运行报告精简与L3汇总（2026-10-19）

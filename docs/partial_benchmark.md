@@ -1,5 +1,7 @@
 # 小批量测试：run_partial_benchmark
 
+DashScope/Qwen请求角色由DSCG公共客户端统一适配，不修改conda包；更新后使用新运行名。AgentDyn首次请求BadRequestError的定位、受限诊断字段和partial clean恢复命令见[消息角色兼容排错](./model_tool_configuration.md#dashscope消息角色兼容与400排错)。旧缓存/cohort与新增请求身份不一致时拒绝复用，旧数据保留。
+
 在 `DSCG/`、已激活 `ipi`（AgentDojo）或 `ipi-agentdyn`（AgentDyn）环境下执行。安装与依赖自检见 [全量指南](./benchmark.md#安装与依赖自检)，模型/工具配置见 [配置指南](./model_tool_configuration.md)。
 
 ## 默认任务范围

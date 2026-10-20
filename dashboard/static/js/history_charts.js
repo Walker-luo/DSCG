@@ -276,7 +276,7 @@
     chartOptions.plugins.tooltip.callbacks = {
       label(context) {
         const value = context.raw;
-        return context.dataset.fullLabel + "：" + (value === null ? "无数据" : value + (context.dataset.metricKey === "total_tokens" ? " K tokens" : "%"));
+        return context.dataset.label + "：" + (value === null ? "无数据" : value + (context.dataset.metricKey === "total_tokens" ? " K tokens" : "%"));
       },
     };
     if (view === "radar") {
@@ -329,7 +329,7 @@
     const chartOptions = options(theme);
     chartOptions.plugins.tooltip.callbacks = {
       label(context) {
-        return context.dataset.fullLabel + " · " + context.raw.suite + " · ASR " + context.raw.x + "% / TSR " + context.raw.y + "%";
+        return context.dataset.label + " · " + context.raw.suite + " · ASR " + context.raw.x + "% / TSR " + context.raw.y + "%";
       },
     };
     chartOptions.scales = {

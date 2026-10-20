@@ -151,6 +151,36 @@ test('legend subtitle shows only the attack while hover identity keeps the full 
   assert.equal(charts.describeExperiment(unknown).subtitle,'未记录攻击');
 });
 
+test('metric tooltips show the short run name and exact values instead of its long source path', () => {
+  const run = {...experiments[0], id: 'long-source', model_suffix: 'qwen3.7-flash_DSCG',
+    model_group: 'agentdojo/qwen3.7-flash_DSCG', attack_name: 'tool_knowledge',
+    source: 'benchmarks/agentdojo/very_long_historical_results_directory/qwen3.7-flash_DSCG/tool_knowledge'};
+  for (const view of ['bar', 'line', 'radar']) {
+    const panels = charts.metricConfigs([run], {...selection, view});
+    for (const panel of panels) {
+      const dataset = panel.config.data.datasets[0];
+      const label = panel.config.options.plugins.tooltip.callbacks.label;
+      assert.equal(label({dataset, raw: dataset.data[0]}), panel.metric === 'utility_rate' ? 'DSCG：100%' : 'DSCG：0%');
+      assert.equal(label({dataset, raw: null}), 'DSCG：无数据');
+      assert.ok(dataset.fullLabel.includes(run.source));
+    }
+  }
+  const tokens = charts.metricConfigs([run], {...selection, metrics: ['total_tokens'], suite: 'workspace'})[0].config;
+  assert.equal(tokens.options.plugins.tooltip.callbacks.label({dataset: tokens.data.datasets[0], raw: 2}), 'DSCG：2 K tokens');
+});
+
+test('scatter tooltips keep both ASR and TSR readable and multi-attack tips remain distinguishable', () => {
+  const runs = ['tool_knowledge', 'ignore_previous'].map(attack => ({...experiments[0], id: attack,
+    model_suffix: 'qwen3.7-flash_DSCG', model_group: 'agentdojo/qwen3.7-flash_DSCG', attack_name: attack,
+    source: 'benchmarks/agentdojo/a_very_long_results_directory/qwen3.7-flash_DSCG/' + attack}));
+  const config = charts.scatterConfig(runs);
+  const label = config.options.plugins.tooltip.callbacks.label;
+  assert.equal(label({dataset: config.data.datasets[0], raw: config.data.datasets[0].data[0]}),
+    'DSCG · tool_knowledge · workspace · ASR 0% / TSR 100%');
+  assert.equal(label({dataset: config.data.datasets[1], raw: config.data.datasets[1].data[0]}),
+    'DSCG · ignore_previous · workspace · ASR 0% / TSR 100%');
+});
+
 test("multiple attacks keep the model color while exposing distinct attack badges and line styles", () => {
   const runs = ["injecagent", "tool_knowledge"].map(attack => ({
     ...experiments[0], id: "new/" + attack, model_group: "deepseek-flash_workshop_new",

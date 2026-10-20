@@ -4,6 +4,7 @@ from contextlib import contextmanager
 from contextvars import ContextVar
 from copy import deepcopy
 from time import perf_counter
+from dscg.request_compatibility import attach_api_error
 
 class _CompletionsProxy:
     def __init__(self, completions, tracker):
@@ -28,8 +29,9 @@ class _CompletionsProxy:
             else:
                 record['missing_usage_calls'] += 1
             return response
-        except Exception:
+        except Exception as exc:
             record['failed_calls'] += 1
+            record['last_api_error'] = attach_api_error(exc, kwargs.get('messages'))
             raise
         finally:
             record['latency_ms'] += round((perf_counter() - started) * 1000, 3)
