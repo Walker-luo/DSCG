@@ -47,6 +47,10 @@ python -m experiments.run_injection_precheck screen \
 
 screen没有force-rerun；需要全新预检使用新name。配置冲突不覆盖原结果。仅记录Git/Python/包版本供追溯，不做工程源码扫描；缺少后端、模型或任务身份不能通过手改manifest补造。
 
+冻结 cohort 用于固定模型筛选后的目标名单。对于旧 AgentDojo/DashScope cohort，仅缺少后来新增的 `chat_request_adapter=dashscope-system-v1` 标记时，程序会核对其余配置、任务、GOAL、原始证据及当前原生消息序列化；确认适配器对预检消息无实际改变（no-op）后，允许继续使用原文件，无需重筛。终端会提示兼容原因，新测量的 `screened_cohort.json` 保存 `request_adapter_compatibility`，原 cohort/轨迹/摘要不改写。
+
+该兼容只用于冻结名单读取；实际改变角色的请求、未知适配版本、DeepSeek/AgentDyn、其他模型配置差异或证据损坏仍拒绝。不放宽旧攻击缓存或未完成 screen 的配置绑定，不能手动补字段来绕过校验。
+
 ## 3. 使用冻结名单测 baseline 和 DSCG
 
 ```bash

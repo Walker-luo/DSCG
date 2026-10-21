@@ -1,5 +1,7 @@
 # 已完成阶段的优化材料
 
+新增[旧cohort请求适配标记兼容](./cohort_adapter_noop_20261021.md)：仅对证据及当前序列化验证为无实际变化的AgentDojo/DashScope新增标记允许原名单继续读取；原cohort不改写，实际请求变化仍拒绝。双环境离线回归通过，无模型调用。
+
 新增[L3直接阈值路由](./l3_threshold_20261021.md)：默认经验阈值0.70，internal/personal读取资格，无运行时artifact依赖；shadow阈值比较与旧记录语义分离，真实收益待新实验。
 
 新增[Benchmark兼容与报告简化](./ponytail_benchmark_20261020.md)：单个runner净减44行；双后端6个离线场景共50份输出一致，全量Python及Node检查通过，无模型调用或研究闸门变化。

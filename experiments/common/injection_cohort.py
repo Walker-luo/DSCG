@@ -4,6 +4,7 @@ import hashlib
 import json
 import os
 import shutil
+import warnings
 from uuid import uuid4
 from collections import Counter
 from contextlib import contextmanager
@@ -12,6 +13,7 @@ from pathlib import Path
 from agentdojo.attacks.attack_registry import ATTACKS
 from dscg.benchmark_catalog import get_suite, benchmark_identity, validate_backend, get_backend, get_suites, same_backend
 from dscg.model_config import resolve_model_config
+from dscg.request_compatibility import DASHSCOPE_ADAPTER
 from dscg.audit_router import DEFAULT_THRESHOLD, validate_router_options, POLICY_VERSION
 from dscg.paths import BENCHMARK_RESULTS_DIR, RESULTS_DIR
 from experiments import run_partial_benchmark as shared
@@ -116,6 +118,38 @@ def _binding_error(recorded, current):
             + ', '.join(fields or ['selection rule']) + '; use a new screen run')
 
 
+def _cohort_adapter_transition(recorded, current):
+    """Recognize only the added DashScope marker, before checking trace equivalence."""
+    old, new = recorded.get('main_model', {}), current.get('main_model', {})
+    if (recorded.get('benchmark', {}).get('id') != 'agentdojo'
+            or old.get('provider') != 'dashscope' or new.get('provider') != 'dashscope'
+            or 'chat_request_adapter' in old or new.get('chat_request_adapter') != DASHSCOPE_ADAPTER):
+        return None
+    without_marker = {key: value for key, value in new.items() if key != 'chat_request_adapter'}
+    if not _bindings_compatible(recorded, {**current, 'main_model': without_marker}):
+        return None
+    return {'policy': 'agentdojo-dashscope-noop-v1', 'recorded_adapter': None,
+            'current_adapter': DASHSCOPE_ADAPTER,
+            'verification': 'hashed goal evidence; current native system-message serialization unchanged by adapter',
+            'source_equivalence_verified': False}
+
+
+def _verify_adapter_noop(trace, model_id):
+    from agentdojo.agent_pipeline.llms.openai_llm import _message_to_openai
+
+    for message in _read(trace)['messages']:
+        role = message.get('role')
+        if role == 'developer':
+            raise ValueError('request adapter changes legacy screening messages; use a new screen run')
+        if role == 'system':
+            try:
+                unchanged = _message_to_openai(message, model_id).get('role') == 'system'
+            except Exception:
+                unchanged = False
+            if not unchanged:
+                raise ValueError('request adapter changes legacy screening messages; use a new screen run')
+
+
 def _record_compatibility(root, recorded, current):
     record = {'reason': 'configuration-only transition; source equivalence not verified',
               'verification_mode': 'configuration_only', 'source_equivalence_verified': False,
@@ -188,7 +222,8 @@ def _validate_cohort_data(cohort, config):
         raise ValueError('invalid or changed frozen cohort')
     binding = cohort['binding']
     current = _binding(config, list(binding['catalog']))
-    if not _bindings_compatible(binding, current):
+    adapter_transition = _cohort_adapter_transition(binding, current)
+    if not _bindings_compatible(binding, current) and adapter_transition is None:
         raise ValueError(_binding_error(binding, current))
     for name, entry in binding['catalog'].items():
         decisions = cohort['decisions'][name]
@@ -207,12 +242,17 @@ def _validate_cohort_data(cohort, config):
                     raise ValueError('screening evidence changed')
                 if _trace_status(trace, name, task, binding['source']['agentdojo'])[0] != attempt['status']:
                     raise ValueError('screening outcome changed')
+                if adapter_transition is not None:
+                    _verify_adapter_noop(trace, config.model_id)
                 if attempt.get('manifest_path') and _file_hash(attempt['manifest_path']) != attempt['manifest_sha256']:
                     raise ValueError('historical source manifest changed')
         expected = {'user_task_ids': entry['user_task_ids'],
                     'injection_task_ids': [i for i, d in decisions.items() if d['status'] == 'kept']}
         if cohort['suites'].get(name) != expected:
             raise ValueError('selected tasks disagree with screening evidence')
+    if adapter_transition is not None:
+        warnings.warn('Cohort compatibility: added DashScope adapter marker verified as no-op for stored '
+                      'AgentDojo evidence; original cohort remains unchanged.', UserWarning, stacklevel=2)
     return cohort
 
 
@@ -341,6 +381,10 @@ def run_screened(cohort_path, *, config_path=None, run_name=None, results_dir=No
                           'planned_per_targeted_attack': len(entry['user_task_ids']) * len(entry['injection_task_ids'])}
                           for name, entry in selected.items()},
                       'cost_scope': 'native per-attack preflight retained; not scored attack samples; screening cost separate'}
+        adapter_transition = _cohort_adapter_transition(
+            cohort['binding'], {**cohort['binding'], 'main_model': config.public_dict()})
+        if adapter_transition is not None:
+            attachment['request_adapter_compatibility'] = adapter_transition
         attachment_path = base / 'screened_cohort.json'
         if not attachment_path.exists() and resume is None:
             prepared.check(attachment_path, attachment)
