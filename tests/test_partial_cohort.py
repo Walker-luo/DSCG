@@ -37,6 +37,7 @@ class PartialCohortTests(unittest.TestCase):
         patches += [patch.object(module, 'resolve_model_config', return_value=self.config) for module in [cohort, precheck, runner]]
         patches += [patch.object(module, 'make_openai_compatible_pipeline', side_effect=factory) for module in [runner, precheck]]
         patches += [patch.object(runner, '_describe_pipeline', side_effect=lambda *a, **kw: factory()[0])]
+        patches += [patch.object(runner, 'check_attack_compatibility', return_value=None)]
         patches += [patch.object(runner.attacks, 'load_attack', return_value=SimpleNamespace(is_dos_attack=False)),
                     patch.object(runner.benchmark, 'benchmark_suite_with_injections', side_effect=self.scored_results),
                     redirect_stdout(StringIO())]
@@ -138,8 +139,10 @@ class PartialCohortTests(unittest.TestCase):
             runner, 'make_defended_pipeline', side_effect=lambda *a, **kw: (*self.factory(), None)
         ) as factory:
             self.assertEqual(runner.cli(['--cohort', str(path), '--suites', 'travel', '--name', 'shadow',
-                                         '--audit-router-mode', 'shadow', '--trace-level', 'full']), 0)
+                                         '--audit-router-mode', 'shadow', '--trace-level', 'full',
+                                         '--audit-router-threshold', '0.65']), 0)
         self.assertEqual(factory.call_args.kwargs['audit_router_mode'], 'shadow')
+        self.assertEqual(factory.call_args.kwargs['audit_router_threshold'], .65)
         self.assertEqual(factory.call_args.kwargs['trace_level'], 'full')
         base = self.root / 'default_results/partial_benchmark/agentdojo/offline_shadow'
         self.assertTrue((base / 'attack_manifest.json').exists())

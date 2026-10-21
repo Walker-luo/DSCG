@@ -11,16 +11,22 @@ class PartialRouterTests(unittest.TestCase):
         self.assertIn('audit_router_mode',inspect.signature(p.main).parameters,'runner routing controls missing')
         with tempfile.TemporaryDirectory() as out, serial_fixture.patched(), \
              patch.object(p,'make_defended_pipeline',side_effect=serial_fixture.defended) as run:
-            self.assertEqual(p.main(run_attack=False,results_dir=out,audit_router_mode='shadow',audit_router_artifact='/tmp/router.json'),0)
+            self.assertEqual(p.main(run_attack=False,results_dir=out,audit_router_mode='shadow',audit_router_threshold=.65),0)
             self.assertEqual(run.call_args.kwargs['audit_router_mode'],'shadow')
-            self.assertEqual(run.call_args.kwargs['audit_router_artifact'],'/tmp/router.json')
+            self.assertEqual(run.call_args.kwargs['audit_router_threshold'],.65)
         for flags in ({'origin':True},{'use_security_checker':False}):
             with self.assertRaises(ValueError):p.main(audit_router_mode='selective',**flags)
 
     def test_cli_exposes_modes_without_starting_models(self):
         with patch.object(p,'main',return_value=0) as run:
-            self.assertEqual(p.cli(['--clean','--audit-router-mode','shadow','--audit-router-artifact','/tmp/router.json']),0)
+            self.assertEqual(p.cli(['--clean','--audit-router-mode','shadow','--audit-router-threshold','0.65']),0)
             self.assertEqual(run.call_args.kwargs['audit_router_mode'],'shadow')
+            self.assertEqual(run.call_args.kwargs['audit_router_threshold'],.65)
+
+    def test_old_artifact_rejected_before_model_setup(self):
+        with tempfile.TemporaryDirectory() as out, patch.object(p, '_run_single_attack',
+                side_effect=AssertionError('must reject before any group preparation')), self.assertRaisesRegex(ValueError, 'threshold'):
+            p.main(audit_router_artifact='/tmp/old.json', results_dir=out)
 
     def test_summary_separates_potential_from_actual_savings(self):
         from dscg import audit_router as a

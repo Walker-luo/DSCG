@@ -6,6 +6,7 @@ from pathlib import Path
 
 from dscg.benchmark_catalog import get_suites
 from dscg.input_isolation import FRAMEWORK_VERSION
+from dscg.audit_router import DEFAULT_THRESHOLD, validate_router_options
 from dscg.l1_projection import MODES as L1_PROJECTION_MODES
 from dscg.prompt_profiles import validate_profile, profile_binding
 
@@ -20,6 +21,17 @@ L2_KEYS = ('planning_requests', 'catalog_tools_total', 'visible_tools_total',
 
 def normalize_config(payload):
     config = dict(payload)
+    threshold = validate_router_options(config.get('audit_router_threshold', DEFAULT_THRESHOLD),
+                                        config.get('audit_router_artifact'))
+    router_mode = config.get('audit_router_mode', 'off')
+    if router_mode not in ('off', 'shadow', 'selective'):
+        raise ValueError('audit_router_mode must be off/shadow/selective')
+    if router_mode != 'off' and (config.get('origin', False) or not config.get('use_sandbox', True)
+                               or not config.get('use_security_checker', True)):
+        raise ValueError('audit routing requires L2 and checker')
+    config['audit_router_mode'] = router_mode
+    config['audit_router_threshold'] = threshold
+
     suites = config.get("suites", [])
     active_suites = get_suites()
     if not isinstance(suites, list) or not suites or any(s not in active_suites for s in suites):

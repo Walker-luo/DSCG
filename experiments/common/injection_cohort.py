@@ -12,6 +12,7 @@ from pathlib import Path
 from agentdojo.attacks.attack_registry import ATTACKS
 from dscg.benchmark_catalog import get_suite, benchmark_identity, validate_backend, get_backend, get_suites, same_backend
 from dscg.model_config import resolve_model_config
+from dscg.audit_router import DEFAULT_THRESHOLD, validate_router_options, POLICY_VERSION
 from dscg.paths import BENCHMARK_RESULTS_DIR, RESULTS_DIR
 from experiments import run_partial_benchmark as shared
 from experiments.common.partial_controls import source_revision, guard_run, validate_controls, select_tasks
@@ -252,9 +253,10 @@ def _preflight_report(base, cohort, active, attacks, selected_tasks=None):
 
 
 def run_screened(cohort_path, *, config_path=None, run_name=None, results_dir=None, origin=False,
-                 attack=None, audit_router_mode='off', trace_level='summary', audit_router_artifact=None,
+                 attack=None, audit_router_mode='off', trace_level='summary', audit_router_artifact=None, audit_router_threshold=DEFAULT_THRESHOLD,
                  force_rerun=False, reuse=False, progress=False, model_id=None, sec_model_id=None, defense=None, suites=None,
                  task_scope='screened', **controls):
+    audit_router_threshold = validate_router_options(audit_router_threshold, audit_router_artifact)
     backend = get_backend()
     if task_scope not in {'screened', 'partial_screened'}:
         raise ValueError('unknown screened task scope')
@@ -317,6 +319,8 @@ def run_screened(cohort_path, *, config_path=None, run_name=None, results_dir=No
                     'schema_version': 'dscg.screened-run.v2', 'benchmark': benchmark_identity(), 'task_scope': task_scope, 'requested_suites': requested, 'selected_tasks': selected,
                     'cohort_sha256': cohort['cohort_sha256'], 'main_model': config.public_dict(), 'security_model': security_model,
                     'baseline': origin, 'attacks': names, 'audit_router_mode': audit_router_mode,
+                    **({'audit_router_threshold': audit_router_threshold, 'audit_router_policy_version': POLICY_VERSION}
+                       if audit_router_mode != 'off' else {}),
                     'trace_level': trace_level, 'controls': effective, 'defense': defense,
                     'tool_metadata_path': str(controls['tool_metadata_path']) if controls.get('tool_metadata_path') else None,
                     'audit_router_artifact_sha256': _file_hash(audit_router_artifact) if audit_router_artifact else None,
@@ -350,7 +354,7 @@ def run_screened(cohort_path, *, config_path=None, run_name=None, results_dir=No
                                task_manifest_path=cohort_path, task_scope=task_scope, attack=names,
                                cohort_sha256=cohort['cohort_sha256'],
                                audit_router_mode=audit_router_mode, trace_level=trace_level,
-                               audit_router_artifact=audit_router_artifact, force_rerun=force_rerun,
+                               audit_router_artifact=audit_router_artifact, audit_router_threshold=audit_router_threshold, force_rerun=force_rerun,
                                reuse=reuse, progress=progress, _reuse_plan=prepared, **controls)
         finally:
             if prepared.committed:

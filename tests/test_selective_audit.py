@@ -29,10 +29,10 @@ class SelectiveAuditTests(unittest.TestCase):
                    label_source='environment_oracle',independence_attested=True,calibration=c)
         path=Path(self.temp.name)/'artifact.json';path.write_text(json.dumps(value));return path
 
-    def setup_chain(self,mode='selective',m=64,response='allow',path=None):
+    def setup_chain(self,mode='selective',m=64,response='allow',path=None,threshold=.70):
         self.assertIn('audit_router',__import__('inspect').signature(d.ActionSecurityChecker).parameters,
                       'checker router integration missing')
-        router=a.LocalAuditRouter(mode,path or self.artifact(m),self.config_hash)
+        router=a.LocalAuditRouter(mode,path,self.config_hash,threshold=threshold)
         sandbox=d.PermissionSandbox(['read_data']);v=a.RouterReceiptVerifier();pre=d.ToolAuthorizationPrecheck(sandbox)
         class Auditor(d.ActionSecurityChecker):
             def _request_audit(self,q,e,p):
@@ -51,14 +51,9 @@ class SelectiveAuditTests(unittest.TestCase):
         for element in chain:state=element.query(*state)
         return state
 
-    def test_legacy_input_artifact_cannot_bypass_new_evidence_audit(self):
-        path = self.artifact()
-        value = json.loads(path.read_text())
-        value['input_schema'] = 'dscg.audit-input.v1'
-        path.write_text(json.dumps(value))
-        chain = self.setup_chain(path=path)
-        self.run_chain(chain)
-        self.assertEqual(chain[1].requests, 1)
+    def test_old_artifact_is_rejected_with_migration_message(self):
+        with self.assertRaisesRegex(ValueError, 'threshold'):
+            self.setup_chain(path=self.artifact())
 
     def test_historical_argument_loss_requires_semantic_audit(self):
         for args in ({'a': {'b': {'c': {'id': 1}}}}, {'amount': float('nan')}):
@@ -106,21 +101,18 @@ class SelectiveAuditTests(unittest.TestCase):
             self.assertEqual(event['semantic_audit_calls'],1);self.assertIsNone(event['semantic_audit_tokens'])
 
     def test_hard_scope_cannot_be_overridden_by_score(self):
-        for sensitivity,effect,sink in [('personal','read','none'),('secret','read','none'),('internal','write','none'),('internal','read','external_recipient')]:
+        for sensitivity,effect,sink in [('secret','read','none'),('internal','write','none'),('internal','read','external_recipient')]:
             self.effects.clear();self.md.update(sensitivity=sensitivity,effect=effect,sink=sink);set_tool_metadata(self.runtime,{'read_data':self.md})
             chain=self.setup_chain();state=self.run_chain(chain)
             self.assertEqual(chain[1].requests,1);self.assertFalse(state[4]['dscg_router_events'][0]['actual_bypass'])
 
-    def test_small_calibration_missing_and_corrupt_artifacts_fall_back(self):
-        for kind in ('small','missing','nan'):
-            path=None
-            if kind=='missing':path=Path(self.temp.name)/'missing.json'
-            if kind=='nan':path=Path(self.temp.name)/'nan.json';path.write_text('{"threshold":NaN}')
-            chain=self.setup_chain(m=2 if kind=='small' else 64,path=path);state=self.run_chain(chain)
-            self.assertEqual(chain[1].requests,1);self.assertFalse(state[4]['dscg_router_events'][0]['would_bypass'])
+    def test_zero_threshold_keeps_semantic_audit(self):
+        chain=self.setup_chain(threshold=0);state=self.run_chain(chain)
+        self.assertEqual(chain[1].requests,1)
+        self.assertFalse(state[4]['dscg_router_events'][0]['would_bypass'])
 
     def test_forged_or_stale_receipt_cannot_execute(self):
-        for mutation in ('token','task','args','catalog','schema','run','artifact','decision','mode','config'):
+        for mutation in ('token','task','args','catalog','schema','run','artifact','threshold','policy','decision','mode','config'):
             self.effects.clear();chain=self.setup_chain();state=chain[1].query(*chain[0].query(*self.state()))
             q,r,e,m,x=state
             if mutation=='token':x['_dscg_router_receipt']={'decision':'allow'}
@@ -130,6 +122,8 @@ class SelectiveAuditTests(unittest.TestCase):
             elif mutation=='schema':r.functions['read_data'].description='Changed description'
             elif mutation=='run':r.functions['read_data'].run=lambda **kw:'other'
             elif mutation=='artifact':chain[1].audit_router.artifact_sha256='3'*64
+            elif mutation=='threshold':chain[1].audit_router.threshold=.9
+            elif mutation=='policy':chain[1].audit_router.policy_version='other'
             elif mutation=='decision':x['_dscg_audit_decision']['confidence']=0.9
             elif mutation=='mode':chain[1].audit_router.mode='shadow'
             elif mutation=='config':chain[1].audit_router.model_config_sha256='4'*64
@@ -166,5 +160,5 @@ class SelectiveAuditTests(unittest.TestCase):
     def test_artifact_denominator_inconsistency_is_not_loadable(self):
         path=self.artifact();value=json.loads(path.read_text());c=value['calibration']
         c['valid_groups']=1;c['results'][0]['selected_actions']=1;c['results'][0]['unacceptable_actions']=9
-        path.write_text(json.dumps(value));router=a.LocalAuditRouter('selective',path,self.config_hash)
-        self.assertIsNone(router.artifact)
+        path.write_text(json.dumps(value))
+        with self.assertRaises(ValueError):a.validate_artifact(value)

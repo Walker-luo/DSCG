@@ -14,7 +14,9 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
-from dscg.request_compatibility import DASHSCOPE_ADAPTER, DashScopeChatClient
+from dscg.request_compatibility import (
+    DASHSCOPE_ADAPTER, DEEPSEEK_ADAPTER, SystemRoleChatClient, DeepSeekChatClient,
+)
 
 
 class ModelConfigurationError(ValueError):
@@ -61,13 +63,14 @@ class ModelConfig:
     def public_dict(self) -> dict[str, str | None]:
         """Return safe metadata suitable for experiment results and logs."""
 
+        adapter = {'dashscope': DASHSCOPE_ADAPTER, 'deepseek': DEEPSEEK_ADAPTER}.get(self.provider)
         return {
             "model_id": self.model_id,
             "provider": self.provider,
             "base_url": self.base_url,
             "api_key_env": self.api_key_env,
             "reasoning_effort": reasoning_effort_for_config(self),
-            **({'chat_request_adapter': DASHSCOPE_ADAPTER} if self.provider == 'dashscope' else {}),
+            **({'chat_request_adapter': adapter} if adapter else {}),
         }
 
 
@@ -400,4 +403,8 @@ def create_openai_client(config: ModelConfig):
     import openai
 
     client = openai.OpenAI(**config.client_kwargs())
-    return DashScopeChatClient(client) if config.provider == 'dashscope' else client
+    if config.provider == 'dashscope':
+        return SystemRoleChatClient(client)
+    if config.provider == 'deepseek':
+        return DeepSeekChatClient(client)
+    return client

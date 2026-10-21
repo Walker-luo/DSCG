@@ -249,6 +249,8 @@ def fixture_backend(identity=DOJO_IDENTITY, *, native_legacy=False):
     from experiments.common import partial_reporting
     stack = ExitStack()
     backend = profile(identity)
+    # Synthetic bookkeeping suites have no native ground_truth contract.
+    stack.enter_context(patch.object(runner, 'check_attack_compatibility', return_value=None))
     for module in (runner, controls, cohort, reuse, run_benchmark, run_injection_precheck, partial_reporting):
         if hasattr(module, 'get_backend'): stack.enter_context(patch.object(module, 'get_backend', return_value=backend))
         if hasattr(module, 'get_suites'): stack.enter_context(patch.object(module, 'get_suites', return_value=backend.suites))

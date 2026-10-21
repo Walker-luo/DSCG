@@ -158,7 +158,7 @@ class PromptProfileTests(unittest.TestCase):
         from experiments.run_partial_benchmark import _describe_pipeline
         options = dict(use_sandbox=True, use_security_checker=True, l1_projection_mode='projected',
                        planning_tool_view=True, delegated_tasks=True, audit_router_mode='shadow',
-                       audit_router_artifact=None, audit_retries=0, completion_prompt=False,
+                       audit_router_artifact=None, audit_router_threshold=.65, audit_retries=0, completion_prompt=False,
                        api_key='offline-key')
         hashes, names = set(), set()
         for profile in ('legacy', 'protocol-v1', 'tool-semantics-v1', 'source-context-v1'):

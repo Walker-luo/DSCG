@@ -1,5 +1,27 @@
 # DSCG Research Handoff
 
+## Direct-threshold L3 routing (2026-10-21)
+
+This user-approved policy supersedes earlier mandatory runtime calibration/artifact and internal-only routing rules; preserve all historical evidence and offline calibrators.
+
+- threshold-read-v1 / dscg.audit-router.threshold.v1 keeps lexical-max-v1 unchanged. Default threshold .70 is empirical, not a certified safety bound. Eligible calls are single L2-authorized valid internal/personal idempotent read, no sink, complete bounded input and valid parameters. Secret and effectful/external actions remain audited; no metadata reclassification.
+- CLI defaults shadow; Python/Dashboard API off. --audit-router-threshold / audit_router_threshold accepts finite numeric [0,1], rejects bool; strict score<threshold. Nonempty old artifact parameters reject with migration guidance before clients. Keep L2, Monitor, signed one-use handoff and execution tickets; bind threshold/policy into receipts and run/cache identity.
+- Shared root reports compare .65/.70/.75 and the configured threshold within each attack/suite/config using actual events. Record four signals, eligibility/reasons, score/threshold, audit parser status/decision, Monitor decision, known/unknown audit Token costs and latency. Missing data stays unknown; disagreements are not safety labels and simulated savings are not actual savings. Old missing-artifact records retain their original semantics.
+- Dashboard API modes/thresholds must be validated and forwarded; UI has no new controls. Update current guides/framework introduction/plan and workshop index. No paid model validation is authorized. New artifacts: workshop/artifacts/20261021_l3_threshold/.
+
+
+## AgentDyn tool_knowledge compatibility (2026-10-20)
+
+- Native AgentDyn dailylife ground_truth lacks placeholder_args for all 10 injection targets. The native tool_knowledge attack cannot construct its payload. Keep original tasks, attack template, scoring and planned counts; never synthesize placeholder arguments.
+- Full/partial/cohort check the actually selected targets before GOAL preflight or model creation and mark the whole attack/suite group `unsupported (missing_placeholder_args)`. Dashboard uses its own selected target IDs. Unsupported groups have no scored sample or success-rate denominator; other groups continue. CLI returns 1 only when all groups are unsupported or a real execution error occurs.
+- Existing user results under results/partial_benchmark/agentdyn/deepseek-flash_test are preserved. New offline evidence belongs in workshop/artifacts/20261020_agentdyn_tool_knowledge/. No paid model calls are needed for implementation validation.
+
+## DeepSeek Chat role compatibility (2026-10-20)
+
+- DeepSeek Chat Completions uses `deepseek-system-text-v1` in the shared client: developer→system; system/developer content made solely of `{type:text,text:<string>}` blocks is concatenated into the API-required string. Preserve the text, message order, tools and all other request arguments; unsupported blocks are left visible to provider validation. The existing `dashscope-system-v1` behavior remains unchanged; other providers keep their native client. Do not alter installed AgentDyn or add fallback requests.
+- Host-computed `chat_request_adapter` is bound in DeepSeek model settings, run/cohort manifests and router identity. Use fresh names for retests; old runs and cohorts missing this identity cannot be silently resumed or rewritten. Protect `results/partial_benchmark/agentdyn/deepseek-flash_test` and its existing failures.
+- Offline protocol checks and evidence are in `workshop/artifacts/20261020_deepseek_chat_roles/`; no real post-fix DeepSeek result is claimed. The earlier DashScope section below is historical for that provider; its “other providers” sentence is superseded for DeepSeek only.
+
 ## DashScope Chat role compatibility (2026-10-19)
 
 - Common create_openai_client wraps DashScope synchronous chat.completions.create with dashscope-system-v1: developer→system only, preserving input objects/content/order/tools/arguments and all other providers. Baseline/DSCG/preflight/screen/Dashboard share it. Never edit conda site-packages, spoof model names, add fallback requests or weaken tool/audit boundaries for provider errors.

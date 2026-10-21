@@ -1,10 +1,21 @@
 # 当前框架与平台展示交接
 
+## L3直接阈值策略（2026-10-21）
+
+当前 `threshold-read-v1` 无需校准artifact：`--audit-router-threshold 0.70` 为默认经验参数，严格score<threshold才免审。CLI默认shadow，Python/Dashboard API默认off；shadow仍审计，selective显式开启后才可能免审。资格扩大到单个已授权、完整有效的internal/personal幂等无sink读取；secret及任何写入/外发不在新增范围。
+
+full/partial/cohort及screen测量透传阈值；Dashboard API校验并透传模式/阈值，未新增页面控件。旧artifact参数非空时报迁移错误；策略/阈值身份不同须新run名。根级L3报告提供经验阈值比较，审计分歧不是安全真值、模拟Token不是实际节省。新策略不把“没有artifact”记成故障，旧记录仍保留原解释。[参数](./model_tool_configuration.md#l3直接阈值路由) · [报告](./result_files.md)
+
+
+## DeepSeek Chat消息角色兼容（2026-10-20）
+
+AgentDyn将受信任的system消息序列化为developer，正文为文本块数组；DeepSeek Chat Completions只列出system/user/assistant/tool角色，且system正文要求字符串。当前共享客户端对provider=deepseek启用独立的`deepseek-system-text-v1`，把developer转换为system，并仅将可确认的纯文本块拼接为字符串；原有DashScope适配和其他服务不变。适配身份进入公开模型配置及运行绑定，旧DeepSeek运行与cohort不自动复用。离线MockTransport验证首轮及工具回合的请求结构；真实服务是否接受完整请求仍需新名复测。见[配置指南](./model_tool_configuration.md#消息角色兼容与请求排错)。
+
 ## DashScope消息角色兼容（2026-10-19）
 
 公共客户端将DashScope同步Chat请求的developer角色转换为system，主/审计模型、baseline和预检均共用；网页无需新增控件，不改模型、三层默认策略或路由模式。适配身份chat_request_adapter进入实际公开模型配置及缓存/路由绑定，更新后新建运行；服务需重启。元数据来源/版本校验不变，不修改conda上游代码。
 
-API失败时页面日志/SSE只返回类型与受限api_error，不再输出SDK异常正文/traceback；运行目录尽力保存execution_error.json，保留错误状态，不生成效用/安全成功标签。CLI执行与失败索引、screen尝试和phase账本同样记录诊断。非API异常沿用原排错路径。离线传输fixture及两套环境回归不证明远端服务已经恢复；复测步骤见[配置指南](./model_tool_configuration.md#dashscope消息角色兼容与400排错)。
+API失败时页面日志/SSE只返回类型与受限api_error，不再输出SDK异常正文/traceback；运行目录尽力保存execution_error.json，保留错误状态，不生成效用/安全成功标签。CLI执行与失败索引、screen尝试和phase账本同样记录诊断。非API异常沿用原排错路径。离线传输fixture及两套环境回归不证明远端服务已经恢复；复测步骤见[配置指南](./model_tool_configuration.md#消息角色兼容与请求排错)。
 
 
 更新时间：2026-10-19（新增显式Qwen效用候选和协议诊断；AgentDojo / AgentDyn 按环境自动识别；三层防御规则及默认开关保持）。当前默认版本 **three-layer-v3.1**。此前用户授权实现有限L1结构化投影，沿用L2工具视图/任务文件与L3动作正文审查；默认投影已接入factory、partial和网页API，架构说明同步。Spotlighting风格来源封装仍是不适用输入的回退。正式研究路线和闸门不改变。
@@ -81,7 +92,7 @@ L1不增加独立模型调用：此前支持的明确原生银行月支出任务
 | delegated_tasks | true，网页/API/partial `--no-delegated-tasks` | 有界明确任务来源展开；NoL2关闭 |
 | authorization_profile / delegated_task_reader | 默认None，仅宿主API | 受信配置，不由网页文本/工具返回创建 |
 | L3/use_security_checker | true，网页/API | 原动作审计 |
-| audit_router_mode/artifact | API off；full/partial DSCG CLI shadow，baseline/NoChecker off | CSA硬门/真实校准不变，网页专门控件仍待完成 |
+| audit_router_mode/threshold | API off；CLI shadow，默认阈值0.70 | 直接阈值，internal/personal读取；API已透传，页面未新增控件 |
 | trace_level | summary | standard判决/账本、full压缩诊断；保留实际字段覆盖 |
 
 网页完整/NoL1/NoL2/NoL3预设和自定义组合已接线。**V2风格**预设关闭L1、前置、视图与文件展开，但新版目录复核仍存在，不是历史V2精确复现。L2/L3全关时L1关闭；原生baseline始终走活动后端的原生工具循环，不带DSCG元数据。

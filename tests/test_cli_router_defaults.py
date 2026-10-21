@@ -14,6 +14,7 @@ class CliRouterDefaultTests(unittest.TestCase):
             with self.subTest(entry=entry), patch.object(partial, 'main', return_value=0) as run:
                 self.assertEqual(entry([]), 0)
                 self.assertEqual(run.call_args.kwargs['audit_router_mode'], 'shadow')
+                self.assertEqual(run.call_args.kwargs['audit_router_threshold'], .70)
 
     def test_baseline_and_no_checker_implicitly_disable_routing(self):
         for entry in (partial.cli, full.cli):
@@ -26,8 +27,9 @@ class CliRouterDefaultTests(unittest.TestCase):
         for entry in (partial.cli, full.cli):
             for mode in ('off', 'shadow', 'selective'):
                 with self.subTest(entry=entry, mode=mode), patch.object(partial, 'main', return_value=0) as run:
-                    self.assertEqual(entry(['--audit-router-mode', mode]), 0)
+                    self.assertEqual(entry(['--audit-router-mode', mode, '--audit-router-threshold', '.75']), 0)
                     self.assertEqual(run.call_args.kwargs['audit_router_mode'], mode)
+                    self.assertEqual(run.call_args.kwargs['audit_router_threshold'], .75)
 
     def test_explicit_incompatible_modes_remain_errors(self):
         for entry in (partial.cli, full.cli):

@@ -99,6 +99,8 @@ class RoutingReportTests(unittest.TestCase):
         report = collect_routing_summary(self.root)
         self.assertIsNone(report['totals']['shadow_would_save_tokens'])
         self.assertIsNone(report['configurations'][0]['totals']['shadow_would_save_tokens'])
+        self.assertIsNone(report['configurations'][0]['totals']['semantic_audit_calls'])
+        self.assertEqual(report['configurations'][0]['totals']['known_semantic_audit_calls'], 1)
 
     def test_missing_calibration_is_unknown_not_zero_savings(self):
         from experiments.common.routing_reports import collect_routing_summary
@@ -110,6 +112,55 @@ class RoutingReportTests(unittest.TestCase):
         self.assertEqual(report['totals']['eligible_batches'], 1)
         self.assertIsNone(report['totals']['shadow_would_save_tokens'])
         self.assertEqual(report['configurations'][0]['calibration_status'], 'uncalibrated')
+
+    def test_direct_threshold_shadow_sweeps_without_artifact(self):
+        from experiments.common.routing_reports import collect_routing_summary, render_routing_summary
+        events = [event(policy_version='threshold-read-v1', score=.64, threshold=.72, artifact_sha256=None,
+                        audit_parser_status='ok', semantic_audit_tokens=100),
+                  event(policy_version='threshold-read-v1', score=.70, threshold=.72, artifact_sha256=None,
+                        audit_parser_status='failure', raw_audit_decision='abstain', semantic_audit_tokens=None)]
+        row = trace(events)
+        row['dscg_framework'].update(audit_router_policy_version='threshold-read-v1',
+            audit_router_threshold=.72, audit_router_artifact_sha256=None)
+        self.fixture({'u0': row})
+        report = collect_routing_summary(self.root)
+        self.assertEqual(report['configurations'][0]['calibration_status'], 'empirical_threshold_uncalibrated')
+        sweep = report['threshold_comparisons'][0]['thresholds']
+        self.assertEqual([r['threshold'] for r in sweep], [.65,.70,.72,.75])
+        self.assertEqual([r['would_bypass_batches'] for r in sweep], [1,1,2,2])
+        self.assertEqual(sweep[0]['shadow_would_save_tokens'],100)
+        self.assertIsNone(sweep[-1]['shadow_would_save_tokens'])
+        self.assertEqual(sweep[-1]['protocol_failure_batches'],1)
+        self.assertEqual(sweep[-1]['audit_decision_counts'],{'allow':1,'abstain':1})
+        self.assertIn('经验阈值', render_routing_summary(report))
+        manifest = json.loads((self.root/'attack/sample/run_manifest.json').read_text())
+        manifest['task_selection']['users'].append('missing')
+        self.put('attack/sample/run_manifest.json', manifest)
+        partial = collect_routing_summary(self.root)
+        self.assertIsNone(partial['threshold_comparisons'][0]['thresholds'][0]['shadow_would_save_tokens'])
+
+    def test_missing_trace_configuration_savings_remain_unknown(self):
+        from experiments.common.routing_reports import collect_routing_summary
+        row = trace([event(policy_version='threshold-read-v1', score=.64, threshold=.70,
+                           artifact_sha256=None, semantic_audit_tokens=100)])
+        row['dscg_framework'].update(audit_router_policy_version='threshold-read-v1',
+            audit_router_threshold=.70, audit_router_artifact_sha256=None)
+        self.fixture({'u0': row})
+        manifest = json.loads((self.root/'attack/sample/run_manifest.json').read_text())
+        manifest['task_selection']['users'].append('missing')
+        self.put('attack/sample/run_manifest.json', manifest)
+        report = collect_routing_summary(self.root)
+        self.assertIsNone(report['configurations'][0]['totals']['shadow_would_save_tokens'])
+        self.assertIsNone(report['configurations'][0]['totals']['semantic_audit_calls'])
+        self.assertEqual(report['configurations'][0]['totals']['known_semantic_audit_calls'], 1)
+
+    def test_legacy_generated_reports_can_refresh(self):
+        from experiments.common.routing_reports import write_routing_summary
+        self.fixture({'u0':trace([event()])})
+        self.put('l3_router_summary.json', {'schema_version':'dscg.l3-router-summary.v1'})
+        (self.root/'l3_router_summary.md').write_text('<!-- dscg.l3-router-summary.v1 -->\nold report\n')
+        report = write_routing_summary(self.root, refresh=True)
+        self.assertEqual(report['schema_version'], 'dscg.l3-router-summary.v2')
 
     def test_no_candidates_missing_corrupt_and_wrong_identity_are_distinct(self):
         from experiments.common.routing_reports import collect_routing_summary

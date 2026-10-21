@@ -18,6 +18,16 @@ class DashboardEvaluationTests(unittest.TestCase):
         selector.start()
         self.addCleanup(selector.stop)
 
+    def test_router_api_threshold_is_validated_and_default_stays_off(self):
+        self.assertEqual(evaluation.normalize_config({'suites':['shopping']})['audit_router_mode'], 'off')
+        config = evaluation.normalize_config({'suites':['shopping'], 'audit_router_mode':'selective',
+                                              'audit_router_threshold':.65})
+        self.assertEqual(config['audit_router_threshold'], .65)
+        for changes in ({'audit_router_threshold':True}, {'audit_router_threshold':float('nan')},
+                        {'audit_router_mode':'selective','origin':True}, {'audit_router_artifact':'old.json'}):
+            with self.subTest(changes=changes), self.assertRaises(ValueError):
+                evaluation.normalize_config({'suites':['shopping'], **changes})
+
     def test_layer_dependencies_and_v2_control_are_recorded_as_effective_config(self):
         config = evaluation.normalize_config({"suites": ["shopping"], "input_isolation": False,
                                               "authorization_precheck": False})
@@ -142,11 +152,14 @@ class DashboardEvaluationTests(unittest.TestCase):
         ARTIFACT_ROOT.mkdir(parents=True, exist_ok=True)
         config = evaluation.normalize_config({"suites": ["shopping"], "run_attack": False,
                                                "input_isolation": False, "authorization_precheck": False,
-                                               "trace_level": "standard"})
+                                               "trace_level": "standard", "audit_router_mode":"shadow",
+                                               "audit_router_threshold":.65})
         def factory(*args, **kwargs):
             self.assertFalse(kwargs["input_isolation"])
             self.assertFalse(kwargs["authorization_precheck"])
             self.assertEqual(kwargs["trace_level"], "standard")
+            self.assertEqual(kwargs["audit_router_mode"], "shadow")
+            self.assertEqual(kwargs["audit_router_threshold"], .65)
             pipeline = SimpleNamespace(name="test-pipeline", dscg_optimization_config={
                 "framework_version": "three-layer-v1", "input_isolation": False,
                 "authorization_precheck": False, "use_security_checker": True})

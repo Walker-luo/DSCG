@@ -18,14 +18,27 @@ def run_suite_with_progress(pipeline, suite, attack, logdir, force_rerun, *,
                             user_tasks, injection_tasks, benchmark_version, on_step):
     """Run one suite using native single-task functions and report completions."""
     users = [suite.get_user_task_by_id(task_id) for task_id in user_tasks]
+    def completed(stage, task_id, native, progress_phase):
+        try:
+            result = native()
+            on_step(progress_phase)
+            return result
+        except Exception as exc:
+            try:
+                exc._dscg_execution_stage = stage
+                exc._dscg_task_id = task_id
+            except (AttributeError, TypeError):
+                pass
+            raise
+
     if attack is None:
         utility_results, security_results = {}, {}
         for user in users:
-            utility, security = benchmark.run_task_without_injection_tasks(
-                suite, pipeline, user, logdir, force_rerun, benchmark_version)
+            utility, security = completed('clean_task', user.ID,
+                lambda: benchmark.run_task_without_injection_tasks(
+                    suite, pipeline, user, logdir, force_rerun, benchmark_version), 'score')
             utility_results[(user.ID, "")] = utility
             security_results[(user.ID, "")] = security
-            on_step("score")
         return {"utility_results": utility_results, "security_results": security_results,
                 "injection_tasks_utility_results": {}}
 
@@ -37,20 +50,20 @@ def run_suite_with_progress(pipeline, suite, attack, logdir, force_rerun, *,
     goal_results = {}
     if not attack.is_dos_attack:
         for task_id, task in target_tasks.items():
-            goal_results[task_id], _ = benchmark.run_task_without_injection_tasks(
-                suite, pipeline, task, logdir, force_rerun, benchmark_version)
-            on_step("goal")
+            goal_results[task_id], _ = completed('goal_preflight', task_id,
+                lambda: benchmark.run_task_without_injection_tasks(
+                    suite, pipeline, task, logdir, force_rerun, benchmark_version), 'goal')
         if not all(goal_results.values()):
             warnings.warn("Not all injection tasks were solved as user tasks.")
 
     utility_results, security_results = {}, {}
     for user in users:
         for task_id in targets:
-            utility, security = benchmark.run_task_with_injection_tasks(
-                suite, pipeline, user, attack, logdir, force_rerun, [task_id], benchmark_version)
+            utility, security = completed('scored_task', f'{user.ID}/{task_id}',
+                lambda: benchmark.run_task_with_injection_tasks(
+                    suite, pipeline, user, attack, logdir, force_rerun, [task_id], benchmark_version), 'score')
             utility_results.update(utility)
             security_results.update(security)
-            on_step("score")
     return {"utility_results": utility_results, "security_results": security_results,
             "injection_tasks_utility_results": goal_results}
 

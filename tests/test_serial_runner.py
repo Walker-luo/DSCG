@@ -13,6 +13,26 @@ import serial_fixture
 
 
 class SerialRunnerTests(unittest.TestCase):
+    def test_progress_group_error_records_safe_location_and_task(self):
+        root = Path(__file__).resolve().parents[1] / 'workshop/artifacts/20261020_deepseek_agentdyn_typeerror/test_runs'
+        root.mkdir(parents=True, exist_ok=True)
+        def fail_second_goal(suite, pipeline, task, injection_task=None, injections=None):
+            if task.ID == 'injection_task_1' and injection_task is None:
+                raise TypeError('sensitive-prompt-text')
+            return serial_fixture.execute(suite, pipeline, task, injection_task, injections)
+        with TemporaryDirectory(dir=root) as temp, serial_fixture.patched(execute_fn=fail_second_goal), redirect_stdout(StringIO()):
+            self.assertEqual(partial.main(origin=True, progress=True, suites=list(get_suites())[:1],
+                attack='ignore_previous', results_dir=temp, run_name='diagnostic'), 1)
+            base = Path(temp) / get_backend().id / 'offline-model_diagnostic'
+            execution = json.loads(next((base / 'execution').glob('*/execution.json')).read_text())
+            error = execution['groups'][0]['execution_error']
+            self.assertEqual(error['stage'], 'goal_preflight')
+            self.assertEqual(error['task_id'], 'injection_task_1')
+            self.assertTrue(error['frames'])
+            case = json.loads((base / 'failure_cases.jsonl').read_text().splitlines()[0])
+            self.assertEqual(case['execution_error'], error)
+            self.assertNotIn('sensitive-prompt-text', (base / 'failure_cases.jsonl').read_text())
+
     def test_later_group_binding_conflict_precedes_factory_and_preserves_outputs(self):
         root = Path(__file__).resolve().parents[1] / 'workshop/artifacts/20261018_serial_lightweight/test_runs'
         root.mkdir(parents=True, exist_ok=True)
@@ -41,10 +61,17 @@ class SerialRunnerTests(unittest.TestCase):
                 results_dir=temp, run_name='full'), 0)
             base = Path(temp) / f'{get_backend().id}/offline-model_full'
             for name in suites:
-                summary = json.loads((base / 'tool_knowledge' / name / 'summary.json').read_text())
                 native = get_suite('v1.2', name)
-                self.assertEqual(summary['task_selection']['user_task_ids'], list(native.user_tasks))
-                self.assertEqual(summary['task_selection']['injection_task_ids'], list(native.injection_tasks))
+                binding = json.loads((base / 'tool_knowledge' / name / 'run_manifest.json').read_text())
+                self.assertEqual(binding['task_selection']['users'], list(native.user_tasks))
+                self.assertEqual(binding['task_selection']['injections'], list(native.injection_tasks))
+                summary_path = base / 'tool_knowledge' / name / 'summary.json'
+                if get_backend().id == 'agentdyn' and name == 'dailylife':
+                    self.assertFalse(summary_path.exists())
+                else:
+                    summary = json.loads(summary_path.read_text())
+                    self.assertEqual(summary['task_selection']['user_task_ids'], list(native.user_tasks))
+                    self.assertEqual(summary['task_selection']['injection_task_ids'], list(native.injection_tasks))
 
     def test_frozen_cohort_serial_skips_empty_scene_without_backfilling_prefix(self):
         from experiments import run_injection_precheck as precheck

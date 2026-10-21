@@ -186,6 +186,7 @@ def write_run_overview(base_dir: Path, attack_names: list[str], suites: list[str
                           "error_type": run["error_type"], "trace_path": None, "trace_exists": False,
                           "excerpt_status": "run_aborted", "excerpts": [],
                           "source_path": metadata,
+                          **({'execution_error': run['execution_error']} if 'execution_error' in run else {}),
                           **({'api_error': run['api_error']} if 'api_error' in run else {})})
     for line, case in enumerate(cases, 1):
         case.update(schema_version="dscg.partial-failure.v2", benchmark=benchmark_identity(), case_id=f"F{line:04d}", detail_line=line)
@@ -211,8 +212,13 @@ def write_run_overview(base_dir: Path, attack_names: list[str], suites: list[str
             report = reports.get((attack, suite))
             if report is None:
                 run = runs.get((attack, suite), runs.get((attack, None), {}))
-                status = f"run_error ({run.get('error_type', 'unknown')})" if run.get("status") == "error" else "not_reported"
-                row = [attack, suite, status, "N/A", "N/A", "N/A", "N/A", "N/A", "N/A", "N/A", "N/A", "N/A", "—"]
+                if run.get('status') == 'unsupported':
+                    status = f"unsupported ({run['reason_code']})"
+                    completed = f"0/{run['planned_pairs']}"
+                else:
+                    status = f"run_error ({run.get('error_type', 'unknown')})" if run.get("status") == "error" else "not_reported"
+                    completed = "N/A"
+                row = [attack, suite, status, completed, "N/A", "N/A", "N/A", "N/A", "N/A", "N/A", "N/A", "N/A", "—"]
             else:
                 data = report["summary"]
                 counts = data["task_counts"]

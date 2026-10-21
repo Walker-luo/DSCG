@@ -26,6 +26,39 @@ class FakeSuite:
 
 
 class ProgressAdapterTests(TestCase):
+    def test_second_goal_failure_identifies_phase_without_changing_exception(self):
+        suite = FakeSuite()
+        calls = []
+        def preflight(_suite, _pipeline, task, *_args):
+            calls.append(task.ID)
+            if task.ID == 'i1':
+                raise TypeError('sensitive-prompt-text')
+            return True, True
+
+        with patch.object(benchmark, 'run_task_without_injection_tasks', side_effect=preflight), \
+             patch.object(benchmark, 'run_task_with_injection_tasks') as scored:
+            with self.assertRaises(TypeError) as caught:
+                run_suite_with_progress(None, suite, SimpleNamespace(is_dos_attack=False), None, False,
+                    user_tasks=['u0'], injection_tasks=['i0', 'i1'], benchmark_version='v1.2',
+                    on_step=lambda _phase: None)
+        self.assertEqual(calls, ['i0', 'i1'])
+        scored.assert_not_called()
+        self.assertEqual(caught.exception._dscg_execution_stage, 'goal_preflight')
+        self.assertEqual(caught.exception._dscg_task_id, 'i1')
+
+    def test_readonly_native_exception_is_not_replaced_by_progress_annotation(self):
+        class ReadonlyError(RuntimeError):
+            def __setattr__(self, name, value):
+                if name.startswith('_dscg_'):
+                    raise TypeError('readonly')
+                super().__setattr__(name, value)
+        suite = FakeSuite()
+        with patch.object(benchmark, 'run_task_without_injection_tasks', side_effect=ReadonlyError('native')):
+            with self.assertRaises(ReadonlyError):
+                run_suite_with_progress(None, suite, SimpleNamespace(is_dos_attack=False), None, False,
+                    user_tasks=['u0'], injection_tasks=['i0'], benchmark_version='v1.2',
+                    on_step=lambda _phase: None)
+
     def test_targeted_reports_preflight_then_each_scored_pair(self):
         suite = FakeSuite()
         attack = SimpleNamespace(is_dos_attack=False)
@@ -108,4 +141,61 @@ class ProgressDisplayTests(TestCase):
                 raise RuntimeError("offline")
         self.assertIn("任务 1/3", stream.getvalue())
         self.assertIn("error", stream.getvalue())
+
+
+class InstalledNativeProgressParityTests(TestCase):
+    def test_real_suite_offline_response_matches_native_order_and_cache(self):
+        from pathlib import Path
+        from tempfile import TemporaryDirectory
+        from agentdojo import attacks, logging
+        from agentdojo.types import ChatAssistantMessage, text_content_block_from_string
+        from dscg.benchmark_catalog import get_backend, get_suite
+        from experiments.common.native_cache_compat import ensure_native_cache_model_ready
+
+        ensure_native_cache_model_ready()
+        suite_name = get_backend().suites[0]
+        suite = get_suite('v1.2', suite_name)
+        users = list(suite.user_tasks)[:1]
+        targets = list(suite.injection_tasks)[:2]
+        artifact_root = Path(__file__).resolve().parents[1] / 'workshop/artifacts/20261020_deepseek_agentdyn_typeerror/test_runs'
+        artifact_root.mkdir(parents=True, exist_ok=True)
+
+        def run(root, with_progress):
+            calls = []
+            class ScriptedPipeline:
+                name = 'offline-native-progress'
+                def query(self, query, runtime, env, messages=None, extra_args=None):
+                    calls.append('query')
+                    answer = ChatAssistantMessage(role='assistant',
+                        content=[text_content_block_from_string('offline response')], tool_calls=None)
+                    output = [{'role': 'user', 'content': [text_content_block_from_string(query)]}, answer]
+                    logging.Logger.get().log(output)
+                    return query, runtime, env, output, extra_args or {}
+            pipeline = ScriptedPipeline()
+            attack = attacks.load_attack('ignore_previous', suite, pipeline)
+            with logging.OutputLogger(str(root)):
+                if with_progress:
+                    events = []
+                    result = run_suite_with_progress(pipeline, suite, attack, root, False,
+                        user_tasks=users, injection_tasks=targets, benchmark_version='v1.2',
+                        on_step=events.append)
+                else:
+                    result = benchmark.benchmark_suite_with_injections(pipeline, suite, attack, root,
+                        force_rerun=False, user_tasks=users, injection_tasks=targets,
+                        verbose=False, benchmark_version='v1.2')
+                    events = None
+            return result, calls, events
+
+        with TemporaryDirectory(dir=artifact_root) as root:
+            native_dir, progress_dir = Path(root) / 'native', Path(root) / 'progress'
+            native, native_calls, _ = run(native_dir, False)
+            shown, shown_calls, events = run(progress_dir, True)
+            for field in ('utility_results', 'security_results', 'injection_tasks_utility_results'):
+                self.assertEqual(native[field], shown[field])
+            self.assertEqual(native_calls, shown_calls)
+            self.assertEqual(events, ['goal'] * len(targets) + ['score'] * len(targets))
+            cached, cached_calls, cached_events = run(progress_dir, True)
+            self.assertEqual(cached_calls, [])
+            self.assertEqual(cached_events, events)
+            self.assertEqual(cached['utility_results'], shown['utility_results'])
 

@@ -1,5 +1,7 @@
 # Qwen banking／Slack 效用诊断与分阶段候选
 
+当前L3运行已改为 `threshold-read-v1` 经验阈值，默认0.70、internal/personal读取资格，无需artifact。本文历史shadow观测与校准说明保留当时语义；提示候选仍需显式选择，新阈值不解决L2漏授权或协议失败。
+
 当前默认仍为 `three-layer-v3.1`、`prompt_profile=legacy`。新增协议诊断默认生效；改变模型提示和L2目录的候选必须显式选择。工程接线与离线测试不能证明TSR恢复。2026-10-16已撤回的准备读取候选没有恢复。
 
 ## 本次数据说明

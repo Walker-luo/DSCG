@@ -19,7 +19,7 @@ python -m dscg.benchmark_catalog
 | 工具名称、描述、输入参数schema和真实实现 | 让规划器知道如何调用工具；运行时校验参数并执行 | 当前后端的suite.tools；自定义工具则来自宿主实现/接口定义 | AgentDojo四场景或AgentDyn三场景已提供，不必手写参数表 |
 | 工具风险元数据 | 让L2/L3识别读取、修改、外发与敏感性，选择检查路径 | 仓库内置审核目录；自定义工具需宿主按实际行为补充 | 默认内置，无需另下载或复制 |
 | 用户任务、注入任务和初始模拟环境 | 定义任务事实、攻击目标和评分环境 | 当前锁定后端的native v1.2任务套件 | 默认已有；普通partial无需外部任务清单 |
-| 宿主授权profile、任务文件reader、L3校准artifact | 有界授权扩展、文件适配或选择性审计 | 测试者有针对性地维护/验证 | 均可选；普通比较不要求提供 |
+| 宿主授权profile、任务文件reader | 有界授权扩展、文件适配或选择性审计 | 测试者有针对性地维护/验证 | 均可选；普通比较不要求提供 |
 
 **工具参数schema与风险元数据是两份不同的信息。** `send_email`的参数schema说明收件人/标题/正文如何传入；风险元数据说明它会把数据发给外部接收者。填写风险TOML不会创建该工具，也不会实现邮箱连接。两个后端都在模拟环境执行动作，通常不需要真实邮箱、GitHub、购物、Slack或银行凭证；换成真实服务的自定义工具时才由宿主负责接口和凭证。
 
@@ -27,13 +27,15 @@ python -m dscg.benchmark_catalog
 
 Qwen banking/Slack的协议诊断、`--prompt-profile`阶段候选、日志字段及配对测试见[效用诊断指南](./qwen_utility.md)。该开关属于防御策略，不是模型TOML参数；默认legacy，不更换主/安全模型。JSON输出可用仍需严格字段校验，普通聊天成功不代表审计协议稳定。
 
-### DashScope消息角色兼容与400排错
+### 消息角色兼容与请求排错
 
-DSCG公共客户端对实际provider=dashscope的同步`chat.completions.create`启用`dashscope-system-v1`：把结构化developer消息转换成system，保留消息正文/顺序、user/assistant/tool角色、工具schema、参数、temperature和reasoning设置；不原地修改消息，不新增重试或降级。其他provider保持原客户端。两套后端的baseline、DSCG、GOAL预检、screen和Dashboard均从此入口创建客户端；不需改site-packages。此兼容策略对应[百炼Chat Completions系统消息协议](https://help.aliyun.com/zh/model-studio/qwen-api-via-openai-chat-completions/)，不涉及Responses API。
+DSCG公共客户端对实际provider=dashscope或deepseek的同步`chat.completions.create`分别启用`dashscope-system-v1`和`deepseek-system-text-v1`：把结构化developer消息转换成system。DeepSeek还要求system正文为字符串，因此仅将完全由`{type:text,text:<字符串>}`组成的文本块按原顺序拼接；不识别的块保留原状，由服务端明确校验。DashScope的正文格式不变。两种适配均保留消息文本/顺序、user/assistant/tool角色、工具schema、temperature和其余请求参数；不原地修改消息，不新增重试或降级。其他provider保持原客户端。两套后端的baseline、DSCG、GOAL预检、screen和Dashboard均从此入口创建客户端；不需改site-packages。对应[百炼Chat系统消息协议](https://help.aliyun.com/zh/model-studio/qwen-api-via-openai-chat-completions/)和[DeepSeek Chat Completions消息结构](https://api-docs.deepseek.com/api/create-chat-completion/)，不涉及Responses API。
 
-`chat_request_adapter`由宿主计算，写入DashScope主/审计模型的公开配置，进入原有manifest、cohort测量配置和路由身份。更新后需新run名；缺少该身份的旧运行/旧cohort配置与当前设置不一致时会拒绝复用，不补造兼容性。旧结果仍可查看，已绑定旧模型配置的名单须重新预检/冻结；原名单与证据不改写。L3的开发候选预设仍不是部署artifact。
+`chat_request_adapter`由宿主计算，写入DashScope或DeepSeek主/审计模型的公开配置，进入原有manifest、cohort测量配置和路由身份。更新后需新run名；缺少该身份的旧运行/旧cohort配置与当前设置不一致时会拒绝复用，不补造兼容性。旧结果仍可查看，已绑定旧模型配置的名单须重新预检/冻结；原名单与证据不改写。当前L3使用直接阈值；旧校准预设仅保留作离线研究。
 
 已核对`results/partial_benchmark/agentdyn/qwen3.7-flash_test`：9个攻击/场景组均在第一个GOAL预检的首个generation请求失败，L2成功、L3未触发，没有81条有效计分轨迹。本机原生消息捕获为AgentDojo system/user、AgentDyn developer/user；角色差异与失败位置一致。旧文件未保存400详情，因此不能排除服务端其他校验错误；不把它标为TSR=0或防御成功。
+
+DeepSeek Flash在AgentDyn的`deepseek-flash_test`记录显示9组均于首个GOAL预检返回422，安全诊断计数为developer/user各1条；此前的Qwen适配不作用于DeepSeek。AgentDyn还把该受信任消息正文序列化为文本块数组，而DeepSeek Chat文档要求system正文是字符串。当前按DeepSeek Chat协议转换为system/user，并把可确认的纯文本块合并为字符串。422未暴露受限参数名，不能把原错误唯一归因于角色或正文类型；离线模拟不能证明真实服务已接受完整工具schema、JSON模式及后续请求。原目录保留，服务器用新运行名小范围复测；若仍422，检查新诊断里的实际角色计数和参数。
 
 新API失败诊断`api_error`只含schema版本、http_status、provider_error_code、provider_error_param和request_role_counts；code/param采用受限字符集和长度，角色仅计数。CLI输出同一受限结构，执行记录、attack_manifest、failure_cases.jsonl及screen的attempt.json保留；TokenTracker各失败phase记录last_api_error。默认不保存请求正文、响应message、凭据或完整SDK异常。Dashboard API失败仅输出受限结构并尽力保存execution_error.json，不推造成功指标。
 
@@ -47,7 +49,7 @@ python -m experiments.run_partial_benchmark --clean --name qwen_rolefix_clean_ds
 python -m experiments.run_partial_benchmark --attack typical --name qwen_rolefix_attack_01
 ```
 
-不使用旧test目录做reuse/force-rerun。若仍400，先查看新api_error的状态/code/param/角色计数：system/user只说明角色已适配，不能证明工具schema、JSON输出及服务部署都兼容。保持原错误/费用分母并按具体参数继续定位，不自动删工具、改模型或放宽审计。
+不使用旧test目录做reuse/force-rerun。若仍400或422，先查看新api_error的状态/code/param/角色计数：system/user只说明角色已适配，不能证明工具schema、JSON输出及服务部署都兼容。保持原错误/费用分母并按具体参数继续定位，不自动删工具、改模型或放宽审计。
 
 ### 2.1 两种角色及能力要求
 
@@ -181,7 +183,7 @@ python -m experiments.run_partial_benchmark --clean --name clean_20261018_01
 | source | calendar / email / cloud / web / local | 工具接触的来源域；是宿主分类，不认证返回事实；新平台按实际操作使用既有域 |
 | sink | none / external_recipient / public_output | 是否有外部接收方/公共输出；影响风险与免审资格。none不表示任意目标安全 |
 | sensitivity | public / internal / personal / secret | 信息敏感度；个人/秘密读取不能当公开免审 |
-| idempotent | true / false | 宿主声明重复相同操作是否改变预期结果；是L3新增internal-read路由资格之一，不提供exactly-once保证 |
+| idempotent | true / false | 宿主声明重复相同操作是否改变预期结果；是L3新增internal/personal读取路由资格之一，不提供exactly-once保证 |
 | reversible | true / false | 宿主是否认为副作用可逆；仅记录属性，当前没有自动撤销/恢复机制 |
 | schema_version | 可选，默认dscg.tool-risk.v1 | 当前风险分类schema版本，其他版本拒绝 |
 
@@ -201,7 +203,7 @@ reversible = false
 
 例子：get_unread_emails会标记邮件已读，所以内置effect=write；send_email和真实发送参会人通知的日历修改是external_send。单effect字段不能枚举动态handler的所有行为；同名工具采用跨场景保守主风险分类，配合sink/敏感度保留审计要求，不表示付款以外的行为已被约束。
 
-公开免审来自有效read+public+sink=none的既有规则；idempotent不是这个旧规则的独立硬条件。internal读取仍默认送L3，只有启用并通过L3纯算法校准硬门才能新增免审。风险级别也不是最终allow/deny：Monitor保留已授权sink-free读取的deny例外，详见 [框架边界](../README.md#读取例外开销与当前边界)。
+公开免审来自有效read+public+sink=none的既有规则；idempotent不是这个旧规则的独立硬条件。单个internal/personal幂等无sink读取，在输入完整、L2允许且开启selective时可按经验阈值免审；其他情况继续审计。风险级别也不是最终allow/deny：Monitor保留已授权sink-free读取的deny例外，详见 [框架边界](../README.md#读取例外开销与当前边界)。
 
 ### 4.3 生成、检查与新增工具
 
@@ -238,28 +240,31 @@ print("classified tools:", len(catalog))
 | planning_tool_view | true | factory/API、网页、partial --no-tool-view；关掉展示完整目录，执行授权仍检查 |
 | delegated_tasks | true | factory/API、网页、partial --no-delegated-tasks；有界明确执行文件/唯一邮件/指定网页任务，不把普通返回变成任务 |
 | use_security_checker | true | factory/API、网页、partial --no-checker；整个L3语义审计开关 |
-| audit_router_mode | API/factory off；DSCG CLI shadow | full/partial CLI未显式指定时，baseline/NoChecker为off，其余为shadow；显式不兼容组合报错。off仍运行原L3，shadow观察，selective需兼容artifact |
-| audit_router_artifact | None | factory/API、partial --audit-router-artifact PATH；独立标签/分组校准产生，不由模型置信度自动生成；默认不需要 |
+| audit_router_mode | API/factory off；DSCG CLI shadow | full/partial CLI未显式指定时，baseline/NoChecker为off，其余为shadow；显式不兼容组合报错。off仍运行原L3，shadow观察并审计，selective按直接阈值免审 |
+| audit_router_threshold | 0.70 | CLI --audit-router-threshold、Python/Dashboard API；有限数值[0,1]，等于阈值仍审计；0不新增免审，1仍审计分数恰为1的调用 |
+| audit_router_artifact | 已停用 | 非空值直接报迁移错误，改用threshold；不读取旧artifact |
 | audit_retries | 0 | factory/API、partial --audit-retries 0/1；仅语义abstain有界重审，普通比较保持0，不是SDK传输重试设置 |
 | completion_prompt | false | factory/API、partial --completion-prompt；历史可选提示，当前普通比较保持关闭 |
 | trace_level | summary | factory/API、网页、partial --trace-level；standard逐条紧凑记录，full压缩诊断增加序列化/写盘成本 |
 
-这些控制不会从模型连接TOML读取。NoL2同时关闭前置检查、授权工具视图与委托展开；L2/L3均关时L1也关闭。shadow/selective要求L2和L3同时开启，baseline使用原生循环。L3候选参数已初始化，真实部署阈值仍待独立数据校准，见下方预设说明；不能用一个自填tau替代兼容artifact。authorization_profile/delegated_task_reader是受信host API对象，不是普通测试必填项或TOML新增段，详见 [L2方案](../workshop/L2_opt.md)。
+这些控制不会从模型连接TOML读取。NoL2同时关闭前置检查、授权工具视图与委托展开；L2/L3均关时L1也关闭。shadow/selective要求L2和L3同时开启，baseline使用原生循环。L3运行时不再要求独立标签或artifact；0.70是经验参数，尚无独立风险校准保证。authorization_profile/delegated_task_reader是受信host API对象，不是普通测试必填项或TOML新增段，详见 [L2方案](../workshop/L2_opt.md)。
 
-### L3校准候选预设
+### L3直接阈值路由
 
-[config/l3_router.calibration.json](../config/l3_router.calibration.json)仅供离线校准入口显式读取，不是模型连接配置，也不是`--audit-router-artifact`。初始网格`[0.65,0.70,0.75]`、参考值`0.70`、epsilon/delta均`0.05`，状态`development_candidate`；参考值不参与阈值选择。普通测量CLI仍默认shadow，API/factory仍off，baseline/NoChecker仍off。
-
-准备好含独立标签、证据引用和不跨分组的真实数据集后，从DSCG目录执行以下命令（路径为待替换示意；本轮没有生成该数据集或部署artifact）：
+`threshold-read-v1` 使用原字符三元组与四信号最大值，不训练模型。单个已授权、有效元数据、幂等、无sink的internal/personal读取，只有输入完整、参数有效且 `s < audit_router_threshold` 时才免审；其他调用继续审计。secret、外发及副作用动作不进入新增免审。
 
 ```bash
-python -m experiments.calibration.calibrate_l3_router \
-  --dataset-dir /absolute/path/to/reviewed_dataset \
-  --preset config/l3_router.calibration.json \
-  --attest-independent-groups --output /absolute/path/to/new_router.json
+python -m experiments.run_benchmark --suites banking slack --name threshold_shadow_new \
+  --audit-router-mode shadow --audit-router-threshold 0.70
 ```
 
-`--preset`不能与`--grid`、`--epsilon`或`--delta`任意一个混用；原来的三项显式参数命令仍可使用。不传预设时必须给全三项。预设不会自动确认标签/组独立性，也不改变数据检查及artifact绑定；缺少独立证据时不要作上述attest。无可行阈值仍输出`threshold=null`，不会回退到参考值0.70。具体统计含义和历史观察见[L3方案](../workshop/L3_checker_opt.md#0-候选参数初始化2026-10-19)。
+Python使用 `make_defended_pipeline(audit_router_mode="selective", audit_router_threshold=0.70)`；Dashboard API接受同名字段并校验/透传，默认off，页面没有新增控件。阈值不从模型连接TOML读取。NaN/Infinity、布尔值、非数值和越界值在创建模型前拒绝。
+
+shadow保留真实审计，并在根级报告比较0.65/0.70/0.75及实际阈值。模拟Token只统计已知事件，缺失/损坏输入或成本时不推造全量；审计allow/deny分歧不能当作独立安全标签。策略、资格范围与阈值进入配置/缓存身份，换阈值须新name。旧artifact参数非空明确拒绝。
+
+### 历史独立校准（当前运行不依赖）
+
+[历史预设](../config/l3_router.calibration.json)和离线数据构建/校准器保留原独立分组流程，epsilon/delta及80组算例属于旧方案，不再控制当前selective。未来重新启用独立校准需另行验证范围、数据和配置；历史artifact不能作为当前运行输入。见[L3方案](../workshop/L3_checker_opt.md)。
 
 --model-config/--tool-metadata是输入配置路径；--name标识实验；--results-dir是输出根；--task-manifest仅用于显式冻结任务ID，默认无需导入。修改任何有效配置/策略后使用新name，--force-rerun不绕过旧manifest绑定。成本比较采用新name并force-rerun，仍核查API usage/样本分母，不能只凭flag保证可比。
 
@@ -267,7 +272,7 @@ python -m experiments.calibration.calibrate_l3_router \
 
 两测量入口支持显式`--reuse`（API：reuse=True，默认False），未指定攻击/场景时恢复原计划。要求原name和可核验目录，与force-rerun/清单导出互斥，并覆盖环境强制重跑。核对后端、模型、完整任务、攻击、工具元数据内容和有效防御设置；源码哈希、Git commit及Python补丁版本不作为续跑门槛。旧绑定保持原字节，规则变化另存configuration_only记录；缺少必要配置时拒绝。cohort及预检证据仍检查哈希。见[续跑指南](./benchmark.md#显式续跑示例)。
 
-保留的L1银行投影适配器针对AgentDojo原生银行月支出请求与完整Transaction返回，最多32768 UTF-8字节、500行；没有为AgentDyn三个场景新增profile，使用完整来源隔离。原生callable/code/schema和元数据不兼容、错误/截断或未知字段均回退，不把旧适配器结果视为新场景已验证。模式/适配器身份影响缓存和L3 artifact兼容，切换用新run名；细节见 [L1说明](../README.md#l1-优化任务限定的结构化投影)。
+保留的L1银行投影适配器针对AgentDojo原生银行月支出请求与完整Transaction返回，最多32768 UTF-8字节、500行；没有为AgentDyn三个场景新增profile，使用完整来源隔离。原生callable/code/schema和元数据不兼容、错误/截断或未知字段均回退，不把旧适配器结果视为新场景已验证。模式/适配器身份影响缓存和L3路由配置兼容，切换用新run名；细节见 [L1说明](../README.md#l1-优化任务限定的结构化投影)。
 
 现有文件委托支持AgentDyn的`read_file(path)`文本；有副作用的`browse_webpage`不能替代纯`get_webpage`委托引导读取。目录自动选择不扩展委托或内部handler权限。
 

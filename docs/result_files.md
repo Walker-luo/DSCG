@@ -2,6 +2,14 @@
 
 新运行以根目录作为查阅入口，不再生成场景report.txt、攻击级或根级all_report.txt、单独攻击错误TXT。旧报告保留，不自动清理。此改动只影响派生展示，不进入防御/缓存配置身份，不改变模型、路由策略、校准阈值或评分。
 
+## 当前shadow如何用于选阈值（2026-10-21）
+
+`threshold-read-v1` 使用经验阈值，默认0.70，不依赖artifact。根级报告按攻击/场景/配置比较0.65/0.70/0.75以及去重后的本次阈值，记录模拟免审、审计allow/deny/abstain分布、协议失败/未知状态及已知/未知审计Token。原公开免审不重复计入新增收益，selective真实Token节省仍未知。
+
+模拟比例只针对已记录事件；缺失轨迹或成本时保留已知小计，完整模拟Token为未知。每次事件保留四个信号、s、阈值、资格及回退原因、审计协议状态、最终Monitor决定和延迟。该统计帮助人工选择阈值，不自动调参，不把审计判断当安全标签。
+
+新策略显示“经验阈值、未独立校准”，没有artifact不是错误；旧 `local_calibrated_algorithm` 记录仍要求原artifact语义，不因新阈值被重新解释。历史报告与结果不自动改写，下文旧校准说明仅适用于旧策略。
+
 ## 从哪里开始看
 
 | 文件 | 用途 |
@@ -13,6 +21,8 @@
 | 场景`summary.json`、`detailed_results.csv` | 原聚合指标、配置及全部任务结果，供历史页/导出读取 |
 | 原始任务JSON及可选full附件 | 原生缓存、动作/审计记录、复核证据；保持原路径和格式 |
 | manifests、cohort、execution、reuse/validation快照 | 范围绑定、冻结名单、运行状态和续跑证据；不合并或移动 |
+
+分组异常时，`execution/<invocation>/execution.json` 和 `failure_cases.jsonl` 的对应错误记录可包含 `execution_error`：执行阶段、任务 ID，以及最多 8 个模块/函数/行号。它不保存异常原文、请求、响应或局部变量。`--progress` 可标出 GOAL 预检、计分或 clean 任务；其他入口无法确定具体任务时阶段为 `group`。若模型请求失败，原始任务轨迹的 `dscg_cost.models` 可保留本任务新增的安全 `last_api_error` 诊断；先核对该诊断再判断是否为服务错误，不把分组异常计入有效评分分母。
 
 CLI full/partial/cohort共用精简报告。Dashboard正常完成后也生成上述根级摘要、失败索引与L3报告，同时保留overall_results.json、CSV及原报告下载API；网页没有新增路由模式控件，不会因为报告功能自动开启shadow/selective。CLI中断可生成部分报告，未完成轨迹明确标记；后续续跑更新派生汇总，保留原有配置快照机制。旧TXT不会被清理，但不应当作续跑后的最新汇总。
 

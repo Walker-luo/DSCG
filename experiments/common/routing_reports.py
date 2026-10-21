@@ -15,8 +15,10 @@ from pathlib import Path
 import re
 import tempfile
 
-SCHEMA = 'dscg.l3-router-summary.v1'
+SCHEMA = 'dscg.l3-router-summary.v2'
+THRESHOLD_POLICY = 'threshold-read-v1'
 MARKER = '<!-- ' + SCHEMA + ' -->'
+OWNED_SCHEMAS = (SCHEMA, 'dscg.l3-router-summary.v1')
 JSON_NAME, MD_NAME = 'l3_router_summary.json', 'l3_router_summary.md'
 MODES = {'off', 'shadow', 'selective', 'baseline', 'unknown'}
 COVERAGE = ('planned_traces', 'read_traces', 'event_traces', 'no_candidate_traces',
@@ -77,11 +79,14 @@ class _Stats:
         self.c = Counter()
         self.reasons, self.decisions, self.monitor, self.cross = (Counter() for _ in range(4))
         self.scores, self.latencies, self.thresholds = [], [], set()
+        self.shadow_samples = []
+        self.threshold_shadow = False
         self.uncalibrated = False
 
     def observe_config(self, config):
         self.c['shadow_traces'] += config['mode'] == 'shadow'
-        if config['mode'] == 'shadow' and (not config['artifact_sha256'] or config['load_error']):
+        self.threshold_shadow |= config['mode'] == 'shadow' and config.get('policy_version') == THRESHOLD_POLICY
+        if config['mode'] == 'shadow' and config.get('policy_version') != THRESHOLD_POLICY and (not config['artifact_sha256'] or config['load_error']):
             self.uncalibrated = True
 
     def event(self, row):
@@ -120,6 +125,9 @@ class _Stats:
                 if row.get('mode') == 'shadow' and (
                         threshold is None or reason in {'INCOMPATIBLE_ARTIFACT', 'ARTIFACT_INVALID_OR_MISSING', 'NO_CERTIFIED_THRESHOLD', 'ROUTER_ERROR'}):
                     self.uncalibrated = True
+        if (router and row.get('mode') == 'shadow' and row.get('policy_version') == THRESHOLD_POLICY
+                and row.get('eligible') is True and _number(row.get('score')) and 0 <= row['score'] <= 1):
+            self.shadow_samples.append(row)
         decision = row.get('raw_audit_decision')
         decision = decision if decision in ('allow', 'deny', 'abstain') else 'not_audited' if calls == 0 else 'unknown'
         self.decisions[decision] += 1
@@ -131,6 +139,31 @@ class _Stats:
                 self.c['known_shadow_would_save_tokens'] += cost
             else:
                 self.c['unknown_shadow_cost_batches'] += 1
+
+    def threshold_sweep(self, configured_threshold):
+        if not self.threshold_shadow:
+            return []
+        candidates = {.65, .70, .75}
+        if _number(configured_threshold):
+            candidates.add(configured_threshold)
+        result = []
+        for threshold in sorted(candidates):
+            selected = [e for e in self.shadow_samples if e['score'] < threshold]
+            decisions = Counter(e.get('raw_audit_decision', 'unknown') for e in selected)
+            costs = [e.get('semantic_audit_tokens') for e in selected]
+            known = [c for c in costs if _count(c)]
+            incomplete = (len(known) != len(selected) or self.c['unknown_audit_cost_traces']
+                          or self.c['unknown_scope_groups'] or self.c['invalid_event_records'])
+            result.append(dict(threshold=threshold, eligible_batches=self.c['eligible_batches'],
+                would_bypass_batches=len(selected),
+                rate_of_audited_batches=len(selected)/self.c['previously_audited_batches'] if self.c['previously_audited_batches'] else None,
+                rate_of_eligible_batches=len(selected)/self.c['eligible_batches'] if self.c['eligible_batches'] else None,
+                audit_decision_counts=dict(decisions),
+                protocol_failure_batches=sum(e.get('audit_parser_status') == 'failure' for e in selected),
+                unknown_protocol_batches=sum(e.get('audit_parser_status') not in ('ok','failure') for e in selected),
+                known_shadow_would_save_tokens=sum(known), unknown_cost_batches=len(selected)-len(known),
+                shadow_would_save_tokens=None if incomplete else sum(known)))
+        return result
 
     def finish(self, scores=False):
         keys = ('candidate_batches', 'previously_audited_batches', 'eligible_batches',
@@ -231,6 +264,8 @@ def _config(frame, binding, baseline, benchmark):
         return value if isinstance(value, str) and len(value) <= 200 else None
     return {'mode': mode if isinstance(mode,str) and mode in MODES else 'unknown', 'benchmark': benchmark,
             'artifact_sha256': text(frame.get('audit_router_artifact_sha256')),
+            'policy_version': text(frame.get('audit_router_policy_version')),
+            'threshold': frame.get('audit_router_threshold') if _number(frame.get('audit_router_threshold')) else None,
             'config_sha256': text(frame.get('audit_router_config_sha256')),
             'prompt_profile': text(frame.get('prompt_profile')) or 'unrecorded',
             'prompt_profile_sha256': text(frame.get('prompt_profile_sha256')),
@@ -244,6 +279,7 @@ def collect_routing_summary(run_dir):
     benchmark = _backend(manifest.get('benchmark'))
     total, coverage, configs, groups = _Stats(), Counter(), {}, []
     issues, issue_counts = [], Counter()
+    comparison_stats = {}
 
     def issue(kind, path, detail=None):
         issue_counts[kind] += 1
@@ -330,7 +366,11 @@ def collect_routing_summary(run_dir):
                     configs[config_key] = {'configuration': config, 'stats': _Stats(), 'groups': set(), 'traces': 0}
                 selected = configs[config_key]
                 selected['traces'] += 1; selected['groups'].add(group_id)
-                accumulators = (total, stats, selected['stats'])
+                comparison_key = (group_id, config_key)
+                if comparison_key not in comparison_stats:
+                    comparison_stats[comparison_key] = dict(attack=attack, suite=suite, configuration=config, stats=_Stats())
+                group_config = comparison_stats[comparison_key]
+                accumulators = (total, stats, selected['stats'], group_config['stats'])
                 for acc in accumulators: acc.observe_config(config)
                 events = raw.get('dscg_router_events')
                 if isinstance(events, list) and events:
@@ -343,6 +383,10 @@ def collect_routing_summary(run_dir):
                                 or (row.get('would_bypass') is True and row.get('eligible') is not True)
                                 or (row.get('actual_bypass') is True and row.get('would_bypass') is not True)
                                 or (row.get('eligible') is True and row.get('artifact_sha256') != config['artifact_sha256'])
+                                or (config['policy_version'] == THRESHOLD_POLICY and (
+                                    row.get('eligible') is True and (row.get('policy_version') != THRESHOLD_POLICY
+                                        or row.get('threshold') != config['threshold'])))
+                                or (row.get('policy_version') == THRESHOLD_POLICY and config['policy_version'] != THRESHOLD_POLICY)
                                 or any(k in row and type(row[k]) is not bool for k in ('eligible','would_bypass','actual_bypass','original_public_bypass'))
                                 or (row.get('model_config_sha256') and config['config_sha256'] and row['model_config_sha256'] != config['config_sha256'])):
                             issue('invalid_event', path)
@@ -379,15 +423,29 @@ def collect_routing_summary(run_dir):
         coverage.update(covered)
         groups.append({'attack': attack, 'suite': suite, 'coverage': {k: covered[k] for k in COVERAGE},
                        'totals': stats.finish(), 'status': 'partial' if any(covered[k] for k in COVERAGE[5:]) or stats.c['invalid_event_records'] else 'recorded'})
+    # Missing traces cannot be assigned to a configuration: conservatively retain
+    # uncertainty for every configuration observed in the affected group.
+    by_group = {row['attack']+'/'+row['suite']: row for row in groups}
+    for selected in configs.values():
+        for key in ('unknown_audit_cost_traces','unknown_audit_call_records','unknown_scope_groups','invalid_event_records'):
+            unknown = sum(by_group[group]['totals'].get(key, 0) for group in selected['groups'])
+            selected['stats'].c[key] = max(selected['stats'].c[key], unknown)
     configurations = []
     for selected in configs.values():
         conf, stat = selected['configuration'], selected['stats']
         calibration = ('disabled' if conf['mode'] in {'off','baseline'} else
+                       'empirical_threshold_uncalibrated' if conf['policy_version'] == THRESHOLD_POLICY else
                        'uncalibrated' if not conf['artifact_sha256'] or conf['load_error'] else
                        'calibrated' if stat.thresholds else 'threshold_unobserved_or_uncertified')
         configurations.append({'configuration': conf, 'calibration_status': calibration,
                                'groups': sorted(selected['groups']), 'traces': selected['traces'],
                                'totals': stat.finish(scores=True)})
+    # Missing/corrupt traces have no per-trace configuration; retain their group uncertainty.
+    by_group = {row['attack']+'/'+row['suite']: row for row in groups}
+    for value in comparison_stats.values():
+        parent = by_group[value['attack']+'/'+value['suite']]['totals']
+        for key in ('unknown_audit_cost_traces','unknown_audit_call_records','unknown_scope_groups','invalid_event_records'):
+            value['stats'].c[key] = max(value['stats'].c[key], parent.get(key, 0))
     totals = total.finish()
     if benchmark is None:
         for name in ('eligible_rate','new_bypass_rate','eligible_bypass_rate'):
@@ -397,9 +455,12 @@ def collect_routing_summary(run_dir):
             'coverage': {k: coverage[k] for k in COVERAGE}, 'totals': totals,
             'aggregation_status': 'recorded_run_identity' if benchmark else 'benchmark_identity_unavailable_rates_not_pooled',
             'groups': groups, 'configurations': configurations,
+            'threshold_comparisons': [dict(attack=v['attack'], suite=v['suite'], configuration=v['configuration'],
+                thresholds=v['stats'].threshold_sweep(v['configuration']['threshold']))
+                for v in comparison_stats.values() if v['stats'].threshold_shadow],
             'issue_counts': dict(issue_counts), 'issues': issues, 'issues_truncated': sum(issue_counts.values()) > len(issues),
             'limitations': ['Recorded scored traces only; preflight, snapshots and current backend registry excluded.',
-                           'Missing calibration means unknown effective shadow savings, not measured zero benefit.',
+                           'Legacy missing calibration remains unknown; threshold-read-v1 uses an empirical threshold without independent calibration.',
                            'Audit disagreement is not a security oracle; selective actual Token savings remain unknown.',
                            'Audit Tokens here exclude preflight; do not add them again to run total Tokens.']}
 
@@ -426,15 +487,28 @@ def render_routing_summary(report):
                   f"{t['eligible_batches']}/{t['would_bypass_batches']}/{t['actual_bypass_batches']}",t['semantic_audit_calls']]
         lines.append('| '+' | '.join(map(cell, values))+' |')
     lines.extend(['', '## 实际模式与配置（风险分数/阈值不跨配置合并）', '',
-                  '| 模式 | 提示候选 | 校准状态 | 配置hash / artifact | 轨迹 | 阈值 | 风险分数P50/P95 | 延迟P50/P95毫秒 |',
+                  '| 模式 | 提示候选 | 校准状态 | 配置hash / 策略或artifact | 轨迹 | 阈值 | 风险分数P50/P95 | 延迟P50/P95毫秒 |',
                   '| --- | --- | --- | --- | --- | --- | --- | --- |'])
     for row in report['configurations']:
         c, t = row['configuration'], row['totals']
         d = t['score_distribution']
-        values = [c['mode'],c['prompt_profile'],row['calibration_status'],
-                  f"{str(c['config_sha256'] or 'unknown')[:12]} / {str(c['artifact_sha256'] or 'missing')[:12]}",row['traces'],t['thresholds'],
+        values = [c['mode'],c['prompt_profile'],('经验阈值、未独立校准' if row['calibration_status'] == 'empirical_threshold_uncalibrated' else row['calibration_status']),
+                  f"{str(c['config_sha256'] or 'unknown')[:12]} / {c['policy_version'] if c['policy_version'] == THRESHOLD_POLICY else str(c['artifact_sha256'] or 'missing')[:12]}",row['traces'],t['thresholds'],
                   f"{cell(d['p50'])}/{cell(d['p95'])}", f"{cell(t['router_latency_p50_ms'])}/{cell(t['router_latency_p95_ms'])}"]
         lines.append('| '+' | '.join(map(cell, values))+' |')
+    lines.extend(['', '## Shadow经验阈值比较（未独立校准）', '',
+                  '以下为已记录历史轨迹上的模拟；审计分歧不是误放率，Token不是实际节省。', '',
+                  '| 攻击/场景 | 配置 | 阈值 | 模拟免审/适用 | 占原审计比例 | 审计判决 | 协议失败/未知 | 已知模拟Token/未知批次 | 模拟Token |',
+                  '| --- | --- | --- | --- | --- | --- | --- | --- | --- |'])
+    for group in report.get('threshold_comparisons', []):
+        for row in group['thresholds']:
+            rate = row['rate_of_audited_batches']
+            values = [group['attack']+'/'+group['suite'], (group['configuration']['config_sha256'] or 'unknown')[:12],
+                      row['threshold'], f"{row['would_bypass_batches']}/{row['eligible_batches']}",
+                      f'{rate:.2%}' if rate is not None else None, row['audit_decision_counts'],
+                      f"{row['protocol_failure_batches']}/{row['unknown_protocol_batches']}",
+                      f"{row['known_shadow_would_save_tokens']}/{row['unknown_cost_batches']}", row['shadow_would_save_tokens']]
+            lines.append('| '+' | '.join(map(cell, values))+' |')
     lines.extend(['','## 路由原因',''])
     lines.extend(f'- {cell(k)}：{v}' for k,v in sorted(total['route_reason_counts'].items()))
     lines.extend(['','## Shadow模拟免审与实际审计判断','',
@@ -476,8 +550,8 @@ def write_routing_summary(run_dir, *, refresh=False, check_running=True):
             if path.exists():
                 if not refresh:
                     raise FileExistsError('routing report exists; use --refresh for tool-owned reports')
-                owned = (_read(root,path).get('schema_version') == SCHEMA if path == output
-                         else path.read_text(encoding='utf-8').startswith(MARKER+'\n'))
+                owned = (_read(root,path).get('schema_version') in OWNED_SCHEMAS if path == output
+                         else path.read_text(encoding='utf-8').startswith(tuple('<!-- '+schema+' -->\n' for schema in OWNED_SCHEMAS)))
                 if not owned:
                     raise ValueError('refusing to replace a file not generated by this reporter')
         report = collect_routing_summary(root)

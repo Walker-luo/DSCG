@@ -14,15 +14,14 @@ import json
 
 from dscg.model_config import ModelConfigurationError, resolve_model_config
 from dscg.paths import RESULTS_DIR, BENCHMARK_RESULTS_DIR
-from dscg.audit_router import summarize_events
+from dscg.audit_router import (DEFAULT_THRESHOLD, POLICY_VERSION as ROUTER_POLICY_VERSION,
+                               validate_router_options, summarize_events, LocalAuditRouter)
 from dscg.input_isolation import FRAMEWORK_VERSION
 from dscg.l1_projection import MODES as L1_PROJECTION_MODES, PROFILE_SHA256 as L1_PROFILE_SHA256
 from dscg.pipelines.baseline import make_openai_compatible_pipeline
 from dscg.pipelines.defended import make_defended_pipeline, router_configuration_hash, defended_pipeline_name
 from dscg.prompt_profiles import PROFILES as PROMPT_PROFILES, validate_profile, profile_binding
-from dscg.audit_router import LocalAuditRouter
 from dscg.tool_metadata import ToolMetadataError, load_tool_metadata, validate_benchmark_tool_metadata, resolve_tool_metadata
-from experiments.diagnostics.harness_audit import rank_ids, security_result_fields
 from experiments.common.benchmark_outcomes import project_outcomes
 from experiments.common.partial_reporting import collect_suite_report, write_run_overview
 from experiments.common.partial_controls import (validate_controls, make_task_manifest, load_task_manifest,
@@ -36,6 +35,9 @@ from experiments.common.benchmark_execution import (
     PreparedBindings, ApprovedBindings, run_lock,
 )
 from experiments.common.benchmark_progress import GroupProgress, run_suite_with_progress
+from experiments.common.error_diagnostics import execution_error_diagnostics
+from experiments.common.native_cache_compat import ensure_native_cache_model_ready
+from experiments.common.attack_compatibility import check_attack_compatibility
 
 
 TYPICAL_ATTACKS = (
@@ -123,10 +125,14 @@ def _describe_pipeline(model_id, sec_model_id, *, origin, defense, **options):
                 authorization_precheck=sandbox, l1_projection_mode=projection,
                 planning_tool_view=view, delegated_tasks=delegated,
                 audit_retries=options['audit_retries'], completion_prompt=options['completion_prompt'],
-                prompt_profile=prompt_profile)
+                prompt_profile=prompt_profile, audit_router_threshold=options.get('audit_router_threshold', DEFAULT_THRESHOLD)
+                if options['audit_router_mode'] != 'off' else None)
             if options['audit_router_mode'] != 'off':
-                router = LocalAuditRouter(options['audit_router_mode'], options['audit_router_artifact'], config_hash)
+                router = LocalAuditRouter(options['audit_router_mode'], model_config_sha256=config_hash,
+                                          threshold=options.get('audit_router_threshold', DEFAULT_THRESHOLD))
         optimization = {'audit_router_config_sha256': config_hash,
+                        'audit_router_threshold': router.threshold if router else None,
+                        'audit_router_policy_version': ROUTER_POLICY_VERSION if router else None,
                         'audit_router_artifact_sha256': router.artifact_sha256 if router else None,
                         **profile_binding(prompt_profile)}
         name = defended_pipeline_name(main.model_id, use_sandbox=sandbox, use_security_checker=checker,
@@ -168,6 +174,7 @@ def main(
     attack: str | list[str] | None = None,
     audit_router_mode: str = "off",
     audit_router_artifact: str | Path | None = None,
+    audit_router_threshold: float = DEFAULT_THRESHOLD,
     planning_tool_view: bool = True,
     delegated_tasks: bool = True,
     l1_projection_mode: str = 'projected',
@@ -199,7 +206,7 @@ def main(
             sec_api_key_env=sec_api_key_env, trace_level=trace_level, tool_metadata_path=tool_metadata_path,
             use_security_checker=use_security_checker, use_sandbox=use_sandbox,
             audit_retries=audit_retries, completion_prompt=completion_prompt,
-            audit_router_mode=audit_router_mode, audit_router_artifact=audit_router_artifact,
+            audit_router_mode=audit_router_mode, audit_router_artifact=audit_router_artifact, audit_router_threshold=audit_router_threshold,
             planning_tool_view=planning_tool_view, delegated_tasks=delegated_tasks,
             l1_projection_mode=l1_projection_mode, prompt_profile=prompt_profile,
         )
@@ -222,6 +229,7 @@ def main(
     if not isinstance(l1_projection_mode, str) or l1_projection_mode not in L1_PROJECTION_MODES:
         raise ValueError('invalid L1 projection mode')
     _validate_prompt_profile(origin, use_sandbox, use_security_checker, prompt_profile)
+    audit_router_threshold = validate_router_options(audit_router_threshold, audit_router_artifact)
     _validate_router_controls(origin,use_security_checker,audit_router_mode,use_sandbox)
     validate_controls(origin=origin, use_security_checker=use_security_checker,
                       audit_retries=audit_retries, completion_prompt=completion_prompt)
@@ -241,8 +249,6 @@ def main(
     attack_names = resolve_attack_names(attack if attack is not None else 'typical') if run_attack else ["none"]
     if task_scope in {'screened', 'partial_screened'} and any(ATTACKS[name].is_dos_attack for name in attack_names):
         raise ValueError('screened measurements do not support DoS')
-    logdir = Path(results_dir) if results_dir is not None else BENCHMARK_RESULTS_DIR if task_scope in {'full', 'screened'} else RESULTS_DIR / "partial_benchmark"
-    multiple = len(attack_names) > 1
     context = {'execution_plan': execution_plan(task_scope, suites, attack_names, cohort_sha256)}
     run_records = []
     print(f"本次攻击 ({len(attack_names) if run_attack else 0}): {', '.join(attack_names) if run_attack else '无（clean）'}", flush=True)
@@ -262,7 +268,7 @@ def main(
                 use_security_checker=use_security_checker,
                 audit_retries=audit_retries, completion_prompt=completion_prompt,
                 task_manifest_path=task_manifest_path,
-                audit_router_mode=audit_router_mode,audit_router_artifact=audit_router_artifact,
+                audit_router_mode=audit_router_mode,audit_router_artifact=audit_router_artifact, audit_router_threshold=audit_router_threshold,
                 planning_tool_view=planning_tool_view and not origin and use_sandbox,
                 delegated_tasks=delegated_tasks and not origin and use_sandbox,
                 prompt_profile=prompt_profile,
@@ -298,7 +304,8 @@ def main(
         jobs = [{'attack': name, 'suite': suite,
                  'options': group_options(name), 'bindings': approved,
                  'execution_plan': context['execution_plan'],
-                 'resources': resources}
+                 'resources': resources,
+                 'compatibility': resources.get('compatibility', {}).get((name, suite))}
                 for name in attack_names for suite in suites]
         invocation = uuid4().hex
         execution_dir = base / 'execution' / invocation
@@ -312,21 +319,30 @@ def main(
             for index, job in enumerate(jobs, 1):
                 if not progress:
                     print(f"[{index}/{len(jobs)}] {job['attack']}/{job['suite']} 开始", flush=True)
-                try:
-                    result = {'status': 'completed', 'result': _execute_group(job)}
-                except (RunConfigurationError, KeyboardInterrupt):
-                    raise
-                except Exception as exc:
-                    result = {'status': 'error', 'error_type': type(exc).__name__}
-                    from dscg.request_compatibility import api_error_diagnostics
-                    diagnostic = api_error_diagnostics(exc)
-                    if diagnostic is not None:
-                        result['api_error'] = diagnostic
-                        print(f"API诊断: {json.dumps(diagnostic, ensure_ascii=False)}", flush=True)
+                if job['compatibility'] is not None:
+                    result = job['compatibility']
+                else:
+                    try:
+                        result = {'status': 'completed', 'result': _execute_group(job)}
+                    except (RunConfigurationError, KeyboardInterrupt):
+                        raise
+                    except Exception as exc:
+                        result = {'status': 'error', 'error_type': type(exc).__name__,
+                                  'execution_error': execution_error_diagnostics(exc)}
+                        from dscg.request_compatibility import api_error_diagnostics
+                        diagnostic = api_error_diagnostics(exc)
+                        if diagnostic is not None:
+                            result['api_error'] = diagnostic
+                            print(f"API诊断: {json.dumps(diagnostic, ensure_ascii=False)}", flush=True)
+                        location = result['execution_error']
+                        last_frame = location['frames'][-1] if location['frames'] else None
+                        print(f"执行异常定位: {location['stage']} {location['task_id'] or '-'} "
+                              f"{last_frame or '-'}", flush=True)
                 group_results.append(result)
-                if not progress or result['status'] == 'error':
+                if not progress or result['status'] != 'completed':
                     print(f"[{index}/{len(jobs)}] {job['attack']}/{job['suite']} {result['status']}"
-                          + (f" ({result['error_type']})" if result['status'] == 'error' else ''), flush=True)
+                          + (f" ({result['error_type']})" if result['status'] == 'error' else
+                             f" ({result['reason_code']}; 0/{result['planned_pairs']})" if result['status'] == 'unsupported' else ''), flush=True)
         except KeyboardInterrupt:
             execution.update(status='interrupted', wall_seconds=monotonic() - started)
             (execution_dir / 'execution.json').write_text(json.dumps(execution, indent=2) + '\n')
@@ -345,7 +361,8 @@ def main(
                 print('部分汇总未完成；原始结果与执行状态已保留，可离线重新汇总。', flush=True)
             print('已中断；保留原参数、运行名并加 --reuse 续跑。', flush=True)
             return 130
-        execution.update(status='error' if any(r['status'] == 'error' for r in group_results) else 'completed',
+        execution.update(status='error' if any(r['status'] == 'error' for r in group_results) else
+                                'unsupported' if all(r['status'] == 'unsupported' for r in group_results) else 'completed',
                          wall_seconds=monotonic() - started,
                          groups=[{'attack': j['attack'], 'suite': j['suite'],
                                   **{k: v for k, v in r.items() if k != 'result'}}
@@ -353,25 +370,22 @@ def main(
         (execution_dir / 'execution.json').write_text(json.dumps(execution, indent=2) + '\n')
         for name in attack_names:
             entries = [(j, r) for j, r in zip(jobs, group_results) if j['attack'] == name]
-            errors = [(j, r) for j, r in entries if r['status'] == 'error']
             for job, result in entries:
                 if result['status'] == 'completed':
                     context.setdefault('suite_reports', []).extend(result['result']['suite_reports'])
-            if errors:
-                for job, result in errors:
-                    run_records.append({'attack': name, 'status': 'error', 'failed_suite': job['suite'],
-                                        'error_type': result['error_type'],
-                                        **({'api_error': result['api_error']} if 'api_error' in result else {})})
-            else:
+            # Keep errors before unsupported groups in manifests and failure indexes.
+            for status in ('error', 'unsupported'):
+                for job, result in entries:
+                    if result['status'] == status:
+                        run_records.append({'attack': name, 'status': status,
+                                            'failed_suite': job['suite'], **result})
+            if any(r['status'] == 'completed' for _, r in entries):
                 run_records.append({'attack': name, 'status': 'completed', 'output_dir': str(base / name)})
 
-        fallback = resolve_run_path(logdir, backend.id, model_id, run_name)
-        batch_dir = context.get("base_output_dir", fallback)
-        batch_dir.mkdir(parents=True, exist_ok=True)
         manifest = {
             "schema_version": "dscg.attack-manifest.v2", "benchmark": benchmark_identity(),
             "task_scope": task_scope,
-            "result_layout": result_layout(logdir, backend.id, batch_dir),
+            "result_layout": result_layout(logdir, backend.id, base),
             "pipeline_name": context.get("pipeline_name"),
             "model_id": context.get("model_id"),
             "attacks": attack_names if run_attack else [],
@@ -382,18 +396,19 @@ def main(
         }
         if cohort_sha256 is not None:
             manifest['cohort_sha256'] = cohort_sha256
-        manifest_path = batch_dir / "attack_manifest.json"
+        manifest_path = base / "attack_manifest.json"
         manifest_path.write_text(json.dumps(manifest, indent=2, ensure_ascii=False), encoding="utf-8")
         from experiments.common.routing_reports import write_routing_summary
-        routing_summary = write_routing_summary(batch_dir, refresh=True, check_running=False)
+        routing_summary = write_routing_summary(base, refresh=True, check_running=False)
         overview_path, failures_path = write_run_overview(
-            batch_dir, attack_names, suites, run_records, context.get("suite_reports", []),
+            base, attack_names, suites, run_records, context.get("suite_reports", []),
             model_id=context.get("model_id", model_id), task_scope=task_scope, routing_summary=routing_summary,
         )
         print(f"📝 紧凑摘要: {overview_path}")
         print(f"🔎 失败片段: {failures_path}")
         print(f"📋 攻击执行清单: {manifest_path}")
-        return 1 if (any(record["status"] == "error" for record in run_records) or
+        return 1 if (not any(r['status'] == 'completed' for r in group_results) or
+                     any(record["status"] == "error" for record in run_records) or
                      any(report.get("task_errors") for report in context.get("suite_reports", []))) else 0
 
 
@@ -435,6 +450,7 @@ def _run_single_attack(
     report_context: dict | None = None,
     audit_router_mode: str = "off",
     audit_router_artifact: str | Path | None = None,
+    audit_router_threshold: float = DEFAULT_THRESHOLD,
     planning_tool_view: bool = True,
     delegated_tasks: bool = True,
     l1_projection_mode: str = 'projected',
@@ -465,6 +481,7 @@ def _run_single_attack(
     if not suites or len(set(suites)) != len(suites) or not set(suites) <= set(backend.suites):
         raise ValueError('invalid suite selection for current backend')
     _validate_prompt_profile(origin, use_sandbox, use_security_checker, prompt_profile)
+    audit_router_threshold = validate_router_options(audit_router_threshold, audit_router_artifact)
     _validate_router_controls(origin,use_security_checker,audit_router_mode,use_sandbox)
     validate_controls(origin=origin, use_security_checker=use_security_checker,
                       audit_retries=audit_retries, completion_prompt=completion_prompt)
@@ -510,7 +527,7 @@ def _run_single_attack(
                     use_security_checker=use_security_checker, use_sandbox=use_sandbox,
                     l1_projection_mode=l1_projection_mode, planning_tool_view=planning_tool_view,
                     delegated_tasks=delegated_tasks, audit_router_mode=audit_router_mode,
-                    audit_router_artifact=audit_router_artifact, audit_retries=audit_retries,
+                    audit_router_artifact=audit_router_artifact, audit_router_threshold=audit_router_threshold, audit_retries=audit_retries,
                     completion_prompt=completion_prompt, prompt_profile=prompt_profile)
             pipeline = copy(resource_cache['descriptor'])
         else:
@@ -544,7 +561,7 @@ def _run_single_attack(
                     use_security_checker=use_security_checker,
                     use_sandbox=use_sandbox,
                     audit_retries=audit_retries, completion_prompt=completion_prompt,
-                    audit_router_mode=audit_router_mode,audit_router_artifact=audit_router_artifact,
+                    audit_router_mode=audit_router_mode,audit_router_artifact=audit_router_artifact, audit_router_threshold=audit_router_threshold,
                     planning_tool_view=planning_tool_view, delegated_tasks=delegated_tasks,
                     l1_projection_mode=l1_projection_mode, prompt_profile=prompt_profile,
                 )
@@ -621,6 +638,9 @@ def _run_single_attack(
             "audit_router_artifact_sha256": getattr(pipeline,"dscg_optimization_config",{}).get("audit_router_artifact_sha256"),
             "audit_router_config_sha256": getattr(pipeline,"dscg_optimization_config",{}).get("audit_router_config_sha256"),
         }
+        if audit_router_mode != 'off':
+            run_binding.update(audit_router_threshold=audit_router_threshold,
+                               audit_router_policy_version=ROUTER_POLICY_VERSION)
         if not origin:
             run_binding.update(profile_binding(prompt_profile))
         if cohort_sha256 is not None:
@@ -633,6 +653,18 @@ def _run_single_attack(
             else len(selected_users)
         )
         if prepare_only:
+            if resource_cache is not None:
+                compatibility = resource_cache.setdefault('compatibility', {})
+                try:
+                    issue = check_attack_compatibility(
+                        suite, attack_name if run_attack and not is_dos_attack else 'none',
+                        selected_users, selected_injections)
+                    if issue is not None:
+                        compatibility[(attack_name, suite_name)] = {'status': 'unsupported', **issue}
+                except Exception as exc:
+                    compatibility[(attack_name, suite_name)] = {
+                        'status': 'error', 'error_type': type(exc).__name__,
+                        'execution_error': execution_error_diagnostics(exc)}
             continue
         if not progress:
             print(f"用户任务={len(selected_users)}；注入目标={len(selected_injections)}；计划组合={planned_task_count}", flush=True)
@@ -640,6 +672,7 @@ def _run_single_attack(
             report_context['pipeline_name'] = result_dir_name
         pipeline.name = attack_component
         try:
+            ensure_native_cache_model_ready()
             with logging.OutputLogger(str(base_output_dir)):
                 if progress:
                     with GroupProgress(f"{attack_name if run_attack else 'none'}/{suite_name}",
@@ -673,47 +706,27 @@ def _run_single_attack(
         finally:
             pipeline.name = result_dir_name
 
-        # 结果分析
         utility_results = results["utility_results"]
         security_results = results.get("security_results", {})
         if not progress:
             print(f"实际完成评测任务数量: {len(utility_results)}")
 
-        # 1. 确保目录存在 (避免 FileNotFoundError)
         suite_output_dir = output_dir / suite_name
         suite_output_dir.mkdir(parents=True, exist_ok=True)
-        
-        # 定义各类文件保存路径
-        # csv_file_path = output_dir / f"{suite_name}_detailed_results.csv"
-        # summary_file_path = output_dir / f"{suite_name}_summary.json"
         csv_file_path = suite_output_dir / "detailed_results.csv"
         summary_file_path = suite_output_dir / "summary.json"
 
-        #
-
-        # ==========================================
-        # 2. 构造结构化数据列表 (用于画图)
-        # ==========================================
         outcomes = project_outcomes(utility_results, security_results, suite_output_dir,
                                     attack_name if run_attack else "none", run_attack=run_attack)
-        structured_records = []
-        for task_key, util_status in utility_results.items():
-            user_task_id = task_key[0]
-            injection_task_id = task_key[1] if len(task_key) > 1 else "None"
-            
-            # AgentDojo 原生定义: True 代表执行了恶意指令(攻击成功)，False 代表安全
-            outcome = outcomes[task_key]
+        structured_records = [{
+            "suite_name": suite_name,
+            "model_id": resolved_model_id,
+            "attack_type": attack_name if run_attack else "None",
+            "user_task_id": task_key[0],
+            "injection_task_id": task_key[1] if len(task_key) > 1 else "None",
+            **outcomes[task_key],
+        } for task_key in utility_results]
 
-            structured_records.append({
-                "suite_name": suite_name,
-                "model_id": resolved_model_id,
-                "attack_type": attack_name if run_attack else "None",
-                "user_task_id": user_task_id,
-                "injection_task_id": injection_task_id,
-                **outcome,
-            })
-
-        # 3. 计算聚合得分 (Summary)
         valid_utility_results = [r['utility_success'] for r in outcomes.values() if isinstance(r['utility_success'], bool)]
         utility_score = sum(valid_utility_results) / len(valid_utility_results) if valid_utility_results else None
         valid_security_results = [r['attack_success'] for r in outcomes.values() if isinstance(r['attack_success'], bool)]
@@ -793,23 +806,13 @@ def _run_single_attack(
             }
 
         preserve_cached_cost(summary_data, summary_file_path, force_rerun)
-        prompt_tokens = summary_data["overhead"]["prompt_tokens"]
-        completion_tokens = summary_data["overhead"]["completion_tokens"]
-        total_tokens = summary_data["overhead"]["total_tokens"]
-        if sec_tracker and "sec_overhead" in summary_data:
-            sec_prompt_tokens = summary_data["sec_overhead"]["prompt_tokens"]
-            sec_completion_tokens = summary_data["sec_overhead"]["completion_tokens"]
-            sec_total_tokens = summary_data["sec_overhead"]["total_tokens"]
 
-        # 4. 写入文件 (TXT, CSV, JSON)
-        # 4.2 保存用于画图和数据分析的 CSV 详细表格
         if structured_records:
             with open(csv_file_path, "w", encoding="utf-8", newline="") as f:
                 writer = csv.DictWriter(f, fieldnames=structured_records[0].keys())
                 writer.writeheader()
                 writer.writerows(structured_records)
 
-        # 4.3 保存聚合数据的 JSON (方便后续写脚本对比多模型的表现)
         with open(summary_file_path, "w", encoding="utf-8") as f:
             json.dump(summary_data, f, indent=4, ensure_ascii=False)
 
@@ -819,7 +822,6 @@ def _run_single_attack(
             ))
 
 
-        # 写完文件后，在控制台给个提示
         if not progress:
             print(f"✅ [{suite_name}] 测试完成！")
             print(f"📊 数据表格(用于画图): {csv_file_path}")
@@ -908,7 +910,9 @@ def cli(argv: list[str] | None = None, *, task_scope: str = 'partial', entrypoin
     # None selects the profile default below: DSCG shadow, baseline/NoChecker off.
     parser.add_argument("--audit-router-mode", choices=("off", "shadow", "selective"), default=None,
                         help="L3纯算法路由；DSCG CLI默认shadow，baseline/NoChecker默认off；可显式选择。")
-    parser.add_argument("--audit-router-artifact",help="冻结的独立分组校准JSON；缺失/无效时保留完整审计。")
+    parser.add_argument("--audit-router-artifact", help="已停用；请改用 --audit-router-threshold。")
+    parser.add_argument("--audit-router-threshold", type=float, default=DEFAULT_THRESHOLD,
+                        help="经验免审阈值 [0,1]，默认0.70；严格score<threshold才免审。")
     parser.add_argument("--audit-retries", type=int, choices=(0, 1), default=0, help="语义 abstain 有界重审次数；默认 0。")
     parser.add_argument("--completion-prompt", action="store_true", help="启用通用任务完成提示；默认关闭。")
     parser.add_argument("--clean", action="store_true", help="用相同用户任务运行无攻击效用控制。")
@@ -920,6 +924,10 @@ def cli(argv: list[str] | None = None, *, task_scope: str = 'partial', entrypoin
     args = parser.parse_args(argv)
     if args.audit_router_mode is None:
         args.audit_router_mode = 'off' if args.baseline or args.no_checker else 'shadow'
+    try:
+        validate_router_options(args.audit_router_threshold, args.audit_router_artifact)
+    except ValueError as exc:
+        parser.error(str(exc))
     try:
         active_suites = get_suites()
     except ValueError as exc:
@@ -990,7 +998,7 @@ def cli(argv: list[str] | None = None, *, task_scope: str = 'partial', entrypoin
             attack=selected_attacks,
             use_security_checker=not args.no_checker, audit_retries=args.audit_retries,
             completion_prompt=args.completion_prompt, task_manifest_path=args.task_manifest_path,
-            audit_router_mode=args.audit_router_mode,audit_router_artifact=args.audit_router_artifact,
+            audit_router_mode=args.audit_router_mode,audit_router_artifact=args.audit_router_artifact, audit_router_threshold=args.audit_router_threshold,
             planning_tool_view=not args.no_tool_view and not args.baseline,
             delegated_tasks=not args.no_delegated_tasks and not args.baseline,
             prompt_profile=args.prompt_profile,

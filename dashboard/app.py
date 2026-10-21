@@ -30,9 +30,11 @@ from dscg.harness_records import SampleStatus
 from dscg.paths import DASHBOARD_RESULTS_DIR, RESULTS_DIR
 from dscg.pipelines.baseline import make_openai_compatible_pipeline
 from dscg.pipelines.defended import make_defended_pipeline
+from dscg.audit_router import DEFAULT_THRESHOLD
 from dscg.tool_metadata import resolve_tool_metadata, validate_benchmark_tool_metadata
 from experiments.diagnostics.harness_audit import rank_ids, security_result_fields
 from experiments.common.benchmark_outcomes import project_outcomes
+from experiments.common.attack_compatibility import check_attack_compatibility
 from dashboard.history_export import build_history_export
 from dashboard.evaluation import FRAMEWORK_VERSION, aggregate, display_metrics, normalize_config, trace_stats
 
@@ -251,6 +253,7 @@ def run_test_thread(run_id: str, config: dict):
         all_summaries = []
         all_structured_records = []
         overview_reports = []
+        unsupported_suites = []
 
         try:
             for suite_index, suite_name in enumerate(suites):
@@ -261,6 +264,32 @@ def run_test_thread(run_id: str, config: dict):
                     "phase": "setup",
                     "completed_suites": suite_index, "total_suites": len(suites)
                 })
+
+                # Check the selected native attack scope before creating a model
+                # client or running any GOAL preflight.
+                suite = get_suite(SUITE_VERSION, suite_name)
+                user_task_ids = list(suite.user_tasks.keys())
+                injection_task_ids = list(suite.injection_tasks.keys())
+                if max_user_tasks > 0 and max_user_tasks < len(user_task_ids):
+                    selected_users = rank_ids(user_task_ids, selection_seed, limit=max_user_tasks)
+                else:
+                    selected_users = user_task_ids
+                if max_injection_tasks > 0 and max_injection_tasks < len(injection_task_ids):
+                    selected_injections = rank_ids(injection_task_ids, selection_seed, limit=max_injection_tasks)
+                else:
+                    selected_injections = injection_task_ids
+                issue = check_attack_compatibility(suite, attack_name if run_attack else 'none',
+                                                   selected_users, selected_injections)
+                if issue is not None:
+                    unsupported_suites.append({'suite': suite_name, 'attack': attack_name,
+                                               'status': 'unsupported', **issue})
+                    push_log(run_id, 'warning', f"[{suite_name}] unsupported ({issue['reason_code']}): "
+                             f"0/{issue['planned_pairs']} 计划组合；影响目标: "
+                             f"{', '.join(issue['injection_task_ids'])}")
+                    push_progress(run_id, {'current_suite': suite_name, 'status': 'unsupported',
+                                           'phase': 'unsupported', 'completed_suites': suite_index + 1,
+                                           'total_suites': len(suites)})
+                    continue
 
                 # ---- 构建 Pipeline ----
                 if is_origin:
@@ -287,6 +316,8 @@ def run_test_thread(run_id: str, config: dict):
                         input_isolation=config.get("input_isolation", True),
                         l1_projection_mode=config.get('l1_projection_mode', 'projected'),
                         prompt_profile=config.get('prompt_profile', 'legacy'),
+                        audit_router_mode=config.get('audit_router_mode', 'off'),
+                        audit_router_threshold=config.get('audit_router_threshold', DEFAULT_THRESHOLD),
                         authorization_precheck=config.get("authorization_precheck", True),
                         planning_tool_view=config.get('planning_tool_view', True),
                         delegated_tasks=config.get('delegated_tasks', True),
@@ -309,28 +340,9 @@ def run_test_thread(run_id: str, config: dict):
                     config["resolved_security_model"] = sec_model_config
                 push_log(run_id, "info", f"已解析模型配置: main={resolved_model_id}, security={resolved_sec_model_id or '无'}")
 
-                # ---- 加载套件 ----
-                suite = get_suite(SUITE_VERSION, suite_name)
-                user_task_ids = list(suite.user_tasks.keys())
-                injection_task_ids = list(suite.injection_tasks.keys())
-
                 push_log(run_id, "info",
                     f"[{suite_name}] User Tasks: {len(user_task_ids)}, "
                     f"Injection Tasks: {len(injection_task_ids)}")
-
-                # ---- 选择任务子集 ----
-                if max_user_tasks > 0 and max_user_tasks < len(user_task_ids):
-                    selected_users = rank_ids(user_task_ids, selection_seed, limit=max_user_tasks)
-                else:
-                    selected_users = user_task_ids
-
-                if max_injection_tasks > 0 and max_injection_tasks < len(injection_task_ids):
-                    selected_injections = rank_ids(
-                        injection_task_ids, selection_seed, limit=max_injection_tasks
-                    )
-                else:
-                    selected_injections = injection_task_ids
-
                 push_log(run_id, "info",
                     f"[{suite_name}] 选中 {len(selected_users)} 个用户任务, "
                     f"{len(selected_injections)} 个注入任务")
@@ -484,6 +496,8 @@ def run_test_thread(run_id: str, config: dict):
             "config": _redact_run_config(config),
             "completed_at": datetime.now().isoformat(),
             "num_suites": len(all_summaries),
+            "status": "unsupported" if not all_summaries and unsupported_suites else "completed",
+            "unsupported_suites": unsupported_suites,
             "suites": all_summaries,
             "total_tasks": sum(s["task_counts"]["total_tasks"] for s in all_summaries),
             "aggregate_metrics": _compute_aggregate(all_summaries),
@@ -498,14 +512,22 @@ def run_test_thread(run_id: str, config: dict):
         routing_summary = write_routing_summary(run_dir, refresh=True, check_running=False)
         from experiments.common.partial_reporting import write_run_overview
         write_run_overview(run_dir, [attack_name if run_attack else 'none'], suites,
-            [{'attack': attack_name if run_attack else 'none', 'status':'completed'}], overview_reports,
+            [{'attack': attack_name, 'status': 'unsupported', 'failed_suite': item['suite'],
+              'reason_code': item['reason_code'], 'injection_task_ids': item['injection_task_ids'],
+              'planned_pairs': item['planned_pairs']} for item in unsupported_suites] +
+            ([{'attack': attack_name if run_attack else 'none', 'status': 'completed'}] if all_summaries else []),
+            overview_reports,
             model_id=config.get('model_id'), task_scope='dashboard', routing_summary=routing_summary)
 
         with _store_lock:
             runs_store[run_id] = overall
 
-        push_done(run_id, overall["aggregate_metrics"])
-        push_log(run_id, "info", f"🏁 测试全部完成! 结果已保存至 {run_dir}")
+        if overall['status'] == 'unsupported':
+            push_done(run_id, {'error': 'all_selected_groups_unsupported'})
+            push_log(run_id, 'warning', f"全部选中场景 unsupported；结果已保存至 {run_dir}")
+        else:
+            push_done(run_id, overall["aggregate_metrics"])
+            push_log(run_id, "info", f"🏁 测试全部完成! 结果已保存至 {run_dir}")
 
     except Exception as e:
         from dscg.request_compatibility import api_error_diagnostics

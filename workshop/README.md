@@ -1,5 +1,7 @@
 # Workshop 优化状态索引
 
+新增[L3直接阈值路由](./completed/l3_threshold_20261021.md)：默认经验阈值0.70，internal/personal读取资格，无运行时artifact依赖；shadow阈值比较与旧记录语义分离，真实收益待新实验。
+
 新增[AgentDyn/Qwen消息角色兼容](./completed/agentdyn_qwen_roles_20261019.md)：DashScope公共Chat适配与受限API失败诊断；请求身份绑定，新run名复测。原始失败与conda包保留；仅离线验证，服务器模型测试待运行。
 
 新增[L3校准候选参数初始化](./completed/l3_preset_20261019.md)：候选网格/参考值与5%风险、5%置信错误目标已保存，校准入口支持显式预设；仍需独立标签/分组校准，无部署阈值或新免审。

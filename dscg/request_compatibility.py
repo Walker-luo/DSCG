@@ -7,6 +7,7 @@ from collections.abc import Iterable, Mapping
 import re
 
 DASHSCOPE_ADAPTER = 'dashscope-system-v1'
+DEEPSEEK_ADAPTER = 'deepseek-system-text-v1'
 ERROR_SCHEMA = 'dscg.api-error.v1'
 _ROLES = frozenset({'system', 'developer', 'user', 'assistant', 'tool', 'function', 'other'})
 
@@ -60,12 +61,31 @@ class _Proxy:
 
 
 class _Completions(_Proxy):
+    def __init__(self, target, system_text_only=False):
+        super().__init__(target)
+        self._system_text_only = system_text_only
+
+    def _adapt_message(self, message):
+        if not isinstance(message, Mapping):
+            return message
+        role = message.get('role')
+        if role != 'developer' and not (self._system_text_only and role == 'system'):
+            return message
+        adapted = dict(message)
+        if role == 'developer':
+            adapted['role'] = 'system'
+        if self._system_text_only and isinstance(adapted.get('content'), (list, tuple)):
+            parts = adapted['content']
+            if all(isinstance(part, Mapping) and set(part) == {'type', 'text'} and
+                   part['type'] == 'text' and isinstance(part['text'], str) for part in parts):
+                adapted['content'] = ''.join(part['text'] for part in parts)
+        return adapted
+
     def create(self, *args, **kwargs):
         messages = kwargs.get('messages')
         if isinstance(messages, Iterable) and not isinstance(messages, (str, bytes, Mapping)):
             # Materialize iterators once; leave source messages/content untouched.
-            messages = [dict(m, role='system') if isinstance(m, Mapping) and m.get('role') == 'developer'
-                        else m for m in messages]
+            messages = [self._adapt_message(message) for message in messages]
             kwargs['messages'] = messages
         try:
             return self._target.create(*args, **kwargs)
@@ -75,15 +95,21 @@ class _Completions(_Proxy):
 
 
 class _Chat(_Proxy):
+    def __init__(self, target, system_text_only=False):
+        super().__init__(target)
+        self._system_text_only = system_text_only
+
     @property
     def completions(self):
-        return _Completions(self._target.completions)
+        return _Completions(self._target.completions, self._system_text_only)
 
 
-class DashScopeChatClient(_Proxy):
+class SystemRoleChatClient(_Proxy):
+    _system_text_only = False
+
     @property
     def chat(self):
-        return _Chat(self._target.chat)
+        return _Chat(self._target.chat, self._system_text_only)
 
     def with_options(self, *args, **kwargs):
         return type(self)(self._target.with_options(*args, **kwargs))
@@ -96,3 +122,10 @@ class DashScopeChatClient(_Proxy):
 
     def __exit__(self, *args):
         return self._target.__exit__(*args)
+
+
+DashScopeChatClient = SystemRoleChatClient
+
+
+class DeepSeekChatClient(SystemRoleChatClient):
+    _system_text_only = True

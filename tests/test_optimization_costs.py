@@ -39,6 +39,38 @@ class DiagnosticTests(unittest.TestCase):
         self.assertEqual(result['independent_final_state'],'unverified')
 
 class PersistedCostTests(unittest.TestCase):
+    def test_api_failure_keeps_original_error_and_safe_phase_diagnostic(self):
+        from tempfile import TemporaryDirectory
+        from pathlib import Path
+        import json
+        from agentdojo import agent_pipeline
+        from agentdojo.logging import TraceLogger, OutputLogger
+        from agentdojo.functions_runtime import FunctionsRuntime
+        from dscg.pipelines.defended import TaskIsolatedPipeline
+
+        def fail(**_kwargs):
+            raise RuntimeError('PRIVATE_RESPONSE')
+        tracker = TokenTrackerClient(SimpleNamespace(chat=SimpleNamespace(
+            completions=SimpleNamespace(create=fail))))
+        class Generate(agent_pipeline.BasePipelineElement):
+            def query(self, q, r, e, m, a):
+                with tracker.phase('authorization'):
+                    tracker.chat.completions.create(messages=[{'role': 'user', 'content': 'PRIVATE_REQUEST'}])
+                return q, r, e, m, a
+        root = Path(__file__).resolve().parents[1] / 'workshop/artifacts/20261020_deepseek_agentdyn_typeerror/test_runs'
+        root.mkdir(parents=True, exist_ok=True)
+        with TemporaryDirectory(dir=root) as directory:
+            pipeline = TaskIsolatedPipeline([Generate()], trackers=(tracker,))
+            with TraceLogger(OutputLogger(directory), suite_name='s', user_task_id='u',
+                             pipeline_name='p', attack_type='none', injection_task_id=None):
+                with self.assertRaisesRegex(RuntimeError, 'PRIVATE_RESPONSE'):
+                    pipeline.query('A', FunctionsRuntime())
+            trace = json.loads((Path(directory) / 'p/s/u/none/none.json').read_text())
+            phase = trace['dscg_cost']['models'][0]['authorization']
+            self.assertEqual((phase['api_calls'], phase['failed_calls']), (1, 1))
+            self.assertEqual(phase['last_api_error']['request_role_counts'], {'user': 1})
+            self.assertNotIn('PRIVATE_', json.dumps(phase))
+
     def test_final_task_cost_is_saved_and_is_a_delta(self):
         from tempfile import TemporaryDirectory
         from pathlib import Path

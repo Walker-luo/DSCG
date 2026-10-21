@@ -27,7 +27,7 @@ class ResultLayoutIntegrationTests(unittest.TestCase):
         for entry in (partial.main,full.main):
             for clean in (True,False):
                 with self.subTest(entry=entry,clean=clean), fixture.patched(), redirect_stdout(StringIO()) as output:
-                    root=self.temporary();backend=get_backend().id;suite=get_suites()[-1]
+                    root=self.temporary();backend=get_backend().id;suite=get_suites()[0]
                     old=root/f'offline-model_{backend}_legacy'
                     options=dict(origin=True,suites=[suite],run_attack=not clean,attack='tool_knowledge',
                                  results_dir=root,run_name='legacy')

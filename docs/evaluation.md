@@ -27,6 +27,7 @@ full的cohort保留所选场景全部用户；partial的cohort只过滤原注入
 | [run_benchmark.py](../experiments/run_benchmark.py) | 完整任务测量；默认results/benchmarks，普通范围full、冻结目标范围screened |
 | [run_partial_benchmark.py](../experiments/run_partial_benchmark.py) | 小批量测量；默认results/partial_benchmark，范围partial或partial_screened |
 | [run_injection_precheck.py](../experiments/run_injection_precheck.py) | screen直接目标预检；默认results/injection_precheck，全部判定完成后生成cohort.json |
+| [agentdyn_zero_rates.py](../experiments/diagnostics/agentdyn_zero_rates.py) | 只读分析已有AgentDyn攻击运行：原生标签、参考工具授权差集、阻断、错误、直接GOAL预检和注入文本在工具返回中的精确重合；输出必须使用新的目录 |
 | [generate_tool_metadata.py](../experiments/tools/generate_tool_metadata.py) | 离线检查/导出注册工具风险目录，不调用模型 |
 
 两测量入口默认运行当前后端的全部场景，`--suites`只能选择该后端子集。当前native v1.2目录如下，实际运行仍以目录和任务清单为准：

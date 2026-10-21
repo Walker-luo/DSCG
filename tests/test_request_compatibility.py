@@ -8,7 +8,7 @@ from tempfile import TemporaryDirectory
 from unittest.mock import patch
 
 import httpx
-from openai import BadRequestError, OpenAI
+from openai import BadRequestError, OpenAI, UnprocessableEntityError
 
 from dscg.model_config import ModelConfig, create_openai_client
 from dscg.token_tracking import TokenTrackerClient
@@ -64,12 +64,151 @@ class RequestCompatibilityTests(unittest.TestCase):
         def handler(request):
             captured.append(json.loads(request.content))
             return httpx.Response(200, json=completion(), request=request)
-        for provider in ('openai', 'deepseek', 'ollama'):
+        for provider in ('openai', 'ollama'):
             client, raw = self.client(handler, provider)
             self.assertIs(client, raw)
             client.chat.completions.create(model='fixture', messages=[{'role':'developer','content':'trusted'}])
             self.assertEqual(captured[-1]['messages'][0]['role'], 'developer')
             self.assertNotIn('chat_request_adapter', self.config(provider).public_dict())
+
+    def test_deepseek_chat_adapts_agentdyn_role_without_changing_request(self):
+        captured = []
+        def handler(request):
+            value = json.loads(request.content)
+            captured.append(value)
+            if any(message['role'] == 'developer' for message in value['messages']):
+                return httpx.Response(422, json={'error': {'code': 'invalid_request_error',
+                    'message': 'PRIVATE_RESPONSE'}}, request=request)
+            if any(message['role'] == 'system' and not isinstance(message['content'], str)
+                   for message in value['messages']):
+                return httpx.Response(422, json={'error': {'code': 'invalid_request_error'}}, request=request)
+            return httpx.Response(200, json=completion(), request=request)
+        client, raw = self.client(handler, provider='deepseek')
+        self.assertIsNot(client, raw)
+        messages = [{'role': 'developer', 'content': [{'type': 'text', 'text': 'PRIVATE_'},
+                    {'type': 'text', 'text': 'REQUEST'}]},
+                    {'role': 'user', 'content': 'task'},
+                    {'role': 'assistant', 'content': None, 'tool_calls': [{'id': 'c1', 'type': 'function',
+                        'function': {'name': 'read_data', 'arguments': '{}'}}]},
+                    {'role': 'tool', 'content': 'result', 'tool_call_id': 'c1'}]
+        tools = [{'type': 'function', 'function': {'name': 'read_data',
+            'parameters': {'type': 'object', 'properties': {}}}}]
+        original = deepcopy((messages, tools))
+        client.chat.completions.create(model='deepseek-flash', messages=messages,
+            tools=tools, reasoning_effort='none')
+        expected = deepcopy(messages)
+        expected[0]['role'] = 'system'
+        expected[0]['content'] = 'PRIVATE_REQUEST'
+        self.assertEqual(captured[0]['messages'], expected)
+        self.assertEqual(captured[0]['tools'], tools)
+        self.assertEqual(captured[0]['reasoning_effort'], 'none')
+        self.assertEqual((messages, tools), original)
+        self.assertEqual(len(captured), 1)
+
+    def test_deepseek_adapter_identity_rejects_old_run_binding(self):
+        from dscg.benchmark_catalog import benchmark_identity
+        from experiments.common.benchmark_reuse import _compatible_binding
+        config = self.config('deepseek', 'deepseek-flash')
+        current = config.public_dict()
+        self.assertEqual(current['chat_request_adapter'], 'deepseek-system-text-v1')
+        self.assertNotIn('offline-key', json.dumps(current))
+        old = {key: value for key, value in current.items() if key != 'chat_request_adapter'}
+        self.assertFalse(_compatible_binding(
+            {'benchmark': benchmark_identity(), 'main_model': old},
+            {'benchmark': benchmark_identity(), 'main_model': current}))
+
+    def test_deepseek_agentdyn_native_goal_and_tool_followup_roles(self):
+        from agentdojo.agent_pipeline.llms.openai_llm import OpenAILLM, _message_to_openai
+        from agentdojo.functions_runtime import FunctionCall, FunctionsRuntime
+        from dscg.benchmark_catalog import get_backend, get_suite
+        if get_backend().id != 'agentdyn':
+            self.skipTest('AgentDyn native serializer is not installed')
+        suite = get_suite('v1.2', 'shopping')
+        self.assertEqual(_message_to_openai({'role': 'system', 'content':
+            [{'type': 'text', 'content': 'trusted'}]}, 'deepseek-flash')['role'], 'developer')
+        captured = []
+        def handler(request):
+            value = json.loads(request.content)
+            captured.append(value)
+            if any(message['role'] == 'developer' for message in value['messages']):
+                return httpx.Response(422, json={'error': {'code': 'invalid_request_error'}}, request=request)
+            if any(message['role'] == 'system' and not isinstance(message['content'], str)
+                   for message in value['messages']):
+                return httpx.Response(422, json={'error': {'code': 'invalid_request_error'}}, request=request)
+            return httpx.Response(200, json=completion(), request=request)
+        client, _ = self.client(handler, provider='deepseek')
+        llm = OpenAILLM(TokenTrackerClient(client), 'deepseek-flash', reasoning_effort='none')
+        runtime = FunctionsRuntime(suite.tools)
+        text = lambda value: [{'type': 'text', 'content': value}]
+        messages = [{'role': 'system', 'content': text('trusted')},
+                    {'role': 'user', 'content': text('task')}]
+        llm.query('task', runtime, messages=messages)
+        self.assertEqual([m['role'] for m in captured[-1]['messages']], ['system', 'user'])
+        self.assertIsInstance(captured[-1]['messages'][0]['content'], str)
+        call = FunctionCall(function=suite.tools[0].name, args={}, id='offline-call')
+        messages += [{'role': 'assistant', 'content': [], 'tool_calls': [call]},
+                     {'role': 'tool', 'content': text('result'), 'tool_call_id': call.id,
+                      'tool_call': call, 'error': None}]
+        llm.query('task', runtime, messages=messages)
+        self.assertEqual([m['role'] for m in captured[-1]['messages']],
+                         ['system', 'user', 'assistant', 'tool'])
+        self.assertEqual(captured[-1]['messages'][-1]['tool_call_id'], call.id)
+        self.assertEqual(len(captured), 2)
+
+    def test_deepseek_baseline_and_defended_factories_share_adapter(self):
+        from dscg.pipelines.baseline import make_openai_compatible_pipeline
+        from dscg.pipelines.defended import make_defended_pipeline
+        config = self.config('deepseek', 'deepseek-flash')
+        def handler(request):
+            value = json.loads(request.content)
+            self.assertFalse(any(m['role'] == 'developer' for m in value['messages']))
+            return httpx.Response(200, json=completion(), request=request)
+        def raw_factory(**kwargs):
+            raw = OpenAI(**kwargs, http_client=httpx.Client(transport=httpx.MockTransport(handler)))
+            self.addCleanup(raw.close)
+            return raw
+        with patch('openai.OpenAI', side_effect=raw_factory):
+            baseline, main = make_openai_compatible_pipeline(model_config=config)
+            defended, main_defended, security = make_defended_pipeline(
+                model_config=config, sec_model_config=config)
+        for pipeline in (baseline, defended):
+            self.assertEqual(pipeline.dscg_model_config['chat_request_adapter'], 'deepseek-system-text-v1')
+        for tracker in (main, main_defended, security):
+            tracker.chat.completions.create(model=config.model_id,
+                messages=[{'role': 'developer', 'content': 'trusted'}])
+
+    def test_deepseek_422_reports_effective_system_role_without_body(self):
+        def handler(request):
+            return httpx.Response(422, json={'error': {'code': 'invalid_request_error',
+                'message': 'PRIVATE_RESPONSE'}}, request=request)
+        client, _ = self.client(handler, provider='deepseek')
+        tracker = TokenTrackerClient(client)
+        with self.assertRaises(UnprocessableEntityError) as failure:
+            tracker.chat.completions.create(model='deepseek-flash',
+                messages=[{'role': 'developer', 'content': 'PRIVATE_REQUEST'},
+                          {'role': 'user', 'content': 'task'}])
+        from dscg.request_compatibility import api_error_diagnostics
+        detail = api_error_diagnostics(failure.exception)
+        self.assertEqual(detail['http_status'], 422)
+        self.assertEqual(detail['request_role_counts'], {'system': 1, 'user': 1})
+        self.assertNotIn('PRIVATE', json.dumps(detail))
+        self.assertEqual(tracker.snapshot()['generation']['failed_calls'], 1)
+
+    def test_deepseek_keeps_unknown_trusted_blocks_for_provider_validation(self):
+        captured = []
+        def handler(request):
+            captured.append(json.loads(request.content))
+            return httpx.Response(422, json={'error': {'code': 'invalid_request_error'}}, request=request)
+        client, _ = self.client(handler, provider='deepseek')
+        messages = [{'role': 'developer', 'content': [{'type': 'image_url',
+            'image_url': {'url': 'https://offline.invalid/image.png'}}]}]
+        original = deepcopy(messages)
+        with self.assertRaises(UnprocessableEntityError):
+            client.chat.completions.create(model='deepseek-flash', messages=messages)
+        self.assertEqual(captured[0]['messages'][0]['role'], 'system')
+        self.assertEqual(captured[0]['messages'][0]['content'], original[0]['content'])
+        self.assertEqual(messages, original)
+        self.assertEqual(len(captured), 1)
 
     def test_adapter_identity_enters_public_config_without_credentials(self):
         value = self.config().public_dict()

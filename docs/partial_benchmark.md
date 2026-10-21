@@ -1,12 +1,12 @@
 # 小批量测试：run_partial_benchmark
 
-DashScope/Qwen请求角色由DSCG公共客户端统一适配，不修改conda包；更新后使用新运行名。AgentDyn首次请求BadRequestError的定位、受限诊断字段和partial clean恢复命令见[消息角色兼容排错](./model_tool_configuration.md#dashscope消息角色兼容与400排错)。旧缓存/cohort与新增请求身份不一致时拒绝复用，旧数据保留。
+DashScope/Qwen与DeepSeek的Chat请求角色由DSCG公共客户端分别适配，不修改conda包；更新后使用新运行名。AgentDyn首次请求的400/422定位、受限诊断字段和小范围复测要求见[消息角色兼容排错](./model_tool_configuration.md#消息角色兼容与请求排错)。旧缓存/cohort与新增请求身份不一致时拒绝复用，旧数据保留。
 
 在 `DSCG/`、已激活 `ipi`（AgentDojo）或 `ipi-agentdyn`（AgentDyn）环境下执行。安装与依赖自检见 [全量指南](./benchmark.md#安装与依赖自检)，模型/工具配置见 [配置指南](./model_tool_configuration.md)。
 
 ## 默认任务范围
 
-当前基准的全部场景，每场景取**注册顺序前3个用户任务×前3个注入目标**。AgentDojo四场景typical三攻击共计划108组合、clean12任务；AgentDyn三场景typical81组合、clean9任务。seed:7保留为元数据，不改变当前前缀顺序。计划组合不等于API调用次数或有效标签分母，攻击目标原生预检另计。
+当前基准的全部场景，每场景取**注册顺序前3个用户任务×前3个注入目标**。AgentDojo四场景typical三攻击共计划108组合、clean12任务；AgentDyn三场景typical注册计划81组合，其中`tool_knowledge × dailylife`的9组合因原生参考调用缺少`placeholder_args`而标为`unsupported`，可执行计划72组合；clean9任务。seed:7保留为元数据，不改变当前前缀顺序。计划组合不等于API调用次数或有效标签分母，攻击目标原生预检另计。跳过规则、full分母和退出状态见[完整指南](./benchmark.md#1-使用哪个入口)。
 
 AgentDojo可用 `--suites travel banking slack` 选子集，此时clean9、typical81；AgentDyn可用 `--suites shopping github`，此时clean6、typical54。全量正式结果使用 `experiments.run_benchmark`，不是本入口。实际ID查看summary.task_selection或离线导出：
 
@@ -50,7 +50,7 @@ python -m experiments.run_partial_benchmark --progress --force-rerun \
   --model-config config/models.local.toml --name qwen37_dscg_01
 ```
 
-默认每场景3×3任务范围不变；每个目标型攻击/场景组仍有额外原生GOAL预检。进度条将预检与计分任务分开显示；clean只有用户任务，cohort同样支持`--progress`，且不影响同名`--reuse`。进度百分比只是执行项计数，不是ASR分母或剩余时间预测。详见[顺序执行与准备信息](./benchmark.md#顺序执行与准备信息)。这不是官方Batch；减小本地开销不代表真实模型速度已经验证。
+默认每场景3×3任务范围不变；兼容的目标型攻击/场景组仍有额外原生GOAL预检。不支持的组在进度条开始前标记`unsupported`，不发起模型请求。进度条将预检与计分任务分开显示；clean只有用户任务，cohort同样支持`--progress`，且不影响同名`--reuse`。进度百分比只是执行项计数，不是ASR分母或剩余时间预测。详见[顺序执行与准备信息](./benchmark.md#顺序执行与准备信息)。这不是官方Batch；减小本地开销不代表真实模型速度已经验证。
 
 ## 干净任务对照
 
@@ -85,7 +85,7 @@ python -m experiments.run_partial_benchmark --attack typical \
 
 默认typical为ignore_previous、important_instructions、tool_knowledge；具体攻击可重复指定，all查询当前已验证后端注册表并排除manual。injecagent仅显式/all。DoS按首个注册目标、not utility单独计分。上游部分参考调用与GOAL不一致，接入不证明攻击强度。
 
-DSCG CLI默认router shadow，保留L3审计并记录算法观测；baseline/NoChecker默认off，Python factory/API原默认off不变。显式off不关闭L3，no-checker才关闭语义审计。重试0、completion_prompt=false、trace summary保持；selective需独立分组校准与新输入/后端绑定，不能直接沿用旧artifact。
+DSCG CLI默认router shadow，保留L3审计并记录算法观测；baseline/NoChecker默认off，Python factory/API原默认off不变。显式off不关闭L3，no-checker才关闭语义审计。重试0、completion_prompt=false、trace summary保持；selective使用 --audit-router-threshold（默认0.70），无需artifact；限单个完整有效的internal/personal幂等无sink读取，旧artifact参数非空报迁移错误。策略/阈值绑定，须新run名。
 
 AgentDojo保留现有银行L1有限profile；AgentDyn没有新增profile，完整来源封装保留。动态网页/OTP操作按副作用审计；Monitor/票据仍是工具级边界。框架参数见 [配置指南](./model_tool_configuration.md#5-运行控制默认值用途及设置入口)。
 
@@ -103,3 +103,15 @@ python -m experiments.run_partial_benchmark --reuse \
 保持原name、根目录、攻击/场景、模型和有效防御设置；旧运行配置一致也可续跑。未指定attack/suites恢复原计划；clean仍需clean，cohort仍需同一文件。源码哈希、Git commit、Python补丁版本不作为兼容门槛；旧绑定保留，规则变化另存记录。reuse与force-rerun互斥，不自动重试原生接受的错误缓存。配置冲突拒绝且不覆盖历史报告；缓存成本不能当作完整新鲜测量。见[显式续跑](./benchmark.md#显式续跑示例)。
 
 Agent临时测试必须用 `--results-dir workshop/artifacts/<YYYYMMDD>_<task>/partial_benchmark`。用户正式默认仍为results，不迁移旧数据。离线回归与原生模拟不能代替真实E0、重复模型对照或防御收益验证。
+
+## AgentDyn 低 TSR/ASR 只读诊断
+
+对已完成的 AgentDyn 攻击目录，可在 `ipi-agentdyn` 环境运行：
+
+```bash
+python -m experiments.diagnostics.agentdyn_zero_rates \
+  --run-dir results/partial_benchmark/agentdyn/<model>_<name> \
+  --output-dir workshop/artifacts/<YYYYMMDD>_<task>/diagnosis
+```
+
+输出目录必须是新目录。脚本只读取原始轨迹与原生标签，报告参考完成路径所用工具与 L2 授权的差集、审计阻断、工具错误、GOAL 预检及注入文本在工具返回中的精确重合。参考路径不是唯一完成路径，文本重合也不等于模型实际遵循注入；缺失、损坏、错误和未执行分组不记为 ASR=0。正式效用与攻击效果仍需同任务、同配置的 baseline/DSCG 对照。

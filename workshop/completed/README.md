@@ -1,5 +1,17 @@
 # 已完成阶段的优化材料
 
+新增[L3直接阈值路由](./l3_threshold_20261021.md)：默认经验阈值0.70，internal/personal读取资格，无运行时artifact依赖；shadow阈值比较与旧记录语义分离，真实收益待新实验。
+
+新增[Benchmark兼容与报告简化](./ponytail_benchmark_20261020.md)：单个runner净减44行；双后端6个离线场景共50份输出一致，全量Python及Node检查通过，无模型调用或研究闸门变化。
+
+新增[AgentDyn零TSR/ASR诊断与小样本对照](./agentdyn_zero_rates_20261020.md)：只读诊断与36条真实计分小样本；两模型shopping clean baseline均2/3，当前DSCG及两个候选均0/3。未修改默认策略；baseline攻击也为零且Qwen预检不稳定，不能据此认定防御有效。原266个用户结果文件哈希不变。
+
+新增[AgentDyn tool_knowledge 不兼容组处理](./agentdyn_tool_knowledge_20261020.md)：对实际选中目标做原生参考调用只读检查，dailylife组标记unsupported；CLI/Dashboard保留计划数、跳过理由和有效分母。双环境及Node离线回归通过，原DeepSeek结果保持原字节；真实模型续跑由用户显式启动。
+
+新增[AgentDyn/DeepSeek Chat角色兼容](./deepseek_chat_roles_20261020.md)：本次422诊断定位到AgentDyn的developer请求角色，宿主对DeepSeek增加独立适配身份；离线协议和双环境回归通过，真实服务须新名复测。
+
+新增[DeepSeek/AgentDyn TypeError 定位与修复](./deepseek_agentdyn_typeerror_20261020.md)：在线最小诊断定位到失败成本汇总，修正结构化API诊断的计数方式；AgentDyn原生缓存类型在内存中初始化。原用户结果保留，真实修复后测量仍需新运行名复测。
+
 新增[AgentDyn/Qwen消息角色兼容](./agentdyn_qwen_roles_20261019.md)：DashScope公共Chat适配与受限API失败诊断；请求身份绑定，新run名复测。原始失败与conda包保留；仅离线验证，服务器模型测试待运行。
 
 新增[L3校准候选参数初始化](./l3_preset_20261019.md)：候选网格/参考值与5%风险、5%置信错误目标已保存，校准入口支持显式预设；仍需独立标签/分组校准，无部署阈值或新免审。

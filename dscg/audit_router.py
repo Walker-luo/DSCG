@@ -1,4 +1,6 @@
-"""Fixed lexical ranking and grouped calibration for opt-in internal-read auditing.
+"""Fixed lexical ranking and direct-threshold read routing.
+
+The independent offline calibration helpers are retained for future work.
 
 No learned weights, model calls, authorization expansion or provenance inference.
 Artifacts and labels are trusted offline configuration, never tool-return data.
@@ -19,6 +21,9 @@ from dscg.audit_context import INPUT_SCHEMA
 
 SCHEMA = 'dscg.audit-router.algorithm.v1'
 FEATURE_VERSION = 'lexical-max-v1'
+RUNTIME_SCHEMA = 'dscg.audit-router.threshold.v1'
+POLICY_VERSION = 'threshold-read-v1'
+DEFAULT_THRESHOLD = 0.70
 LABELS = {'safe_and_sufficient', 'unsafe', 'insufficient_or_ambiguous', 'unjudgeable'}
 LABEL_SOURCES = {'independent_policy', 'environment_oracle', 'human_double_review'}
 MAX_ARTIFACT_BYTES = 8 * 1024 * 1024
@@ -123,7 +128,7 @@ def eligibility(packet, flags, runtime, calls, sandbox):
     try:validate_completeness_flags(flags)
     except ValueError:return False,'INVALID_COMPLETENESS_FLAGS'
     if sandbox is None or len(calls) != 1:
-        return False, 'SINGLE_AUTHORIZED_INTERNAL_READ_REQUIRED'
+        return False, 'SINGLE_AUTHORIZED_READ_REQUIRED'
     call = calls[0]; name = getattr(call, 'function', None) or call.get('function')
     if not sandbox.assess(name, runtime)[0]:
         return False, 'POLICY_NOT_ALLOWED'
@@ -131,8 +136,9 @@ def eligibility(packet, flags, runtime, calls, sandbox):
     if status is None or not status.registered:
         return False, 'INVALID_METADATA'
     m = status.metadata
-    if (m.effect, m.sink, m.sensitivity, m.idempotent) != ('read', 'none', 'internal', True):
-        return False, 'NOT_INTERNAL_IDEMPOTENT_READ'
+    if ((m.effect, m.sink, m.idempotent) != ('read', 'none', True)
+            or m.sensitivity not in {'internal', 'personal'}):
+        return False, 'NOT_ELIGIBLE_IDEMPOTENT_READ'
     if any(flags.values()):
         return False, 'INCOMPLETE_INPUT'
     if not packet['trusted_user_request'].strip() or not packet['current_actions'][0]['host_tool_description'].strip():
@@ -272,53 +278,57 @@ def validate_artifact(a):
     return a
 
 
+def validate_router_options(threshold=DEFAULT_THRESHOLD, artifact_path=None):
+    if artifact_path not in (None, ''):
+        raise ValueError('audit router artifacts are no longer used; set audit_router_threshold instead')
+    if isinstance(threshold, bool) or not isinstance(threshold, (int, float)):
+        raise ValueError('audit_router_threshold must be a finite number in [0,1]')
+    try:
+        valid = math.isfinite(threshold) and 0 <= threshold <= 1
+    except (OverflowError, ValueError):
+        valid = False
+    if not valid:
+        raise ValueError('audit_router_threshold must be a finite number in [0,1]')
+    return float(threshold)
+
+
 class LocalAuditRouter:
-    def __init__(self, mode='off', artifact_path=None, model_config_sha256=None):
+    def __init__(self, mode='off', artifact_path=None, model_config_sha256=None, *, threshold=DEFAULT_THRESHOLD):
         if mode not in {'off','shadow','selective'}:
             raise ValueError('unknown audit router mode')
-        self.mode=mode;self.artifact=None;self.artifact_sha256=None;self.error=None
-        self.model_config_sha256=model_config_sha256
-        if mode != 'off' and artifact_path:
-            try:
-                a,h=load_json(artifact_path);validate_artifact(a)
-                self.artifact=deepcopy(a);self.artifact_sha256=h
-            except Exception as e:
-                self.error=type(e).__name__  # no paths/private input in diagnostics
-        elif mode != 'off':
-            self.error='ARTIFACT_MISSING'
+        self.threshold = validate_router_options(threshold, artifact_path)
+        self.mode = mode
+        self.policy_version = POLICY_VERSION
+        self.model_config_sha256 = model_config_sha256
+        # Retained public metadata fields for stored-run compatibility; never loaded.
+        self.artifact = None
+        self.artifact_sha256 = None
+        self.error = None
 
     def assess(self, packet, flags, runtime, calls, sandbox):
         import time
-        started=time.perf_counter()
-        result=dict(router_schema=SCHEMA, mode=self.mode, route_source='local_calibrated_algorithm',
-                    feature_version=FEATURE_VERSION, artifact_sha256=self.artifact_sha256,
-                    eligible=False,would_bypass=False,actual_bypass=False,score=None,threshold=None,
-                    completeness_flags=flags,features=None,semantic_audit_calls=0,semantic_audit_tokens=0)
+        started = time.perf_counter()
+        result = dict(router_schema=RUNTIME_SCHEMA, policy_version=self.policy_version,
+                      mode=self.mode, route_source='local_threshold_algorithm', feature_version=FEATURE_VERSION,
+                      artifact_sha256=None, eligible=False, would_bypass=False, actual_bypass=False,
+                      score=None, threshold=self.threshold, completeness_flags=flags, features=None,
+                      semantic_audit_calls=0, semantic_audit_tokens=0)
         try:
-            eligible,reason=eligibility(packet,flags,runtime,calls,sandbox)
-            result.update(eligible=eligible,route_reason=reason)
+            validate_router_options(self.threshold)
+            eligible, reason = eligibility(packet, flags, runtime, calls, sandbox)
+            if self.mode == 'off':
+                eligible, reason = False, 'ROUTER_OFF'
+            result.update(eligible=eligible, route_reason=reason)
             if eligible:
-                score,features=risk_score(packet);result.update(score=score,features=features)
-                a=self.artifact
-                if not a:
-                    result['route_reason']='ARTIFACT_INVALID_OR_MISSING'
-                else:
-                    # Revalidate numeric evidence if a caller mutates the trusted configuration.
-                    validate_artifact(a)
-                    catalog,tools=catalog_snapshot(runtime)
-                    name=packet['current_actions'][0]['tool_name']
-                    compatible=(catalog==a['catalog_sha256'] and tools.get(name)==a['approved_tool_schema_hashes'].get(name)
-                                and a['model_config_sha256']==self.model_config_sha256)
-                    c=a['calibration'];result['threshold']=c['threshold']
-                    result['calibration']=dict(unit=c['calibration_unit'],risk_target=c['risk_target'],epsilon=c['epsilon'],delta=c['delta'],
-                                               selected=next((r for r in c['results'] if r['threshold']==c['threshold']),None))
-                    result['would_bypass']=compatible and c['threshold'] is not None and score<c['threshold']
-                    result['route_reason']=('BELOW_CALIBRATED_THRESHOLD' if result['would_bypass'] else
-                                            'INCOMPATIBLE_ARTIFACT' if not compatible else
-                                            'NO_CERTIFIED_THRESHOLD' if c['threshold'] is None else 'SCORE_REQUIRES_AUDIT')
-        except Exception as e:
-            result.update(route_reason='ROUTER_ERROR',error_type=type(e).__name__,would_bypass=False)
-        result['router_total_latency_ms']=(time.perf_counter()-started)*1000
+                score, features = risk_score(packet)
+                if isinstance(score, bool) or not isinstance(score, (int, float)) or not math.isfinite(score) or not 0 <= score <= 1:
+                    raise ValueError('invalid routing score')
+                bypass = score < self.threshold
+                result.update(score=score, features=features, would_bypass=bypass,
+                              route_reason='BELOW_THRESHOLD' if bypass else 'SCORE_REQUIRES_AUDIT')
+        except Exception as exc:
+            result.update(route_reason='ROUTER_ERROR', error_type=type(exc).__name__, would_bypass=False)
+        result['router_total_latency_ms'] = (time.perf_counter() - started) * 1000
         return result
 
 

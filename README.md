@@ -7,11 +7,11 @@ DSCG 是工具使用型 LLM Agent 的间接提示词注入（IPI）防御研究�
 | 环境 | 基准 / 默认场景 | full clean | partial clean / typical |
 | --- | --- | ---: | ---: |
 | `ipi` | AgentDojo v1.2：workspace、travel、banking、slack | 97 | 12 / 108 |
-| `ipi-agentdyn` | AgentDyn v1.2：shopping、github、dailylife | 60 | 9 / 81 |
+| `ipi-agentdyn` | AgentDyn v1.2：shopping、github、dailylife | 60 | 9 / 81计划（72可执行） |
 
 启动按实际Python加载路径、安装来源、版本和revision识别后端，不依赖环境名称。当前使用metadata_only校验，不扫描源码哈希；不同后端或任务范围不能合并分母。详见[全量测试指南](./docs/benchmark.md)。
 
-DashScope/Qwen的Chat请求由公共客户端统一适配：将上游生成的developer角色转换成system，baseline、DSCG、预检及网页共用，不需修改conda包。适配版本进入公开请求配置；更新后用新运行名，旧缓存/校准文件不自动复用。AgentDyn首请求400的定位与复测见[兼容性排错](./docs/model_tool_configuration.md#dashscope消息角色兼容与400排错)。
+DashScope/Qwen与DeepSeek的Chat请求由公共客户端分别适配：将上游生成的developer角色转换成system；DeepSeek还将纯文本系统消息块合并为字符串。baseline、DSCG、预检及网页共用，不需修改conda包。适配版本进入公开请求配置；更新后用新运行名，旧缓存/校准文件不自动复用。AgentDyn首请求400/422的定位与复测见[兼容性排错](./docs/model_tool_configuration.md#消息角色兼容与请求排错)。
 
 当前测试的主模型与审计模型默认 **Qwen3.7-Flash（关闭思考）**，保留DeepSeek等显式配置。full/partial/cohort恢复顺序执行，已删除workers；准备阶段静默核对配置，执行时逐组输出进度。见[模型配置](./docs/model_tool_configuration.md#24-最小可运行配置与角色复用)与[运行流程](./docs/benchmark.md#顺序执行与准备信息)。
 
@@ -80,7 +80,7 @@ python -m experiments.run_partial_benchmark --name l1_marker_new --l1-projection
 python -m experiments.run_partial_benchmark --name l1_projected_new --l1-projection-mode projected
 ```
 
-模式/profile/适配器/schema/边界已绑定到框架、缓存和 L3 路由兼容身份；切换模式使用新 run 名，旧路由 artifact 需重新校准。`dscg_l1_projection` 记录实际/候选投影次数、回退原因和字符变化；同一历史返回在多次规划中重复呈现也会重复计数，不能当作独立样本。`added_characters_total` 仍只统计来源封装新增字符，不抵扣投影减少量。
+模式/profile/适配器/schema/边界已绑定到框架、缓存和 L3 路由兼容身份；切换模式使用新 run 名，历史artifact不再作为当前路由输入。`dscg_l1_projection` 记录实际/候选投影次数、回退原因和字符变化；同一历史返回在多次规划中重复呈现也会重复计数，不能当作独立样本。`added_characters_total` 仍只统计来源封装新增字符，不抵扣投影减少量。
 
 本次只读重建现有144条参考历史的最后视图：12/144任务、12/334工具返回适用；这12条返回从14,787到7,380字符。**没有新模型调用或轨迹，不能据此重算TSR/ASR或宣称Token节省。** 更广的原生输出适配、四臂匹配实验、引用保真与适应性攻击仍待验收。见 [实施报告](./workshop/completed/l1_projection_20261013.md)、[实现](./dscg/l1_projection.py) 和 [待验收方案](./workshop/L1_opt.md)。
 
@@ -100,25 +100,25 @@ API 可传入 `ToolAuthorizationProfile`（[实现](./dscg/l2_authorization.py)�
 
 可在网页关闭工具视图/任务展开，或用 partial CLI `--no-tool-view --no-delegated-tasks` 做对照；独立工具视图 A0/A1 比较应两组都关闭展开、固定 L1/L3和任务 ID。详细已实现/待测项见 [L2实施报告](./workshop/completed/l2_implementation_20261012.md) 和 [候选余项](./workshop/L2_opt.md)。
 
-### L3 可选纯算法路由
+### L3 直接阈值路由
 
-L3支持 `off / shadow / selective`。full/partial测量CLI的DSCG默认shadow，baseline/NoChecker未显式指定时为off；Python API/factory仍默认off。显式不兼容组合报错。本地路由采用固定字符三元组公式：任务—工具距离、参数新颖度、不可信支持增量和近期失败比例取最大值；不训练分类器，不调用小模型或 embedding，不增加 API Tokens。只有单个已授权、有效注册、internal、idempotent、无 sink 的读取可进入新增免审，个人/秘密读取、任何写入或外发仍完整审计。
+本地算法仍使用字符三元组计算任务—工具距离、参数新颖度、不可信支持增量及近期失败比例，取最大值为 `s`。当前策略为 `threshold-read-v1`：**符合资格且 `s < threshold` 才免审**，默认经验阈值 `0.70`，没有独立风险校准保证，也不需要 artifact。
 
-低分本身不会免审：还要匹配冻结的工具/schema/模型配置，并通过独立任务组标签的阈值校准。`shadow` 只观察分数，保留原审计；`selective` 命中才省去本次审计，仍由 Monitor 验证一次性路由凭据和执行票据。无有效 artifact 或样本不足得到 `threshold=null` 时继续完整审计。当前没有部署阈值或真实节省结论，词面信号不认证事实或参数来源。
+资格限于单个已授权、元数据有效、幂等、无 sink、internal 或 personal 的读取；参数schema、输入完整性与长度检查保留。secret读取、写入、金融、删除、邀请和外发仍审计；原公开读取免审单独统计。banking余额/交易/常设转账/用户信息可参与，IBAN与文件读取仍按secret审计。Monitor、一次性交接和执行票据保留。
 
-细节和数据格式见 [L3 方案](workshop/L3_checker_opt.md)，工程验证见 [实施报告](workshop/completed/l3_algorithm_implementation_20261010.md)。例如显式观察模式：
+CLI默认shadow，Python/Dashboard API默认off；off只关闭路由，不关闭L3。shadow执行真实审计并记录模拟结果，selective才可能省去本次审计，不新增分类器或模型调用。
 
 ```bash
-python -m experiments.run_partial_benchmark --name l3_shadow_new --audit-router-mode shadow
+python -m experiments.run_benchmark --suites banking slack --name l3_threshold_shadow_new \
+  --audit-router-mode shadow --audit-router-threshold 0.70
+# 确定经验阈值后，用新的运行名显式选择selective；不保证安全或TSR收益
+python -m experiments.run_benchmark --suites banking slack --name l3_threshold_selective_new \
+  --audit-router-mode selective --audit-router-threshold 0.70
 ```
 
-后续配置 artifact 使用 `--audit-router-artifact <router.json>`；基线/NoChecker 不能启用。新的模式/artifact 需要新的 run 名，已有结果保持原身份。
+运行根部 `l3_router_summary.md/json` 比较0.65/0.70/0.75及本次阈值，按攻击/场景/配置列出模拟免审、审计分歧、协议失败和已记录Token。它用于人工选择阈值，不自动调参；分歧不是误放率，模拟Token不是实际节省，缺失数据保留未知。
 
-#### L3 仍需确定什么
-
-**候选参数已初始化，部署校准尚未完成。** [校准预设](./config/l3_router.calibration.json)保存网格 `[0.65, 0.70, 0.75]`、开发参考值 `0.70`、`epsilon=0.05`、`delta=0.05`。参考值不直接用于免审，预设也不是部署artifact；独立标签与校准数据仍待准备，未通过校准保持 `threshold=null`。加载方法见[配置指南](./docs/model_tool_configuration.md#l3校准候选预设)。
-
-参数含义、样本量算例、shadow → 校准 → selective 验证顺序，以及各层增量与后续优化优先级统一见 [参数确定与优化计划](./plan.md)。固定源码边界见 [配置详解](./docs/model_tool_configuration.md)。
+旧 `--audit-router-artifact` 非空时报迁移错误；历史记录仍按原策略读取，不补造免审。切换策略或阈值须新run名，旧缓存不能跨策略复用。独立校准工具和[历史预设](./config/l3_router.calibration.json)保留为未来扩展，已退出当前运行链。配置见[阈值说明](./docs/model_tool_configuration.md#l3直接阈值路由)，后续任务见[plan.md](./plan.md)，实现与边界见[L3方案](./workshop/L3_checker_opt.md)。
 
 ### 例子：读邮件并发送预算摘要
 
@@ -138,7 +138,7 @@ python -m experiments.run_partial_benchmark --name l3_shadow_new --audit-router-
 
 默认 `audit_retries=0`、`completion_prompt=false`。API 可用 `input_isolation=False, authorization_precheck=False, planning_tool_view=False, delegated_tasks=False` 建立 V2 风格对照（仍保留新版目录复核，不等于历史 V2）；默认 pipeline 名区分版本和实际开关，显式指定名称时仍需使用新名字。普通任务的工具视图无新增独立推理调用，但深拷贝/目录核验有本地开销，封装和有效任务随历史重复计费。任务文件准备读取可能增加审计/输入成本；profile 证据也可能增加授权 Tokens。私有读取或写入较多时 L3 仍频繁触发，已有单次历史/当前运行的成本记录，但完整成本对照与可归因的节省仍未验收。
 
-当前约束仍是工具级：对象、目的地、参数和数据权限尚未强制约束。I3 离线压力测试仍 partial（24条有效样例、8条范围缺口），真实 E0 和重复匹配对照待完成。安全、效用与总 Token 收益需要匹配实验和独立终态核查，当前文档不据单次观察宣布普遍收益。L3纯算法免审已按opt-in接入，真实校准和端到端收益未验收；在线DRV和授权对照校准未实施。来源标记、风险分流、Monitor 和票据本身不作为已证明的新算法贡献。
+当前约束仍是工具级：对象、目的地、参数和数据权限尚未强制约束。I3 离线压力测试仍 partial（24条有效样例、8条范围缺口），真实 E0 和重复匹配对照待完成。安全、效用与总 Token 收益需要匹配实验和独立终态核查，当前文档不据单次观察宣布普遍收益。L3直接阈值免审已按opt-in接入，当前阈值未独立校准，端到端收益未验收；在线DRV和授权对照校准未实施。来源标记、风险分流、Monitor 和票据本身不作为已证明的新算法贡献。
 
 ### 当前验证记录（2026-10-13复核）
 
@@ -185,7 +185,7 @@ python -m experiments.run_partial_benchmark --baseline --force-rerun --name base
 python -m experiments.run_partial_benchmark --force-rerun --name workshop_compare_01
 ```
 
-baseline使用当前基准的原生工具循环，不启用DSCG或安全模型。两组使用同一环境、主模型和v1.2任务；partial每场景取注册前3用户×前3目标。AgentDojo默认typical计划108组合，AgentDyn为81，另有原生GOAL预检；实际ID和有效分母以summary为准。全部任务请用full入口。
+baseline使用当前基准的原生工具循环，不启用DSCG或安全模型。两组使用同一环境、主模型和v1.2任务；partial每场景取注册前3用户×前3目标。AgentDojo默认typical计划108组合；AgentDyn注册计划81组合，其中`tool_knowledge × dailylife`的9组合不受原生模板支持，标记`unsupported`，其余72组合可执行。实际ID和有效分母以summary为准。全部任务请用full入口。
 
 | 默认 `--attack typical` 的攻击 | 简要说明 | 来源 |
 | --- | --- | --- |
@@ -205,7 +205,7 @@ baseline使用当前基准的原生工具循环，不启用DSCG或安全模型�
 results/partial_benchmark/<benchmark_id>/<model_id>_<name>/<attack>/<suite>/
 ```
 
-full / partial / cohort 在运行根目录生成精简 `summary.md`（每攻击/场景一行，最多10个失败入口）、完整 `failure_cases.jsonl`，以及 `l3_router_summary.md/json`（运行级 shadow / selective 路由统计）。新运行不再生成重复的多层TXT；原始JSON、full附件、CSV和配置/续跑记录保留。旧结果仅按需新增L3报告，不清理旧文件；缺少校准或轨迹时模拟节省为未知。用法见[结果文件与离线汇总](./docs/result_files.md)。
+full / partial / cohort 在运行根目录生成精简 `summary.md`（每攻击/场景一行，最多10个失败入口）、完整 `failure_cases.jsonl`，以及 `l3_router_summary.md/json`（运行级 shadow / selective 路由统计）。新运行不再生成重复的多层TXT；原始JSON、full附件、CSV和配置/续跑记录保留。旧结果仅按需新增L3报告，不清理旧文件；缺少轨迹/成本时模拟节省为未知，旧校准策略缺少artifact时也保持未知。用法见[结果文件与离线汇总](./docs/result_files.md)。
 
 ## Dashboard
 

@@ -38,7 +38,8 @@ from dscg.l2_authorization import (catalog_fingerprint, planning_runtime_view,
                                   resolve_delegated_task, effective_delegated_task, DELEGATION_VERSION)
 from dscg.audit_router import (LocalAuditRouter, RouterReceiptVerifier, argument_flags,
                                normalized as router_normalized, digest as router_digest,
-                               catalog_snapshot as router_catalog_snapshot)
+                               catalog_snapshot as router_catalog_snapshot, DEFAULT_THRESHOLD, POLICY_VERSION as ROUTER_POLICY_VERSION,
+                               validate_router_options)
 from dscg.audit_context import (INPUT_SCHEMA as AUDIT_INPUT_SCHEMA_VERSION, EVIDENCE_VERSION,
                                 FACT_BUDGET, MAX_RESULTS, MAX_CALL_ARGUMENTS, select_tool_evidence)
 from dscg.prompt_profiles import (validate_profile, semantic_catalog, audit_policy,
@@ -1696,6 +1697,7 @@ def _host_router_binding(query, runtime, calls, sandbox, router, messages, extra
             "action_history_sha256": _hash_json(extra_args.get("dscg_action_ledger",[])),
             "source_ids_sha256": _hash_json(extra_args.get("dscg_source_ids",{})),
             "artifact_sha256": router.artifact_sha256,
+            "threshold": router.threshold, "policy_version": router.policy_version,
             "artifact_content_sha256": router_digest(router.artifact),
             "model_config_sha256": router.model_config_sha256}
 
@@ -1867,7 +1869,7 @@ class ReferenceMonitor(agent_pipeline.BasePipelineElement):
         audit_valid = _is_valid_audit_record(audit, fingerprint)
         router_token = extra_args.pop("_dscg_router_receipt", None)
         if self._router_handoff_required or (isinstance(audit, dict) and (audit.get("reason_code") == "SELECTIVE_READ_BYPASS"
-                                      or audit.get("route_source") == "local_calibrated_algorithm"
+                                      or audit.get("route_source") == "local_threshold_algorithm"
                                       or router_token is not None)):
             try:
                 binding = _host_router_binding(query, runtime, tool_calls, self.sandbox, self.audit_router, messages, extra_args)
@@ -2144,6 +2146,20 @@ class TaskIsolatedPipeline(agent_pipeline.AgentPipeline):
         self._task_lock = RLock()
         self.trackers = trackers
 
+    @staticmethod
+    def _cost_delta(after, before):
+        phases = {}
+        for phase, counters in after.items():
+            previous = before.get(phase, {})
+            delta = {key: value - previous.get(key, 0)
+                     for key, value in counters.items()
+                     if type(value) in (int, float)}
+            if (counters.get('failed_calls', 0) > previous.get('failed_calls', 0)
+                    and isinstance(counters.get('last_api_error'), dict)):
+                delta['last_api_error'] = counters['last_api_error']
+            phases[phase] = delta
+        return phases
+
     def query(self, query, runtime, env=None, messages=None, extra_args=None):
         with self._task_lock:
             context = {
@@ -2180,9 +2196,7 @@ class TaskIsolatedPipeline(agent_pipeline.AgentPipeline):
                     self.reference_monitor.revoke_tickets()
                 context["dscg_cost"] = {
                     "elapsed_ms": round((time.perf_counter() - started) * 1000, 3),
-                    "models": [{phase: {key: value - before.get(phase, {}).get(key, 0)
-                                          for key, value in counters.items()}
-                                for phase, counters in tracker.snapshot().items()}
+                    "models": [self._cost_delta(tracker.snapshot(), before)
                                for tracker, before in zip(self.trackers, costs_before)],
                 }
                 if isinstance(getattr(logger, "context", None), dict):
@@ -2559,9 +2573,9 @@ class ActionSecurityChecker(agent_pipeline.BasePipelineElement):
                     decision = AuditDecision(batch_fingerprint=batch_fingerprint,decision="allow",violations=(),confidence=0.0,
                                              reason_code="SELECTIVE_READ_BYPASS",audit_input_sha256=input_hash,
                                              raw_response_sha256=_hash_json(router_event),
-                                             model_version="local-router:"+self.audit_router.artifact_sha256[:16],
+                                             model_version="local-router:"+self.audit_router.policy_version,
                                              latency_ms=round(router_event["router_total_latency_ms"],2),parser_status="deterministic_bypass")
-                    record = decision.public_dict();record.update(semantic_attempt=0,route_source="local_calibrated_algorithm")
+                    record = decision.public_dict();record.update(semantic_attempt=0,route_source="local_threshold_algorithm")
                     token = self.router_verifier.issue(binding,record)
                     if binding != _host_router_binding(query,runtime,tool_calls,self.sandbox,self.audit_router,messages,extra_args):
                         self.router_verifier.discard(token)
@@ -2663,7 +2677,8 @@ class ActionSecurityChecker(agent_pipeline.BasePipelineElement):
                 missing = sum(r.get("missing_usage_calls",0) for r in after.values())-sum(r.get("missing_usage_calls",0) for r in cost_before.values())
                 failed = sum(r.get("failed_calls",0) for r in after.values())-sum(r.get("failed_calls",0) for r in cost_before.values())
                 tokens = (sum(r.get("total_tokens",0) for r in after.values())-sum(r.get("total_tokens",0) for r in cost_before.values())) if missing==0 and failed==0 else None
-            router_event.update(semantic_audit_calls=attempt+1,semantic_audit_tokens=tokens,raw_audit_decision=decision.decision)
+            router_event.update(semantic_audit_calls=attempt+1,semantic_audit_tokens=tokens,raw_audit_decision=decision.decision,
+                                audit_parser_status=decision.parser_status, audit_failure_type=failure_type)
             _publish_router_event(extra_args,router_event)
         return query, runtime, env, messages, extra_args
 
@@ -2680,9 +2695,13 @@ TASK_COMPLETION_PROMPT = (
 def router_configuration_hash(main_config, sec_config, *, input_isolation, authorization_precheck,
                               l1_projection_mode, planning_tool_view, delegated_tasks,
                               profile_hash=None, reader_hash=None, audit_retries=0, completion_prompt=False,
-                              prompt_profile='legacy'):
+                              prompt_profile='legacy', audit_router_threshold=None):
     """Describe the router request/configuration identity without creating clients."""
-    return router_digest({**profile_binding(prompt_profile), "main": main_config.public_dict(), "audit": sec_config.public_dict(),
+    return router_digest({**({"router_policy_version": ROUTER_POLICY_VERSION,
+                                             "router_threshold": validate_router_options(audit_router_threshold),
+                                             "router_scope": "single-internal-personal-idempotent-read-no-sink"}
+                                            if audit_router_threshold is not None else {}),
+                           **profile_binding(prompt_profile), "main": main_config.public_dict(), "audit": sec_config.public_dict(),
                                            "temperature": 0.0,
                                            "reasoning_effort": [reasoning_effort_for_config(main_config),reasoning_effort_for_config(sec_config)],
                                            "main_system_prompt_sha256": _hash_json(load_system_message(None)),
@@ -2740,7 +2759,7 @@ def defended_pipeline_name(model_id, *, use_sandbox, use_security_checker, input
     if profile_binding(prompt_profile):
         name += '-Prompt-' + prompt_profile + '-' + profile_binding(prompt_profile)['prompt_profile_sha256'][:16]
     if audit_router_mode != "off":
-        name += f"-CSA-{audit_router_mode}-{(audit_router.artifact_sha256 or 'uncalibrated')[:16]}-{router_config_hash[:16]}"
+        name += f"-CSA-{audit_router_mode}-{audit_router.policy_version}-T{audit_router.threshold:g}-{router_config_hash[:16]}"
     return name
 
 
@@ -2757,6 +2776,7 @@ def make_qwen_newFrame_pipeline(
     authorization_precheck: bool = True,
     audit_router_mode: str = "off",
     audit_router_artifact: str | Path | None = None,
+    audit_router_threshold: float = DEFAULT_THRESHOLD,
     planning_tool_view: bool = True,
     authorization_profile=None,
     delegated_tasks: bool = True,
@@ -2787,6 +2807,7 @@ def make_qwen_newFrame_pipeline(
     :param trace_level: 任务 JSON 中 DSCG 记录级别：summary、standard 或 full
     :param tool_metadata: 可选的工具名到显式风险元数据的映射
     """
+    audit_router_threshold = validate_router_options(audit_router_threshold, audit_router_artifact)
     validate_profile(prompt_profile)
     if prompt_profile != 'legacy' and (not use_sandbox or not use_security_checker):
         raise ValueError('candidate prompt profiles require L2 and checker')
@@ -2887,9 +2908,10 @@ def make_qwen_newFrame_pipeline(
             authorization_precheck=authorization_precheck, l1_projection_mode=l1_projection_mode,
             planning_tool_view=planning_tool_view, delegated_tasks=delegated_tasks,
             profile_hash=profile_hash, reader_hash=reader_hash,
-            audit_retries=audit_retries, completion_prompt=completion_prompt, prompt_profile=prompt_profile)
+            audit_retries=audit_retries, completion_prompt=completion_prompt, prompt_profile=prompt_profile,
+            audit_router_threshold=audit_router_threshold if audit_router_mode != "off" else None)
         if audit_router_mode != "off":
-            audit_router = LocalAuditRouter(audit_router_mode, audit_router_artifact, router_config_hash)
+            audit_router = LocalAuditRouter(audit_router_mode, model_config_sha256=router_config_hash, threshold=audit_router_threshold)
         security_checker = ActionSecurityChecker(
             small_llm=sec_llm,
             llm=llm,
@@ -2945,6 +2967,8 @@ def make_qwen_newFrame_pipeline(
         "task_isolation": True, "audit_retries": audit_retries,
         "completion_prompt": completion_prompt, "use_security_checker": use_security_checker,
         "audit_router_mode": audit_router_mode,
+        "audit_router_threshold": audit_router_threshold if audit_router else None,
+        "audit_router_policy_version": ROUTER_POLICY_VERSION if audit_router else None,
         "audit_router_artifact_sha256": audit_router.artifact_sha256 if audit_router else None,
         "audit_router_config_sha256": router_config_hash,
         "audit_router_load_error": audit_router.error if audit_router else None,

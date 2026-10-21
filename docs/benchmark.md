@@ -1,6 +1,13 @@
 # 完整任务测试：AgentDojo 与 AgentDyn
 
-DashScope/Qwen请求角色由DSCG公共客户端统一适配，不修改conda包；更新后使用新运行名。AgentDyn首次请求BadRequestError的定位、受限诊断字段和partial clean恢复命令见[消息角色兼容排错](./model_tool_configuration.md#dashscope消息角色兼容与400排错)。旧缓存/cohort与新增请求身份不一致时拒绝复用，旧数据保留。
+## L3直接阈值策略（2026-10-21）
+
+当前 `threshold-read-v1` 无需校准artifact：`--audit-router-threshold 0.70` 为默认经验参数，严格score<threshold才免审。CLI默认shadow，Python/Dashboard API默认off；shadow仍审计，selective显式开启后才可能免审。资格扩大到单个已授权、完整有效的internal/personal幂等无sink读取；secret及任何写入/外发不在新增范围。
+
+full/partial/cohort及screen测量透传阈值；Dashboard API校验并透传模式/阈值，未新增页面控件。旧artifact参数非空时报迁移错误；策略/阈值身份不同须新run名。根级L3报告提供经验阈值比较，审计分歧不是安全真值、模拟Token不是实际节省。新策略不把“没有artifact”记成故障，旧记录仍保留原解释。[参数](./model_tool_configuration.md#l3直接阈值路由) · [报告](./result_files.md)
+
+
+DashScope/Qwen与DeepSeek的Chat请求角色由DSCG公共客户端分别适配，不修改conda包；更新后使用新运行名。AgentDyn首次请求的400/422定位、受限诊断字段和小范围复测要求见[消息角色兼容排错](./model_tool_configuration.md#消息角色兼容与请求排错)。旧缓存/cohort与新增请求身份不一致时拒绝复用，旧数据保留。
 
 同一份代码在两个conda环境中自动选择基准，正常测试不需要`--benchmark`或额外工具目录参数。模型/风险配置见 [配置指南](./model_tool_configuration.md)，小规模排错见 [partial](./partial_benchmark.md)。
 
@@ -94,6 +101,8 @@ python -m experiments.run_benchmark --baseline --suites travel banking slack \
 
 计划组合不是模型请求次数或有效分母；原生攻击GOAL预检另计。可用`--suites travel banking slack`选择AgentDojo子集，或`--suites shopping github`选择AgentDyn子集。跨后端场景名拒绝；full保留所选场景全部注册ID，不能用manifest缩小范围。
 
+AgentDyn当前原生`tool_knowledge × dailylife`不支持：10个目标的参考调用均缺少该攻击生成器要求的`placeholder_args`。程序在模型请求前检查实际选中目标，将整个组标为`unsupported (missing_placeholder_args)`，不运行该组GOAL预检或计分，也不把跳过当作成功/失败样本。上表仍是**注册计划数**；默认full typical的1,680组合中200不支持、1,480可执行；默认partial的81组合中9不支持、72可执行。cohort按实际保留目标重算；若没有该场景的目标，按原空场景规则跳过。`summary.md`中该组显示`0/计划数`和`N/A`，受影响ID及原因见`attack_manifest.json.execution.groups`。至少一组完成且没有真实错误时CLI退出0；全部不支持时退出1。实际评分分母仅取原生返回结果。
+
 ## 2. Clean 对照：先确认智能体能力
 
 建议先做同轮无攻击对照，再做攻击测试。以下会真实调用模型，请自行在服务器启动；本轮工程验收没有执行它们。
@@ -129,7 +138,7 @@ python -m experiments.run_benchmark --baseline --attack important_instructions i
   --name baseline_explicit_01
 ```
 
-两套后端按各自原生任务/工具循环评分。AgentDyn提供动态环境与新目标，攻击生成器仍有AgentDojo基线来源；安装成功不代表比旧攻击更强。`tool_knowledge` 使用上游参考调用，当前部分 shopping/github 注入目标的参考调用仍有占位或与GOAL不一致的内容，可能降低攻击质量或造成原生预检失败。本项目不补写标准答案或修改原生评分来追分，正式实验需保留并检查这些轨迹。
+两套后端按各自原生任务/工具循环评分。AgentDyn提供动态环境与新目标，攻击生成器仍有AgentDojo基线来源；安装成功不代表比旧攻击更强。`tool_knowledge` 使用上游参考调用，shopping/github的占位参数可供原生模板使用，但其内容仍需核对GOAL与实际轨迹。本项目不补写标准答案或修改原生评分来追分。
 
 DoS按 `not utility` 单独计分，每用户仅使用首个注册目标一次；不可与目标型ASR合并。cohort测量拒绝DoS及包含DoS的all。全部自动攻击的实际名单和组合数以运行manifest为准，不固定论文数字。
 

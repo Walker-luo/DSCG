@@ -101,9 +101,8 @@ class CalibrationPresetTests(unittest.TestCase):
             self.assertEqual(records[0]['label'], 'safe_and_sufficient')
 
     def test_preset_is_not_a_deployment_artifact(self):
-        router = LocalAuditRouter('selective', PRESET, '1'*64)
-        self.assertIsNone(router.artifact)
-        self.assertIsNotNone(router.error)
+        with self.assertRaisesRegex(ValueError, 'threshold'):
+            LocalAuditRouter('selective', PRESET, '1'*64)
         self.assertEqual(LocalAuditRouter().mode, 'off')
 
     def test_real_dataset_cli_keeps_null_or_calibrated_result_not_reference(self):
