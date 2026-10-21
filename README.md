@@ -13,11 +13,11 @@ DSCG 是工具使用型 LLM Agent 的间接提示词注入（IPI）防御研究�
 
 DashScope/Qwen与DeepSeek的Chat请求由公共客户端分别适配：将上游生成的developer角色转换成system；DeepSeek还将纯文本系统消息块合并为字符串。baseline、DSCG、预检及网页共用，不需修改conda包。适配版本进入公开请求配置；更新后用新运行名，旧缓存/校准文件不自动复用。AgentDyn首请求400/422的定位与复测见[兼容性排错](./docs/model_tool_configuration.md#消息角色兼容与请求排错)。
 
-当前测试的主模型与审计模型默认 **Qwen3.7-Flash（关闭思考）**，保留DeepSeek等显式配置。full/partial/cohort恢复顺序执行，已删除workers；准备阶段静默核对配置，执行时逐组输出进度。见[模型配置](./docs/model_tool_configuration.md#24-最小可运行配置与角色复用)与[运行流程](./docs/benchmark.md#顺序执行与准备信息)。
+当前测试的主模型与审计模型默认 **Qwen3.7-Flash（关闭思考）**，保留DeepSeek等显式配置。full/partial/cohort默认按attack并行，每个attack内部仍顺序执行场景与任务；单attack、clean保持直接顺序执行，不新增参数。准备阶段静默核对配置，主进程统一输出进度。见[模型配置](./docs/model_tool_configuration.md#24-最小可运行配置与角色复用)与[运行流程](./docs/benchmark.md#按攻击并行与准备信息)。
 
 ## 当前框架与工作流程
 
-2026-10-19新增 **Qwen效用诊断与分阶段候选**：默认策略仍为`legacy`，新增协议错误分类默认记录；`--prompt-profile protocol-v1|tool-semantics-v1|source-context-v1`依次增加严格输出说明、宿主工具参数/副作用目录、合法来源关联提示。候选显式开启并独立绑定缓存，尚未经过真实模型验收，不能宣称TSR恢复。详见[诊断、参数和对照命令](./docs/qwen_utility.md)。
+2026-10-21新增 **精简任务对齐候选**：benchmark加 `--prompt-profile task-alignment-v1`，L2逐步匹配请求与工具作用，L3只判断当前动作与任务/事实的关系；使用原简洁工具目录，不叠加长提示。默认仍为legacy，旧protocol/tool-semantics/source-context候选保留；144次诊断不支持晋升旧候选，新的精简候选尚待真实clean/攻击验证。[改动、限制与直接测试命令](./docs/qwen_utility.md#task-alignment-v1)。不加该参数仍运行现有默认实现。
 
 当前默认运行 **three-layer-v3.1**：L1 对有限任务投影工具返回，其余任务保留来源封装；L2 决定可用工具，L3 判断当前动作是否服务于用户任务。层号表示职责；L2 在任务开始编译授权，并在每批候选执行前检查，L1 在工具反馈进入下一次规划时工作，因此不是每轮依次调用三个模型。
 

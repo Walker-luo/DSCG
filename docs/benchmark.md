@@ -1,5 +1,7 @@
 # 完整任务测试：AgentDojo 与 AgentDyn
 
+本次效用优化通过 `--prompt-profile task-alignment-v1` 显式启用；不加参数仍为legacy。建议先固定Qwen配置与shadow，比较banking/Slack的37项clean，不用partial前三用户代替。三臂完整命令见[精简任务对齐候选](./qwen_utility.md#task-alignment-v1)，新候选的真实收益尚待测试。
+
 ## L3直接阈值策略（2026-10-21）
 
 当前 `threshold-read-v1` 无需校准artifact：`--audit-router-threshold 0.70` 为默认经验参数，严格score<threshold才免审。CLI默认shadow，Python/Dashboard API默认off；shadow仍审计，selective显式开启后才可能免审。资格扩大到单个已授权、完整有效的internal/personal幂等无sink读取；secret及任何写入/外发不在新增范围。
@@ -43,11 +45,13 @@ python -m dscg.benchmark_catalog
 
 <a id="进程并发提速"></a>
 
-## 顺序执行与准备信息
+<a id="顺序执行与准备信息"></a>
+
+## 按攻击并行与准备信息
 
 主模型、授权编译和审计默认使用 Qwen3.7-Flash，显式关闭思考；本地配置、环境变量和显式参数仍可覆盖。配置方法见[模型指南](./model_tool_configuration.md#24-最小可运行配置与角色复用)。
 
-full、partial和cohort均按攻击、场景顺序执行，已删除workers参数及进程并发。旧命令需去掉该参数。准备阶段静默核对完整任务范围与已有配置绑定，不创建pipeline或发起模型请求；启动一次打印模型、后端、攻击、场景、结果目录和缓存策略。默认每组打印开始/完成状态；加`--progress`后，每个攻击/场景组显示独立进度条，完成的组保留最终状态。原生错误和必要警告继续输出。
+full、partial和cohort默认按attack并行：每个attack一个spawn独立进程，进程内按现有顺序执行场景、GOAL预检和计分任务。不新增参数；typical最多同时执行3种攻击，all同时执行全部选定攻击，没有额外并发上限。单个attack、clean仍直接顺序运行，screen不变。准备阶段静默核对完整任务范围与已有配置绑定，不创建pipeline或发起模型请求；启动一次打印模型、后端、攻击、场景、结果目录和缓存策略。默认每组打印开始/完成状态；加`--progress`后，每个攻击/场景组显示独立进度条，完成的组保留最终状态。主进程统一显示进度条及带attack/场景标识的原生日志；错误和必要警告继续输出。
 
 ```bash
 python -m experiments.run_benchmark --baseline --force-rerun \
@@ -66,9 +70,9 @@ python -m experiments.run_benchmark --baseline --suites travel banking slack \
 
 目标型攻击的每组进度分别标为`GOAL 已完成/目标数`和`任务 已完成/用户×目标组合数`；clean只显示用户任务，DoS不做GOAL预检。百分比按已完成执行项数计算，缓存命中也会计入；它不是有效计分分母、模型请求数或剩余时间预测。交互终端显示动态条和已耗时，重定向日志写入无控制字符的阶段与少量里程碑行。`--progress`只控制显示，可在同名`--reuse`时开启或关闭，不改变配置绑定或缓存。
 
-每个目标型攻击/场景分组仍先执行原生GOAL预检，再执行用户×注入目标组合；一次任务通常包含多次模型/工具交互，DSCG还包括授权和审计。减小本地准备开销不保证Qwen服务响应加快，也不享受官方Batch折扣。
+每个目标型攻击/场景分组仍先执行原生GOAL预检，再执行用户×注入目标组合；一次任务通常包含多次模型/工具交互，DSCG还包括授权和审计。这是在线请求并行，不享受官方Batch折扣；all可能触及服务限流，本次不增加重试或限流策略。实际加速由服务器测试确认。
 
-同目录运行锁防止重复写入。`attack_manifest.json.execution`与`execution/<本次ID>/execution.json`记录serial、组状态及wall_seconds；历史并发记录保持原样。失败组单列，其他组继续；中断保留原生结果，使用原参数加reuse恢复。API不再提供workers参数。
+同目录运行锁防止重复写入。`attack_manifest.json.execution`与`execution/<本次ID>/execution.json`记录parallel_attacks或serial、独立attack进程数/PID、各组状态及实际wall_seconds；总耗时不取各attack耗时之和。历史记录保持原样。失败组单列，其他组继续；中断保留原生结果，使用原参数加reuse恢复。CLI/API不新增并发参数。并行只是执行策略，不改变任务/评分或缓存身份，配置匹配的旧顺序运行仍可reuse。更新后重新启动命令才会使用新调度，正在运行的进程不会自动切换。
 
 ## 1. 使用哪个入口
 

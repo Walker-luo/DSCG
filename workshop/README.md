@@ -1,5 +1,16 @@
 # Workshop 优化状态索引
 
+新增[按Attack默认并行](./completed/attack_parallel_20261021.md)：每个attack独立spawn进程，内部场景与任务顺序不变；主进程统一校验、进度和根汇总。无新增参数；双环境原生离线并行/缓存对照通过，真实服务加速和限流待测。
+
+
+新增[精简任务对齐候选](./completed/task_alignment_20261021.md)：`--prompt-profile task-alignment-v1`可直接进行benchmark；L2步骤与工具作用匹配、L3当前动作审计，保留原简洁目录和全部执行边界。诊断authorized-v2补齐合成授权/来源工具，旧包可复核。默认legacy不变，真实效果待测，无新增模型调用。
+
+新增[Qwen有限真实诊断结果](./completed/utility_diagnosis_20261021.md)：已用完明确授权的144次请求，API错误0、Token131,588；L3协议改善未证明效用恢复，银行诊断缺授权上下文；L2语义候选新增错授权，不晋升默认。保留原始输入和响应，先以新版本修诊断；source/37clean未启动。
+
+新增[有限真实诊断采集器](./completed/utility_collection_20261021.md)：明确执行/次数上限、SDK零重试、首次接口错误停止、调用前持久化及provider适配；此前为实际0次、等待授权的工程快照；后续用户明确批准的144次执行结果见上方新报告。
+
+新增[banking/Slack分阶段诊断准备](./completed/utility_stages_20261021.md)：固定24审计例/12授权例、相邻响应比较和重叠失败信号；当时仅离线工程交付；后续144次模型诊断已完成但不晋升，37项clean仍待安排，默认防御未改。
+
 新增[L3审计提示压缩](./completed/l3_audit_prompt_20261021.md)：基础提示3262→1919字符，保留来源/准备读取/外发审查并明确四字段协议；配置身份自动变化，仅离线验收，真实语义效果待测。
 
 新增[L3直接阈值路由](./completed/l3_threshold_20261021.md)：默认经验阈值0.70，internal/personal读取资格，无运行时artifact依赖；shadow阈值比较与旧记录语义分离，真实收益待新实验。
@@ -10,7 +21,7 @@
 
 新增[结果精简与L3运行级汇总](./completed/result_reports_20261019.md)：共享离线报告、紧凑摘要与完整失败索引已接线；指定旧目录仅新增两份报告，1279原文件SHA256不变。两环境/网页回归通过，无模型调用或防御策略变化；[使用指南](../docs/result_files.md)。
 
-2026-10-19：[Qwen候选验收计划](./qwen_utility_20261019.md)、[已完成工程报告](./completed/qwen_utility_20261019.md)与[使用指南](../docs/qwen_utility.md)。协议诊断和分阶段候选工程已接线，默认legacy保留；模型协议/语义配对、37/97clean与冻结cohort攻击验收待授权，尚未证明TSR恢复。L1未改。
+2026-10-19：[Qwen候选验收计划](./qwen_utility_20261019.md)、[已完成工程报告](./completed/qwen_utility_20261019.md)与[使用指南](../docs/qwen_utility.md)。协议诊断和分阶段候选工程已接线，默认legacy保留；首轮144次模型诊断已完成但输入限制/候选错误阻止晋升，37/97clean与冻结cohort攻击未执行，尚未证明TSR恢复。L1未改。
 
 最新结果布局：[按后端分目录](./completed/backend_result_layout_20261018.md)。CLI测量/预检使用分类根/后端/运行目录；旧目录原地续跑，历史页兼容；网页发起实验布局不变。
 

@@ -211,7 +211,8 @@ class SerialRunnerTests(unittest.TestCase):
                 self.assertEqual(factory.call_count, 2)
             self.assertEqual(output.getvalue().count('模型: offline-model；后端:'), 1)
 
-    def test_serial_groups_preserve_global_scope_and_parent_only_aggregation(self):
+    def test_mocked_groups_preserve_global_scope_and_parent_only_aggregation(self):
+        from experiments.common.attack_execution import iter_serial_results
         root = Path(__file__).resolve().parents[1] / 'workshop/artifacts/20261018_serial_lightweight/test_runs'
         root.mkdir(parents=True, exist_ok=True)
         with TemporaryDirectory(dir=root) as temp, \
@@ -219,6 +220,7 @@ class SerialRunnerTests(unittest.TestCase):
              patch.object(partial, 'resolve_model_config', side_effect=serial_fixture.resolve), \
              patch.object(partial.attacks, 'load_attack', side_effect=fake_attack), \
              patch.object(partial.benchmark, 'benchmark_suite_with_injections', side_effect=fake_results) as native, \
+             patch.object(partial, 'iter_attack_results', side_effect=iter_serial_results), \
              redirect_stdout(StringIO()):
             suites = list(get_suites())[:2]
             self.assertEqual(partial.main(origin=True, suites=suites, attack='typical',
@@ -228,5 +230,5 @@ class SerialRunnerTests(unittest.TestCase):
             self.assertEqual(json.loads((base / 'suite_manifest.json').read_text())['suites'], suites)
             manifest = json.loads((base / 'attack_manifest.json').read_text())
             self.assertEqual(manifest['execution']['planned_groups'], 6)
-            self.assertEqual(manifest['execution']['mode'], 'serial')
+            self.assertEqual(manifest['execution']['mode'], 'parallel_attacks')
             self.assertEqual(len(list(base.glob('*/*/summary.json'))), 6)

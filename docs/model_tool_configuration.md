@@ -25,7 +25,7 @@ python -m dscg.benchmark_catalog
 
 ## 2. 主模型和审计模型
 
-Qwen banking/Slack的协议诊断、`--prompt-profile`阶段候选、日志字段及配对测试见[效用诊断指南](./qwen_utility.md)。该开关属于防御策略，不是模型TOML参数；默认legacy，不更换主/安全模型。JSON输出可用仍需严格字段校验，普通聊天成功不代表审计协议稳定。
+Qwen banking/Slack的协议诊断、`--prompt-profile`候选、日志字段及配对测试见[效用诊断指南](./qwen_utility.md)。新精简候选用 `--prompt-profile task-alignment-v1`；该开关属于防御策略，不是模型TOML参数，默认legacy，不更换主/安全模型。JSON输出可用仍需严格字段校验，普通聊天成功不代表审计协议稳定。
 
 ### 消息角色兼容与请求排错
 
@@ -268,7 +268,7 @@ shadow保留真实审计，并在根级报告比较0.65/0.70/0.75及实际阈值
 
 --model-config/--tool-metadata是输入配置路径；--name标识实验；--results-dir是输出根；--task-manifest仅用于显式冻结任务ID，默认无需导入。修改任何有效配置/策略后使用新name，--force-rerun不绕过旧manifest绑定。成本比较采用新name并force-rerun，仍核查API usage/样本分母，不能只凭flag保证可比。
 
-两测量入口和cohort恢复顺序执行，已删除workers参数与进程调度。准备阶段静默核对全部配置，不创建pipeline；每组执行时再创建独立pipeline及tracker。见[运行流程](./benchmark.md#顺序执行与准备信息)。
+两测量入口和cohort默认按attack使用spawn独立进程并行，不新增CLI/API参数；每个attack内部仍顺序执行场景及任务，单attack与clean继续直接顺序运行。准备阶段静默核对全部配置，不创建pipeline；每组执行时再创建独立pipeline及tracker。通过Python脚本调用时，将测量调用放在`if __name__ == "__main__":`保护内，以满足spawn入口要求；CLI已处理。见[运行流程](./benchmark.md#按攻击并行与准备信息)。
 
 两测量入口支持显式`--reuse`（API：reuse=True，默认False），未指定攻击/场景时恢复原计划。要求原name和可核验目录，与force-rerun/清单导出互斥，并覆盖环境强制重跑。核对后端、模型、完整任务、攻击、工具元数据内容和有效防御设置；源码哈希、Git commit及Python补丁版本不作为续跑门槛。旧绑定保持原字节，规则变化另存configuration_only记录；缺少必要配置时拒绝。冻结cohort测量只校验名单自身摘要与模型/环境/所选任务，screen续跑仍检查原预检证据。见[续跑指南](./benchmark.md#显式续跑示例)。
 

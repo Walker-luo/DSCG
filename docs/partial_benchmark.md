@@ -38,9 +38,9 @@ results/partial_benchmark/<benchmark_id>/<model_id>_<name>/<attack>/<suite>/
 
 <a id="并发运行"></a>
 
-## 顺序运行
+## 按攻击并行运行
 
-主模型和审计模型默认Qwen3.7-Flash、关闭思考。按攻击、场景顺序执行，已删除workers参数。启动打印一次模型与范围；准备阶段静默核对绑定。默认每组打印开始/完成状态，按需加`--progress`显示每个攻击/场景组的独立进度条：
+主模型和审计模型默认Qwen3.7-Flash、关闭思考。不同attack默认使用spawn独立进程并行执行，每个attack内部场景、GOAL预检及计分任务仍顺序运行；不新增参数。typical最多3个攻击同时运行，all同时运行全部选定攻击；单个attack和clean保持直接顺序运行。启动打印一次模型与范围；准备阶段静默核对绑定。默认每组打印开始/完成状态，按需加`--progress`显示每个攻击/场景组的独立进度条：
 
 ```bash
 python -m experiments.run_partial_benchmark --baseline --progress --force-rerun \
@@ -50,7 +50,7 @@ python -m experiments.run_partial_benchmark --progress --force-rerun \
   --model-config config/models.local.toml --name qwen37_dscg_01
 ```
 
-默认每场景3×3任务范围不变；兼容的目标型攻击/场景组仍有额外原生GOAL预检。不支持的组在进度条开始前标记`unsupported`，不发起模型请求。进度条将预检与计分任务分开显示；clean只有用户任务，cohort同样支持`--progress`，且不影响同名`--reuse`。进度百分比只是执行项计数，不是ASR分母或剩余时间预测。详见[顺序执行与准备信息](./benchmark.md#顺序执行与准备信息)。这不是官方Batch；减小本地开销不代表真实模型速度已经验证。
+默认每场景3×3任务范围不变；兼容的目标型攻击/场景组仍有额外原生GOAL预检。不支持的组在进度条开始前标记`unsupported`，不发起模型请求。进度条将预检与计分任务分开显示；clean只有用户任务，cohort同样支持`--progress`，且不影响同名`--reuse`。进度百分比只是执行项计数，不是ASR分母或剩余时间预测。详见[并行执行与准备信息](./benchmark.md#按攻击并行与准备信息)。这是在线并行，不享受官方Batch折扣；all可能触及服务限流，不增加自动重试。实际加速仍需服务器验证。
 
 ## 干净任务对照
 

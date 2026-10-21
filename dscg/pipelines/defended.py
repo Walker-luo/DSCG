@@ -1085,7 +1085,7 @@ class ToolAuthorizationCompiler:
                 profile_status = 'unsupported_task_fallback'
         prohibited, prepared, evidence_refs = frozenset(), frozenset(), ()
         policy = authorization_policy(self.PROFILE_POLICY if profile is not None else self.SYSTEM_POLICY,
-                                      self.prompt_profile)
+                                      self.prompt_profile, bounded=profile is not None)
         authorization_mode = 'bounded-profile-v1' if profile is not None else 'legacy'
         if profile is not None:
             if not requires_model:

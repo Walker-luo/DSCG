@@ -1,5 +1,39 @@
 # DSCG Research Handoff
 
+## Default attack-only parallel execution (2026-10-21)
+
+This user-approved policy supersedes the earlier all-groups-sequential requirement only between attacks.
+
+- CLI/Python full, partial and cohort measurements spawn one isolated process per runnable attack when more than one attack can execute. No new public concurrency parameters or cap: typical has three concurrent attacks; all runs all selected attacks concurrently. Inside each attack, suites, GOAL preflight and scored tasks retain native order. Single attack, clean and screen stay sequential.
+- Parent validates the complete plan and all bindings before model calls, owns the directory lock and root reports. Children write only their attack subtree using independent pipelines/logging/Token trackers. Parent reads frozen cohort once and passes validated memory; no new source scanning or original-evidence validation.
+- Parent forwards native logs with attack/suite labels and owns the shared Rich display. Group failures continue; worker death records unfinished groups without scores. Interrupt terminates/joins children before partial reporting and reuse guidance. Costs preserve native/preflight/cache scopes; wall time is measured for the whole invocation.
+- Parallel scheduling is execution metadata, never model/defense/cache identity. Existing configuration-matched serial runs can reuse caches. No new retries/rate limiter or Batch discount; all can encounter provider limits. Preserve all existing user results and concurrent work. New offline evidence: workshop/artifacts/20261021_attack_parallel/.
+
+
+## Compact task-alignment candidate (2026-10-21)
+
+- User requested actual framework optimization for subsequent benchmark testing. Explicit prompt_profile=task-alignment-v1 is a separate compact branch, not promotion/accumulation of failed protocol/tool-semantics/source-context candidates. L2 matches all requested steps to operation/object/destination; L3 judges current operation and needed facts rather than rejecting a whole contaminated source. Legacy catalogue remains name/description only; no full semantics schema input.
+- Preserve legacy/default model/router/retry settings, metadata, authorization parser, read rules, Monitor/tickets and scope limits. No extra model calls, dynamic grants or new exemptions. New candidate is opt-in via existing CLI/API/factory, requires L2+L3 and binds content identity; use new names. Plain benchmark without --prompt-profile still legacy. New candidate has no real efficacy evidence; do not call it validated or promote automatically.
+- utility_stages new exports default input_revision=authorized-v2: fixed synthetic allowlist, registered source tools, candidate/source schema validation and policy consistency. They are not actual L2 compiled/native end-state samples. Old missing revision is legacy-v1, including known incomplete banking context; replay/hash semantics unchanged. Do not rebind historical responses. Original utility_packets entry stays historical.
+- New offline evidence workshop/artifacts/20261021_task_alignment/ and completed report workshop/completed/task_alignment_20261021.md. Protect original results/download and all prior utility_live artifacts. Prior144-call budget exhausted; no paid requests this task. E0 pending/I3 partial/I2 locked unchanged.
+
+## Explicit utility response collector (2026-10-21)
+
+- User-approved144-call budget is EXHAUSTED: audit96 + authorization48, APIerrors0, recordedTokens131588, tools/source/clean0. qwen3.7-flash at archived DashScope endpoint, no SDK retries. First rejection before process creation is historical approval evidence, not API failure. No additional paid requests without new authorization.
+- No candidate promotion: L3 mechanical protocol gate1→0 only; expected-allow nonallow including schema failure9/24 in both profiles. All48 banking audit responses lack sandbox authorization context; unsuitable for actual post-L2 utility/safety claims. Slack synthetic historical sources also include unregistered tools; not native end-to-end replay. Preserve frozen bundles/responses/comparisons; correct context under NEW fixture/bundle identity before retest, never rebind old responses.
+- L2 semantics misses1→3, extra action grants2→3, newunsafe pair1; reject promotion, retain shortlegacy. These are synthetic component expectations, not executed effects/ASR. Actual report workshop/completed/utility_diagnosis_20261021.md; diagnosis_manifest/validation/analysis in current artifact root. Prior zero-call reports/manifests remain dated snapshots. E0/I3/I2 unchanged.
+- utility_collect requires --execute, fixed audit/authorization stage budget and fresh artifact directory. Use archived public Qwen model settings explicitly (localdefault is DeepSeek), shared provider adapter, SDK max_retries=0, serial counterbalanced pairs, started-attempt fsync and atomic response writes. Stop firstAPIerror/interruption; no resume/retry/model fallback/tools/source/37clean automatically. No live requests in offline tests.
+- Local replay preserves no_choices/NO_CHOICES. Existing imported-response comparison never promotes defaults. Capture only actual response content/usage/finish/refusal flag and whitelisted API metadata; no SDK exceptions or credentials. Current evidence workshop/artifacts/20261021_utility_live/; prior utility_stages preparation and user results protected.
+
+
+## Utility-stage diagnostic preparation (2026-10-21)
+
+- User approved fixed-input validation, not paid calls or new defenses. utility_stages exports audit24x2profilesx2=96, authorization12x2x2=48, source24x2x2=96 conditional templates. Captured local replay clients never instantiate SDKs or run tools. Original utility_packets remains12 cases.
+- Responses are imported only after separate budget approval/collection. Bind current frozen inputs and declared public model settings; these declarations do not certify server execution. Native audit/authorization parsers replay locally. Missing means not_measured/incomplete, costs unknown, errors separate, per-pair new unsafe grants block the diagnostic gate. Gate never promotes defaults or proves safety/TSR.
+- Authored labels remain synthetic expectations; no benchmark reference path, task IDs, schema loosening, retries, permission repair or runtime profile-splitting. Profiles are cumulative: authorization control protocol-v1 and tool-semantics-v1 share L3; arbitrary L2/L3 combinations are not implemented.
+- Trace signals read explicit files only, support summary/ledger, distinguish actual AUDIT_DENY from raw deny and preserve overlapping/unknown observations. Preserve results/download and E0/I3/I2 gates. Evidence workshop/artifacts/20261021_utility_stages/; completed engineering report workshop/completed/utility_stages_20261021.md. Subsequent144-call diagnosis above supersedes pending diagnosis status;37clean/attacks/97clean remain pending.
+
+
 ## Compact default audit prompt (2026-10-21)
 
 - User requested shortening ActionSecurityChecker.SYSTEM_POLICY. Base legacy prompt is now1919 characters/253 whitespace words (was3262/484); numbered action/task/evidence/read/send rules and explicit four-field JSON contract. These are character/word metrics, not measured token savings or semantic efficacy.

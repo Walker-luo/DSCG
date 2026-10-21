@@ -1,4 +1,5 @@
 import argparse
+from contextlib import closing
 import os
 from pathlib import Path
 import csv
@@ -34,6 +35,7 @@ from experiments.common.result_paths import (
 from experiments.common.benchmark_execution import (
     PreparedBindings, ApprovedBindings, run_lock,
 )
+from experiments.common.attack_execution import iter_attack_results, AttackOutput
 from experiments.common.benchmark_progress import GroupProgress, run_suite_with_progress
 from experiments.common.error_diagnostics import execution_error_diagnostics
 from experiments.common.native_cache_compat import ensure_native_cache_model_ready
@@ -316,47 +318,32 @@ def main(
         invocation = uuid4().hex
         execution_dir = base / 'execution' / invocation
         execution_dir.mkdir(parents=True, exist_ok=True)
-        execution = {'mode': 'serial', 'unit': 'attack_suite',
+        runnable_attacks = len({j['attack'] for j in jobs if j['compatibility'] is None})
+        parallel = runnable_attacks > 1
+        execution = {'mode': 'parallel_attacks' if parallel else 'serial', 'unit': 'attack',
+                     'attack_processes': runnable_attacks if parallel else 0,
                      'planned_groups': len(jobs), 'invocation_id': invocation}
         if 'cohort_validation' in context:
             execution['cohort_validation'] = context['cohort_validation']
-        print(f"结果目录: {base}；顺序执行 {len(jobs)} 组。", flush=True)
+        print(f"结果目录: {base}；{len(attack_names)} 个attack，{len(jobs)} 个场景组；"
+              + ("attack并行，内部顺序执行。" if parallel else "顺序执行。"), flush=True)
         started = monotonic()
         try:
-            group_results = []
-            for index, job in enumerate(jobs, 1):
-                if not progress:
-                    print(f"[{index}/{len(jobs)}] {job['attack']}/{job['suite']} 开始", flush=True)
-                if job['compatibility'] is not None:
-                    result = job['compatibility']
-                else:
-                    try:
-                        result = {'status': 'completed', 'result': _execute_group(job)}
-                    except (RunConfigurationError, KeyboardInterrupt):
-                        raise
-                    except Exception as exc:
-                        result = {'status': 'error', 'error_type': type(exc).__name__,
-                                  'execution_error': execution_error_diagnostics(exc)}
-                        from dscg.request_compatibility import api_error_diagnostics
-                        diagnostic = api_error_diagnostics(exc)
-                        if diagnostic is not None:
-                            result['api_error'] = diagnostic
-                            print(f"API诊断: {json.dumps(diagnostic, ensure_ascii=False)}", flush=True)
-                        location = result['execution_error']
-                        last_frame = location['frames'][-1] if location['frames'] else None
-                        print(f"执行异常定位: {location['stage']} {location['task_id'] or '-'} "
-                              f"{last_frame or '-'}", flush=True)
-                group_results.append(result)
-                if not progress or result['status'] != 'completed':
-                    print(f"[{index}/{len(jobs)}] {job['attack']}/{job['suite']} {result['status']}"
-                          + (f" ({result['error_type']})" if result['status'] == 'error' else
-                             f" ({result['reason_code']}; 0/{result['planned_pairs']})" if result['status'] == 'unsupported' else ''), flush=True)
+            group_results = [None] * len(jobs)
+            with AttackOutput(jobs, progress) as output:
+                with closing(iter_attack_results(jobs, on_event=output.event)) as results:
+                    for index, result in results:
+                        group_results[index] = result
+                        output.result(index, result)
         except KeyboardInterrupt:
-            execution.update(status='interrupted', wall_seconds=monotonic() - started)
+            execution.update(status='interrupted', wall_seconds=monotonic() - started, workers=output.workers,
+                             groups=[{'attack': j['attack'], 'suite': j['suite'],
+                                      **({k: v for k, v in r.items() if k != 'result'} if r is not None else {'status': 'interrupted'})}
+                                     for j, r in zip(jobs, group_results)])
             (execution_dir / 'execution.json').write_text(json.dumps(execution, indent=2) + '\n')
             # Derive partial reports from completed groups and already committed
             # task bindings. No model calls, new scores or cache rewrites.
-            completed_reports = [report for result in group_results if result['status'] == 'completed'
+            completed_reports = [report for result in group_results if result is not None and result['status'] == 'completed'
                                  for report in result['result']['suite_reports']]
             try:
                 from experiments.common.routing_reports import write_routing_summary
@@ -371,7 +358,7 @@ def main(
             return 130
         execution.update(status='error' if any(r['status'] == 'error' for r in group_results) else
                                 'unsupported' if all(r['status'] == 'unsupported' for r in group_results) else 'completed',
-                         wall_seconds=monotonic() - started,
+                         wall_seconds=monotonic() - started, workers=output.workers,
                          groups=[{'attack': j['attack'], 'suite': j['suite'],
                                   **{k: v for k, v in r.items() if k != 'result'}}
                                  for j, r in zip(jobs, group_results)])

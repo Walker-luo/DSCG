@@ -36,7 +36,8 @@ def defended(*args, **kwargs):
     return pipe,main,audit
 
 def attack(name,*args):
-    return SimpleNamespace(name=name,is_dos_attack=False,attack=lambda *_:{})
+    from agentdojo.attacks.attack_registry import ATTACKS
+    return SimpleNamespace(name=name,is_dos_attack=ATTACKS[name].is_dos_attack,attack=lambda *_:{})
 
 def execute(suite,pipeline,task,injection_task=None,injections=None):
     from agentdojo import logging
@@ -51,9 +52,11 @@ def execute(suite,pipeline,task,injection_task=None,injections=None):
 @contextmanager
 def patched(execute_fn=execute):
     from experiments import run_partial_benchmark as runner
-    with patch.object(runner,'make_openai_compatible_pipeline',side_effect=baseline), \
+    from experiments.common.attack_execution import iter_serial_results
+    with patch.object(runner,'iter_attack_results',side_effect=iter_serial_results), \
+         patch.object(runner,'make_openai_compatible_pipeline',side_effect=baseline), \
          patch.object(runner,'make_defended_pipeline',side_effect=defended), \
          patch.object(runner,'resolve_model_config',side_effect=resolve), \
          patch.object(runner.attacks,'load_attack',side_effect=attack), \
-         patch.object(type(get_suite('v1.2',get_suites()[0])),'run_task_with_pipeline',autospec=True,side_effect=execute_fn):
+         patch.object(type(get_suite('v1.2',get_suites()[0])),'run_task_with_pipeline',new=execute_fn):
         yield

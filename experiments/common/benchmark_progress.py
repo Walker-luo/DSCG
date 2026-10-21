@@ -6,12 +6,26 @@ the display without changing the native task loop or scorer.
 """
 from __future__ import annotations
 
+from contextlib import contextmanager
+from contextvars import ContextVar
 from math import ceil
 import sys
 from time import monotonic
 import warnings
 
 from agentdojo import benchmark
+
+
+_EVENT_SINK = ContextVar('benchmark_progress_events', default=None)
+
+
+@contextmanager
+def progress_events(send):
+    token = _EVENT_SINK.set(send)
+    try:
+        yield
+    finally:
+        _EVENT_SINK.reset(token)
 
 
 def run_suite_with_progress(pipeline, suite, attack, logdir, force_rerun, *,
@@ -71,7 +85,9 @@ def run_suite_with_progress(pipeline, suite, attack, logdir, force_rerun, *,
 class GroupProgress:
     """One attack/suite bar; redirected output uses bounded plain milestones."""
 
-    def __init__(self, label, *, goal_total, score_total, stream=None, is_tty=None):
+    def __init__(self, label, *, goal_total, score_total, stream=None, is_tty=None, shared_progress=None):
+        self.send = _EVENT_SINK.get()
+        self.shared_progress = shared_progress
         self.label = label
         self.goal_total = goal_total
         self.score_total = score_total
@@ -102,7 +118,14 @@ class GroupProgress:
 
     def __enter__(self):
         self.started = monotonic()
-        if self.is_tty:
+        if self.send is not None:
+            self.send({'kind': 'progress_start', 'label': self.label,
+                       'goal_total': self.goal_total, 'score_total': self.score_total})
+            return self
+        if self.shared_progress is not None:
+            self._progress = self.shared_progress
+            self._task_id = self._progress.add_task(self._description(), total=max(1, self.total))
+        elif self.is_tty:
             from rich.console import Console
             from rich.progress import BarColumn, Progress, TaskProgressColumn, TextColumn, TimeElapsedColumn
             self._progress = Progress(TextColumn("{task.description}"), BarColumn(),
@@ -125,6 +148,9 @@ class GroupProgress:
                 raise ValueError("scored progress exceeded planned tasks")
         else:
             raise ValueError(f"unknown benchmark progress phase: {phase}")
+        if self.send is not None:
+            self.send({'kind': 'progress_step', 'label': self.label, 'phase': phase})
+            return
         completed = self.goal_done + self.score_done
         if self._progress is not None:
             self._progress.update(self._task_id, completed=completed,
@@ -138,10 +164,15 @@ class GroupProgress:
 
     def __exit__(self, exc_type, _exc, _tb):
         status = "interrupted" if exc_type is KeyboardInterrupt else "error" if exc_type else "completed"
+        if self.send is not None:
+            self.send({'kind': 'progress_end', 'label': self.label, 'status': status})
+            return False
         if self._progress is not None:
             self._progress.update(self._task_id, description=self._description(status),
                                   completed=self.goal_done + self.score_done)
-            self._progress.stop()
+            self._progress.stop_task(self._task_id)
+            if self.shared_progress is None:
+                self._progress.stop()
         else:
             self._line(status)
         return False

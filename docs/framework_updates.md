@@ -1,5 +1,7 @@
 # 当前框架与平台展示交接
 
+2026-10-21精简候选：API `prompt_profile=task-alignment-v1` 已复用现有配置校验、身份绑定和factory，CLI full/partial/cohort相同；页面无新增控件，普通操作仍legacy。该分支使用原简洁工具目录，分别替换L2/L3提示，不累计旧长候选。严格协议、L2权限/Monitor/路由不变；重启服务后API可显式选用。新name测试，真实效用/安全未验证。[测试命令](./qwen_utility.md#task-alignment-v1)。
+
 2026-10-21：默认审计基础提示已压缩至1919字符，明确reason_code格式，保留现有边界与判决流程；候选profile追加规则不变。变化进入既有配置绑定，须新name测试；字符缩短不代表已验证的TSR或Token收益。[实施说明](../workshop/completed/l3_audit_prompt_20261021.md)。
 
 ## L3直接阈值策略（2026-10-21）
