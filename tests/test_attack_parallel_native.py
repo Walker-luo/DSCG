@@ -151,9 +151,21 @@ class NativeAttackParallelTests(unittest.TestCase):
     def test_interrupt_reaps_children_preserves_results_and_can_resume(self):
         from contextlib import closing
         import multiprocessing
+        import time
         def interrupted(jobs,*,on_event):
-            with closing(spawned(jobs,on_event=on_event)) as results:
+            with closing(iter_attack_results(jobs, on_event=on_event,
+                         execute=attack_parallel_fixture.execute_interruptible)) as results:
                 yield next(results)
+                # Stop at a deterministic task boundary, rather than randomly
+                # tearing a native JSON write (corrupt caches must still reject).
+                deadline = time.monotonic() + 15
+                while True:
+                    files = list(self.base('interrupt').glob('*/' + get_suites()[0] + '/fixture_events.jsonl'))
+                    if len(files) == 2 and all('"kind": "end"' in p.read_text() for p in files):
+                        break
+                    if time.monotonic() >= deadline:
+                        self.fail('fixture attacks did not reach the between-suite boundary')
+                    time.sleep(0.02)
                 raise KeyboardInterrupt
         previous={p.pid for p in multiprocessing.active_children()}
         options=dict(origin=True,suites=list(get_suites())[:2],attack=['ignore_previous','important_instructions'],results_dir=self.root,run_name='interrupt',progress=True)
@@ -169,7 +181,8 @@ class NativeAttackParallelTests(unittest.TestCase):
             self.assertTrue(traces)
             with patch.object(runner,'iter_attack_results',side_effect=spawned):
                 self.assertEqual(runner.main(**options,reuse=True),0)
-            for p,data in traces.items():self.assertEqual(p.read_bytes(),data)
+            for p,data in traces.items():
+                self.assertEqual(p.read_bytes(), data)
 
     def test_run_lock_blocks_dispatch(self):
         from experiments.common.benchmark_execution import run_lock

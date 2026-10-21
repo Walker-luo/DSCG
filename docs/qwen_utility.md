@@ -1,10 +1,10 @@
 # Qwen banking／Slack 效用诊断与分阶段候选
 
-2026-10-21：默认审计基础提示已压缩至1919字符，明确reason_code格式，保留现有边界与判决流程；候选profile追加规则不变。变化进入既有配置绑定，须新name测试；字符缩短不代表已验证的TSR或Token收益。[实施说明](../workshop/completed/l3_audit_prompt_20261021.md)。
+此前2026-10-21阶段：审计基础提示压缩至1919字符，明确reason_code格式，保留现有边界与判决流程；候选profile追加规则不变。变化进入既有配置绑定，须新name测试；字符缩短不代表已验证的TSR或Token收益。[实施说明](../workshop/completed/l3_audit_prompt_20261021.md)。
 
 当前L3运行已改为 `threshold-read-v1` 经验阈值，默认0.70、internal/personal读取资格，无需artifact。本文历史shadow观测与校准说明保留当时语义；提示候选仍需显式选择，新阈值不解决L2漏授权或协议失败。
 
-当前默认仍为 `three-layer-v3.1`、`prompt_profile=legacy`。新增协议诊断默认生效；改变模型提示和L2目录的候选必须显式选择。工程接线与离线测试不能证明TSR恢复。2026-10-16已撤回的准备读取候选没有恢复。
+当前默认为 `three-layer-v3.2`、`prompt_profile=legacy`，已直接采用更宽L2候选授权和更短的L3意图／参数来源审计，不需额外profile。写入、支付及外发仍检查关键参数与任务的关联，准备读取不要求未知事实已存在；协议/记录/回执失败分开诊断。这里的旧候选仍需显式选择，旧144次响应不能代表新默认的效果。[当前测试规则](./benchmark.md#默认-v32-策略与复测)。
 
 <a id="task-alignment-v1"></a>
 
@@ -14,7 +14,7 @@
 
 L3使用精简替换提示：先判断当前操作，再检查当前所需的事实。来源中夹有攻击文字，不等于当前符合用户任务且未转发攻击的动作违规；来源也不能新增任务、目的地或权限。准备读取无需提前证明未来写入成功，写入/外发仍审查真实目的地和正文。四字段解析、Monitor、票据、风险元数据、selective资格/阈值和重试均保持。
 
-这只是可测试的新候选，不宣称已恢复TSR。**普通benchmark仍为legacy，必须加参数才能测试本次优化。** 使用新运行名，配置绑定会拒绝混用旧缓存。沿用你的Qwen主/安全模型配置，先检查启动日志中的有效模型/端点；下面命令不切换模型：
+这只是可测试的新候选，不宣称已恢复TSR。**这个历史候选仍需显式参数；普通benchmark已运行新版默认策略，无需该参数。** 使用新运行名，配置绑定会拒绝混用旧缓存。沿用你的Qwen主/安全模型配置，先检查启动日志中的有效模型/端点；下面命令不切换模型：
 
 ```bash
 # ipi / AgentDojo：所选两个场景的全部37个clean任务
@@ -200,3 +200,7 @@ python -m experiments.run_benchmark --cohort /absolute/path/to/cohort.json --pro
 正式输出沿用results/benchmarks/agentdojo/运行目录；agent自测必须额外指定workshop/artifacts/下新results-dir。续跑保留原候选及全部配置，加`--reuse`，不通过force-rerun绕过绑定。两套环境同命令自动切换；AgentDyn的全量clean是60项，没有banking/slack，不跨后端比较分母。
 
 报告原生TSR/ASR、任务成功且攻击失败的联合结果、配对得失、有效/错误分母、协议错误、全部Token和模型调用数。目标是观察全量clean相对同轮baseline的差距能否接近5pp，不预先保证。若新增误放、合法动作出现新损失或只能依赖特例追分，不替换默认；L1继续等待独立对照证据。
+
+## 历史诊断回放
+
+`utility_stages`的`legacy-v1`使用冻结的旧授权/审计基础提示，保留原请求哈希和144次历史响应的解释；不将旧响应重新绑定新默认。默认`authorized-v2`导出当前提示，生成新的请求/包身份。包内相同profile名称不代表跨版本提示相同，比较时以冻结请求为准。

@@ -1,5 +1,7 @@
 # 小批量测试：run_partial_benchmark
 
+默认DSCG已更新为 `three-layer-v3.2`（legacy）：L2保留多个合理工具候选，L3精简为当前用途与参数来源审计。执行校验保持不变；新策略使用新name，旧冻结cohort仍按轻量规则读取。详见[默认策略与复测](./benchmark.md#默认-v32-策略与复测)。本次离线验证不代表真实TSR/ASR改善。
+
 DashScope/Qwen与DeepSeek的Chat请求角色由DSCG公共客户端分别适配，不修改conda包；更新后使用新运行名。AgentDyn首次请求的400/422定位、受限诊断字段和小范围复测要求见[消息角色兼容排错](./model_tool_configuration.md#消息角色兼容与请求排错)。旧测量缓存与新增请求身份不一致时拒绝复用，旧数据保留；冻结cohort只比较主模型ID/provider及环境与所选任务，详见[名单校验](./injection_precheck.md#2-中断和错误后续跑)。
 
 在 `DSCG/`、已激活 `ipi`（AgentDojo）或 `ipi-agentdyn`（AgentDyn）环境下执行。安装与依赖自检见 [全量指南](./benchmark.md#安装与依赖自检)，模型/工具配置见 [配置指南](./model_tool_configuration.md)。
@@ -115,3 +117,7 @@ python -m experiments.diagnostics.agentdyn_zero_rates \
 ```
 
 输出目录必须是新目录。脚本只读取原始轨迹与原生标签，报告参考完成路径所用工具与 L2 授权的差集、审计阻断、工具错误、GOAL 预检及注入文本在工具返回中的精确重合。参考路径不是唯一完成路径，文本重合也不等于模型实际遵循注入；缺失、损坏、错误和未执行分组不记为 ASR=0。正式效用与攻击效果仍需同任务、同配置的 baseline/DSCG 对照。
+
+## 工具参数 JSON 错误
+
+单条主模型工具参数发生原生JSON语法错误时，只结束当前任务，记为基础设施错误并继续其他任务；不修补参数、不自动重试，原分母和任务范围不改变。TSR/ASR有效分母排除错误任务，GOAL预检错误另列；progress开关和attack并行采用同一策略，存在错误仍退出1。诊断在每场景`task_errors.jsonl`及本次summary/失败索引中；旧错误不污染新的成功结果。其他JSON异常仍报告原错误。详见[错误处理与续跑](./benchmark.md#工具参数-json-解析错误)。

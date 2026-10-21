@@ -356,7 +356,7 @@ def main(
                 print('部分汇总未完成；原始结果与执行状态已保留，可离线重新汇总。', flush=True)
             print('已中断；保留原参数、运行名并加 --reuse 续跑。', flush=True)
             return 130
-        execution.update(status='error' if any(r['status'] == 'error' for r in group_results) else
+        execution.update(status='error' if any(r['status'] == 'error' or r.get('task_errors') for r in group_results) else
                                 'unsupported' if all(r['status'] == 'unsupported' for r in group_results) else 'completed',
                          wall_seconds=monotonic() - started, workers=output.workers,
                          groups=[{'attack': j['attack'], 'suite': j['suite'],
@@ -404,7 +404,7 @@ def main(
         print(f"📋 攻击执行清单: {manifest_path}")
         return 1 if (not any(r['status'] == 'completed' for r in group_results) or
                      any(record["status"] == "error" for record in run_records) or
-                     any(report.get("task_errors") for report in context.get("suite_reports", []))) else 0
+                     any(report.get("task_errors") or report.get("goal_preflight_errors") for report in context.get("suite_reports", []))) else 0
 
 
 def _execute_group(job):
@@ -678,27 +678,11 @@ def _run_single_attack(
                             pipeline, suite, attack, base_output_dir, force_rerun,
                             user_tasks=selected_users, injection_tasks=selected_injections,
                             benchmark_version=SUITE_VERSION, on_step=display.advance)
-                elif run_attack:
-                    results = benchmark.benchmark_suite_with_injections(
-                        pipeline,
-                        suite,
-                        attack,
-                        base_output_dir,
-                        force_rerun=force_rerun,
-                        user_tasks = selected_users,
-                        injection_tasks = selected_injections,
-                        verbose= True,
-                        benchmark_version=SUITE_VERSION,
-                    )
                 else:
-                    results = benchmark.benchmark_suite_without_injections(
-                        pipeline,
-                        suite,
-                        base_output_dir,
-                        force_rerun=force_rerun,
-                        user_tasks = selected_users,
-                        benchmark_version=SUITE_VERSION,
-                    )
+                    results = run_suite_with_progress(
+                        pipeline, suite, attack, base_output_dir, force_rerun,
+                        user_tasks=selected_users, injection_tasks=selected_injections,
+                        benchmark_version=SUITE_VERSION)
         finally:
             pipeline.name = result_dir_name
 
@@ -713,7 +697,8 @@ def _run_single_attack(
         summary_file_path = suite_output_dir / "summary.json"
 
         outcomes = project_outcomes(utility_results, security_results, suite_output_dir,
-                                    attack_name if run_attack else "none", run_attack=run_attack)
+                                    attack_name if run_attack else "none", run_attack=run_attack,
+                                    task_errors=results.get("task_errors", []))
         structured_records = [{
             "suite_name": suite_name,
             "model_id": resolved_model_id,
@@ -791,6 +776,10 @@ def _run_single_attack(
                 "total_tokens": total_tokens
             },
         }
+        task_errors = results.get('task_errors', [])
+        if task_errors:
+            summary_data['task_error_diagnostics'] = task_errors
+            summary_data['task_counts']['goal_preflight_errors'] = sum(e['stage'] == 'goal_preflight' for e in task_errors)
         if cohort_sha256 is not None:
             summary_data['cohort_sha256'] = cohort_sha256
 

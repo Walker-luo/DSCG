@@ -7,6 +7,15 @@ import time
 import serial_fixture
 
 
+def execute_interruptible(job):
+    """Pause between suites so interruption never tears a fixture JSON write."""
+    from dscg.benchmark_catalog import get_suites
+    if job['suite'] != get_suites()[0]:
+        while True:
+            time.sleep(0.05)
+    return execute(job)
+
+
 def execute(job):
     from experiments import run_partial_benchmark as runner
     folder = next(p.parent for p in job['bindings'].checked

@@ -15,6 +15,7 @@ from agentdojo.functions_runtime import FunctionsRuntime, FunctionCall
 from dscg.pipelines import defended as d
 from dscg.tool_metadata import load_tool_metadata, set_tool_metadata, metadata_for_runtime
 from experiments.diagnostics.utility_packets import build_packets
+from dscg.prompt_profiles import audit_policy
 
 ROOT = Path(__file__).resolve().parents[2]
 FIXTURES = ROOT / 'tests/fixtures'
@@ -26,6 +27,7 @@ STAGES = {'audit': ('legacy', 'protocol-v1'),
 LIMITATION = ('Authored diagnostic expectations, not independent safety labels, native TSR/ASR, '
               'or proof of causal recovery. Local replay creates no SDK clients and executes no tools; '
               'imported responses may represent paid model calls. No automatic promotion.')
+_LEGACY_POLICIES = json.loads(Path(__file__).with_name('utility_legacy_policies.json').read_text())
 
 
 def digest(value):
@@ -138,6 +140,16 @@ def _model(client):
     return SimpleNamespace(name='diagnostic-model-placeholder', client=client)
 
 
+def _component(client, profile, *, authorization=False, input_revision='authorized-v2'):
+    component = (d.ToolAuthorizationCompiler if authorization else d.ActionSecurityChecker)(
+        _model(client), prompt_profile=profile)
+    if input_revision == 'legacy-v1':
+        # Frozen historical responses must never be rebound to today's default prompts.
+        component.SYSTEM_POLICY = (_LEGACY_POLICIES['authorization'] if authorization else
+                                   audit_policy(_LEGACY_POLICIES['audit'], profile))
+    return component
+
+
 def _bank_packets():
     """Historical incomplete context, used only to verify frozen legacy-v1 bundles."""
     runtime = synthetic_runtime('banking')
@@ -198,10 +210,10 @@ def build_stage(stage, *, input_revision='authorized-v2'):
         for case in cases:
             client = _ReplayClient(authorization=stage == 'authorization')
             if stage == 'authorization':
-                d.ToolAuthorizationCompiler(_model(client), prompt_profile=profile).compile(
+                _component(client, profile, authorization=True, input_revision=input_revision).compile(
                     d.TrustedTaskRequest(case['request']), synthetic_runtime(case['suite']))
             else:
-                d.ActionSecurityChecker(_model(client), prompt_profile=profile)._request_audit(
+                _component(client, profile, input_revision=input_revision)._request_audit(
                     case['packet']['trusted_user_request'], None, case['packet'])
             for repetition in (1, 2):
                 requests.append(dict(id=f'{profile}/{case["id"]}/{repetition}', case_id=case['id'],
@@ -226,7 +238,8 @@ def _prediction(bundle, request, case, response):
     try:
         if bundle['stage'] == 'authorization':
             runtime = synthetic_runtime(case['suite'])
-            grant = d.ToolAuthorizationCompiler(_model(client), prompt_profile=request['profile']).compile(
+            grant = _component(client, request['profile'], authorization=True,
+                               input_revision=bundle.get('input_revision', 'legacy-v1')).compile(
                 d.TrustedTaskRequest(case['request']), runtime)
             action_tools = {name for name,status in metadata_for_runtime(runtime).items()
                             if status.metadata.effect != 'read'}
@@ -236,7 +249,8 @@ def _prediction(bundle, request, case, response):
                                                         - set(case['allowed_action_tools'])))
             result['unsafe'] = bool(result['unexpected_action_tools'])
         else:
-            text = d.ActionSecurityChecker(_model(client), prompt_profile=request['profile'])._request_audit(
+            text = _component(client, request['profile'],
+                              input_revision=bundle.get('input_revision', 'legacy-v1'))._request_audit(
                 case['packet']['trusted_user_request'], None, case['packet'])
             decision, _, _, _ = d._parse_audit_payload(text)
             result.update(decision=decision, authored_expectation=case['expected'],

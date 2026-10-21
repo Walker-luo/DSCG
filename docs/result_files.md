@@ -79,3 +79,19 @@ python -m experiments.diagnostics.summarize_results \
 refresh只替换具有本工具schema/Markdown标记的两份报告，不覆盖同名个人文件。生成时持有目录锁、检查现有CLI运行锁、临时写入后原子替换单文件；符号链接输出拒绝。先确认运行已停止；Dashboard在另一服务进程中的活动状态不能仅凭文件锁完整识别。两份报告的时间来源相同，若进程在两次替换之间崩溃，可在运行停止后refresh重建。
 
 所有指标只是已保存事件的统计，不验证远端模型版本，不更改研究闸门，也不证明防御有效或阈值已可部署。
+
+## 工具参数错误记录
+
+CLI测量的每个`<attack>/<suite>/task_errors.jsonl`只追加本次新出现的主模型工具参数JSON语法错误，每行含invocation_id、阶段/任务ID、固定错误码、解析位置、参数长度及有限堆栈；不含参数正文、异常原文或凭证。原生轨迹不补造utility/security标签。场景summary.json的task_error_diagnostics仅含本次事件；当前评分及失败索引不扫描历史错误文件来反推失败。
+
+新错误记录还区分`empty_arguments`和`json_syntax`，保存`response_finish_reason`及`response_completion_tokens`；无法取得时为null。`length`可作为输出达到服务长度限制的线索；其他结束原因不能证明参数完整，也不能反推历史错误的原因。
+
+计分/clean错误行的派生标签为空、sample_status=infrastructure_error，保留计划数但排除有效TSR/ASR分母。GOAL预检错误使用goal_preflight阶段与独立计数，根摘要明确显示，不进入评分分母。进度100%表示尝试已结束；有错误仍返回退出码1。API成功返回后发生格式错误，Token已计入，不把它计作HTTP失败。
+
+显式reuse仍由原生loader决定缓存完整性，完整错误缓存不自动重试；缺失/不完整任务按原规则补测并保存旧字节快照。历史task_errors.jsonl原样保留；新尝试成功时只在历史中保留旧错误。screen/Dashboard及其他JSON异常不应用这套单任务隔离。详见[完整指南](./benchmark.md#工具参数-json-解析错误)。
+
+## 审计与交接诊断
+
+v3.2的审计事件保留`mediation_diagnostics`：`checker_parser_status`和受限`checker_protocol_diagnostics`记录原始模型协议观察，`audit_record_status`记录审计记录校验，`router_handoff_status`记录路由回执交接。`failure_stage`分别为`model_protocol`、`model_request`、`audit_record`或`router_handoff`，正常为空；未检查/未知状态不反推模型错误。审计摘要新增`mediation_failure_counts`，并继续保留原始解析计数。
+
+不要仅凭`AUDIT_SCHEMA_INVALID`断定模型JSON格式失败：可能是记录或回执校验失败，即使原始解析为ok仍会拒绝执行。新增字段不保存响应正文或异常原文，不放宽Monitor；旧轨迹缺字段时保留未知，不回填历史结果。

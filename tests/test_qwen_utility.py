@@ -6,6 +6,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from types import SimpleNamespace
 import unittest
+from tests.test_partial_agentdyn import legacy_suite_dispatch
 from unittest.mock import Mock, patch
 
 from agentdojo.functions_runtime import FunctionsRuntime, FunctionCall, EmptyEnv
@@ -232,6 +233,7 @@ class PromptProfileTests(unittest.TestCase):
         with TemporaryDirectory(dir=artifacts) as directory, \
                 patch.object(d, 'create_openai_client', return_value=Mock()), \
                 patch.object(runner.benchmark, 'benchmark_suite_without_injections', side_effect=scored), \
+                patch.object(runner, 'run_suite_with_progress', side_effect=legacy_suite_dispatch), \
                 redirect_stdout(StringIO()):
             options = dict(model_id='qwen3.7-flash', api_key='offline-key', suites=[get_suites()[0]],
                            run_attack=False, results_dir=directory, run_name='bound', audit_router_mode='shadow')

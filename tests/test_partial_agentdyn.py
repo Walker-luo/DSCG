@@ -241,6 +241,22 @@ class AgentDynOfflineExecution(unittest.TestCase):
                             self.assertEqual(plan['schema_version'], 'dscg.benchmark-plan.v2')
 
 
+def legacy_suite_dispatch(pipeline, suite, attack, logdir, force_rerun, *,
+                          user_tasks, injection_tasks, benchmark_version, on_step=None):
+    """Keep existing batch-mocked bookkeeping fixtures independent of task I/O."""
+    if on_step is not None:
+        from experiments.common.benchmark_tasks import run_native_suite
+        return run_native_suite(pipeline, suite, attack, logdir, force_rerun,
+            user_tasks=user_tasks, injection_tasks=injection_tasks,
+            benchmark_version=benchmark_version, on_step=on_step)
+    if attack is not None:
+        return runner.benchmark.benchmark_suite_with_injections(pipeline,suite,attack,logdir,
+            force_rerun=force_rerun,user_tasks=user_tasks,injection_tasks=injection_tasks,
+            verbose=True,benchmark_version=benchmark_version)
+    return runner.benchmark.benchmark_suite_without_injections(pipeline,suite,logdir,
+        force_rerun=force_rerun,user_tasks=user_tasks,benchmark_version=benchmark_version)
+
+
 def fixture_backend(identity=DOJO_IDENTITY, *, native_legacy=False):
     """Explicit synthetic profile for generic bookkeeping tests, never efficacy."""
     from contextlib import ExitStack
@@ -251,6 +267,7 @@ def fixture_backend(identity=DOJO_IDENTITY, *, native_legacy=False):
     backend = profile(identity)
     from experiments.common.attack_execution import iter_serial_results
     stack.enter_context(patch.object(runner, 'iter_attack_results', side_effect=iter_serial_results))
+    stack.enter_context(patch.object(runner, 'run_suite_with_progress', side_effect=legacy_suite_dispatch))
     # Synthetic bookkeeping suites have no native ground_truth contract.
     stack.enter_context(patch.object(runner, 'check_attack_compatibility', return_value=None))
     for module in (runner, controls, cohort, reuse, run_benchmark, run_injection_precheck, partial_reporting):

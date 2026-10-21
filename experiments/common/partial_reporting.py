@@ -88,6 +88,9 @@ def collect_suite_report(base_dir: Path, suite_dir: Path, summary: dict, records
     attack = selection["attack"] or "none"
     attacked = summary["attack_kind"] != "none"
     cases = []
+    diagnostics = {(e['user_task_id'], e['injection_task_id']): e
+                   for e in summary.get('task_error_diagnostics', []) if e['stage'] != 'goal_preflight'}
+    preflight_errors = [e for e in summary.get('task_error_diagnostics', []) if e['stage'] == 'goal_preflight']
 
     def add_case(user, injection, utility, security, status, failure_types):
         trace = suite_dir / str(user) / attack / f"{injection if attacked else 'none'}.json"
@@ -99,6 +102,9 @@ def collect_suite_report(base_dir: Path, suite_dir: Path, summary: dict, records
             "sample_status": status, "trace_path": trace.relative_to(base_dir).as_posix(),
             "trace_exists": trace.is_file(), "excerpts": [],
         }
+        detail = diagnostics.get((user, injection if attacked else None))
+        if detail is not None:
+            case['tool_arguments_error'] = detail
         # Reporting must not read outside the run directory, including symlinks.
         if trace.resolve().is_relative_to(base_dir.resolve()):
             excerpt_status, excerpts, task_error = _read_excerpts(trace)
@@ -136,15 +142,25 @@ def collect_suite_report(base_dir: Path, suite_dir: Path, summary: dict, records
             if (user, injection) not in seen:
                 add_case(user, injection, None, None, "infrastructure_error", ["result_missing"])
 
+    for error in preflight_errors:
+        trace = suite_dir / error['user_task_id'] / 'none' / 'none.json'
+        cases.append({'attack': attack, 'suite': summary['suite_name'], 'model_id': summary['model_id'],
+                      'user_task_id': None, 'injection_task_id': error['user_task_id'], 'phase': 'goal_preflight',
+                      'failure_types': ['goal_preflight_error'], 'sample_status': 'infrastructure_error',
+                      'utility_success': None, 'attack_success': None,
+                      'trace_path': trace.relative_to(base_dir).as_posix(), 'trace_exists': trace.is_file(),
+                      'excerpt_status': 'not_scored_preflight', 'excerpts': [], 'tool_arguments_error': error})
+
     unavailable = sum(record["attack_success"] is None for record in records) if attacked else 0
     missing = sum("result_missing" in case["failure_types"] for case in cases)
     return {
         "attack": attack, "suite": summary["suite_name"], "summary": summary,
         "summary_path": (suite_dir / "summary.json").relative_to(base_dir).as_posix(),
-        "status": "partial" if missing or unavailable or any(r.get("execution_error") for r in records) else "completed",
+        "status": "partial" if missing or unavailable or preflight_errors or any(r.get("execution_error") for r in records) else "completed",
         "tsr_failures": sum("tsr_failure" in case["failure_types"] for case in cases),
         "asr_successes": sum("asr_success" in case["failure_types"] for case in cases),
         "metric_unavailable": unavailable + missing,
+        "goal_preflight_errors": len(preflight_errors),
         "task_errors": sum("task_error" in case["failure_types"] for case in cases),
         "cases": cases,
     }
@@ -227,13 +243,16 @@ def write_run_overview(base_dir: Path, attack_names: list[str], suites: list[str
                 main_tokens = data["overhead"].get("total_tokens", 0)
                 sec_tokens = data.get("sec_overhead", {}).get("total_tokens", 0)
                 status = report["status"] + (" (DoS)" if data["attack_kind"] == "dos" else "")
+                task_errors = str(report['task_errors'])
+                if report.get('goal_preflight_errors'):
+                    task_errors += f" (GOAL预检错误={report['goal_preflight_errors']})"
                 row = [attack, suite, status, f"{total}/{counts['planned_tasks']}",
                        _rate(counts["utility_passed"], counts.get("utility_valid", total)),
                        _rate(report["asr_successes"], valid, enabled=attacked),
                        _rate(valid - report["asr_successes"], valid, enabled=attacked),
                        f"{main_tokens}/{sec_tokens}/{main_tokens + sec_tokens}",
                        report["tsr_failures"], report["asr_successes"], report["metric_unavailable"],
-                       report["task_errors"], _link(report["summary_path"])]
+                       task_errors, _link(report["summary_path"])]
             # Links are already Markdown-escaped.
             lines.append("| " + " | ".join(_cell(value) for value in row[:-1]) + " | " + row[-1] + " |")
     lines.extend(["", "各场景 Token 统计范围："])
@@ -253,7 +272,8 @@ def write_run_overview(base_dir: Path, attack_names: list[str], suites: list[str
                       "| --- | --- | --- | --- | --- | --- | --- |"])
         labels = {"tsr_failure": "TSR失败", "asr_success": "ASR成功（防御失败）",
                   "asr_unavailable": "ASR缺失/无效", "result_missing": "结果缺失",
-                  "task_error": "任务运行错误", "run_error": "运行中断"}
+                  "task_error": "任务运行错误", "run_error": "运行中断",
+                  "goal_preflight_error": "GOAL预检错误（不计分）"}
         for case in cases[:10]:
             task = f"{case.get('user_task_id') or '—'} / {case.get('injection_task_id') or 'none'}"
             location = case.get("trace_path") or case.get("source_path")

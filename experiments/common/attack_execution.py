@@ -17,7 +17,10 @@ def group_result(job, execute=None):
         from experiments.run_partial_benchmark import _execute_group
         execute = _execute_group
     try:
-        return {'status': 'completed', 'result': execute(job)}
+        result = execute(job)
+        errors = sum(r.get('task_errors', 0) + r.get('goal_preflight_errors', 0)
+                     for r in result.get('suite_reports', []))
+        return {'status': 'completed', 'result': result, **({'task_errors': errors} if errors else {})}
     except KeyboardInterrupt:
         raise
     except Exception as exc:
@@ -219,9 +222,11 @@ class AttackOutput:
             location = result['execution_error']
             frame = location['frames'][-1] if location['frames'] else None
             self.line(f"执行异常定位: {location['stage']} {location['task_id'] or '-'} {frame or '-'}")
-        if not self.progress or result['status'] != 'completed':
+        if not self.progress or result['status'] != 'completed' or result.get('task_errors'):
             suffix = (f" ({result['error_type']})" if result['status'] == 'error' else
                       f" ({result['reason_code']}; 0/{result['planned_pairs']})" if result['status'] == 'unsupported' else '')
+            if result.get('task_errors'):
+                suffix += f" (task_errors={result['task_errors']})"
             self.line(f"[{index+1}/{len(self.jobs)}] {job['attack']}/{job['suite']} {result['status']}{suffix}")
 
     def __exit__(self, exc_type, exc, tb):

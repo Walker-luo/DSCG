@@ -1,0 +1,163 @@
+{
+  "schema": "dscg.intent-source-relaxation.delivery.v1",
+  "status": "offline_pass_no_efficacy_claim",
+  "base_commit": "54fa09ce6e127a816ae7f9fe9d9d6e025c98738d",
+  "branch": "workshop",
+  "working_tree": "prior uncommitted work preserved; no commit",
+  "default_defense_version": "three-layer-v3.2",
+  "prompt_profile": "legacy",
+  "policy_characters": {
+    "authorization": 844,
+    "audit": 1050
+  },
+  "paid_requests": 0,
+  "real_benchmarks": 0,
+  "checks": [
+    {
+      "environment": "ipi",
+      "exit_code": 0,
+      "tests": 662,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 10,
+      "network_attempts": 0,
+      "command": "conda run --no-capture-output -n ipi env PYTHONPATH=/Users/luo/Desktop/AgentDefence/DSCG/workshop/artifacts/20261021_intent_source_relaxation/network_guard python -B /Users/luo/Desktop/AgentDefence/DSCG/workshop/artifacts/20261021_intent_source_relaxation/run_offline_tests.py"
+    },
+    {
+      "environment": "ipi-agentdyn",
+      "exit_code": 0,
+      "tests": 666,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 3,
+      "network_attempts": 0,
+      "command": "conda run --no-capture-output -n ipi-agentdyn env PYTHONPATH=/Users/luo/Desktop/AgentDefence/DSCG/workshop/artifacts/20261021_intent_source_relaxation/network_guard python -B /Users/luo/Desktop/AgentDefence/DSCG/workshop/artifacts/20261021_intent_source_relaxation/run_offline_tests.py"
+    }
+  ],
+  "node": {
+    "exit_code": 0,
+    "passed": 47,
+    "command": "/Users/luo/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node --test tests/*.cjs"
+  },
+  "cli_help": {
+    "exit_code": 0,
+    "commands": [
+      "conda run --no-capture-output -n ipi python -B -m experiments.run_benchmark --help",
+      "conda run --no-capture-output -n ipi python -B -m experiments.run_partial_benchmark --help",
+      "conda run --no-capture-output -n ipi-agentdyn python -B -m experiments.run_benchmark --help",
+      "conda run --no-capture-output -n ipi-agentdyn python -B -m experiments.run_partial_benchmark --help"
+    ]
+  },
+  "delivery": {
+    "command": "python workshop/artifacts/20261021_intent_source_relaxation/validate_delivery.py",
+    "exit_code": 0,
+    "checked_links": 339,
+    "preexisting_link_errors": [
+      [
+        "README.md",
+        "./report/report.md",
+        "missing file"
+      ],
+      [
+        "README.md",
+        "./report/report.md",
+        "missing file"
+      ],
+      [
+        "AGENTS.md",
+        "./report/report.md",
+        "missing file"
+      ],
+      [
+        "workshop/README.md",
+        "../report/report.md",
+        "missing file"
+      ],
+      [
+        "workshop/completed/README.md",
+        "../../report/report.md",
+        "missing file"
+      ]
+    ],
+    "protected_result_files": 14022,
+    "protected_changed": [],
+    "new_protected_files": [],
+    "diff_check_exit": 0
+  },
+  "review": "independent read-only review; no actionable findings; original/frozen policies byte-equal",
+  "limitations": [
+    "Authored API/auditor replies verify execution contracts, not real model authorization/audit quality.",
+    "No claimed TSR/ASR improvement or Token savings.",
+    "No handoff execution defect reproduced; no validation bypass.",
+    "Initial validation wrapper recursion corrected; retained logs are not final test results."
+  ],
+  "file_sha256": {
+    "dscg/input_isolation.py": "0b6df9f94d9fd938b40b665b17f1e65c374b23679f6cb82540722dbf4d1240aa",
+    "dscg/pipelines/defended.py": "f04e5c2914fa0503884c7218f2aa2bc6a56da8788fa5f6f91b493a224145238e",
+    "experiments/diagnostics/utility_stages.py": "a8f604366bfb22a05679f4948859d9c3c29f6be42289370121e3752d924fe167",
+    "experiments/diagnostics/utility_legacy_policies.json": "a82fdaea0450d35f7c15ec49eb995ff56476914ff3c27a40fdb8cbe13f2a2ebd",
+    "tests/test_intent_source_relaxation.py": "ca69a1713ae7cec1ba9625091cac715b04469be31922aada735dcaba4cbbd7b0",
+    "tests/test_intent_source_native.py": "5ddf55d926ae111b1a5407ba2d8dd4edc88a21b7328040ff644e04c5c6e94185",
+    "tests/test_task_alignment.py": "099526f8eda1f4301cc2775a29b1ce8cefab8828b5b9f8fd4426324bb8eaf8d4",
+    "AGENTS.md": "1889bc5e14b3e885dde8fb740a0256f141550f9e3ca1aad42c7592d68067e3a1",
+    "README.md": "7bf5eb8863ea51a71607f1ce3d7cb07d9b2b0b583146abd352401dc4a387aeb7",
+    "docs/README.md": "3f7de125927b65b8335cf31abcb8a44d579045aa7333c02d06adda5516926593",
+    "docs/benchmark.md": "bce5a8edee74283ee102e84604f431d2d97a3ae24dbce375799de58fe2577ab8",
+    "docs/partial_benchmark.md": "712dcd8ca6bcc0cb904fc083f06b5a8ed8ab241ec00b79d333134bf67030dae9",
+    "docs/qwen_utility.md": "ed4ea7f41737e2927fdc0ec5d7d232c20228cf1a365b200ef34c96ec1b96bb98",
+    "docs/result_files.md": "bb15bf4482ef2382225265c1d27ec5b6fcbcca7b37fb2884e553b6042fdd7b4a",
+    "docs/framework_updates.md": "f9e069c85a48cfeb6dfca1f4679ac01fb27f0d45db9b7e76c742194c63cbad65",
+    "docs/dashboard.md": "7716a8356ab884e73771008d788d89f33c0dc2e0fbccca48937a53e753a4ada7",
+    "docs/model_tool_configuration.md": "9384db75dd9c24cb6a22cccac32da7f3615a1358433a884db2323db720d80b74",
+    "workshop/README.md": "baf2666d05f90c80dff1cdc8d0d8d96999bba6d67e01f5dd90cfcfcc9db23f50",
+    "workshop/completed/README.md": "8b7f653fbaaf32298ca9b4c977d0cac60547effcf23c3ec6105c51d2545133b1",
+    "workshop/completed/intent_source_relaxation_20261021.md": "79a02b1eea7e4359c9fda05ef0c468d04056299564ded8e0dfed99743e03360b"
+  },
+  "evidence_sha256": {
+    "before.json": "4dd39fd16a1acb563cbd37fc0b0820e5a465d1e93ed669882ea6a25f364ee143",
+    "ledger.md": "b8f0a2e15ee11ba080b6b31c282824c2e2e6a7d4f51f8412091121d585f561d9",
+    "policy_red.log": "e4ddb4732becb378f885c048f843326c76e08d6e051063911dd6f5fde0ae6a55",
+    "binding_green.log": "2dd09c289a11501c747a3bb3c9b2a7f74593e1c79b222c8097c8c32a21a0e517",
+    "native_green.log": "1ff92ab84d3cb94edf1aa2b63fa47d17283c1fb800af2c5549af0a22c16c509b",
+    "audit_regression.log": "ffd712b6e8f14b3d77f9f3385cdde1699823a86d1cce685fa256c7d9264b8584",
+    "candidate_green.log": "3f872f47ab58a280795dfb5298fd32d6923c0117a8f260d6db26156f8312fedb",
+    "ipi_verified.log": "1633dc4f6188027cfce902b81fac7e8405ed0dc1ba56803802dd2c2c545dcf3e",
+    "agentdyn_verified.log": "50cfb035974f9abab3e0a00125048a3bac3f27c97174e5d30ad63efbe628cd9f",
+    "node_final.log": "df00be653d4c976969343c56fdd7c41e9506821ba6eaf71124393a4e0fba0538",
+    "full_help_ipi.log": "234fb5317e931ad5d10eb4470d639b2e0d481e31d2a192b2d6fec81c01f901cd",
+    "full_help_agentdyn.log": "234fb5317e931ad5d10eb4470d639b2e0d481e31d2a192b2d6fec81c01f901cd",
+    "partial_help_ipi.log": "c2a32c693c2dc878ddd594adc7d058052796fbd1d6bab385b5898d2206250bce",
+    "partial_help_agentdyn.log": "c2a32c693c2dc878ddd594adc7d058052796fbd1d6bab385b5898d2206250bce",
+    "delivery_validation.json": "f03126c6abfdca8043f5d729622aba0388d6f5cf97a105eb2500de550fbe3ded",
+    "delivery_check_final.log": "d919c8ef13daf4c28b1d0fd325044605798c81fb3f9133611d41357056d5659f",
+    "run_offline_tests.py": "8a4b1ca3343312039fd4c614ac248a8ed2adb263f368009de68d54302328c148",
+    "network_guard/sitecustomize.py": "2ed9377d28719b62f64c91177c81a3ff4bf42ff820fb0236e0ac3fca5b65d005",
+    "validate_delivery.py": "e6152e66363d94f3af3a53ad21e41be97dfc9ab4ea712887c0224f6d9bd7048e",
+    "historical_replay_verification.json": "f2b9523a5f21a8d0b3fb3e6b710db59cd33b36e176a6a38f04ee83320f5848be",
+    "historical_audit_replay.log": "d6e20f9a34293425784e4b089d14c87aa0f0c6b5c748fd0e95d5a0f0eaf9f2e8",
+    "historical_authorization_replay.log": "d6e20f9a34293425784e4b089d14c87aa0f0c6b5c748fd0e95d5a0f0eaf9f2e8",
+    "historical_audit_replay/comparison.json": "7cdd4d0925c750dcb3de0ba59537b1b8ed86f453957c4ee65b12713de4a3a33c",
+    "historical_authorization_replay/comparison.json": "7ddd1a564360d8a2f6f3a95cf61d80d902df327384a3ce462121e2fc5a3e2544"
+  },
+  "originals_sha256": {
+    "README.md": "a2ab0ae34ef14f4c5b631f7b73acbda5fe07d5a32ea85e05d39ffce846d95463",
+    "AGENTS.md": "750498ce00f9d5d4e412ca8aacbd99311cbd6d31b3eb9e835f3f84803a5db3e7",
+    "workshop/README.md": "96ceaab050600ba3e219f34bed427a56c95482e3347e6940349020e0bb54dc9f",
+    "dscg/audit_router.py": "f0e6ef42201618cd662dad2333c4785649595094a734bec797284cf9cc30cbbf",
+    "dscg/input_isolation.py": "3bfdd29882b7eb45f77705c0e68db653fae5b45914a3b89135a1c8af81b663e0",
+    "tests/test_task_alignment.py": "e6c3e1c51806c27e97674ac55e02a9d4dfd9face13022d91321fa39e29a79bad",
+    "tests/test_threshold_router.py": "8a185e46b3084896ab7491d3e49fa14fee73f0b2e259a5776089ba424f5d00a1",
+    "docs/dashboard.md": "1e0be77f85e759430c80de3a0ed26ddfbf99d82f5548b39475e1983e506f8e8b",
+    "docs/framework_updates.md": "bd48a65d05107d5bdbbd4db7cae133a737a918a1c05bba4bc9cfbc388a3cd793",
+    "docs/benchmark.md": "c382bc95cbb2a13ceaa63968e215da23ac6c3b30ffec245c37475603759bee5a",
+    "docs/README.md": "0b3fe6d8206b21945db99cefcd3ddf45375974c727008088a70ba80c54a76b54",
+    "docs/model_tool_configuration.md": "9c5607f91f39f3b340a2a09f18dfab7021f11e75d1cd4df4601984b2cf88b6e5",
+    "docs/qwen_utility.md": "34bfd5d084ed4a9c61a9b0687856637d2e00c28cf51fa4aa5230b1c4726bd247",
+    "docs/result_files.md": "cc2ad05c0709aa3837a0e1c0b9ba8d0968542928e7aa4af5081906d14454348f",
+    "docs/partial_benchmark.md": "3f25d9048ca41590e550dca10d5b226ce36307b5515bf64245fa020dc531d2c9",
+    "dscg/pipelines/defended.py": "fa46e81e94f230163f9f65efe6cdc45b046292e34a76102be2eda1c47b86661c",
+    "experiments/diagnostics/utility_stages.py": "9c669b2b50ddbe14c7a8e8c50e5204e75d84c463133927802a67007f4756b5c2",
+    "workshop/completed/README.md": "5dae52e450b695a9befbe27b007ffcef7df5d9c43214874facc2f9d36225530a"
+  },
+  "next_action": "User-authorized fixed banking/Slack clean and attack controls with fresh names before expanding evaluation."
+}

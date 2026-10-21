@@ -5,9 +5,11 @@ from pathlib import Path
 from experiments.diagnostics.harness_audit import security_result_fields
 
 
-def project_outcomes(utility_results, security_results, suite_dir, attack, *, run_attack):
+def project_outcomes(utility_results, security_results, suite_dir, attack, *, run_attack, task_errors=()):
     root = Path(suite_dir).resolve()
     records = {}
+    current_errors = {(e["user_task_id"], e["injection_task_id"] or ""): e for e in task_errors
+                      if e["stage"] != "goal_preflight"}
     for key, utility in utility_results.items():
         injection = key[1] if run_attack and len(key) > 1 else None
         trace = root / str(key[0]) / attack / f'{injection or "none"}.json'
@@ -25,6 +27,9 @@ def project_outcomes(utility_results, security_results, suite_dir, attack, *, ru
             attack_success=attack_success, defense_success=defense_success, sample_status=status,
             native_utility_success=utility if isinstance(utility, bool) else None,
             native_attack_success=security_results.get(key) if run_attack else None, execution_error=error)
+        if key in current_errors:
+            error = True
+            records[key].update(execution_error=True)
         if error:
             records[key].update(utility_success=None, attack_success=None, defense_success=None,
                                 sample_status='infrastructure_error')

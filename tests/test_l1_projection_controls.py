@@ -6,6 +6,7 @@ import json
 from pathlib import Path
 from tests.test_partial_agentdyn import TemporaryDirectory
 import unittest
+from tests.test_partial_agentdyn import legacy_suite_dispatch
 from unittest.mock import Mock, patch
 from tests import test_l1_projection as fixture_module
 from tests import test_partial_attacks as partial_fixture
@@ -77,7 +78,7 @@ class ProjectionControlTests(unittest.TestCase):
             runner,'make_defended_pipeline',side_effect=factory
         ) as build, patch.object(runner, '_describe_pipeline', side_effect=lambda *a, **k: partial_fixture.fake_pipeline()[0]), patch.object(runner.attacks,'load_attack',side_effect=partial_fixture.fake_attack), patch.object(
             runner.benchmark,'benchmark_suite_with_injections',side_effect=partial_fixture.fake_results
-        ):
+        ), patch.object(runner,'run_suite_with_progress',side_effect=legacy_suite_dispatch):
             args=dict(suites=[get_backend().suites[0]],results_dir=directory,run_name='bound',attack='tool_knowledge',
                       tool_metadata_path=get_backend().tool_metadata_path)
             self.assertEqual(runner.main(**args,l1_projection_mode='shadow'),0)

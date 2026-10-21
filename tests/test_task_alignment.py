@@ -6,6 +6,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from types import SimpleNamespace
 import unittest
+from tests.test_partial_agentdyn import legacy_suite_dispatch
 from unittest.mock import Mock, patch
 
 from agentdojo.functions_runtime import FunctionCall, EmptyEnv
@@ -40,7 +41,8 @@ class TaskAlignmentTests(unittest.TestCase):
             prompts[name]=kwargs['messages'][0]['content']
         self.assertEqual(catalogs['legacy'],catalogs[PROFILE])
         self.assertNotEqual(prompts['legacy'],prompts[PROFILE])
-        self.assertLessEqual(len(prompts[PROFILE]),len(prompts['legacy']))
+        # The new default is shorter; this historical candidate keeps its own budget.
+        self.assertLessEqual(len(prompts[PROFILE]),1084)
         self.assertFalse(profiles.semantic_catalog(PROFILE))
 
     def test_candidate_does_not_replace_bounded_authorization_contract(self):
@@ -77,7 +79,7 @@ class TaskAlignmentTests(unittest.TestCase):
                 record=state[-1]['dscg_audit_decisions'][-1]
                 self.assertEqual(record['final_policy_decision'],expected)
                 llm.client.chat.completions.create.assert_called_once()
-                self.assertLessEqual(len(checker.SYSTEM_POLICY),len(d.ActionSecurityChecker.SYSTEM_POLICY))
+                self.assertLessEqual(len(checker.SYSTEM_POLICY),1919)
                 self.assertNotIn(profiles.PROTOCOL_RULE,checker.SYSTEM_POLICY)
 
     def test_entrypoints_and_cache_identity_include_candidate(self):
@@ -128,6 +130,7 @@ class TaskAlignmentTests(unittest.TestCase):
         with TemporaryDirectory(dir=root) as directory, \
                 patch.object(d,'create_openai_client',return_value=Mock()), \
                 patch.object(runner.benchmark,'benchmark_suite_without_injections',side_effect=scored), \
+                patch.object(runner,'run_suite_with_progress',side_effect=legacy_suite_dispatch), \
                 redirect_stdout(StringIO()):
             options=dict(model_id='qwen3.7-flash',api_key='offline-key',suites=[get_suites()[0]],
                          run_attack=False,results_dir=directory,run_name='candidate',audit_router_mode='shadow')

@@ -213,6 +213,7 @@ class SerialRunnerTests(unittest.TestCase):
 
     def test_mocked_groups_preserve_global_scope_and_parent_only_aggregation(self):
         from experiments.common.attack_execution import iter_serial_results
+        from test_partial_agentdyn import legacy_suite_dispatch
         root = Path(__file__).resolve().parents[1] / 'workshop/artifacts/20261018_serial_lightweight/test_runs'
         root.mkdir(parents=True, exist_ok=True)
         with TemporaryDirectory(dir=root) as temp, \
@@ -220,6 +221,7 @@ class SerialRunnerTests(unittest.TestCase):
              patch.object(partial, 'resolve_model_config', side_effect=serial_fixture.resolve), \
              patch.object(partial.attacks, 'load_attack', side_effect=fake_attack), \
              patch.object(partial.benchmark, 'benchmark_suite_with_injections', side_effect=fake_results) as native, \
+             patch.object(partial, 'run_suite_with_progress', side_effect=legacy_suite_dispatch), \
              patch.object(partial, 'iter_attack_results', side_effect=iter_serial_results), \
              redirect_stdout(StringIO()):
             suites = list(get_suites())[:2]
