@@ -7,7 +7,7 @@
 full/partial/cohort及screen测量透传阈值；Dashboard API校验并透传模式/阈值，未新增页面控件。旧artifact参数非空时报迁移错误；策略/阈值身份不同须新run名。根级L3报告提供经验阈值比较，审计分歧不是安全真值、模拟Token不是实际节省。新策略不把“没有artifact”记成故障，旧记录仍保留原解释。[参数](./model_tool_configuration.md#l3直接阈值路由) · [报告](./result_files.md)
 
 
-DashScope/Qwen与DeepSeek的Chat请求角色由DSCG公共客户端分别适配，不修改conda包；更新后使用新运行名。AgentDyn首次请求的400/422定位、受限诊断字段和小范围复测要求见[消息角色兼容排错](./model_tool_configuration.md#消息角色兼容与请求排错)。旧缓存/cohort与新增请求身份不一致时拒绝复用，旧数据保留。
+DashScope/Qwen与DeepSeek的Chat请求角色由DSCG公共客户端分别适配，不修改conda包；更新后使用新运行名。AgentDyn首次请求的400/422定位、受限诊断字段和小范围复测要求见[消息角色兼容排错](./model_tool_configuration.md#消息角色兼容与请求排错)。旧测量缓存与新增请求身份不一致时拒绝复用，旧数据保留；冻结cohort只比较主模型ID/provider及环境与所选任务，详见[名单校验](./injection_precheck.md#2-中断和错误后续跑)。
 
 同一份代码在两个conda环境中自动选择基准，正常测试不需要`--benchmark`或额外工具目录参数。模型/风险配置见 [配置指南](./model_tool_configuration.md)，小规模排错见 [partial](./partial_benchmark.md)。
 
@@ -163,7 +163,7 @@ python -m experiments.run_benchmark --attack typical \
   --name dscg_screened_01
 ```
 
-示例使用AgentDyn路径；AgentDojo输出路径中为agentdojo。使用当前环境实际生成的模型/运行目录，名单不能跨后端读取。screened保留全部所选用户任务，仅筛选目标；名单核对后端元数据、模型、任务ID、GOAL、筛选规则及证据哈希，源码变化本身不再阻止读取。细则见[预检指南](./injection_precheck.md)。
+示例使用AgentDyn路径；AgentDojo输出路径中为agentdojo。使用当前环境实际生成的模型/运行目录，名单不能跨后端读取。screened保留全部所选用户任务，仅筛选目标；名单只核对主模型ID/provider、后端身份/具体包版本/suite版本（AgentDyn固定revision）、所选场景任务ID及顺序，并一次验证cohort自身摘要。原预检目录可移动或缺失，不再读取轨迹/attempt/引用manifest，不重新验证预检证据；请求adapter、endpoint与思考设置不影响名单兼容。full默认选择当前后端全部场景；若名单只覆盖子集，须用`--suites`明确选择。细则见[预检指南](./injection_precheck.md)。
 
 ## 结果文件
 
@@ -222,7 +222,7 @@ python -m experiments.run_benchmark --reuse \
 
 ## cohort 或续跑校验失败
 
-来源/revision、模型、任务、GOAL或防御配置冲突不等于模型配置文件缺失。先核对实际Python与包路径、安装来源、模型公开配置、工具目录和原防御参数；cohort文件/轨迹哈希不符仍拒绝。当前已取消源码兼容映射检查，不需要为单纯源码变化修改映射或manifest。CLI路由解析器保留default=None，按profile解析shadow/off。
+校验失败不等于模型配置文件缺失。冻结cohort检查主模型ID/provider、后端/包版本/suite版本与所选任务，以及cohort自身摘要；不检查原预检轨迹。实际测量缓存则继续核对完整模型请求配置、工具目录和有效防御参数，配置冲突仍拒绝复用。先核对实际Python与包路径及对应身份。当前已取消源码兼容映射检查，不需要为单纯源码变化修改映射或manifest。CLI路由解析器保留default=None，按profile解析shadow/off。
 
 ## 可选控制与日志
 

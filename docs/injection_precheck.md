@@ -26,7 +26,7 @@ results/injection_precheck/<benchmark_id>/<model_id>_injection_screen_01/
   cohort.json  # 全部目标完成判定后生成
 ```
 
-results-dir表示预检分类根，程序追加`<backend>/<model>_<name>/`。相同screen命令优先使用新目录，新路径不存在时才查找旧`<model>_<backend>_<name>/`并原地续跑；新路径存在但绑定缺失/损坏/不符时拒绝，不回退旧目录。旧cohort与attempt不移动、不改写，证据中的绝对路径保持有效。
+results-dir表示预检分类根，程序追加`<backend>/<model>_<name>/`。相同screen命令优先使用新目录，新路径不存在时才查找旧`<model>_<backend>_<name>/`并原地续跑；新路径存在但绑定缺失/损坏/不符时拒绝，不回退旧目录。旧cohort与attempt不移动、不改写。screen续跑仍依赖原证据路径；测量读取已冻结cohort不依赖这些路径。
 
 具体尝试保留独立原生轨迹、原始错误与哈希，冻结名单引用证据。成本未知保持未知，screen成本与后续攻击原生预检分别记录。
 
@@ -47,9 +47,11 @@ python -m experiments.run_injection_precheck screen \
 
 screen没有force-rerun；需要全新预检使用新name。配置冲突不覆盖原结果。仅记录Git/Python/包版本供追溯，不做工程源码扫描；缺少后端、模型或任务身份不能通过手改manifest补造。
 
-冻结 cohort 用于固定模型筛选后的目标名单。对于旧 AgentDojo/DashScope cohort，仅缺少后来新增的 `chat_request_adapter=dashscope-system-v1` 标记时，程序会核对其余配置、任务、GOAL、原始证据及当前原生消息序列化；确认适配器对预检消息无实际改变（no-op）后，允许继续使用原文件，无需重筛。终端会提示兼容原因，新测量的 `screened_cohort.json` 保存 `request_adapter_compatibility`，原 cohort/轨迹/摘要不改写。
+冻结 cohort 在测量时视为可信名单：只比较主模型的 `model_id + provider`，核对实际后端身份、具体包版本、suite版本（AgentDyn还核对固定revision），并检查本次所选场景及任务ID的有效性和注册顺序。只读取一次cohort并验证自身摘要，随后复用内存名单；adapter、endpoint、凭证变量、思考设置和审计模型不作为名单兼容条件。
 
-该兼容只用于冻结名单读取；实际改变角色的请求、未知适配版本、DeepSeek/AgentDyn、其他模型配置差异或证据损坏仍拒绝。不放宽旧攻击缓存或未完成 screen 的配置绑定，不能手动补字段来绕过校验。
+测量不再读取attempt、原始轨迹或引用manifest，不核对GOAL、重算筛选结论或检查消息序列化。因此原预检目录移动、缺失或轨迹变化不会阻止冻结名单读取，也不再使用adapter no-op特殊兼容分支。原文件不改写；新附件及执行记录的 `cohort_validation` 标明 `mode=model_backend_suites_v1`、`screening_evidence_verified=false`，表示未重新验证预检证据，而非重新认证筛选结论。
+
+这仅适用于测量读取冻结名单。screen创建、未完成续跑及历史证据复用仍走原证据校验；已有攻击结果的缓存复用仍严格比较实际模型请求与防御配置，不能因名单可读就混用不同请求配置的旧缓存。
 
 ## 3. 使用冻结名单测 baseline 和 DSCG
 

@@ -1,6 +1,6 @@
 # 小批量测试：run_partial_benchmark
 
-DashScope/Qwen与DeepSeek的Chat请求角色由DSCG公共客户端分别适配，不修改conda包；更新后使用新运行名。AgentDyn首次请求的400/422定位、受限诊断字段和小范围复测要求见[消息角色兼容排错](./model_tool_configuration.md#消息角色兼容与请求排错)。旧缓存/cohort与新增请求身份不一致时拒绝复用，旧数据保留。
+DashScope/Qwen与DeepSeek的Chat请求角色由DSCG公共客户端分别适配，不修改conda包；更新后使用新运行名。AgentDyn首次请求的400/422定位、受限诊断字段和小范围复测要求见[消息角色兼容排错](./model_tool_configuration.md#消息角色兼容与请求排错)。旧测量缓存与新增请求身份不一致时拒绝复用，旧数据保留；冻结cohort只比较主模型ID/provider及环境与所选任务，详见[名单校验](./injection_precheck.md#2-中断和错误后续跑)。
 
 在 `DSCG/`、已激活 `ipi`（AgentDojo）或 `ipi-agentdyn`（AgentDyn）环境下执行。安装与依赖自检见 [全量指南](./benchmark.md#安装与依赖自检)，模型/工具配置见 [配置指南](./model_tool_configuration.md)。
 
@@ -79,7 +79,7 @@ python -m experiments.run_partial_benchmark --attack typical \
   --name partial_dscg_screened_01
 ```
 
-示例路径为AgentDyn；AgentDojo目录标识为agentdojo。换成当前环境实际生成的模型/运行目录。用户仍是原前三个，目标为“原前三个ID ∩ cohort保留目标”，不从后续补位；全筛空场景跳过，全部为空拒绝。scope为partial_screened，不能与full screened混用分母。不能同时使用clean/task manifest，拒绝DoS/all。本次交付前的名单/缓存不迁移，两套后端之间也不可复用。
+示例路径为AgentDyn；AgentDojo目录标识为agentdojo。换成当前环境实际生成的模型/运行目录。用户仍是原前三个，目标为“原前三个ID ∩ cohort保留目标”，不从后续补位；全筛空场景跳过，全部为空拒绝。scope为partial_screened，不能与full screened混用分母。不能同时使用clean/task manifest，拒绝DoS/all。旧名单/缓存不迁移，两套后端之间也不可复用。冻结名单仅核对主模型ID/provider、后端版本与所选任务及文件自身摘要；不读取原预检证据，目录移动不影响读取。实际测量缓存仍按完整请求/防御配置校验。
 
 ## 攻击选择与shadow记录
 

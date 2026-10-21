@@ -7,7 +7,7 @@ conda activate ipi              # 或 conda activate ipi-agentdyn
 python -m dscg.benchmark_catalog
 ```
 
-最后一条命令只检查安装来源、版本、revision、实际导入路径并列出场景，不调用模型。首次安装分别使用[environment.yml](../environment.yml)或[environment-agentdyn.yml](../environment-agentdyn.yml)。两者沿用agentdojo导入名及0.1.35版本；当前verification_mode=metadata_only、runtime_variant=unverified，不扫描源码或认证客户端变体。未知来源、错误revision/路径及跨后端场景仍拒绝。旧运行配置一致可续跑，cohort及预检证据继续验证哈希。
+最后一条命令只检查安装来源、版本、revision、实际导入路径并列出场景，不调用模型。首次安装分别使用[environment.yml](../environment.yml)或[environment-agentdyn.yml](../environment-agentdyn.yml)。两者沿用agentdojo导入名及0.1.35版本；当前verification_mode=metadata_only、runtime_variant=unverified，不扫描源码或认证客户端变体。未知来源、错误revision/路径及跨后端场景仍拒绝。旧运行配置一致可续跑，冻结cohort测量只验证名单自身摘要和模型/环境/所选任务；screen续跑仍验证原预检证据。
 
 ## 测试指南
 

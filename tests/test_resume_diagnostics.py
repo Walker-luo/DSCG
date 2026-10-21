@@ -5,6 +5,7 @@ from io import StringIO
 import hashlib
 from pathlib import Path
 import unittest
+from types import SimpleNamespace
 from unittest.mock import patch
 
 from experiments import run_benchmark as full, run_partial_benchmark as partial
@@ -29,15 +30,19 @@ class ResumeDiagnosticsTests(unittest.TestCase):
             self.assertFalse(reuse.compatible_source(old, {**current, 'agentdojo': 'changed'}))
 
     def rejected_cohort(self, recorded, current):
-        frozen = {'schema_version': cohort.SCHEMA, 'benchmark': __import__('test_partial_agentdyn').DOJO_IDENTITY, 'selection_rule': cohort.RULE, 'binding': recorded}
+        frozen = {'schema_version': cohort.SCHEMA, 'benchmark': __import__('test_partial_agentdyn').DOJO_IDENTITY,
+                  'suite_version': 'v1.2', 'selection_rule': cohort.RULE, 'binding': recorded,
+                  'suites': {'workspace': {'user_task_ids': ['user_task_0'], 'injection_task_ids': ['injection_task_0']}}}
         frozen['cohort_sha256'] = cohort._digest(frozen)
-        with patch.object(cohort, '_binding', return_value=current):
+        config = SimpleNamespace(public_dict=lambda: current['main_model'])
+        with patch.object(cohort, 'get_suite', return_value=SimpleNamespace(
+                user_tasks={'user_task_0': None}, injection_tasks={'injection_task_0': None})):
             with self.assertRaises(ValueError) as error:
-                cohort._validate_cohort_data(frozen, None)
+                cohort._validate_cohort_data(frozen, config)
         return str(error.exception)
 
     def binding(self):
-        return {'benchmark': __import__('test_partial_agentdyn').DOJO_IDENTITY, 'catalog': {}, 'main_model': {'model_id': 'offline', 'base_url': 'private-url'},
+        return {'benchmark': __import__('test_partial_agentdyn').DOJO_IDENTITY, 'catalog': {}, 'main_model': {'model_id': 'offline', 'provider': 'openai', 'base_url': 'private-url'},
                 'source': {'benchmark': __import__('test_partial_agentdyn').DOJO_IDENTITY, 'python': '3.10.19', 'agentdojo': '0.1.35', 'source_sha256': {'old.py': 'known'}},
                 'screening_script_sha256': 'old'}
 
@@ -48,10 +53,11 @@ class ResumeDiagnosticsTests(unittest.TestCase):
 
     def test_cohort_error_names_model_fields_without_exposing_values(self):
         old = self.binding(); current = deepcopy(old)
-        current['main_model']['base_url'] = 'other-private-url'
+        current['main_model']['model_id'] = 'other-private-model'
         message = self.rejected_cohort(old, current)
-        self.assertIn('main_model.base_url', message)
+        self.assertIn('main_model.model_id', message)
         self.assertNotIn('private-url', message)
+        self.assertNotIn('other-private-model', message)
 
     def test_source_hash_changes_do_not_change_screen_configuration(self):
         old = self.binding(); current = deepcopy(old)

@@ -226,13 +226,13 @@ class InjectionPrecheckTests(unittest.TestCase):
             precheck.run_screened(self.output / 'cohort.json', config_path=None, run_name='empty')
         runner.assert_not_called()
 
-    def test_changed_evidence_prevents_using_frozen_cohort(self):
+    def test_changed_evidence_still_prevents_screen_resumption(self):
         self.screen()
         trace = next(self.output.rglob('none.json'))
         value = json.loads(trace.read_text()); value['utility'] = not value['utility']
         trace.write_text(json.dumps(value))
         with self.assertRaises(ValueError):
-            precheck.run_screened(self.output / 'cohort.json', config_path=None, run_name='changed')
+            self.screen()
 
     def test_completed_native_trace_is_recovered_after_interrupted_attempt_bookkeeping(self):
         self.suite.outcomes[1] = [RuntimeError('offline interruption'), False, False]
@@ -246,7 +246,7 @@ class InjectionPrecheckTests(unittest.TestCase):
         self.screen()
         with patch.object(precheck.shared, 'main', return_value=0) as runner, redirect_stdout(StringIO()):
             self.assertEqual(precheck.cli(['benchmark', '--cohort', str(self.output / 'cohort.json'),
-                '--name', 'shadow', '--results-dir', str(self.root / 'benchmarks'),
+                '--name', 'shadow', '--suites', 'workspace', '--results-dir', str(self.root / 'benchmarks'),
                 '--audit-router-mode', 'shadow', '--trace-level', 'full']), 0)
             options = runner.call_args.kwargs
             self.assertEqual(options['audit_router_mode'], 'shadow')
@@ -262,7 +262,7 @@ class InjectionPrecheckTests(unittest.TestCase):
         self.screen()
         from experiments import run_benchmark as full
         with patch.object(precheck.shared, 'main', return_value=0) as runner, redirect_stdout(StringIO()):
-            self.assertEqual(full.cli(['--cohort', str(self.output / 'cohort.json'), '--name', 'unified',
+            self.assertEqual(full.cli(['--cohort', str(self.output / 'cohort.json'), '--name', 'unified', '--suites', 'workspace',
                 '--results-dir', str(self.root / 'benchmarks'), '--audit-router-mode', 'shadow',
                 '--trace-level', 'full', '--no-tool-view', '--no-delegated-tasks',
                 '--l1-projection-mode', 'off', '--audit-retries', '1', '--completion-prompt']), 0)
@@ -464,7 +464,7 @@ class InjectionPrecheckTests(unittest.TestCase):
             precheck.shared.attacks, 'load_attack', side_effect=fake_attack), patch.object(
             precheck.shared.benchmark, 'benchmark_suite_with_injections', side_effect=fake_results), redirect_stdout(StringIO()):
             self.assertEqual(full.main(cohort_path=self.output / 'cohort.json', config_path=None, run_name='selected',
-                results_dir=self.root / 'benchmarks', origin=True, attack=['ignore_previous']), 0)
+                results_dir=self.root / 'benchmarks', suites=['workspace'], origin=True, attack=['ignore_previous']), 0)
         base = self.root / 'benchmarks/agentdojo/offline_selected'
         summary = json.loads((base / 'ignore_previous/workspace/summary.json').read_text())
         self.assertEqual(summary['task_counts']['planned_tasks'], 4)

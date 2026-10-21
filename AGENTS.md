@@ -1,5 +1,15 @@
 # DSCG Research Handoff
 
+## Lightweight frozen-cohort measurement validation (2026-10-21)
+
+This user-approved policy supersedes earlier adapter/evidence gates only for measurement consumption of a frozen cohort.
+
+- Full/partial/legacy benchmark consumption compares main model_id + provider only; backend identity, exact package/suite version and AgentDyn fixed revision still match. Validate requested suites and registered task IDs/order; preserve full users and partial prefix intersection without backfill. Restore reuse suites before validation.
+- Read/digest cohort once and share the validated in-memory list. Do not read attempts, original traces or referenced manifests, hash evidence, compare GOAL, reconstruct decisions or test serialization. Remove adapter no-op exceptions; endpoint, adapter, thinking settings and audit model do not bind list compatibility. Frozen cohorts remain usable after moving the original screening directory.
+- Preserve old files/bindings byte-for-byte. New attachments/execution records declare cohort_validation.mode=model_backend_suites_v1 and screening_evidence_verified=false; list consumption does not recertify screening conclusions. Actual measurement caches still bind full effective request/defense configuration.
+- Screen creation/resume and historical screening evidence reuse retain their original evidence checks. No source scanning or paid calls. New offline evidence: workshop/artifacts/20261021_cohort_lightweight/.
+
+
 ## Direct-threshold L3 routing (2026-10-21)
 
 This user-approved policy supersedes earlier mandatory runtime calibration/artifact and internal-only routing rules; preserve all historical evidence and offline calibrators.

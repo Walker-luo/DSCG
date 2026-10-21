@@ -18,7 +18,7 @@ from experiments.common.partial_controls import source_revision, guard_run
 from experiments.common.result_paths import resolve_run_path
 from experiments.common.injection_cohort import (
     SCHEMA, RULE, LIMITATIONS, _digest, _file_hash, _read, _write_new, _replace,
-    _lock, _binding, _trace_status, _decision, _validate_cohort, _validate_cohort_data,
+    _lock, _binding, _trace_status, _decision, _validate_screen_cohort_data,
     _bindings_compatible, _binding_error, _source_compatible, _record_compatibility, run_screened,
 )
 
@@ -212,7 +212,7 @@ def screen(*, config_path, run_name, results_dir=None, reuse_from=None, suites=N
         progress.emit(f'模型={config.model_id}；目标={total}；模式={"续跑" if resumed else "首次运行"}；输出={root}')
         progress.emit(f'复用来源={reuse_from or "未指定"}；规则：任一次成功保留，两次有效失败排除，错误待解决。')
         if (root / 'cohort.json').exists():
-            _validate_cohort(root / 'cohort.json', config)
+            _validate_screen_cohort_data(_read(root / 'cohort.json'), config)
             progress.emit(f'冻结名单已存在，核验通过，无新增模型调用：{root / "cohort.json"}')
             return 0
         decisions, rejected = {}, []
@@ -269,7 +269,7 @@ def screen(*, config_path, run_name, results_dir=None, reuse_from=None, suites=N
                       'injection_task_ids': [i for i, d in decisions[name].items() if d['status'] == 'kept']}
                       for name, entry in binding['catalog'].items()}, 'limitations': LIMITATIONS}
         cohort['cohort_sha256'] = _digest(cohort)
-        _validate_cohort_data(cohort, config)
+        _validate_screen_cohort_data(cohort, config)
         _write_new(root / 'cohort.json', cohort)
         progress.emit(f'完成：{dict(report["counts"])}；报告：{root / "summary.md"}；名单：{root / "cohort.json"}')
         return 0

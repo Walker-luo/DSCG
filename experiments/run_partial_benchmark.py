@@ -184,6 +184,7 @@ def main(
     cohort_sha256: str | None = None,
     cohort_path: str | Path | None = None,
     _reuse_plan=None,
+    _validated_cohort=None,
 ) -> int:
     backend = get_backend()
     if task_scope not in {'partial', 'full', 'screened', 'partial_screened'}:
@@ -233,12 +234,15 @@ def main(
     _validate_router_controls(origin,use_security_checker,audit_router_mode,use_sandbox)
     validate_controls(origin=origin, use_security_checker=use_security_checker,
                       audit_retries=audit_retries, completion_prompt=completion_prompt)
-    frozen_tasks = load_task_manifest(task_manifest_path)
+    frozen_tasks = _validated_cohort if _validated_cohort is not None else load_task_manifest(task_manifest_path)
     if task_scope in {'screened', 'partial_screened'}:
-        from experiments.common.injection_cohort import _digest
+        from experiments.common.injection_cohort import _digest, COHORT_VALIDATION
         if (not frozen_tasks or not cohort_sha256 or frozen_tasks.get('cohort_sha256') != cohort_sha256
-                or _digest({k: v for k, v in frozen_tasks.items() if k != 'cohort_sha256'}) != cohort_sha256):
+                or (_validated_cohort is None and
+                    _digest({k: v for k, v in frozen_tasks.items() if k != 'cohort_sha256'}) != cohort_sha256)):
             raise ValueError('screened measurement requires the validated frozen cohort identity')
+    elif _validated_cohort is not None:
+        raise ValueError('validated cohort is reserved for screened measurements')
     if task_scope in {'full', 'screened', 'partial_screened'} and frozen_tasks is not None:
         # Validate the full catalogue before model/client construction. DoS later
         # projects this complete catalogue to its native first-injection rule.
@@ -250,12 +254,14 @@ def main(
     if task_scope in {'screened', 'partial_screened'} and any(ATTACKS[name].is_dos_attack for name in attack_names):
         raise ValueError('screened measurements do not support DoS')
     context = {'execution_plan': execution_plan(task_scope, suites, attack_names, cohort_sha256)}
+    if task_scope in {'screened', 'partial_screened'}:
+        context['cohort_validation'] = dict(COHORT_VALIDATION)
     run_records = []
     print(f"本次攻击 ({len(attack_names) if run_attack else 0}): {', '.join(attack_names) if run_attack else '无（clean）'}", flush=True)
     print(f"本次场景 ({len(suites)}): {', '.join(suites)}", flush=True)
 
     prepared = resume if resume is not None else PreparedBindings()
-    resources = {}
+    resources = {'task_manifest': frozen_tasks}
     def group_options(attack_name):
         return dict(
                 model_id=model_id, sec_model_id=sec_model_id, suites=suites, run_attack=run_attack, origin=origin, defense=defense,
@@ -312,6 +318,8 @@ def main(
         execution_dir.mkdir(parents=True, exist_ok=True)
         execution = {'mode': 'serial', 'unit': 'attack_suite',
                      'planned_groups': len(jobs), 'invocation_id': invocation}
+        if 'cohort_validation' in context:
+            execution['cohort_validation'] = context['cohort_validation']
         print(f"结果目录: {base}；顺序执行 {len(jobs)} 组。", flush=True)
         started = monotonic()
         try:
@@ -485,7 +493,8 @@ def _run_single_attack(
     _validate_router_controls(origin,use_security_checker,audit_router_mode,use_sandbox)
     validate_controls(origin=origin, use_security_checker=use_security_checker,
                       audit_retries=audit_retries, completion_prompt=completion_prompt)
-    frozen_tasks = load_task_manifest(task_manifest_path)
+    frozen_tasks = (resource_cache['task_manifest'] if resource_cache is not None and 'task_manifest' in resource_cache
+                    else load_task_manifest(task_manifest_path))
     selection_seed = None if task_scope in {'full', 'screened'} else frozen_tasks.get("seed", 7) if frozen_tasks else 7
     if resource_cache is not None and 'metadata' in resource_cache:
         metadata_selection, tool_metadata = resource_cache['metadata']

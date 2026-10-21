@@ -31,7 +31,7 @@ Qwen banking/Slack的协议诊断、`--prompt-profile`阶段候选、日志字�
 
 DSCG公共客户端对实际provider=dashscope或deepseek的同步`chat.completions.create`分别启用`dashscope-system-v1`和`deepseek-system-text-v1`：把结构化developer消息转换成system。DeepSeek还要求system正文为字符串，因此仅将完全由`{type:text,text:<字符串>}`组成的文本块按原顺序拼接；不识别的块保留原状，由服务端明确校验。DashScope的正文格式不变。两种适配均保留消息文本/顺序、user/assistant/tool角色、工具schema、temperature和其余请求参数；不原地修改消息，不新增重试或降级。其他provider保持原客户端。两套后端的baseline、DSCG、GOAL预检、screen和Dashboard均从此入口创建客户端；不需改site-packages。对应[百炼Chat系统消息协议](https://help.aliyun.com/zh/model-studio/qwen-api-via-openai-chat-completions/)和[DeepSeek Chat Completions消息结构](https://api-docs.deepseek.com/api/create-chat-completion/)，不涉及Responses API。
 
-`chat_request_adapter`由宿主计算，写入DashScope或DeepSeek主/审计模型的公开配置，进入原有manifest、cohort测量配置和路由身份。更新后需新run名；缺少该身份的旧运行/旧cohort配置与当前设置不一致时会拒绝复用，不补造兼容性。旧结果仍可查看，已绑定旧模型配置的名单须重新预检/冻结；原名单与证据不改写。当前L3使用直接阈值；旧校准预设仅保留作离线研究。
+`chat_request_adapter`由宿主计算，写入DashScope或DeepSeek主/审计模型的公开配置，进入原有manifest、cohort测量配置和路由身份。更新后实际测量缓存需匹配请求身份，否则使用新run名。冻结cohort的名单兼容只比较主模型ID/provider、后端/版本及所选任务，并校验名单自身摘要；不再以adapter、endpoint或思考设置差异要求重新预检，也不重读原预检证据。screen自身续跑仍保留原证据流程。原名单与证据不改写。当前L3使用直接阈值；旧校准预设仅保留作离线研究。
 
 已核对`results/partial_benchmark/agentdyn/qwen3.7-flash_test`：9个攻击/场景组均在第一个GOAL预检的首个generation请求失败，L2成功、L3未触发，没有81条有效计分轨迹。本机原生消息捕获为AgentDojo system/user、AgentDyn developer/user；角色差异与失败位置一致。旧文件未保存400详情，因此不能排除服务端其他校验错误；不把它标为TSR=0或防御成功。
 
@@ -270,7 +270,7 @@ shadow保留真实审计，并在根级报告比较0.65/0.70/0.75及实际阈值
 
 两测量入口和cohort恢复顺序执行，已删除workers参数与进程调度。准备阶段静默核对全部配置，不创建pipeline；每组执行时再创建独立pipeline及tracker。见[运行流程](./benchmark.md#顺序执行与准备信息)。
 
-两测量入口支持显式`--reuse`（API：reuse=True，默认False），未指定攻击/场景时恢复原计划。要求原name和可核验目录，与force-rerun/清单导出互斥，并覆盖环境强制重跑。核对后端、模型、完整任务、攻击、工具元数据内容和有效防御设置；源码哈希、Git commit及Python补丁版本不作为续跑门槛。旧绑定保持原字节，规则变化另存configuration_only记录；缺少必要配置时拒绝。cohort及预检证据仍检查哈希。见[续跑指南](./benchmark.md#显式续跑示例)。
+两测量入口支持显式`--reuse`（API：reuse=True，默认False），未指定攻击/场景时恢复原计划。要求原name和可核验目录，与force-rerun/清单导出互斥，并覆盖环境强制重跑。核对后端、模型、完整任务、攻击、工具元数据内容和有效防御设置；源码哈希、Git commit及Python补丁版本不作为续跑门槛。旧绑定保持原字节，规则变化另存configuration_only记录；缺少必要配置时拒绝。冻结cohort测量只校验名单自身摘要与模型/环境/所选任务，screen续跑仍检查原预检证据。见[续跑指南](./benchmark.md#显式续跑示例)。
 
 保留的L1银行投影适配器针对AgentDojo原生银行月支出请求与完整Transaction返回，最多32768 UTF-8字节、500行；没有为AgentDyn三个场景新增profile，使用完整来源隔离。原生callable/code/schema和元数据不兼容、错误/截断或未知字段均回退，不把旧适配器结果视为新场景已验证。模式/适配器身份影响缓存和L3路由配置兼容，切换用新run名；细节见 [L1说明](../README.md#l1-优化任务限定的结构化投影)。
 

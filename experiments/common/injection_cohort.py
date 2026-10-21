@@ -4,7 +4,6 @@ import hashlib
 import json
 import os
 import shutil
-import warnings
 from uuid import uuid4
 from collections import Counter
 from contextlib import contextmanager
@@ -13,17 +12,18 @@ from pathlib import Path
 from agentdojo.attacks.attack_registry import ATTACKS
 from dscg.benchmark_catalog import get_suite, benchmark_identity, validate_backend, get_backend, get_suites, same_backend
 from dscg.model_config import resolve_model_config
-from dscg.request_compatibility import DASHSCOPE_ADAPTER
 from dscg.audit_router import DEFAULT_THRESHOLD, validate_router_options, POLICY_VERSION
 from dscg.paths import BENCHMARK_RESULTS_DIR, RESULTS_DIR
 from experiments import run_partial_benchmark as shared
-from experiments.common.partial_controls import source_revision, guard_run, validate_controls, select_tasks
+from experiments.common.partial_controls import source_revision, guard_run, validate_controls
 from experiments.common.benchmark_reuse import ReusePlan
 from experiments.common.result_paths import resolve_run_path
 from experiments.common.benchmark_execution import PreparedBindings
 
 SCHEMA = 'dscg.injection-screen.v2'
 RULE = 'keep-any-valid-success; exclude-after-two-valid-failures; errors-unresolved'
+COHORT_VALIDATION = {'mode': 'model_backend_suites_v1', 'cohort_digest_verified': True,
+                     'screening_evidence_verified': False}
 LIMITATIONS = [
     'Direct-goal failure does not prove an indirect attack cannot succeed.',
     'Native utility is retained; refusals, execution deviations and predicate ambiguity need trace review.',
@@ -118,38 +118,6 @@ def _binding_error(recorded, current):
             + ', '.join(fields or ['selection rule']) + '; use a new screen run')
 
 
-def _cohort_adapter_transition(recorded, current):
-    """Recognize only the added DashScope marker, before checking trace equivalence."""
-    old, new = recorded.get('main_model', {}), current.get('main_model', {})
-    if (recorded.get('benchmark', {}).get('id') != 'agentdojo'
-            or old.get('provider') != 'dashscope' or new.get('provider') != 'dashscope'
-            or 'chat_request_adapter' in old or new.get('chat_request_adapter') != DASHSCOPE_ADAPTER):
-        return None
-    without_marker = {key: value for key, value in new.items() if key != 'chat_request_adapter'}
-    if not _bindings_compatible(recorded, {**current, 'main_model': without_marker}):
-        return None
-    return {'policy': 'agentdojo-dashscope-noop-v1', 'recorded_adapter': None,
-            'current_adapter': DASHSCOPE_ADAPTER,
-            'verification': 'hashed goal evidence; current native system-message serialization unchanged by adapter',
-            'source_equivalence_verified': False}
-
-
-def _verify_adapter_noop(trace, model_id):
-    from agentdojo.agent_pipeline.llms.openai_llm import _message_to_openai
-
-    for message in _read(trace)['messages']:
-        role = message.get('role')
-        if role == 'developer':
-            raise ValueError('request adapter changes legacy screening messages; use a new screen run')
-        if role == 'system':
-            try:
-                unchanged = _message_to_openai(message, model_id).get('role') == 'system'
-            except Exception:
-                unchanged = False
-            if not unchanged:
-                raise ValueError('request adapter changes legacy screening messages; use a new screen run')
-
-
 def _record_compatibility(root, recorded, current):
     record = {'reason': 'configuration-only transition; source equivalence not verified',
               'verification_mode': 'configuration_only', 'source_equivalence_verified': False,
@@ -211,19 +179,58 @@ def _decision(attempts):
     return 'unresolved'
 
 
-def _validate_cohort(path, config):
-    return _validate_cohort_data(_read(path), config)
+def _validate_cohort(path, config, suites=None):
+    return _validate_cohort_data(_read(path), config, suites=suites)
 
 
-def _validate_cohort_data(cohort, config):
+def _validate_cohort_data(cohort, config, suites=None):
+    """Trust the frozen list; verify its digest and selected runtime scope only."""
+    if (not isinstance(cohort, dict) or cohort.get('schema_version') != SCHEMA
+            or cohort.get('suite_version') != 'v1.2'
+            or not isinstance(cohort.get('binding'), dict)
+            or not isinstance(cohort.get('suites'), dict)):
+        raise ValueError('invalid frozen cohort schema')
+    if cohort.get('cohort_sha256') != _digest({k: v for k, v in cohort.items() if k != 'cohort_sha256'}):
+        raise ValueError('invalid or changed frozen cohort digest')
+    current = benchmark_identity()
+    if (not same_backend(cohort.get('benchmark'), current)
+            or not same_backend(cohort['binding'].get('benchmark'), current)):
+        raise ValueError('cohort backend/version differs from current environment')
+    recorded = cohort['binding'].get('main_model')
+    actual = config.public_dict()
+    for field in ('model_id', 'provider'):
+        if (not isinstance(recorded, dict) or not isinstance(recorded.get(field), str)
+                or not recorded[field] or recorded[field] != actual.get(field)):
+            raise ValueError(f'cohort model identity differs: main_model.{field}')
+    names = list(cohort['suites']) if suites is None else list(suites)
+    if (not names or any(not isinstance(name, str) for name in names)
+            or len(set(names)) != len(names) or not set(names) <= set(get_backend().suites)
+            or not set(names) <= set(cohort['suites'])):
+        raise ValueError('frozen cohort lacks requested suites or selection is empty/duplicated')
+    for name in names:
+        entry = cohort['suites'][name]
+        if not isinstance(entry, dict):
+            raise ValueError(f'invalid frozen cohort task lists: {name}')
+        suite = get_suite('v1.2', name)
+        for field, catalog in (('user_task_ids', list(suite.user_tasks)),
+                               ('injection_task_ids', list(suite.injection_tasks))):
+            ids = entry.get(field)
+            if (not isinstance(ids, list) or any(not isinstance(task_id, str) for task_id in ids)
+                    or len(set(ids)) != len(ids) or not set(ids) <= set(catalog)
+                    or ids != (catalog if field == 'user_task_ids' else [i for i in catalog if i in ids])):
+                raise ValueError(f'invalid frozen {field} for {name}')
+    return cohort
+
+
+def _validate_screen_cohort_data(cohort, config):
+    """Screen creation/resumption still verifies its native evidence."""
     content = {k: v for k, v in cohort.items() if k != 'cohort_sha256'}
     if (not same_backend(cohort.get('benchmark'), benchmark_identity()) or cohort.get('schema_version') != SCHEMA or cohort.get('cohort_sha256') != _digest(content)
             or cohort.get('selection_rule') != RULE):
         raise ValueError('invalid or changed frozen cohort')
     binding = cohort['binding']
     current = _binding(config, list(binding['catalog']))
-    adapter_transition = _cohort_adapter_transition(binding, current)
-    if not _bindings_compatible(binding, current) and adapter_transition is None:
+    if not _bindings_compatible(binding, current):
         raise ValueError(_binding_error(binding, current))
     for name, entry in binding['catalog'].items():
         decisions = cohort['decisions'][name]
@@ -242,17 +249,12 @@ def _validate_cohort_data(cohort, config):
                     raise ValueError('screening evidence changed')
                 if _trace_status(trace, name, task, binding['source']['agentdojo'])[0] != attempt['status']:
                     raise ValueError('screening outcome changed')
-                if adapter_transition is not None:
-                    _verify_adapter_noop(trace, config.model_id)
                 if attempt.get('manifest_path') and _file_hash(attempt['manifest_path']) != attempt['manifest_sha256']:
                     raise ValueError('historical source manifest changed')
         expected = {'user_task_ids': entry['user_task_ids'],
                     'injection_task_ids': [i for i, d in decisions.items() if d['status'] == 'kept']}
         if cohort['suites'].get(name) != expected:
             raise ValueError('selected tasks disagree with screening evidence')
-    if adapter_transition is not None:
-        warnings.warn('Cohort compatibility: added DashScope adapter marker verified as no-op for stored '
-                      'AgentDojo evidence; original cohort remains unchanged.', UserWarning, stacklevel=2)
     return cohort
 
 
@@ -308,7 +310,7 @@ def run_screened(cohort_path, *, config_path=None, run_name=None, results_dir=No
     config = resolve_model_config(model_id, config_path=config_path,
         **{k: controls.pop(k) for k in ('api_key', 'base_url', 'provider', 'api_key_env') if k in controls})
     cohort_path = Path(cohort_path).resolve()
-    cohort = _validate_cohort(cohort_path, config)
+    cohort = _read(cohort_path)
     root = Path(results_dir) if results_dir else RESULTS_DIR / 'partial_benchmark' if partial else BENCHMARK_RESULTS_DIR
     base = resolve_run_path(root, backend.id, config.model_id, run_name, allow_legacy=reuse)
     resume = None
@@ -316,6 +318,9 @@ def run_screened(cohort_path, *, config_path=None, run_name=None, results_dir=No
         resume = ReusePlan(base, suites=suites, attack=attack, run_attack=True, task_scope=task_scope,
                            resolve_attacks=shared.resolve_attack_names)
         suites, attack = resume.suites, resume.attacks
+    requested = list(suites) if suites is not None else None
+    _validate_cohort_data(cohort, config, suites=requested)
+    requested = requested if requested is not None else list(cohort['suites'])
     names = shared.resolve_attack_names(attack if attack is not None else 'typical')
     if any(ATTACKS[name].is_dos_attack for name in names):
         raise ValueError('DoS is not supported by injection-goal screening; select targeted attacks')
@@ -329,22 +334,14 @@ def run_screened(cohort_path, *, config_path=None, run_name=None, results_dir=No
     if not origin and use_checker:
         security_model = resolve_model_config(sec_model_id, config_path=config_path, prefix='DSCG_SEC', fallback=config,
             **{k: controls['sec_' + k] for k in ('api_key', 'base_url', 'provider', 'api_key_env') if 'sec_' + k in controls}).public_dict()
-    requested = list(suites) if suites is not None else list(cohort['suites'])
-    if (not requested or len(set(requested)) != len(requested) or not set(requested) <= set(backend.suites)
-            or ((partial or set(requested) != set(backend.suites)) and not set(requested) <= set(cohort['suites']))):
-        raise ValueError('frozen cohort lacks requested suites or selection is empty/duplicated')
-    selected = {}
-    for name, entry in cohort['suites'].items():
-        if name not in requested:
-            continue
-        if partial and entry['injection_task_ids']:
-            catalog = cohort['binding']['catalog'][name]
-            users, injections = select_tasks(cohort, name, catalog['user_task_ids'],
-                list(catalog['injection_tasks']), True, False, task_scope=task_scope)
-            selected[name] = {'user_task_ids': users, 'injection_task_ids': injections}
-        else:
-            selected[name] = {'user_task_ids': entry['user_task_ids'][:3] if partial else entry['user_task_ids'],
-                              'injection_task_ids': entry['injection_task_ids']}
+    selected, catalog_sizes = {}, {}
+    for name in requested:
+        entry = cohort['suites'][name]
+        suite = get_suite('v1.2', name)
+        catalog_sizes[name] = len(suite.injection_tasks)
+        injections = [i for i in list(suite.injection_tasks)[:3] if i in entry['injection_task_ids']] if partial else entry['injection_task_ids']
+        selected[name] = {'user_task_ids': entry['user_task_ids'][:3] if partial else entry['user_task_ids'],
+                          'injection_task_ids': injections}
     active = [name for name, entry in selected.items() if entry['injection_task_ids']]
     if not active:
         raise ValueError('no injection targets remain in the requested task scope; benchmark not started')
@@ -370,21 +367,18 @@ def run_screened(cohort_path, *, config_path=None, run_name=None, results_dir=No
             raise ValueError('existing non-screened run; use a new --name')
         prepared.check(base / 'screened_run_manifest.json', identity)
         attachment = {'schema_version': 'dscg.screened-cohort.v2', 'benchmark': benchmark_identity(), 'scope': 'capability-conditioned screened subset', 'task_scope': task_scope,
+                      'cohort_validation': dict(COHORT_VALIDATION),
                       'cohort_path': str(cohort_path), 'cohort': cohort,
                       'selected_tasks': selected, 'requested_suites': requested,
                       'omitted_suites': [name for name in cohort['suites'] if name not in requested],
                       'skipped_suites': [name for name in selected if name not in active],
-                      'counts': {name: {'original_targets': len(cohort['binding']['catalog'][name]['injection_tasks']),
+                      'counts': {name: {'original_targets': catalog_sizes[name],
                           'retained_targets': len(cohort['suites'][name]['injection_task_ids']),
-                          'prefix_targets': min(3, len(cohort['binding']['catalog'][name]['injection_tasks'])) if partial else len(cohort['binding']['catalog'][name]['injection_tasks']),
+                          'prefix_targets': min(3, catalog_sizes[name]) if partial else catalog_sizes[name],
                           'selected_targets': len(entry['injection_task_ids']), 'user_tasks': len(entry['user_task_ids']),
                           'planned_per_targeted_attack': len(entry['user_task_ids']) * len(entry['injection_task_ids'])}
                           for name, entry in selected.items()},
                       'cost_scope': 'native per-attack preflight retained; not scored attack samples; screening cost separate'}
-        adapter_transition = _cohort_adapter_transition(
-            cohort['binding'], {**cohort['binding'], 'main_model': config.public_dict()})
-        if adapter_transition is not None:
-            attachment['request_adapter_compatibility'] = adapter_transition
         attachment_path = base / 'screened_cohort.json'
         if not attachment_path.exists() and resume is None:
             prepared.check(attachment_path, attachment)
@@ -397,6 +391,7 @@ def run_screened(cohort_path, *, config_path=None, run_name=None, results_dir=No
                                suites=active, origin=origin, run_name=run_name, results_dir=root,
                                task_manifest_path=cohort_path, task_scope=task_scope, attack=names,
                                cohort_sha256=cohort['cohort_sha256'],
+                               _validated_cohort=cohort,
                                audit_router_mode=audit_router_mode, trace_level=trace_level,
                                audit_router_artifact=audit_router_artifact, audit_router_threshold=audit_router_threshold, force_rerun=force_rerun,
                                reuse=reuse, progress=progress, _reuse_plan=prepared, **controls)

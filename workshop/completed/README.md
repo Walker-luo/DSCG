@@ -1,5 +1,8 @@
 # 已完成阶段的优化材料
 
+新增[冻结cohort轻量读取](./cohort_lightweight_20261021.md)：只校验主模型ID/provider、后端版本、所选任务及一次名单摘要；不再访问原预检证据。实际测量缓存配置保持严格绑定，screen证据流程不变；取代下面旧adapter no-op名单读取策略。
+
+
 新增[旧cohort请求适配标记兼容](./cohort_adapter_noop_20261021.md)：仅对证据及当前序列化验证为无实际变化的AgentDojo/DashScope新增标记允许原名单继续读取；原cohort不改写，实际请求变化仍拒绝。双环境离线回归通过，无模型调用。
 
 新增[L3直接阈值路由](./l3_threshold_20261021.md)：默认经验阈值0.70，internal/personal读取资格，无运行时artifact依赖；shadow阈值比较与旧记录语义分离，真实收益待新实验。

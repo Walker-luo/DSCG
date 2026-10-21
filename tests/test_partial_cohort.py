@@ -97,7 +97,7 @@ class PartialCohortTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             runner.main(**{**options, 'suites': ['travel'], 'run_name': 'empty'})
 
-    def test_conflicts_missing_suites_and_corrupt_evidence_are_rejected(self):
+    def test_conflicts_and_invalid_scope_reject_but_old_evidence_is_not_required(self):
         path = self.screen()
         for args in [['--clean'], ['--task-manifest', 'tasks.json'], ['--write-task-manifest', 'out.json']]:
             with self.subTest(args=args), redirect_stderr(StringIO()), self.assertRaises(SystemExit):
@@ -107,13 +107,39 @@ class PartialCohortTests(unittest.TestCase):
         data = json.loads(path.read_text())
         trace = Path(data['decisions']['travel']['injection_task_1']['attempts'][0]['trace_path'])
         trace.write_text('{}')
-        with self.assertRaises(ValueError):
-            runner.main(cohort_path=path, origin=True, run_name='corrupt', results_dir=self.root / 'runs')
+        self.assertEqual(runner.main(cohort_path=path, origin=True, run_name='corrupt',
+                                    results_dir=self.root / 'runs'), 0)
 
     def test_cohort_must_cover_requested_suites(self):
         path = self.screen(['travel', 'banking', 'slack'])
         with self.assertRaises(ValueError):
             runner.main(cohort_path=path, origin=True, run_name='missing', results_dir=self.root / 'runs')
+
+    def test_full_and_partial_read_cohort_once_and_never_open_original_evidence(self):
+        from experiments import run_benchmark as full
+        path = self.screen(); original = path.read_bytes()
+        for entrypoint, name in [(full.main, 'full_once'), (runner.main, 'partial_once')]:
+            reads, digests = [], []
+            native_read, native_digest = Path.read_text, cohort._digest
+            def read(candidate, *args, **kwargs):
+                if candidate.is_relative_to(path.parent): reads.append(candidate)
+                return native_read(candidate, *args, **kwargs)
+            def digest(value):
+                if isinstance(value, dict) and value.get('schema_version') == cohort.SCHEMA and 'suites' in value:
+                    digests.append(value)
+                return native_digest(value)
+            with patch.object(Path, 'read_text', new=read), patch.object(cohort, '_digest', side_effect=digest), \
+                 patch.object(cohort, '_file_hash', side_effect=AssertionError('original evidence hashing')):
+                self.assertEqual(entrypoint(cohort_path=path, origin=True, suites=['travel', 'banking'],
+                    run_name=name, results_dir=self.root / 'runs'), 0)
+            self.assertEqual(reads, [path])
+            self.assertEqual(len(digests), 1)
+            base = self.root / 'runs' / 'agentdojo' / f'offline_{name}'
+            attachment = json.loads((base / 'screened_cohort.json').read_text())
+            self.assertEqual(attachment['cohort_validation'], cohort.COHORT_VALIDATION)
+            execution = json.loads(next(base.glob('execution/*/execution.json')).read_text())
+            self.assertEqual(execution['cohort_validation'], cohort.COHORT_VALIDATION)
+            self.assertEqual(path.read_bytes(), original)
 
     def test_full_cli_suite_subset_keeps_all_users_and_all_kept_targets(self):
         from experiments import run_benchmark as full
@@ -172,6 +198,21 @@ class PartialCohortTests(unittest.TestCase):
             self.assertEqual(json.loads((base / 'attack_manifest.json').read_text())['attacks'], ['injecagent'])
             for p, content in bindings.items(): self.assertEqual(p.read_bytes(), content)
         self.assertEqual(path.read_bytes(), original)
+
+    def test_list_transport_compatibility_does_not_relax_measurement_cache(self):
+        from dataclasses import replace
+        path = self.screen()
+        options = dict(cohort_path=path, origin=True, suites=['banking'],
+                       attack='injecagent', run_name='original', results_dir=self.root / 'runs')
+        self.assertEqual(runner.main(**options), 0)
+        base = self.root / 'runs/agentdojo/offline_original'
+        bindings = {p: p.read_bytes() for p in base.rglob('*manifest.json')}
+        self.config = replace(self.config, base_url='https://changed.invalid')
+        with patch.object(cohort, 'resolve_model_config', return_value=self.config), \
+             patch.object(runner, 'resolve_model_config', return_value=self.config):
+            self.assertEqual(runner.main(**{**options, 'run_name': 'new_endpoint'}), 0)
+            with self.assertRaises(ValueError): runner.main(**options, reuse=True)
+        for p, content in bindings.items(): self.assertEqual(p.read_bytes(), content)
 
     def test_reuse_preserves_requested_and_active_suites_when_a_scene_is_empty(self):
         from experiments import run_benchmark as full

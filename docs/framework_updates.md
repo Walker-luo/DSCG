@@ -9,7 +9,7 @@ full/partial/cohort及screen测量透传阈值；Dashboard API校验并透传模
 
 ## DeepSeek Chat消息角色兼容（2026-10-20）
 
-AgentDyn将受信任的system消息序列化为developer，正文为文本块数组；DeepSeek Chat Completions只列出system/user/assistant/tool角色，且system正文要求字符串。当前共享客户端对provider=deepseek启用独立的`deepseek-system-text-v1`，把developer转换为system，并仅将可确认的纯文本块拼接为字符串；原有DashScope适配和其他服务不变。适配身份进入公开模型配置及运行绑定，旧DeepSeek运行与cohort不自动复用。离线MockTransport验证首轮及工具回合的请求结构；真实服务是否接受完整请求仍需新名复测。见[配置指南](./model_tool_configuration.md#消息角色兼容与请求排错)。
+AgentDyn将受信任的system消息序列化为developer，正文为文本块数组；DeepSeek Chat Completions只列出system/user/assistant/tool角色，且system正文要求字符串。当前共享客户端对provider=deepseek启用独立的`deepseek-system-text-v1`，把developer转换为system，并仅将可确认的纯文本块拼接为字符串；原有DashScope适配和其他服务不变。适配身份进入公开模型配置及运行绑定，旧DeepSeek测量缓存须匹配实际请求身份；冻结cohort测量读取只比较主模型ID/provider及环境/所选任务，不受adapter标记差异影响。离线MockTransport验证首轮及工具回合的请求结构；真实服务是否接受完整请求仍需新名复测。见[配置指南](./model_tool_configuration.md#消息角色兼容与请求排错)。
 
 ## DashScope消息角色兼容（2026-10-19）
 
