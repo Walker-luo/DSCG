@@ -102,6 +102,8 @@ API 可传入 `ToolAuthorizationProfile`（[实现](./dscg/l2_authorization.py)�
 
 ### L3 直接阈值路由
 
+审计模型的默认提示已压缩为编号规则：聚焦当前动作、可信任务与来源事实、必要读取、外发内容及JSON输出；默认基础提示从3262降为1919字符（约41%），不是实测Token降幅。严格解析、Monitor和路由不变；提示内容进入既有配置绑定，更新后使用新run名。真实效用/安全影响待匹配实验，见[提示压缩报告](./workshop/completed/l3_audit_prompt_20261021.md)。
+
 本地算法仍使用字符三元组计算任务—工具距离、参数新颖度、不可信支持增量及近期失败比例，取最大值为 `s`。当前策略为 `threshold-read-v1`：**符合资格且 `s < threshold` 才免审**，默认经验阈值 `0.70`，没有独立风险校准保证，也不需要 artifact。
 
 资格限于单个已授权、元数据有效、幂等、无 sink、internal 或 personal 的读取；参数schema、输入完整性与长度检查保留。secret读取、写入、金融、删除、邀请和外发仍审计；原公开读取免审单独统计。banking余额/交易/常设转账/用户信息可参与，IBAN与文件读取仍按secret审计。Monitor、一次性交接和执行票据保留。

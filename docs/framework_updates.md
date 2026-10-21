@@ -1,5 +1,7 @@
 # 当前框架与平台展示交接
 
+2026-10-21：默认审计基础提示已压缩至1919字符，明确reason_code格式，保留现有边界与判决流程；候选profile追加规则不变。变化进入既有配置绑定，须新name测试；字符缩短不代表已验证的TSR或Token收益。[实施说明](../workshop/completed/l3_audit_prompt_20261021.md)。
+
 ## L3直接阈值策略（2026-10-21）
 
 当前 `threshold-read-v1` 无需校准artifact：`--audit-router-threshold 0.70` 为默认经验参数，严格score<threshold才免审。CLI默认shadow，Python/Dashboard API默认off；shadow仍审计，selective显式开启后才可能免审。资格扩大到单个已授权、完整有效的internal/personal幂等无sink读取；secret及任何写入/外发不在新增范围。

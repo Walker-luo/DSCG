@@ -1,5 +1,12 @@
 # DSCG Research Handoff
 
+## Compact default audit prompt (2026-10-21)
+
+- User requested shortening ActionSecurityChecker.SYSTEM_POLICY. Base legacy prompt is now1919 characters/253 whitespace words (was3262/484); numbered action/task/evidence/read/send rules and explicit four-field JSON contract. These are character/word metrics, not measured token savings or semantic efficacy.
+- Preserve schema parser, Monitor, L2, selective thresholds/eligibility, metadata and evidence packets. Existing audit_policy_sha256 in configuration hash changes automatically, including router off; use new run names, never patch old manifests/results.
+- Explicit protocol/tool-semantics/source-context profiles still append their existing rules; their promotion/effectiveness remains unvalidated. No model requests authorized for this task; all regressions use socket guard. Evidence workshop/artifacts/20261021_l3_audit_prompt/; report workshop/completed/l3_audit_prompt_20261021.md.
+
+
 ## Lightweight frozen-cohort measurement validation (2026-10-21)
 
 This user-approved policy supersedes earlier adapter/evidence gates only for measurement consumption of a frozen cohort.

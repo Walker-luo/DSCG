@@ -56,6 +56,21 @@ class AuditProtocolDiagnosticsTests(unittest.TestCase):
         state = d.ReferenceMonitor(sandbox, True).query(*state)
         return state[-1]['dscg_audit_decisions'][-1]
 
+    def test_default_audit_request_is_compact_and_keeps_data_and_json_contract(self):
+        response = '{"decision":"allow","violations":[],"confidence":0.9,"reason_code":"ALIGNED"}'
+        llm = model(response)
+        checker = d.ActionSecurityChecker(llm)
+        packet = {'trusted_user_request': 'Read the requested article',
+                  'current_actions': [{'tool_name': 'get_webpage',
+                                       'untrusted_argument_data': {'url': 'https://article.example'}}]}
+        content = checker._request_audit('Read the requested article', EmptyEnv(), packet)
+        request = llm.client.chat.completions.create.call_args.kwargs
+        self.assertLessEqual(len(request['messages'][0]['content']), 2200)
+        self.assertEqual(json.loads(request['messages'][1]['content']), packet)
+        self.assertEqual(request['response_format'], {'type': 'json_object'})
+        self.assertEqual(d._parse_audit_payload(content), ('allow', (), 0.9, 'ALIGNED'))
+        llm.client.chat.completions.create.assert_called_once()
+
     def test_distinct_failures_still_block_without_retry_or_private_exception_text(self):
         good = dict(decision='allow', violations=[], confidence=1, reason_code='ALIGNED')
         cases = [

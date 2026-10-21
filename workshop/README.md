@@ -1,5 +1,7 @@
 # Workshop 优化状态索引
 
+新增[L3审计提示压缩](./completed/l3_audit_prompt_20261021.md)：基础提示3262→1919字符，保留来源/准备读取/外发审查并明确四字段协议；配置身份自动变化，仅离线验收，真实语义效果待测。
+
 新增[L3直接阈值路由](./completed/l3_threshold_20261021.md)：默认经验阈值0.70，internal/personal读取资格，无运行时artifact依赖；shadow阈值比较与旧记录语义分离，真实收益待新实验。
 
 新增[AgentDyn/Qwen消息角色兼容](./completed/agentdyn_qwen_roles_20261019.md)：DashScope公共Chat适配与受限API失败诊断；请求身份绑定，新run名复测。原始失败与conda包保留；仅离线验证，服务器模型测试待运行。
