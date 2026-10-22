@@ -1,3 +1,4 @@
+from authorization_fixture import adapt_client
 """Default prompt contract and strict mediation diagnostics, without model calls."""
 import json
 from types import SimpleNamespace
@@ -20,12 +21,13 @@ def model(payload):
     client=Mock()
     client.chat.completions.create.return_value=SimpleNamespace(choices=[SimpleNamespace(
         message=SimpleNamespace(content=payload,refusal=None),finish_reason='stop')])
+    adapt_client(client)
     return SimpleNamespace(name='offline',client=client)
 
 
 class IntentSourceRelaxationTests(unittest.TestCase):
     def test_default_version_and_compact_audit_contract(self):
-        self.assertEqual(FRAMEWORK_VERSION,'three-layer-v3.2')
+        self.assertEqual(FRAMEWORK_VERSION,'three-layer-v3.3')
         policy=d.ActionSecurityChecker.SYSTEM_POLICY
         self.assertLessEqual(len(policy),1200)
         for field in ('decision','violations','confidence','reason_code'):
@@ -133,7 +135,7 @@ class IntentSourceRelaxationTests(unittest.TestCase):
             self.assertEqual(runner.main(**options),0)
             path=Path(temp)/get_backend().id/'offline-model_binding/none'/get_suites()[0]/'run_manifest.json'
             binding=json.loads(path.read_text())
-            self.assertEqual(binding['defense_version'],'three-layer-v3.2')
+            self.assertEqual(binding['defense_version'],'three-layer-v3.3')
             binding['defense_version']='three-layer-v3.1';path.write_text(json.dumps(binding))
             before={p:p.read_bytes() for p in Path(temp).rglob('*') if p.is_file()}
             with patch.object(runner,'iter_attack_results') as dispatch:

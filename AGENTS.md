@@ -1,5 +1,11 @@
 # DSCG Research Handoff
 
+## Native L2 definitions and task-step authorization (2026-10-22)
+
+- Default three-layer-v3.3/legacy supersedes v3.2 only for L2 input/output. One call receives all native names/descriptions/exact parameter schemas and automatic-read markers, returns strict steps(intent/tools) plus the same tool union. Host retains original auto-read policy and selects only action grants; no synonyms, task-ID mappings, extra calls, dynamic grants or parameter/object permissions. Steps are diagnostics, never a semantic coverage oracle.
+- Explicit older prompt candidates and trusted bounded profiles retain original protocols/catalogues. Preserve historical utility input/request hashes. Bind actual policy/version/content in existing contracts/router/cache identities, use fresh names; frozen cohort lightweight reading and native baseline remain unchanged. L3, thresholds, Monitor/tickets and risk catalogues unchanged.
+- User authorized Qwen3.7-Flash small tests here; bounded total160 requests, no full suite. Evidence and exact counts/limitations: workshop/artifacts/20261022_l2_step_authorization/ and workshop/completed/l2_step_authorization_20261022.md. New clean results do not establish attack safety or aggregate TSR gain. Preserve all original results/download and concurrent Dashboard/history work.
+
 ## Default intent/source relaxation (2026-10-21)
 
 - Default is three-layer-v3.2 / prompt_profile=legacy, superseding older v3.1 default and opt-in-only optimization statements. One L2 call may retain multiple plausible task-related alternative tools; explicit read-only/prohibited/unrelated operations and host authorization ceilings remain enforced. No synonym engine, dynamic grants or extra requests.

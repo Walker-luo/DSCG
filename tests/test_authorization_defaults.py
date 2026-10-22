@@ -1,3 +1,4 @@
+from authorization_fixture import adapt_client
 """Authorization compiler protocol and diagnostics, without model calls."""
 import json
 from types import SimpleNamespace
@@ -32,6 +33,7 @@ def model(content='{"tools":["update_payment"]}', finish="stop", refusal=None):
     client.chat.completions.create.return_value = SimpleNamespace(choices=[
         SimpleNamespace(message=SimpleNamespace(content=content, refusal=refusal), finish_reason=finish)
     ])
+    adapt_client(client)
     return SimpleNamespace(name="offline", client=client, query=Mock(
         side_effect=lambda q, r, e, m, a: (q, r, e, [*m, {"role": "assistant", "content": [], "tool_calls": []}], a)
     ))
@@ -58,8 +60,8 @@ class AuthorizationDefaultsTests(unittest.TestCase):
         cases = [
             (model(content="bad JSON"), "AUTH_INVALID_JSON"),
             (model(content=None), "AUTH_INVALID_JSON"),
-            (model(content="{}"), "AUTH_INVALID_SCHEMA"),
-            (model(content='{"tools":["ghost"]}'), "AUTH_UNKNOWN_TOOL"),
+            (model(content="{}"), "AUTH_INVALID_STEP_SCHEMA"),
+            (model(content='{"tools":["ghost"]}'), "AUTH_INVALID_STEP_TOOLS"),
             (model(refusal="refused"), "AUTH_REFUSED"),
             (model(finish="length"), "AUTH_INCOMPLETE"),
         ]

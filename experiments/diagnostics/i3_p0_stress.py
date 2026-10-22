@@ -264,7 +264,11 @@ class _RecoveryModel:
 
     def compile(self, **kwargs):
         self.compiler_inputs.append(kwargs["messages"])
-        return _response(json.dumps({"tools": self.manifest["allowed_tools"]}))
+        payload = {"tools": self.manifest["allowed_tools"]}
+        catalog = json.loads(kwargs["messages"][-1]["content"])["available_tools"]
+        if catalog and all(isinstance(v, dict) and "authorization" in v for v in catalog.values()):
+            payload["steps"] = [{"intent": "Authored stress fixture", "tools": payload["tools"]}]
+        return _response(json.dumps(payload))
 
     def query(self, query, runtime, env, messages, extra_args):
         if self.step == 0:

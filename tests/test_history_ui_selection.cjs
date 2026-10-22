@@ -9,7 +9,8 @@ const historyCharts = require("../dashboard/static/js/history_charts.js");
 function historyUI(catalog, filters) {
   const source = fs.readFileSync(path.join(__dirname, "../dashboard/static/js/history.js"), "utf8");
   class Element {
-    constructor() { this.children = []; this.handlers = {}; this.style = {}; this.value = "all"; }
+    constructor() { this.children = []; this.handlers = {}; this.style = {}; this.value = "all";
+      this.classList = {add() {}, toggle() {}}; }
     append(...children) { this.children.push(...children); }
     replaceChildren(...children) { this.children = children; }
     addEventListener(name, callback) { this.handlers[name] = callback; }
@@ -17,6 +18,7 @@ function historyUI(catalog, filters) {
     removeAttribute() {}
     click() {}
     remove() {}
+    querySelector() { return {}; }
   }
   const nodes = new Map();
   let ready;
@@ -28,7 +30,8 @@ function historyUI(catalog, filters) {
     querySelector(selector) { if (!nodes.has(selector)) nodes.set(selector, new Element()); return nodes.get(selector); },
     querySelectorAll(selector) {
       const model = selector.startsWith(".history-model-cb");
-      const elements = find(this.querySelector(model ? "#history-model-options" : "#history-run-list"), model ? "history-model-cb" : "history-run-cb");
+      const suite = selector.startsWith(".history-suite-cb");
+      const elements = find(this.querySelector(suite ? "#history-suite-options" : model ? "#history-model-options" : "#history-run-list"), suite ? "history-suite-cb" : model ? "history-model-cb" : "history-run-cb");
       return selector.includes(":checked") ? elements.filter(item => item.checked) : elements;
     },
     createElement() { return new Element(); },
@@ -37,7 +40,7 @@ function historyUI(catalog, filters) {
   const gate = selection.createRequestGate();
   const context = {
     document, window: {setInterval() {}, setTimeout() {}}, historySelection: selection, historyCharts, analysisRequests: gate,
-    catalog, filters, suites: ["workspace"],
+    catalog, filters, suiteSelection: null,
     experimentStyles: historyCharts.createExperimentStyles(catalog), exporting: false,
     updateControls() {}, loadCatalog() {}, clearCharts() {}, renderSummaryTable() {}, showEmpty() {}, analyze() {}, exportAnalysis() {},
     addOption(select, value, text) { const node = new Element(); node.value = value; node.textContent = text; select.append(node); },
@@ -95,7 +98,7 @@ test("backend UI refresh excludes hidden runs from actual analyze/export and rej
   assert.deepEqual(ui.selected(), ["dyn-new", "dyn-old"]);
   assert.equal(ui.nodes.get("#history-selection-count").textContent, "2 项已选");
   assert.equal(ui.nodes.get("#history-catalog-count").textContent, "2 / 3 项");
-  assert.deepEqual(ui.nodes.get("#history-suite-select").children.map(n => n.value), ["all", "shopping"]);
+  assert.deepEqual(ui.context.document.querySelectorAll('.history-suite-cb:checked').map(n => n.value), ["shopping"]);
   // Simulate the timer's render with one manually excluded run.
   ui.context.renderCatalog(new Set(["dyn-old"]), false);
   assert.deepEqual(ui.selected(), ["dyn-old"]);
@@ -116,8 +119,8 @@ test("backend UI refresh excludes hidden runs from actual analyze/export and rej
   await ui.context.analyze();
   await ui.context.exportAnalysis();
   assert.deepEqual(payloads, [
-    {url: "/api/history/analyze", body: {run_ids: ["dyn-old"], suites: [], include_task_records: false}},
-    {url: "/api/history/export", body: {run_ids: ["dyn-old"], suites: []}},
+    {url: "/api/history/analyze", body: {run_ids: ["dyn-old"], suites: ["shopping"], include_task_records: false}},
+    {url: "/api/history/export", body: {run_ids: ["dyn-old"], suites: ["shopping"]}},
   ]);
   assert.equal(rendered.length, 1);
   let resolveOld;
@@ -132,4 +135,64 @@ test("backend UI refresh excludes hidden runs from actual analyze/export and rej
   ui.context.renderCatalog(new Set(), false);
   assert.deepEqual(ui.selected(), []);
   assert.equal(ui.nodes.get("#history-export").disabled, true);
+});
+
+test('multi-suite controls send only checked scenes and preserve explicit empty selection on refresh', async () => {
+  const run = {id:'run', source:'benchmarks/model', model_group:'model_v1', result_folder:'benchmarks',
+    attack_name:'tool_knowledge', suites:['banking','travel','workspace'].map(suite_name=>({suite_name}))};
+  const ui = historyUI([run], {folder:'all',backend:'all',models:null,attack:'all'});
+  ui.click('#history-model-select-all');
+  const checked = () => ui.context.document.querySelectorAll('.history-suite-cb:checked').map(n=>n.value);
+  assert.deepEqual(checked(), ['banking','travel','workspace']);
+  const change = () => ui.nodes.get('#history-suite-options').handlers.change();
+  ui.context.document.querySelectorAll('.history-suite-cb')[0].checked = false;
+  change();
+  assert.deepEqual(checked(), ['travel','workspace']);
+  ui.context.renderCatalog(new Set(['run']),false);
+  assert.deepEqual(checked(), ['travel','workspace']);
+  const payloads = [], renders = [];
+  Object.assign(ui.context, {
+    selectedMetricKeys:()=>['utility_rate','attack_success_rate','total_tokens'],
+    renderAnalysis:(data,settings)=>renders.push(settings),
+    URL:{createObjectURL:()=> 'blob:fixture',revokeObjectURL(){}},
+    fetch:async(url,init)=>{payloads.push({url,body:JSON.parse(init.body)});return {
+      ok:true,json:async()=>({experiments:[]}),blob:async()=>({}),headers:{get:()=>null}};},
+  });
+  ui.nodes.get('#history-chart-type').value='bar';
+  vm.runInContext(ui.source.slice(ui.source.indexOf('  async function exportAnalysis()'),ui.source.indexOf('  function addOption('))
+    +ui.source.slice(ui.source.indexOf('  function updateControls()'),ui.source.indexOf('  function selectedMetricKeys()'))
+    +ui.source.slice(ui.source.indexOf('  function analysisSelectionKey()'),ui.source.indexOf('  function clearCharts()')),ui.context);
+  await ui.context.analyze(); await ui.context.exportAnalysis();
+  assert.deepEqual(payloads,[
+    {url:'/api/history/analyze',body:{run_ids:['run'],suites:['travel','workspace'],include_task_records:false}},
+    {url:'/api/history/export',body:{run_ids:['run'],suites:['travel','workspace']}},
+  ]);
+  assert.deepEqual(Array.from(renders[0].suites), ['travel','workspace']);
+  const pending = ui.gate.start();
+  ui.context.document.querySelectorAll('.history-suite-cb').forEach(n=>{n.checked=false;});
+  change();
+  assert.equal(ui.gate.isCurrent(pending),false);
+  assert.equal(ui.nodes.get('#history-analyze').disabled,true);
+  assert.equal(ui.nodes.get('#history-export').disabled,true);
+  await ui.context.analyze(); await ui.context.exportAnalysis();
+  assert.equal(payloads.length,2);
+  ui.context.renderCatalog(new Set(['run']),false);
+  assert.deepEqual(checked(),[]);
+});
+
+test('multi-suite charts keep separate scenario values while one selected scene uses experiment comparison', () => {
+  const run={id:'run',model_suffix:'model_v1',suites:['travel','workspace'].map((suite_name,i)=>({
+    suite_name,metrics:{utility_rate:50+i*25,attack_success_rate:25-i*25},overhead:{total_tokens:1000+i*1000}}))};
+  const ui=historyUI([{...run,model_group:'model_v1',result_folder:'benchmarks',attack_name:'tool_knowledge'}],{});
+  const configs=[];
+  Object.assign(ui.context,{chartTheme:()=>({}),renderChartPanel:(_wrap,_key,_title,_desc,config)=>configs.push(config)});
+  vm.runInContext(ui.source.slice(ui.source.indexOf('  function renderAnalysis('),ui.source.indexOf('  function renderChartPanel(')),ui.context);
+  ui.context.renderAnalysis({experiments:[run]}, {view:'bar',metrics:['utility_rate','total_tokens'],suites:['travel','workspace']});
+  assert.deepEqual(Array.from(configs[0].data.labels),['travel','workspace']);
+  assert.deepEqual(Array.from(configs[0].data.datasets[0].data),[50,75]);
+  assert.deepEqual(Array.from(configs[1].data.datasets[0].data),[1,2]);
+  configs.length=0;
+  ui.context.renderAnalysis({experiments:[{...run,suites:[run.suites[0]]}]}, {view:'bar',metrics:['utility_rate'],suites:['travel']});
+  assert.deepEqual(Array.from(configs[0].data.labels),['v1']);
+  assert.deepEqual(Array.from(configs[0].data.datasets[0].data),[50]);
 });

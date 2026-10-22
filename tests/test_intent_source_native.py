@@ -1,3 +1,4 @@
+from authorization_fixture import step_content
 """Native AgentDojo tools/predicates + authored MockTransport, never model efficacy."""
 from contextlib import redirect_stdout
 from io import StringIO
@@ -35,7 +36,7 @@ class NativeIntentSourceTests(unittest.TestCase):
             if body.get('response_format'):
                 packet=json.loads(body['messages'][-1]['content'])
                 if 'available_tools' in packet:
-                    value={'tools':sorted(grants & set(packet['available_tools']))}
+                    value=json.loads(step_content(json.dumps({'tools':sorted(grants & set(packet['available_tools']))}),body))
                 else:
                     off_task=any(a['tool_name']=='post_webpage' or 'attacker.example' in json.dumps(a['untrusted_argument_data'])
                                  for a in packet['current_actions'])

@@ -1,6 +1,6 @@
 # 模型、工具与运行参数详解
 
-本文供首次运行或更换模型/工具的测试者使用，对应当前three-layer-v3.2。所有命令从DSCG/执行；激活`ipi`使用AgentDojo，激活`ipi-agentdyn`使用AgentDyn，相同运行入口自动识别实际安装。模型配置和工具风险目录是宿主输入；模型返回、网页正文或工具错误不能改写它们。
+本文供首次运行或更换模型/工具的测试者使用，对应当前three-layer-v3.3。所有命令从DSCG/执行；激活`ipi`使用AgentDojo，激活`ipi-agentdyn`使用AgentDyn，相同运行入口自动识别实际安装。模型配置和工具风险目录是宿主输入；模型返回、网页正文或工具错误不能改写它们。
 
 两个独立环境的安装入口是 [environment.yml](../environment.yml) 与 [environment-agentdyn.yml](../environment-agentdyn.yml)。保留已有环境和本地模型配置；运行前可离线自检：
 
@@ -134,7 +134,7 @@ baseline/NoChecker不需要建立审计客户端；上述两角色检查用于�
 
 ## 3. 工具参数：查看什么、在哪里获取
 
-真实注册工具具有name、description、parameters和run；输入schema由当前后端的函数定义/类型标注机制生成。schema说明属性类型、required字段、default/枚举等；实际函数实现才决定副作用。工具描述由宿主提供，L2编译、主模型工具视图与L3宿主描述都会使用。
+真实注册工具具有name、description、parameters和run；输入schema由当前后端的函数定义/类型标注机制生成。schema说明属性类型、required字段、default/枚举等；实际函数实现才决定副作用。工具描述由宿主提供；默认L2编译使用全部原生名称、描述与完整参数schema，主模型工具视图仍只展示有效已授权工具。L3宿主描述逻辑不变。`tools.local.toml`仅描述风险，不替代原生参数定义，也不直接指定本任务白名单。步骤输出与限制见[运行指南](./benchmark.md#默认-v33-策略与复测)。
 
 以下示例**只查看注册定义，不执行send_email、不调用模型**：
 

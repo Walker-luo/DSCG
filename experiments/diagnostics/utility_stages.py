@@ -145,6 +145,7 @@ def _component(client, profile, *, authorization=False, input_revision='authoriz
         _model(client), prompt_profile=profile)
     if input_revision == 'legacy-v1':
         # Frozen historical responses must never be rebound to today's default prompts.
+        if authorization: component.CLASSIC_POLICY = _LEGACY_POLICIES['authorization']
         component.SYSTEM_POLICY = (_LEGACY_POLICIES['authorization'] if authorization else
                                    audit_policy(_LEGACY_POLICIES['audit'], profile))
     return component

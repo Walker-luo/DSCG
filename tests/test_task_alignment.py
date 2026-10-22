@@ -1,3 +1,4 @@
+from tests.authorization_fixture import adapt_client
 """Opt-in compact candidate plumbing and strict boundaries; no model efficacy claims."""
 import json
 from contextlib import redirect_stdout, redirect_stderr
@@ -21,6 +22,7 @@ def model(text):
     client = Mock()
     client.chat.completions.create.return_value = SimpleNamespace(choices=[SimpleNamespace(
         message=SimpleNamespace(content=text, refusal=None), finish_reason='stop')])
+    adapt_client(client)
     return SimpleNamespace(name='offline', client=client)
 
 
@@ -39,7 +41,9 @@ class TaskAlignmentTests(unittest.TestCase):
             kwargs=llm.client.chat.completions.create.call_args.kwargs
             catalogs[name]=json.loads(kwargs['messages'][1]['content'])
             prompts[name]=kwargs['messages'][0]['content']
-        self.assertEqual(catalogs['legacy'],catalogs[PROFILE])
+        self.assertIsInstance(catalogs['legacy']['available_tools']['send_channel_message'],dict)
+        self.assertIsInstance(catalogs[PROFILE]['available_tools']['send_channel_message'],str)
+        self.assertIn('parameters',catalogs['legacy']['available_tools']['send_channel_message'])
         self.assertNotEqual(prompts['legacy'],prompts[PROFILE])
         # The new default is shorter; this historical candidate keeps its own budget.
         self.assertLessEqual(len(prompts[PROFILE]),1084)

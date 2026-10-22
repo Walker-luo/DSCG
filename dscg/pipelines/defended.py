@@ -28,6 +28,7 @@ from agentdojo.benchmark import TaskResults
 
 #! 统计token消耗
 from dscg.token_tracking import TokenTrackerClient
+from dscg.authorization_steps import PROTOCOL as STEP_PROTOCOL, POLICY as STEP_POLICY, native_catalog, parse_steps
 from dscg.input_isolation import FRAMEWORK_VERSION, ISOLATION_RULE, build_isolated_view
 from dscg.l1_projection import (MODES as L1_PROJECTION_MODES, PROFILE_SHA256 as L1_PROFILE_SHA256,
                                PROFILE as L1_PROFILE, trusted_request_for_view)
@@ -521,6 +522,8 @@ def _compact_authorization_record(record: dict) -> dict:
         "tool_risk_counts",
         "metadata_errors",
         "allowed_tools",
+        "authorization_protocol",
+        "authorization_steps",
         "implicit_read_tools",
         'authorization_mode', 'profile_status', 'task_phase',
         'prohibited_tools', 'preparatory_read_tools', 'evidence_refs',
@@ -951,6 +954,8 @@ class ToolAuthorizationContract:
     evidence_refs: tuple[tuple[str, str, int, int], ...] = ()
     authorization_source: str = 'trusted_user+fixed_system_policy'
     task_phase: str = 'execution'
+    authorization_steps: tuple[tuple[str, tuple[str, ...]], ...] = ()
+    authorization_protocol: str = ''
 
     def public_dict(self) -> dict:
         record = {
@@ -972,6 +977,9 @@ class ToolAuthorizationContract:
             'preparatory_read_tools': sorted(self.preparatory_read_tools),
             'evidence_refs': [list(entry) for entry in self.evidence_refs],
         }
+        if self.authorization_protocol:
+            record['authorization_protocol'] = self.authorization_protocol
+            record['authorization_steps'] = [{'intent':intent,'tools':list(tools)} for intent,tools in self.authorization_steps]
         record["contract_version"] = _authorization_hash(record)
         return record
 
@@ -995,7 +1003,8 @@ class ToolAuthorizationCompiler:
     are context, never an independent source of task authorization.
     """
 
-    SYSTEM_POLICY = (
+    SYSTEM_POLICY = STEP_POLICY
+    CLASSIC_POLICY = (
         "Select action-tool permissions from trusted user_request and host available_tools. "
         "Cover every requested step, including conditional and later steps and necessary documented side effects. "
         "When wording or tool semantics are uncertain, include plausible alternative tools for that step "
@@ -1031,6 +1040,8 @@ class ToolAuthorizationCompiler:
         self.prompt_profile = validate_profile(prompt_profile)
 
     def _catalog(self, runtime, metadata):
+        if self.prompt_profile == 'legacy' and self.authorization_profile is None:
+            return native_catalog(runtime, metadata)
         if not semantic_catalog(self.prompt_profile):
             return {name: str(getattr(runtime.functions[name], 'description', 'No description')).strip()
                     for name in sorted(runtime.functions)}
@@ -1107,7 +1118,10 @@ class ToolAuthorizationCompiler:
                 profile = None
                 profile_status = 'unsupported_task_fallback'
         prohibited, prepared, evidence_refs = frozenset(), frozenset(), ()
-        policy = authorization_policy(self.PROFILE_POLICY if profile is not None else self.SYSTEM_POLICY,
+        step_mode = self.prompt_profile == 'legacy' and self.authorization_profile is None
+        steps = ()
+        base_policy = self.SYSTEM_POLICY if step_mode else self.CLASSIC_POLICY
+        policy = authorization_policy(self.PROFILE_POLICY if profile is not None else base_policy,
                                       self.prompt_profile, bounded=profile is not None)
         authorization_mode = 'bounded-profile-v1' if profile is not None else 'legacy'
         if profile is not None:
@@ -1153,6 +1167,7 @@ class ToolAuthorizationCompiler:
                     if status.error_code
                 )),
                 runtime_catalog_sha256=catalog_fingerprint(runtime),
+                authorization_steps=steps, authorization_protocol=STEP_PROTOCOL if step_mode else '',
                 authorization_mode=authorization_mode, profile_status=profile_status,
                 profile_sha256=self.authorization_profile.identity() if self.authorization_profile else '',
                 prohibited_tools=prohibited, preparatory_read_tools=prepared, evidence_refs=evidence_refs,
@@ -1163,7 +1178,7 @@ class ToolAuthorizationCompiler:
             return contract()
 
         # 3. 构建单次意图解析 Prompt (要求输出 JSON)
-        input_packet = {"user_request": request.text, "available_tools": action_tools}
+        input_packet = {"user_request": request.text, "available_tools": catalog if step_mode else action_tools}
         if profile is not None:
             input_packet['tool_risks'] = {name: metadata[name].public_dict() for name in action_tools}
         prompt = json.dumps(input_packet, ensure_ascii=False, sort_keys=True)
@@ -1211,6 +1226,14 @@ class ToolAuthorizationCompiler:
                 raise AuthorizationCompilationError(exc.reason_code) from exc
             allowed = set(selected)
             implicit_reads = frozenset(name for name in allowed if metadata[name].metadata.deterministic_read)
+            return contract()
+
+        if step_mode:
+            try:
+                selected, steps = parse_steps(result_json, set(all_tools), set(action_tools))
+            except ValueError as exc:
+                raise AuthorizationCompilationError(str(exc)) from exc
+            allowed.update(selected)
             return contract()
 
         if isinstance(result_json, dict):
@@ -2720,7 +2743,7 @@ def router_configuration_hash(main_config, sec_config, *, input_isolation, autho
                                            "reasoning_effort": [reasoning_effort_for_config(main_config),reasoning_effort_for_config(sec_config)],
                                            "main_system_prompt_sha256": _hash_json(load_system_message(None)),
                                            "audit_policy_sha256": _hash_json(audit_policy(ActionSecurityChecker.SYSTEM_POLICY, prompt_profile)),
-                                           "authorization_policy_sha256": _hash_json(authorization_policy(ToolAuthorizationCompiler.SYSTEM_POLICY, prompt_profile)),
+                                           "authorization_policy_sha256": _hash_json(authorization_policy(ToolAuthorizationCompiler.SYSTEM_POLICY if prompt_profile == 'legacy' and profile_hash is None else ToolAuthorizationCompiler.CLASSIC_POLICY, prompt_profile)),
                                            "isolation_rule_sha256": _hash_json(ISOLATION_RULE),
                                            "completion_rule_sha256": _hash_json(TASK_COMPLETION_PROMPT),
                                            "framework_version": FRAMEWORK_VERSION,

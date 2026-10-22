@@ -95,3 +95,7 @@ CLI测量的每个`<attack>/<suite>/task_errors.jsonl`只追加本次新出现�
 v3.2的审计事件保留`mediation_diagnostics`：`checker_parser_status`和受限`checker_protocol_diagnostics`记录原始模型协议观察，`audit_record_status`记录审计记录校验，`router_handoff_status`记录路由回执交接。`failure_stage`分别为`model_protocol`、`model_request`、`audit_record`或`router_handoff`，正常为空；未检查/未知状态不反推模型错误。审计摘要新增`mediation_failure_counts`，并继续保留原始解析计数。
 
 不要仅凭`AUDIT_SCHEMA_INVALID`断定模型JSON格式失败：可能是记录或回执校验失败，即使原始解析为ok仍会拒绝执行。新增字段不保存响应正文或异常原文，不放宽Monitor；旧轨迹缺字段时保留未知，不回填历史结果。
+
+## L2步骤记录（v3.3）
+
+默认授权的 `dscg_authorizations` 每条记录新增 `authorization_protocol=native-steps-v1` 和 `authorization_steps`（intent/tools）。该映射只记录一次授权模型的自述，不认证步骤完整、参数正确或任务成功。`allowed_tools` 仍是工具级有效授权；显式旧候选/受限授权没有这些字段时不补造。新协议和提示身份进入现有绑定，旧策略结果请保留并使用新运行名。

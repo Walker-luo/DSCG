@@ -1,3 +1,4 @@
+from tests.authorization_fixture import adapt_client
 """Explicit clean task sources must use real mediation and one effective task."""
 from copy import deepcopy
 import json
@@ -24,6 +25,7 @@ class Planner:
         text = '{"tools": []}' if summary else '{"tools": ["send_order"]}'
         self.client.chat.completions.create.return_value = SimpleNamespace(choices=[
             SimpleNamespace(message=SimpleNamespace(content=text, refusal=None), finish_reason='stop')])
+        adapt_client(self.client)
 
     def query(self, q, runtime, env, messages, extra):
         self.views.append((q, set(runtime.functions), deepcopy(messages)))

@@ -4,6 +4,7 @@
   const historySelection = window.DSCGHistorySelection;
   const analysisRequests = historySelection.createRequestGate();
   let filters = { folder: "all", backend: "all", models: null, attack: "all" };
+  let suiteSelection = null;
   let catalog = [];
   let loaded = false;
   let charts = [];
@@ -43,7 +44,13 @@
       filters.models = [];
       refreshFilterResults(true);
     });
-    document.querySelector("#history-suite-select").addEventListener("change", updateControls);
+    document.querySelector("#history-suite-options").addEventListener("change", () => {
+      analysisRequests.invalidate();
+      const chosen = selectedSuiteNames();
+      suiteSelection = chosen.length === document.querySelectorAll(".history-suite-cb").length ? null : chosen;
+      updateExportButton();
+      updateControls();
+    });
     document.querySelector("#history-chart-type").addEventListener("change", updateControls);
     document.querySelector("#history-metric-select").addEventListener("change", updateControls);
     document.querySelector("#history-analyze").addEventListener("click", analyze);
@@ -190,14 +197,31 @@
     catalog.forEach((run) => {
       if (selected.has(run.id)) (run.suites || []).forEach((item) => available.add(item.suite_name));
     });
-    const select = document.querySelector("#history-suite-select");
-    const previous = select.value;
-    select.replaceChildren();
-    addOption(select, "all", "全部场景");
-    Array.from(available).sort().forEach((suite) => addOption(select, suite, suite));
-    select.value = available.has(previous) ? previous : "all";
+    if (suiteSelection?.length) {
+      suiteSelection = suiteSelection.filter(suite => available.has(suite));
+      if (!suiteSelection.length) suiteSelection = null;
+    }
+    const options = document.querySelector("#history-suite-options");
+    options.replaceChildren();
+    Array.from(available).sort().forEach(suite => {
+      const label = document.createElement("label");
+      const checkbox = document.createElement("input");
+      checkbox.type = "checkbox";
+      checkbox.className = "form-check-input history-suite-cb";
+      checkbox.value = suite;
+      checkbox.checked = suiteSelection === null || suiteSelection.includes(suite);
+      const text = document.createElement("span");
+      text.textContent = suite;
+      label.append(checkbox, text);
+      options.append(label);
+    });
+    if (!available.size) options.textContent = "请先勾选实验结果。";
     updateExportButton();
     updateControls();
+  }
+
+  function selectedSuiteNames() {
+    return Array.from(document.querySelectorAll(".history-suite-cb:checked"), item => item.value);
   }
 
   function selectedRunIds() {
@@ -205,7 +229,7 @@
   }
 
   function updateExportButton() {
-    document.querySelector("#history-export").disabled = exporting || !selectedRunIds().length;
+    document.querySelector("#history-export").disabled = exporting || !selectedRunIds().length || !selectedSuiteNames().length;
   }
 
   async function exportAnalysis() {
@@ -216,7 +240,11 @@
       status.textContent = "请先选择至少一项历史实验结果。";
       return;
     }
-    const suite = document.querySelector("#history-suite-select").value;
+    const suites = selectedSuiteNames();
+    if (!suites.length) {
+      status.textContent = "请至少选择一个场景。";
+      return;
+    }
     const button = document.querySelector("#history-export");
     const originalLabel = button.innerHTML;
     exporting = true;
@@ -228,7 +256,7 @@
       const response = await fetch("/api/history/export", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ run_ids: ids, suites: suite === "all" ? [] : [suite] }),
+        body: JSON.stringify({ run_ids: ids, suites }),
       });
       if (!response.ok) {
         const error = await response.json().catch(() => ({}));
@@ -266,17 +294,18 @@
   function updateControls() {
     const view = document.querySelector("#history-chart-type");
     const metrics = selectedMetricKeys();
+    const suites = selectedSuiteNames();
     const fixedMetrics = view.value === "scatter" || view.value === "heatmap";
     document.querySelector("#history-metric-select").disabled = fixedMetrics;
     const radar = view.querySelector('option[value="radar"]');
-    radar.disabled = !historyCharts.canUseRadar(metrics, document.querySelector("#history-suite-select").value);
+    radar.disabled = !historyCharts.canUseRadar(metrics, suites.length > 1 ? "all" : suites[0]);
     if (radar.disabled && view.value === "radar") view.value = "bar";
-    document.querySelector("#history-analyze").disabled = !selectedRunIds().length || (!fixedMetrics && !metrics.length);
+    document.querySelector("#history-analyze").disabled = !selectedRunIds().length || !suites.length || (!fixedMetrics && !metrics.length);
     document.querySelector("#history-metric-hint").textContent = fixedMetrics
       ? (view.value === "scatter" ? "散点图固定比较 ASR 与 TSR。" : "热图固定展示逐任务效用结果。")
       : !metrics.length ? "请至少选择一个指标。"
         : view.value === "bar" ? "颜色区分版本，填充纹理区分攻击；点击图例可隐藏单项，悬停查看数值。"
-        : "同一模型 / 运行名称共用颜色与字母标记；点击图例可隐藏单项。雷达图仅支持全部场景的百分比指标。";
+        : "同一模型 / 运行名称共用颜色与字母标记；点击图例可隐藏单项。雷达图仅支持多个场景的百分比指标。";
   }
 
   function selectedMetricKeys() {
@@ -286,7 +315,7 @@
   function analysisSelectionKey() {
     return JSON.stringify({
       ids: selectedRunIds().sort(), filters,
-      suite: document.querySelector("#history-suite-select").value,
+      suites: selectedSuiteNames(),
       view: document.querySelector("#history-chart-type").value,
       metrics: selectedMetricKeys(),
     });
@@ -299,9 +328,13 @@
       status.textContent = "请先选择至少一项历史实验结果。";
       return;
     }
-    const suite = document.querySelector("#history-suite-select").value;
+    const suites = selectedSuiteNames();
+    if (!suites.length) {
+      status.textContent = "请至少选择一个场景。";
+      return;
+    }
     const view = document.querySelector("#history-chart-type").value;
-    const settings = { suite, view, metrics: selectedMetricKeys() };
+    const settings = { suites, view, metrics: selectedMetricKeys() };
     const request = analysisRequests.start();
     const selectionKey = analysisSelectionKey();
     const isCurrent = () => analysisRequests.isCurrent(request) && selectionKey === analysisSelectionKey();
@@ -312,7 +345,7 @@
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           run_ids: ids,
-          suites: suite === "all" ? [] : [suite],
+          suites,
           include_task_records: view === "heatmap",
         }),
       });
@@ -340,8 +373,9 @@
       showEmpty("没有可绘制的指标", "所选结果中没有与当前场景匹配的汇总数据。");
       return;
     }
-    const { view, metrics, suite: selectedSuite } = settings;
-    const suiteTitle = selectedSuite === "all" ? "全部场景" : selectedSuite;
+    const { view, metrics, suites } = settings;
+    const selectedSuite = suites.length === 1 ? suites[0] : "all";
+    const suiteTitle = suites.length === document.querySelectorAll(".history-suite-cb").length ? "全部场景" : suites.join("、");
     const status = document.querySelector("#history-analysis-status");
     document.querySelector("#history-source-caption").textContent =
       experiments.length + " 项实验 · " + rows.length + " 个场景结果";

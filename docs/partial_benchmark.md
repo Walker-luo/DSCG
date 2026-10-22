@@ -1,6 +1,6 @@
 # 小批量测试：run_partial_benchmark
 
-默认DSCG已更新为 `three-layer-v3.2`（legacy）：L2保留多个合理工具候选，L3精简为当前用途与参数来源审计。执行校验保持不变；新策略使用新name，旧冻结cohort仍按轻量规则读取。详见[默认策略与复测](./benchmark.md#默认-v32-策略与复测)。本次离线验证不代表真实TSR/ASR改善。
+默认DSCG为 `three-layer-v3.3`（legacy）：L2一次调用读取完整原生定义并生成步骤—工具映射，L3及执行校验不变。新策略使用新name，旧冻结cohort继续按轻量规则读取。详见[默认策略与复测](./benchmark.md#默认-v33-策略与复测)；[小样本实测](../workshop/completed/l2_step_authorization_20261022.md)不代表完整场景收益。
 
 DashScope/Qwen与DeepSeek的Chat请求角色由DSCG公共客户端分别适配，不修改conda包；更新后使用新运行名。AgentDyn首次请求的400/422定位、受限诊断字段和小范围复测要求见[消息角色兼容排错](./model_tool_configuration.md#消息角色兼容与请求排错)。旧测量缓存与新增请求身份不一致时拒绝复用，旧数据保留；冻结cohort只比较主模型ID/provider及环境与所选任务，详见[名单校验](./injection_precheck.md#2-中断和错误后续跑)。
 

@@ -1,3 +1,4 @@
+from tests.authorization_fixture import adapt_client
 """Offline regressions with AgentDojo's executor and local recording tools."""
 from types import SimpleNamespace
 from dataclasses import FrozenInstanceError
@@ -78,6 +79,7 @@ class SandboxExecutionTests(unittest.TestCase):
             SimpleNamespace(message=SimpleNamespace(content=content, refusal=refusal),
                             finish_reason=finish)
         ])
+        adapt_client(llm.client)
         llm.query.side_effect = lambda q, r, e, m, a: (q, r, e, [*m, assistant("safe_tool")], a)
         return llm
 
@@ -117,7 +119,7 @@ class SandboxExecutionTests(unittest.TestCase):
                 self.assertEqual(llm.query.call_count, 1)
 
     def test_parser_valid_object_and_legacy_array(self):
-        for content in ('{"tools": ["safe_tool"]}', '["safe_tool"]'):
+        for content in ('{"tools": ["safe_tool"]}',):
             llm = self.parser_llm(content)
             result = ToolAuthorizationCompiler(llm).compile(TrustedTaskRequest("test"), self.runtime)
             self.assertEqual(result.allowed_tools, frozenset(["safe_tool"]))
@@ -193,6 +195,7 @@ class SandboxExecutionTests(unittest.TestCase):
             return q, r, e, [*m, assistant("forbidden_tool", "safe_tool")], a
 
         llm.client.chat.completions.create.side_effect = compile_response
+        adapt_client(llm.client)
         llm.query.side_effect = propose
         state = OurFrameExecutor(llm, sandbox).query("test", self.runtime, self.env, [USER], {})
         agent_pipeline.ToolsExecutor().query(*sandbox.query(*state))

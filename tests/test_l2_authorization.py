@@ -1,3 +1,4 @@
+from authorization_fixture import adapt_client
 """Tool exposure must not change authority or the registered execution runtime."""
 import json
 import unittest
@@ -42,6 +43,7 @@ def make_runtime():
 def model(*outputs):
     client = Mock()
     client.chat.completions.create.side_effect = [response(x) for x in outputs]
+    adapt_client(client)
     planner = SimpleNamespace(name='offline', client=client, views=[])
 
     def query(q, runtime, env, messages, extra):

@@ -1,3 +1,4 @@
+from tests.authorization_fixture import adapt_client
 """Protocol and prompt-candidate regression; no model network requests."""
 import json
 from contextlib import redirect_stdout, redirect_stderr
@@ -18,6 +19,7 @@ def model(text, finish='stop', refusal=None):
     client = Mock()
     client.chat.completions.create.return_value = SimpleNamespace(choices=[
         SimpleNamespace(message=SimpleNamespace(content=text, refusal=refusal), finish_reason=finish)])
+    adapt_client(client)
     return SimpleNamespace(name='offline', client=client)
 
 
@@ -275,12 +277,12 @@ class PromptProfileTests(unittest.TestCase):
         changed = compiler.compile(d.TrustedTaskRequest('Publish the supplied text on my webpage'), r)
         self.assertNotEqual(original, changed.tool_catalog_sha256)
 
-    def test_legacy_and_protocol_preserve_original_authorization_catalog(self):
+    def test_default_native_and_explicit_protocol_catalogues(self):
         for profile in ('legacy', 'protocol-v1'):
             llm = model('{"tools":[]}')
             d.ToolAuthorizationCompiler(llm, prompt_profile=profile).compile(d.TrustedTaskRequest('Read the webpage'), runtime())
             packet = json.loads(llm.client.chat.completions.create.call_args.kwargs['messages'][1]['content'])
-            self.assertIsInstance(packet['available_tools']['post_webpage'], str)
+            self.assertIsInstance(packet['available_tools']['post_webpage'], dict if profile=='legacy' else str)
 
     def test_profiles_are_explicit_and_unknown_profile_fails_before_clients(self):
         with patch.object(d, 'create_openai_client') as create:

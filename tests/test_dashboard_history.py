@@ -30,6 +30,23 @@ def summary(suite, utility, attack, defense):
 
 
 class DashboardHistoryTests(unittest.TestCase):
+    def test_history_metric_defaults_are_three_checked_options(self):
+        from html.parser import HTMLParser
+
+        class Inputs(HTMLParser):
+            def __init__(self):
+                super().__init__()
+                self.metrics = []
+
+            def handle_starttag(self, tag, attrs):
+                attrs = dict(attrs)
+                if tag == 'input' and 'history-metric-cb' in attrs.get('class', '').split():
+                    self.metrics.append((attrs.get('value'), 'checked' in attrs))
+
+        parser = Inputs()
+        parser.feed(self.client.get('/history').get_data(as_text=True))
+        self.assertEqual(parser.metrics, [('utility_rate', True), ('attack_success_rate', True), ('total_tokens', True)])
+
     def test_backend_folders_and_legacy_results_stay_separate_in_history_and_export(self):
         sources=[]
         for backend,suite in [('agentdojo','workspace'),('agentdyn','shopping')]:

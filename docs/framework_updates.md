@@ -1,6 +1,8 @@
 # 当前框架与平台展示交接
 
-2026-10-21最新默认为three-layer-v3.2（profile名仍legacy）：L2保留同请求步骤的合理候选工具，L3以用途/参数来源为主，允许准备读取取得未知事实，关键写入/外发参数仍须任务关联。页面/API直接采用新默认，不新增控件；服务须重启。审计协议、记录与回执失败分别报告，Monitor/票据保持。[测试与新运行名](./benchmark.md#默认-v32-策略与复测)。以下较早阶段说明保留历史上下文。
+2026-10-22当前默认v3.3：L2采用完整原生schema和一次调用的步骤映射；L3及路由/Monitor不变。页面/API自动采用，服务须重启；旧显式候选协议保留。新name测试，结果与限制见[运行指南](./benchmark.md#默认-v33-策略与复测)及[小样本报告](../workshop/completed/l2_step_authorization_20261022.md)。下文v3.2条目为前序变更。
+
+2026-10-21最新默认为three-layer-v3.2（profile名仍legacy）：L2保留同请求步骤的合理候选工具，L3以用途/参数来源为主，允许准备读取取得未知事实，关键写入/外发参数仍须任务关联。页面/API直接采用新默认，不新增控件；服务须重启。审计协议、记录与回执失败分别报告，Monitor/票据保持。[测试与新运行名](./benchmark.md#默认-v33-策略与复测)。以下较早阶段说明保留历史上下文。
 
 2026-10-21精简候选：API `prompt_profile=task-alignment-v1` 已复用现有配置校验、身份绑定和factory，CLI full/partial/cohort相同；页面无新增控件，普通操作仍legacy。该分支使用原简洁工具目录，分别替换L2/L3提示，不累计旧长候选。严格协议、L2权限/Monitor/路由不变；重启服务后API可显式选用。新name测试，真实效用/安全未验证。[测试命令](./qwen_utility.md#task-alignment-v1)。
 
@@ -24,7 +26,7 @@ AgentDyn将受信任的system消息序列化为developer，正文为文本块数
 API失败时页面日志/SSE只返回类型与受限api_error，不再输出SDK异常正文/traceback；运行目录尽力保存execution_error.json，保留错误状态，不生成效用/安全成功标签。CLI执行与失败索引、screen尝试和phase账本同样记录诊断。非API异常沿用原排错路径。离线传输fixture及两套环境回归不证明远端服务已经恢复；复测步骤见[配置指南](./model_tool_configuration.md#消息角色兼容与请求排错)。
 
 
-更新时间：2026-10-19（新增显式Qwen效用候选和协议诊断；AgentDojo / AgentDyn 按环境自动识别；三层防御规则及默认开关保持）。当前默认版本 **three-layer-v3.2**。此前用户授权实现有限L1结构化投影，沿用L2工具视图/任务文件与L3动作正文审查；默认投影已接入factory、partial和网页API，架构说明同步。Spotlighting风格来源封装仍是不适用输入的回退。正式研究路线和闸门不改变。
+更新时间：2026-10-19（新增显式Qwen效用候选和协议诊断；AgentDojo / AgentDyn 按环境自动识别；三层防御规则及默认开关保持）。当前默认版本 **three-layer-v3.3**。此前用户授权实现有限L1结构化投影，沿用L2工具视图/任务文件与L3动作正文审查；默认投影已接入factory、partial和网页API，架构说明同步。Spotlighting风格来源封装仍是不适用输入的回退。正式研究路线和闸门不改变。
 
 ## 运行报告精简与L3汇总（2026-10-19）
 

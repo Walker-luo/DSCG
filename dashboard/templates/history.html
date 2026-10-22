@@ -44,19 +44,16 @@
 
           <div class="history-analysis-main">
           <section class="history-view-controls" aria-label="分析视图设置">
-            <div class="field-group">
-              <label class="form-label" for="history-suite-select">场景</label>
-              <select id="history-suite-select" class="form-select form-select-sm">
-                <option value="all">全部场景</option>
-              </select>
-            </div>
+            <fieldset class="field-group history-metric-field">
+              <legend class="form-label">场景（可多选）</legend>
+              <div id="history-suite-options" class="history-metric-options"></div>
+            </fieldset>
             <fieldset class="field-group history-metric-field" id="history-metric-select" aria-describedby="history-metric-hint">
               <legend class="form-label">指标（可多选）</legend>
               <div class="history-metric-options">
                 <label><input type="checkbox" class="form-check-input history-metric-cb" value="utility_rate" checked><span>任务效用率 TSR</span></label>
                 <label><input type="checkbox" class="form-check-input history-metric-cb" value="attack_success_rate" checked><span>攻击成功率 ASR</span></label>
-                <label><input type="checkbox" class="form-check-input history-metric-cb" value="defense_success_rate"><span>防御成功率</span></label>
-                <label><input type="checkbox" class="form-check-input history-metric-cb" value="total_tokens"><span>Token 消耗</span></label>
+                <label><input type="checkbox" class="form-check-input history-metric-cb" value="total_tokens" checked><span>Token 消耗</span></label>
               </div>
               <p id="history-metric-hint" class="history-metric-hint" aria-live="polite"></p>
             </fieldset>
