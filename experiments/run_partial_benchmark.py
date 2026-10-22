@@ -897,7 +897,7 @@ def cli(argv: list[str] | None = None, *, task_scope: str = 'partial', entrypoin
                         help="L3纯算法路由；DSCG CLI默认shadow，baseline/NoChecker默认off；可显式选择。")
     parser.add_argument("--audit-router-artifact", help="已停用；请改用 --audit-router-threshold。")
     parser.add_argument("--audit-router-threshold", type=float, default=DEFAULT_THRESHOLD,
-                        help="经验免审阈值 [0,1]，默认0.70；严格score<threshold才免审。")
+                        help="诊断阈值 [0,1]，默认0.70；read-purpose-v2按读取规则免审，不按分数阈值。")
     parser.add_argument("--audit-retries", type=int, choices=(0, 1), default=0, help="语义 abstain 有界重审次数；默认 0。")
     parser.add_argument("--completion-prompt", action="store_true", help="启用通用任务完成提示；默认关闭。")
     parser.add_argument("--clean", action="store_true", help="用相同用户任务运行无攻击效用控制。")

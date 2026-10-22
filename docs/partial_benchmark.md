@@ -1,6 +1,14 @@
 # 小批量测试：run_partial_benchmark
 
-默认DSCG为 `three-layer-v3.3`（legacy）：L2一次调用读取完整原生定义并生成步骤—工具映射，L3及执行校验不变。新策略使用新name，旧冻结cohort继续按轻量规则读取。详见[默认策略与复测](./benchmark.md#默认-v33-策略与复测)；[小样本实测](../workshop/completed/l2_step_authorization_20261022.md)不代表完整场景收益。
+当前内部身份为 **DSCG_v3.3**（legacy）：L2保留原生定义与步骤授权，L3普通读取及全读批次按规则成为免审候选，个人/秘密读取和效果性操作继续审计。两入口共用核心策略，name不切换版本；历史DSCG_v3.2与原引擎标签不改写。新策略使用新name，冻结cohort轻量读取不变。[规则与边界](./benchmark.md#默认-v33-策略与复测)。
+
+```bash
+python -m experiments.run_partial_benchmark --suites banking slack \
+  --model-config config/models.local.toml --audit-router-mode shadow \
+  --progress --name DSCG_v3.3_shadow_partial_01
+```
+
+此命令仍会调用真实模型，留待用户执行；本次仅离线验证。shadow继续审计，selective才应用新增免审，不能把shadow的候选统计当实际TSR提升。
 
 DashScope/Qwen与DeepSeek的Chat请求角色由DSCG公共客户端分别适配，不修改conda包；更新后使用新运行名。AgentDyn首次请求的400/422定位、受限诊断字段和小范围复测要求见[消息角色兼容排错](./model_tool_configuration.md#消息角色兼容与请求排错)。旧测量缓存与新增请求身份不一致时拒绝复用，旧数据保留；冻结cohort只比较主模型ID/provider及环境与所选任务，详见[名单校验](./injection_precheck.md#2-中断和错误后续跑)。
 
@@ -87,7 +95,7 @@ python -m experiments.run_partial_benchmark --attack typical \
 
 默认typical为ignore_previous、important_instructions、tool_knowledge；具体攻击可重复指定，all查询当前已验证后端注册表并排除manual。injecagent仅显式/all。DoS按首个注册目标、not utility单独计分。上游部分参考调用与GOAL不一致，接入不证明攻击强度。
 
-DSCG CLI默认router shadow，保留L3审计并记录算法观测；baseline/NoChecker默认off，Python factory/API原默认off不变。显式off不关闭L3，no-checker才关闭语义审计。重试0、completion_prompt=false、trace summary保持；selective使用 --audit-router-threshold（默认0.70），无需artifact；限单个完整有效的internal/personal幂等无sink读取，旧artifact参数非空报迁移错误。策略/阈值绑定，须新run名。
+DSCG CLI默认router shadow，保留L3审计并记录算法观测；baseline/NoChecker默认off，Python factory/API原默认off不变。显式off不关闭L3，no-checker才关闭语义审计。重试0、completion_prompt=false、trace summary保持；selective使用read-purpose-v2的读取规则，无需artifact；--audit-router-threshold保留作诊断，不决定免审。个人/秘密和混合读写仍审计，旧artifact参数非空报迁移错误。策略/阈值仍绑定，须新run名。
 
 AgentDojo保留现有银行L1有限profile；AgentDyn没有新增profile，完整来源封装保留。动态网页/OTP操作按副作用审计；Monitor/票据仍是工具级边界。框架参数见 [配置指南](./model_tool_configuration.md#5-运行控制默认值用途及设置入口)。
 

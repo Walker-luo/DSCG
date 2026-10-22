@@ -1,4 +1,4 @@
-"""Fixed lexical ranking and direct-threshold read routing.
+"""Rule-based ordinary-read routing with diagnostic lexical ranking.
 
 The independent offline calibration helpers are retained for future work.
 
@@ -14,6 +14,9 @@ import json
 import math
 from pathlib import Path
 from threading import Lock
+import ipaddress
+import re
+from urllib.parse import urlsplit
 import unicodedata
 
 from dscg.tool_metadata import metadata_for_runtime, metadata_catalog_hash
@@ -21,8 +24,8 @@ from dscg.audit_context import INPUT_SCHEMA
 
 SCHEMA = 'dscg.audit-router.algorithm.v1'
 FEATURE_VERSION = 'lexical-max-v1'
-RUNTIME_SCHEMA = 'dscg.audit-router.threshold.v1'
-POLICY_VERSION = 'threshold-read-v1'
+RUNTIME_SCHEMA = 'dscg.audit-router.read-policy.v2'
+POLICY_VERSION = 'read-purpose-v2'
 DEFAULT_THRESHOLD = 0.70
 LABELS = {'safe_and_sufficient', 'unsafe', 'insufficient_or_ambiguous', 'unjudgeable'}
 LABEL_SOURCES = {'independent_policy', 'environment_oracle', 'human_double_review'}
@@ -124,36 +127,79 @@ def catalog_snapshot(runtime):
     return digest({'risk': metadata_catalog_hash(statuses), 'tools': tools}), tools
 
 
-def eligibility(packet, flags, runtime, calls, sandbox):
-    try:validate_completeness_flags(flags)
-    except ValueError:return False,'INVALID_COMPLETENESS_FLAGS'
-    if sandbox is None or len(calls) != 1:
-        return False, 'SINGLE_AUTHORIZED_READ_REQUIRED'
-    call = calls[0]; name = getattr(call, 'function', None) or call.get('function')
-    if not sandbox.assess(name, runtime)[0]:
-        return False, 'POLICY_NOT_ALLOWED'
-    status = metadata_for_runtime(runtime).get(name)
-    if status is None or not status.registered:
-        return False, 'INVALID_METADATA'
-    m = status.metadata
-    if ((m.effect, m.sink, m.idempotent) != ('read', 'none', True)
-            or m.sensitivity not in {'internal', 'personal'}):
-        return False, 'NOT_ELIGIBLE_IDEMPOTENT_READ'
-    if any(flags.values()):
-        return False, 'INCOMPLETE_INPUT'
-    if not packet['trusted_user_request'].strip() or not packet['current_actions'][0]['host_tool_description'].strip():
-        return False, 'EMPTY_TASK_OR_DESCRIPTION'
-    text_length = (len(packet['trusted_user_request']) + len(packet['current_actions'][0]['host_tool_description']) +
-                   len(json.dumps(packet['current_actions'][0]['untrusted_argument_data'], ensure_ascii=True)) +
-                   sum(len(r['content']) + len(json.dumps(r.get('call_arguments', {}), ensure_ascii=False))
-                       + len(r.get('error') or '') for r in packet.get('recent_tool_results', [])))
-    if text_length > 12288:
-        return False, 'INPUT_TOO_LARGE'
+def _literal_public_web_read(args, request):
+    """Narrow routing exception, not DNS certification or object authorization."""
+    if not isinstance(args, dict) or set(args) != {'url'} or not isinstance(args['url'], str):
+        return False
+    # A literal mention may be a prohibition or discussion, not permission to visit.
+    if re.search(r"\b(?:not|never|avoid|don't|without|except|exclude|no)\b|不要|不得|禁止|不许", request, re.I):
+        return False
+    url = args['url']
+    tokens = re.findall(r"(?<![\w./:-])(?:https?://|www\.)[^\s<>\"'`]+", request)
+    if url not in {token.rstrip('.,;:!?)]}') for token in tokens}:
+        return False
+    if not url.isascii() or '%' in url or any(c.isspace() or c == '\\' for c in url):
+        return False
     try:
-        runtime.functions[name].parameters.model_validate(getattr(call, 'args', None) if not isinstance(call, dict) else call['args'])
-    except Exception:
-        return False, 'INVALID_ARGUMENT_SCHEMA'
-    return True, 'ELIGIBLE_INTERNAL_READ'
+        parsed = urlsplit('https://' + url if url.startswith('www.') else url)
+        host = parsed.hostname or ''
+        if (parsed.scheme not in {'http', 'https'} or parsed.username is not None or
+                parsed.password is not None or parsed.port is not None or parsed.query or parsed.fragment):
+            return False
+        try:
+            ipaddress.ip_address(host)
+            return False
+        except ValueError:
+            pass
+        if (not re.fullmatch(r'[a-z]{2,63}', host.rsplit('.', 1)[-1]) or
+                len(host) > 253 or not re.fullmatch(r'[a-z0-9-]+(?:\.[a-z0-9-]+)+', host) or
+                any(not label or len(label) > 63 or label.startswith('-') or label.endswith('-') for label in host.split('.')) or
+                host.rsplit('.', 1)[-1] in {'local','localhost','internal','invalid','test','example','onion'} or
+                any(c in url for c in ('?', '#', '@')) or
+                re.search(r'(?:password|token|secret|credential|session|api[_-]?key|auth)(?:[=/_.-]|$)', parsed.path, re.I)):
+            return False
+    except ValueError:
+        return False
+    return True
+
+
+def eligibility(packet, flags, runtime, calls, sandbox):
+    try:
+        validate_completeness_flags(flags)
+    except ValueError:
+        return False, 'INVALID_COMPLETENESS_FLAGS'
+    if sandbox is None or not calls:
+        return False, 'AUTHORIZED_READ_BATCH_REQUIRED'
+    # Past tool errors and evidence-window clipping do not invalidate a new read.
+    if any(flags[key] for key in ('request_truncated','description_truncated',
+                                  'arguments_truncated','arguments_nonfinite_or_unsupported')):
+        return False, 'INCOMPLETE_CURRENT_INPUT'
+    if not packet.get('trusted_user_request', '').strip():
+        return False, 'EMPTY_TASK'
+    statuses = metadata_for_runtime(runtime)
+    web = False
+    for call in calls:
+        name = getattr(call, 'function', None) if not isinstance(call, dict) else call.get('function')
+        args = getattr(call, 'args', None) if not isinstance(call, dict) else call.get('args')
+        if not sandbox.assess(name, runtime)[0]:
+            return False, 'POLICY_NOT_ALLOWED'
+        status = statuses.get(name)
+        if status is None or not status.registered:
+            return False, 'INVALID_METADATA'
+        m = status.metadata
+        if m.effect != 'read' or not m.idempotent or m.sensitivity not in {'public','internal'}:
+            return False, 'SENSITIVE_OR_EFFECTFUL_CALL'
+        try:
+            runtime.functions[name].parameters.model_validate(args)
+        except Exception:
+            return False, 'INVALID_ARGUMENT_SCHEMA'
+        if m.sink == 'none':
+            continue
+        if (m.source != 'web' or m.sensitivity != 'public' or m.sink != 'external_recipient' or
+                not _literal_public_web_read(args, packet['trusted_user_request'])):
+            return False, 'EXTERNAL_READ_REQUIRES_AUDIT'
+        web = True
+    return True, 'LITERAL_PUBLIC_WEB_READ' if web else 'ORDINARY_READ_BATCH'
 
 
 def binomial_upper(k, m, alpha):
@@ -309,7 +355,7 @@ class LocalAuditRouter:
         import time
         started = time.perf_counter()
         result = dict(router_schema=RUNTIME_SCHEMA, policy_version=self.policy_version,
-                      mode=self.mode, route_source='local_threshold_algorithm', feature_version=FEATURE_VERSION,
+                      mode=self.mode, route_source='local_read_policy', feature_version=FEATURE_VERSION,
                       artifact_sha256=None, eligible=False, would_bypass=False, actual_bypass=False,
                       score=None, threshold=self.threshold, completeness_flags=flags, features=None,
                       semantic_audit_calls=0, semantic_audit_tokens=0)
@@ -319,13 +365,24 @@ class LocalAuditRouter:
             if self.mode == 'off':
                 eligible, reason = False, 'ROUTER_OFF'
             result.update(eligible=eligible, route_reason=reason)
+            result['threshold_applied'] = False
+            result['candidate_count'] = len(calls)
+            result['ignored_context_flags'] = [key for key in sorted(flags) if flags[key] and key in {
+                'history_truncated','tool_results_window_truncated','content_truncated','tool_result_error'}]
             if eligible:
-                score, features = risk_score(packet)
-                if isinstance(score, bool) or not isinstance(score, (int, float)) or not math.isfinite(score) or not 0 <= score <= 1:
-                    raise ValueError('invalid routing score')
-                bypass = score < self.threshold
-                result.update(score=score, features=features, would_bypass=bypass,
-                              route_reason='BELOW_THRESHOLD' if bypass else 'SCORE_REQUIRES_AUDIT')
+                result['would_bypass'] = True
+                # Keep lexical scores for observation; they do not select this policy's reads.
+                try:
+                    observations = [risk_score({**packet, 'current_actions': [action]}) for action in packet['current_actions']]
+                    scores = [value[0] for value in observations]
+                    if not scores or any(isinstance(v, bool) or not isinstance(v, (int, float)) or not math.isfinite(v) or not 0 <= v <= 1 for v in scores):
+                        raise ValueError('invalid diagnostic score')
+                    result.update(score=max(scores), features={key: max(v[1].get(key, 0.) for v in observations)
+                        for key in ('task_tool_distance','argument_novelty','untrusted_support_gain','recent_failure_fraction')},
+                        action_scores=scores)
+                except Exception as exc:
+                    result['score_error_type'] = type(exc).__name__
+
         except Exception as exc:
             result.update(route_reason='ROUTER_ERROR', error_type=type(exc).__name__, would_bypass=False)
         result['router_total_latency_ms'] = (time.perf_counter() - started) * 1000

@@ -144,6 +144,7 @@ def _component(client, profile, *, authorization=False, input_revision='authoriz
     component = (d.ToolAuthorizationCompiler if authorization else d.ActionSecurityChecker)(
         _model(client), prompt_profile=profile)
     if input_revision == 'legacy-v1':
+        component._legacy_audit_input = True
         # Frozen historical responses must never be rebound to today's default prompts.
         if authorization: component.CLASSIC_POLICY = _LEGACY_POLICIES['authorization']
         component.SYSTEM_POLICY = (_LEGACY_POLICIES['authorization'] if authorization else
@@ -155,6 +156,7 @@ def _bank_packets():
     """Historical incomplete context, used only to verify frozen legacy-v1 bundles."""
     runtime = synthetic_runtime('banking')
     checker = d.ActionSecurityChecker(_model(_ReplayClient()))
+    checker._legacy_audit_input = True
     rows = []
     for case in _fixture('banking_utility_cases.json'):
         source = FunctionCall(function=case['source_tool'], args=case['source_args'], id='source')
@@ -253,7 +255,7 @@ def _prediction(bundle, request, case, response):
             text = _component(client, request['profile'],
                               input_revision=bundle.get('input_revision', 'legacy-v1'))._request_audit(
                 case['packet']['trusted_user_request'], None, case['packet'])
-            decision, _, _, _ = d._parse_audit_payload(text)
+            decision, _, _, _ = d._parse_audit_payload(text, legacy=bundle.get('input_revision', 'legacy-v1') == 'legacy-v1')
             result.update(decision=decision, authored_expectation=case['expected'],
                           unsafe=decision == 'allow' and case['expected'] != 'allow',
                           semantic_false_block=case['expected'] == 'allow' and decision != 'allow')

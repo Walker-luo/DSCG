@@ -55,7 +55,7 @@ class SelectiveAuditTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'threshold'):
             self.setup_chain(path=self.artifact())
 
-    def test_historical_argument_loss_requires_semantic_audit(self):
+    def test_historical_argument_loss_does_not_force_current_read_audit(self):
         for args in ({'a': {'b': {'c': {'id': 1}}}}, {'amount': float('nan')}):
             chain = self.setup_chain()
             q, r, e, m, x = self.state()
@@ -63,9 +63,9 @@ class SelectiveAuditTests(unittest.TestCase):
                 {'role': 'tool', 'content': [{'type': 'text', 'content': '[]'}], 'tool_call_id': 'old',
                  'tool_call': FunctionCall(function='read_data', args=args, id='old'), 'error': None}]
             self.run_chain(chain, (q, r, e, [*history, m[-1]], x))
-            self.assertEqual(chain[1].requests, 1)
+            self.assertEqual(chain[1].requests, 0)
 
-    def test_router_total_input_bound_includes_historical_call_arguments(self):
+    def test_historical_input_volume_does_not_disqualify_current_valid_read(self):
         runtime = FunctionsRuntime()
         @runtime.register_function
         def read_data(queries: list[str]) -> str:
@@ -82,8 +82,8 @@ class SelectiveAuditTests(unittest.TestCase):
             recent_tool_results=[dict(content='c' * 256, call_arguments={'selector': 's' * 500}, error=None) for _ in range(8)])
         eligible, reason = a.eligibility(packet, {k: False for k in a.COMPLETENESS_FLAGS},
                                          runtime, [call], d.PermissionSandbox(['read_data']))
-        self.assertFalse(eligible)
-        self.assertEqual(reason, 'INPUT_TOO_LARGE')
+        self.assertTrue(eligible)
+        self.assertEqual(reason, 'ORDINARY_READ_BATCH')
 
     def test_selective_skips_api_but_requires_monitor_and_ticket(self):
         chain=self.setup_chain();state=self.run_chain(chain)
@@ -106,10 +106,10 @@ class SelectiveAuditTests(unittest.TestCase):
             chain=self.setup_chain();state=self.run_chain(chain)
             self.assertEqual(chain[1].requests,1);self.assertFalse(state[4]['dscg_router_events'][0]['actual_bypass'])
 
-    def test_zero_threshold_keeps_semantic_audit(self):
+    def test_zero_threshold_is_diagnostic_for_rule_based_candidates(self):
         chain=self.setup_chain(threshold=0);state=self.run_chain(chain)
-        self.assertEqual(chain[1].requests,1)
-        self.assertFalse(state[4]['dscg_router_events'][0]['would_bypass'])
+        self.assertEqual(chain[1].requests,0)
+        self.assertTrue(state[4]['dscg_router_events'][0]['would_bypass'])
 
     def test_forged_or_stale_receipt_cannot_execute(self):
         for mutation in ('token','task','args','catalog','schema','run','artifact','threshold','policy','decision','mode','config'):
@@ -135,7 +135,7 @@ class SelectiveAuditTests(unittest.TestCase):
         chain=self.setup_chain();q,r,e,m,x=self.state()
         tools=[{'role':'tool','content':[{'type':'text','content':'<max-depth>'}],'error':None} for _ in range(9)]
         messages=[{'role':'user','content':[]},*tools,m[-1]]
-        state=self.run_chain(chain,(q,r,e,messages,x));self.assertEqual(chain[1].requests,1)
+        state=self.run_chain(chain,(q,r,e,messages,x));self.assertEqual(chain[1].requests,0)
         self.assertTrue(state[4]['dscg_router_events'][0]['completeness_flags']['tool_results_window_truncated'])
 
     def test_route_marker_removal_and_changed_history_cannot_downgrade_handoff(self):

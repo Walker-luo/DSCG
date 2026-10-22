@@ -4,22 +4,33 @@
 
 ## 默认 v3.3 策略与复测
 
-DSCG默认使用 `three-layer-v3.3`，`prompt_profile=legacy`。L2仍只进行一次授权调用，输入当前后端的全部原生工具定义（名称、原始描述、完整参数schema及自动读取标记），避免仅看动作名称/描述而遗漏准备读取或混淆参数。原生描述与参数名不一致时，以schema为准；不修改已安装的工具。
+当前内部身份统一为 **`DSCG_v3.3`**，默认 `prompt_profile=legacy`。L2保留完整原生工具定义与一次调用的步骤授权；本次更新L3读取路由、当前动作审计上下文和协议诊断。历史实验名DSCG_v3.2及其 `three-layer-v3.3` 记录保留原样，不因当前命名改写。
+
+`read-purpose-v2` 将L2已允许、原生参数有效、public/internal、幂等且无sink的普通读取（含全为合格读取的批次）列为免审候选。当前请求/描述/参数仍须完整；历史工具错误、旧证据窗口截断及历史参数丢失不再单独迫使新的读取审计。personal/secret、写入、外发及混合读写批次仍审计。风险目录不改，工具级internal标签不能证明某个频道/文件不私密，也没有新增对象或参数权限。
+
+外部网页保留external_recipient标签，仅为可信用户请求中逐字给出的公共网页URL提供窄例外：只接受url参数、HTTP(S)或www域名，无查询串、fragment、凭证、端口、IP、内部域名或编码文本。工具返回中的新地址不能据此免审；AgentDyn可分发副作用的browse_webpage也不适用。该规则不验证DNS、重定向或网页真实性。
+
+CLI默认 `shadow`，Python/Dashboard API默认off：shadow记录候选，仍实际审计并由Monitor决定；显式selective才应用新免审。原公开读取免审继续单列。词法分数及 `--audit-router-threshold` 保留作诊断/兼容输入，**不再决定当前策略的免审**；修改阈值仍改变配置绑定。旧threshold-read-v1报告保留旧解释。
+
+默认短审计提示仅判断当前动作；新增宿主effect及原生参数schema，允许先读取得未知事实，再核对后续写入的目标、金额和正文。审计四字段JSON不变，violation代码原文或规范化后超过96字符时明确记协议失败并关闭；不修补响应。Monitor、一次性回执和执行票据继续绑定整批动作。
 
 L2返回 `{"steps":[{"intent":"步骤","tools":["tool_name"]}],"tools":["tool_name"]}`：逐步覆盖发现、读取、条件步骤和最终动作，未知频道/金额留待执行时查询。总工具清单须等于步骤工具并集，工具须已注册；宿主从中选取动作授权，自动读取规则保持不变。步骤摘要写入轨迹 `dscg_authorizations[].authorization_steps`，只是模型的覆盖说明，不是完成证明或额外执行计划。纯读/禁止操作/无关动作仍不应获得写权限；没有新增动态扩权或额外请求。显式旧prompt候选和宿主受限授权仍沿用其原协议。
 
-L3默认短提示只聚焦当前工具用途和参数来源：允许为任务获取未知事实的准备读取，允许用相关工具事实计算金额或汇总内容；写入、支付、外发仍核对关键目标与内容。外部文本不能新增任务或权限，出现注入文本本身也不等于当前动作违规。严格JSON、Monitor及一次性回执/票据校验保持不变，模型、路由模式与阈值不变。
+新身份进入共享factory、full/partial/cohort及缓存绑定；请用新name，不能续用旧防御缓存。冻结cohort轻量读取不变，baseline原生流程不变。下列命令由用户后续启动，本次仅离线验收：
 
-新版本及提示身份进入测量缓存绑定，请使用新运行名；不能用旧策略的同名缓存冒充新策略。冻结cohort的轻量读取规则不变，模型/provider和环境适配时仍可使用原名单。baseline仍走原生无防御流程。例如后续固定banking/Slack做小样本对照时，使用各自的新name；不要直接续跑旧DSCG策略来比较。完整命令和范围选项见下文，历史候选仍见[效用诊断指南](./qwen_utility.md)。
+```bash
+python -m experiments.run_benchmark --suites banking slack \
+  --model-config config/models.local.toml --audit-router-mode shadow \
+  --progress --name DSCG_v3.3_shadow_01
+```
 
-2026-10-22已做Qwen固定授权输入及4项原生clean小样本；结果仍有漏授权与L3阻断，不能声称整体TSR/ASR改善，也未进行全场景攻击测量。详见[实施与逐任务结果](../workshop/completed/l2_step_authorization_20261022.md)。
+shadow报告显示候选的真实审计/Monitor交叉结果、模型协议失败、记录校验失败及已知/未知审计成本；这些不是安全标签或实际节省。历史Qwen授权小样本见[原报告](../workshop/completed/l2_step_authorization_20261022.md)，本次离线验证见[实施记录](../workshop/completed/l3_read_policy_20261022.md)。未证明TSR/ASR改善。
 
-## L3直接阈值策略（2026-10-21）
+<a id="l3直接阈值策略2026-10-21"></a>
 
-当前 `threshold-read-v1` 无需校准artifact：`--audit-router-threshold 0.70` 为默认经验参数，严格score<threshold才免审。CLI默认shadow，Python/Dashboard API默认off；shadow仍审计，selective显式开启后才可能免审。资格扩大到单个已授权、完整有效的internal/personal幂等无sink读取；secret及任何写入/外发不在新增范围。
+## L3读取路由
 
-full/partial/cohort及screen测量透传阈值；Dashboard API校验并透传模式/阈值，未新增页面控件。旧artifact参数非空时报迁移错误；策略/阈值身份不同须新run名。根级L3报告提供经验阈值比较，审计分歧不是安全真值、模拟Token不是实际节省。新策略不把“没有artifact”记成故障，旧记录仍保留原解释。[参数](./model_tool_configuration.md#l3直接阈值路由) · [报告](./result_files.md)
-
+当前策略与兼容参数见[配置指南](./model_tool_configuration.md#l3读取路由)，输出口径见[结果文件](./result_files.md)。2026-10-21直接阈值策略是历史行为，保留其结果和离线校准器，不控制当前免审。
 
 DashScope/Qwen与DeepSeek的Chat请求角色由DSCG公共客户端分别适配，不修改conda包；更新后使用新运行名。AgentDyn首次请求的400/422定位、受限诊断字段和小范围复测要求见[消息角色兼容排错](./model_tool_configuration.md#消息角色兼容与请求排错)。旧测量缓存与新增请求身份不一致时拒绝复用，旧数据保留；冻结cohort只比较主模型ID/provider及环境与所选任务，详见[名单校验](./injection_precheck.md#2-中断和错误后续跑)。
 

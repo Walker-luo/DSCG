@@ -1,6 +1,6 @@
 # 模型、工具与运行参数详解
 
-本文供首次运行或更换模型/工具的测试者使用，对应当前three-layer-v3.3。所有命令从DSCG/执行；激活`ipi`使用AgentDojo，激活`ipi-agentdyn`使用AgentDyn，相同运行入口自动识别实际安装。模型配置和工具风险目录是宿主输入；模型返回、网页正文或工具错误不能改写它们。
+本文供首次运行或更换模型/工具的测试者使用，对应当前DSCG_v3.3。所有命令从DSCG/执行；激活`ipi`使用AgentDojo，激活`ipi-agentdyn`使用AgentDyn，相同运行入口自动识别实际安装。模型配置和工具风险目录是宿主输入；模型返回、网页正文或工具错误不能改写它们。
 
 两个独立环境的安装入口是 [environment.yml](../environment.yml) 与 [environment-agentdyn.yml](../environment-agentdyn.yml)。保留已有环境和本地模型配置；运行前可离线自检：
 
@@ -31,7 +31,7 @@ Qwen banking/Slack的协议诊断、`--prompt-profile`候选、日志字段及�
 
 DSCG公共客户端对实际provider=dashscope或deepseek的同步`chat.completions.create`分别启用`dashscope-system-v1`和`deepseek-system-text-v1`：把结构化developer消息转换成system。DeepSeek还要求system正文为字符串，因此仅将完全由`{type:text,text:<字符串>}`组成的文本块按原顺序拼接；不识别的块保留原状，由服务端明确校验。DashScope的正文格式不变。两种适配均保留消息文本/顺序、user/assistant/tool角色、工具schema、temperature和其余请求参数；不原地修改消息，不新增重试或降级。其他provider保持原客户端。两套后端的baseline、DSCG、GOAL预检、screen和Dashboard均从此入口创建客户端；不需改site-packages。对应[百炼Chat系统消息协议](https://help.aliyun.com/zh/model-studio/qwen-api-via-openai-chat-completions/)和[DeepSeek Chat Completions消息结构](https://api-docs.deepseek.com/api/create-chat-completion/)，不涉及Responses API。
 
-`chat_request_adapter`由宿主计算，写入DashScope或DeepSeek主/审计模型的公开配置，进入原有manifest、cohort测量配置和路由身份。更新后实际测量缓存需匹配请求身份，否则使用新run名。冻结cohort的名单兼容只比较主模型ID/provider、后端/版本及所选任务，并校验名单自身摘要；不再以adapter、endpoint或思考设置差异要求重新预检，也不重读原预检证据。screen自身续跑仍保留原证据流程。原名单与证据不改写。当前L3使用直接阈值；旧校准预设仅保留作离线研究。
+`chat_request_adapter`由宿主计算，写入DashScope或DeepSeek主/审计模型的公开配置，进入原有manifest、cohort测量配置和路由身份。更新后实际测量缓存需匹配请求身份，否则使用新run名。冻结cohort的名单兼容只比较主模型ID/provider、后端/版本及所选任务，并校验名单自身摘要；不再以adapter、endpoint或思考设置差异要求重新预检，也不重读原预检证据。screen自身续跑仍保留原证据流程。原名单与证据不改写。当前L3使用read-purpose-v2读取规则；旧校准预设仅保留作离线研究。
 
 已核对`results/partial_benchmark/agentdyn/qwen3.7-flash_test`：9个攻击/场景组均在第一个GOAL预检的首个generation请求失败，L2成功、L3未触发，没有81条有效计分轨迹。本机原生消息捕获为AgentDojo system/user、AgentDyn developer/user；角色差异与失败位置一致。旧文件未保存400详情，因此不能排除服务端其他校验错误；不把它标为TSR=0或防御成功。
 
@@ -183,7 +183,7 @@ python -m experiments.run_partial_benchmark --clean --name clean_20261018_01
 | source | calendar / email / cloud / web / local | 工具接触的来源域；是宿主分类，不认证返回事实；新平台按实际操作使用既有域 |
 | sink | none / external_recipient / public_output | 是否有外部接收方/公共输出；影响风险与免审资格。none不表示任意目标安全 |
 | sensitivity | public / internal / personal / secret | 信息敏感度；个人/秘密读取不能当公开免审 |
-| idempotent | true / false | 宿主声明重复相同操作是否改变预期结果；是L3新增internal/personal读取路由资格之一，不提供exactly-once保证 |
+| idempotent | true / false | 宿主声明重复相同操作是否改变预期结果；是L3新增public/internal读取路由资格之一，不提供exactly-once保证 |
 | reversible | true / false | 宿主是否认为副作用可逆；仅记录属性，当前没有自动撤销/恢复机制 |
 | schema_version | 可选，默认dscg.tool-risk.v1 | 当前风险分类schema版本，其他版本拒绝 |
 
@@ -203,7 +203,7 @@ reversible = false
 
 例子：get_unread_emails会标记邮件已读，所以内置effect=write；send_email和真实发送参会人通知的日历修改是external_send。单effect字段不能枚举动态handler的所有行为；同名工具采用跨场景保守主风险分类，配合sink/敏感度保留审计要求，不表示付款以外的行为已被约束。
 
-公开免审来自有效read+public+sink=none的既有规则；idempotent不是这个旧规则的独立硬条件。单个internal/personal幂等无sink读取，在输入完整、L2允许且开启selective时可按经验阈值免审；其他情况继续审计。风险级别也不是最终allow/deny：Monitor保留已授权sink-free读取的deny例外，详见 [框架边界](../README.md#读取例外开销与当前边界)。
+公开免审来自有效read+public+sink=none的既有规则；idempotent不是这个旧规则的独立硬条件。L2允许且当前输入/参数有效的public/internal幂等无sink读取及全读批次，在selective时按规则免审；personal/secret仍审计。风险级别也不是最终allow/deny：Monitor保留已授权sink-free读取的deny例外，详见 [框架边界](../README.md#读取例外开销与当前边界)。
 
 ### 4.3 生成、检查与新增工具
 
@@ -240,27 +240,29 @@ print("classified tools:", len(catalog))
 | planning_tool_view | true | factory/API、网页、partial --no-tool-view；关掉展示完整目录，执行授权仍检查 |
 | delegated_tasks | true | factory/API、网页、partial --no-delegated-tasks；有界明确执行文件/唯一邮件/指定网页任务，不把普通返回变成任务 |
 | use_security_checker | true | factory/API、网页、partial --no-checker；整个L3语义审计开关 |
-| audit_router_mode | API/factory off；DSCG CLI shadow | full/partial CLI未显式指定时，baseline/NoChecker为off，其余为shadow；显式不兼容组合报错。off仍运行原L3，shadow观察并审计，selective按直接阈值免审 |
-| audit_router_threshold | 0.70 | CLI --audit-router-threshold、Python/Dashboard API；有限数值[0,1]，等于阈值仍审计；0不新增免审，1仍审计分数恰为1的调用 |
+| audit_router_mode | API/factory off；DSCG CLI shadow | full/partial CLI未显式指定时，baseline/NoChecker为off，其余为shadow；显式不兼容组合报错。off仍运行原L3，shadow观察并审计，selective按读取规则免审 |
+| audit_router_threshold | 0.70 | CLI --audit-router-threshold、Python/Dashboard API；有限数值[0,1]，保留作诊断，不控制read-purpose-v2免审 |
 | audit_router_artifact | 已停用 | 非空值直接报迁移错误，改用threshold；不读取旧artifact |
 | audit_retries | 0 | factory/API、partial --audit-retries 0/1；仅语义abstain有界重审，普通比较保持0，不是SDK传输重试设置 |
 | completion_prompt | false | factory/API、partial --completion-prompt；历史可选提示，当前普通比较保持关闭 |
 | trace_level | summary | factory/API、网页、partial --trace-level；standard逐条紧凑记录，full压缩诊断增加序列化/写盘成本 |
 
-这些控制不会从模型连接TOML读取。NoL2同时关闭前置检查、授权工具视图与委托展开；L2/L3均关时L1也关闭。shadow/selective要求L2和L3同时开启，baseline使用原生循环。L3运行时不再要求独立标签或artifact；0.70是经验参数，尚无独立风险校准保证。authorization_profile/delegated_task_reader是受信host API对象，不是普通测试必填项或TOML新增段，详见 [L2方案](../workshop/L2_opt.md)。
+这些控制不会从模型连接TOML读取。NoL2同时关闭前置检查、授权工具视图与委托展开；L2/L3均关时L1也关闭。shadow/selective要求L2和L3同时开启，baseline使用原生循环。L3运行时不再要求独立标签或artifact；0.70仅保留为诊断参数，当前规则没有独立安全保证。authorization_profile/delegated_task_reader是受信host API对象，不是普通测试必填项或TOML新增段，详见 [L2方案](../workshop/L2_opt.md)。
 
-### L3直接阈值路由
+<a id="l3直接阈值路由"></a>
 
-`threshold-read-v1` 使用原字符三元组与四信号最大值，不训练模型。单个已授权、有效元数据、幂等、无sink的internal/personal读取，只有输入完整、参数有效且 `s < audit_router_threshold` 时才免审；其他调用继续审计。secret、外发及副作用动作不进入新增免审。
+### L3读取路由
+
+DSCG_v3.3使用read-purpose-v2，不按词法分数或阈值决定免审。public/internal、幂等、无sink且L2允许/参数有效的普通读取及全读批次成为候选；personal/secret、混合/效果性操作仍审计。历史错误/证据截断不再阻止新读取，当前输入异常仍回退。可信用户原文URL仅有严格窄例外，不改变风险标签或提供对象权限。[完整规则](./benchmark.md#默认-v33-策略与复测)。
+
+CLI默认shadow，API默认off；shadow仍审计，selective才应用候选。--audit-router-threshold及Python同名参数保留为有限[0,1]诊断输入，不控制新规则；旧artifact仍拒绝。策略/阈值/有效提示仍进入缓存身份，使用新name。
 
 ```bash
-python -m experiments.run_benchmark --suites banking slack --name threshold_shadow_new \
-  --audit-router-mode shadow --audit-router-threshold 0.70
+python -m experiments.run_benchmark --suites banking slack --name DSCG_v3.3_shadow_01 \
+  --audit-router-mode shadow --progress
 ```
 
-Python使用 `make_defended_pipeline(audit_router_mode="selective", audit_router_threshold=0.70)`；Dashboard API接受同名字段并校验/透传，默认off，页面没有新增控件。阈值不从模型连接TOML读取。NaN/Infinity、布尔值、非数值和越界值在创建模型前拒绝。
-
-shadow保留真实审计，并在根级报告比较0.65/0.70/0.75及实际阈值。模拟Token只统计已知事件，缺失/损坏输入或成本时不推造全量；审计allow/deny分歧不能当作独立安全标签。策略、资格范围与阈值进入配置/缓存身份，换阈值须新name。旧artifact参数非空明确拒绝。
+根报告记录候选与实际审计/Monitor分歧及已知成本，不把分歧当安全标签或模拟Token当实际节省；新规则不生成阈值扫描。旧threshold-read-v1数据仍按历史阈值解释。
 
 ### 历史独立校准（当前运行不依赖）
 

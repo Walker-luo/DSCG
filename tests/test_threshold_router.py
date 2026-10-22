@@ -23,7 +23,7 @@ class ThresholdRouterTests(unittest.TestCase):
             return 'fact'
 
         self.metadata = dict(effect='read', source='local', sink='none',
-                             sensitivity='personal', idempotent=True, reversible=True)
+                             sensitivity='internal', idempotent=True, reversible=True)
         set_tool_metadata(self.runtime, {'read_data': self.metadata})
         self.sandbox = d.PermissionSandbox(['read_data'])
         self.call = FunctionCall(function='read_data', args={}, id='one')
@@ -35,7 +35,7 @@ class ThresholdRouterTests(unittest.TestCase):
     def assess(self, router):
         return router.assess(self.packet, self.flags, self.runtime, [self.call], self.sandbox)
 
-    def test_personal_read_needs_no_artifact(self):
+    def test_ordinary_read_needs_no_artifact(self):
         row = self.assess(a.LocalAuditRouter('shadow'))
         self.assertTrue(row['eligible'])
         self.assertTrue(row['would_bypass'])
@@ -43,9 +43,9 @@ class ThresholdRouterTests(unittest.TestCase):
         self.assertEqual(row['score'], 0)
         self.assertFalse(row['actual_bypass'])
 
-    def test_strict_threshold_and_nonfinite_score_fallback(self):
+    def test_threshold_and_nonfinite_scores_are_diagnostic(self):
         router = a.LocalAuditRouter('selective', threshold=.70)
-        for score, expected in ((.69, True), (.70, False), (.71, False), (math.nan, False), (math.inf, False)):
+        for score, expected in ((.69, True), (.70, True), (.71, True), (math.nan, True), (math.inf, True)):
             with self.subTest(score=score), patch.object(a, 'risk_score', return_value=(score, {})):
                 self.assertEqual(self.assess(router)['would_bypass'], expected)
 
@@ -55,7 +55,7 @@ class ThresholdRouterTests(unittest.TestCase):
                 a.LocalAuditRouter('shadow', threshold=threshold)
         with self.assertRaisesRegex(ValueError, 'threshold'):
             a.LocalAuditRouter('selective', artifact_path='old.json')
-        self.assertFalse(self.assess(a.LocalAuditRouter('selective', threshold=0))['would_bypass'])
+        self.assertTrue(self.assess(a.LocalAuditRouter('selective', threshold=0))['would_bypass'])
         self.assertTrue(self.assess(a.LocalAuditRouter('selective', threshold=1))['would_bypass'])
 
     def test_scope_and_incomplete_inputs_still_audit(self):
@@ -65,14 +65,14 @@ class ThresholdRouterTests(unittest.TestCase):
                 set_tool_metadata(self.runtime, {'read_data': {**self.metadata, field: value}})
                 self.assertFalse(self.assess(a.LocalAuditRouter('selective'))['would_bypass'])
         set_tool_metadata(self.runtime, {'read_data': self.metadata})
-        self.flags['content_truncated'] = True
+        self.flags['arguments_truncated'] = True
         self.assertFalse(self.assess(a.LocalAuditRouter('selective'))['would_bypass'])
 
-    def test_unauthorized_missing_metadata_and_multicall_cannot_bypass(self):
+    def test_unauthorized_missing_metadata_cannot_bypass_and_read_batch_can(self):
         router = a.LocalAuditRouter('selective')
         self.assertFalse(router.assess(self.packet, self.flags, self.runtime, [self.call],
                                       d.PermissionSandbox([]))['would_bypass'])
-        self.assertFalse(router.assess(self.packet, self.flags, self.runtime,
+        self.assertTrue(router.assess(self.packet, self.flags, self.runtime,
                                       [self.call, self.call], self.sandbox)['would_bypass'])
         set_tool_metadata(self.runtime, {})
         self.assertFalse(self.assess(router)['would_bypass'])

@@ -1,5 +1,19 @@
 # DSCG Research Handoff
 
+## DSCG_v3.3 ordinary-read routing (2026-10-22)
+
+- User explicitly sets NEW internal identity DSCG_v3.3. Supersedes prior three-layer-v3.3 only for new runs; preserve historical version labels/manifests and experiment names. Shared factory/full/partial/cohort use the same defaults; no new flags/requests or paid validation.
+- read-purpose-v2 selects L2-authorized schema-valid public/internal idempotent no-sink reads and all-qualified read batches by rules, not lexical thresholds. Personal/secret, mixed/effectful and unqualified external reads remain audited. Current-input loss gates candidates; past tool errors/history clipping/old argument loss do not. Scores/thresholds diagnostic, still configuration-bound; old reports retain threshold-read-v1 semantics.
+- Narrow URL-only public-web exception requires literal trusted-user URL and conservative HTTP(S)/www domain syntax, no query/fragment/credentials/port/IP/internal host/encoded text. Never reclassify metadata or treat AgentDyn handler dispatch as read. No DNS/redirect certification or object authorization; tool-level internal does not establish private-channel safety.
+- CLI shadow/API off remain: shadow audits and preserves actual mediation; selective applies candidates via bound one-use whole-batch receipts and tickets. Default audit input v3 adds actual effect/native schema; only current action needs present evidence. Raw/normalized violation code >96 is protocol failure, fail closed. Keep frozen legacy-v1 diagnostic prompts/inputs/parsing; no historical response rebinding.
+- New report separates candidate audit/Monitor cross, protocol and record failures; no threshold sweep for new rule or actual savings/safety/TSR claim. Fresh run names; cohort lightweight reading unchanged. Evidence workshop/artifacts/20261022_l3_read_policy/; report workshop/completed/l3_read_policy_20261022.md. Earlier dated rules below are historical where superseded.
+
+
+## Current experiment naming and Slack diagnosis (2026-10-22)
+
+- User renamed experiment DSCG_v4.2 to DSCG_v3.2 (previous v4.1 folder is now v3.1). Actual stored engine identity remains three-layer-v3.3 for native L2 schemas/steps. Treat experiment names and engine identities separately; never downgrade the constant or rewrite historical labels/manifests merely to unify names. Both benchmark entrypoints retain the shared defaults.
+- Latest export download/dscg-history-analysis-20261022T070621Z is observational. Slack baseline223/315 vs current60/314 with1infrastructure error; baseline-success/current-fail164,overlapping read blocks153,record-failure69,model-protocol10,required-reference-action grantgap3. New L2 reduced all315 reference grantgaps88→18;17new authorization errors remain. No paid calls or defense change in this analysis. Evidence workshop/artifacts/20261022_v32_slack_analysis/ and workshop/completed/slack_v32_analysis_20261022.md. Preserve originalresults/download.
+
 ## Native L2 definitions and task-step authorization (2026-10-22)
 
 - Default three-layer-v3.3/legacy supersedes v3.2 only for L2 input/output. One call receives all native names/descriptions/exact parameter schemas and automatic-read markers, returns strict steps(intent/tools) plus the same tool union. Host retains original auto-read policy and selects only action grants; no synonyms, task-ID mappings, extra calls, dynamic grants or parameter/object permissions. Steps are diagnostics, never a semantic coverage oracle.

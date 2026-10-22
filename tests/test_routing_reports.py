@@ -56,6 +56,30 @@ class RoutingReportTests(unittest.TestCase):
         for user, row in rows.items():
             self.put(f'attack/sample/{user}/attack/i0.json', row)
 
+    def test_rule_shadow_has_no_threshold_sweep_and_retains_disagreement_cost(self):
+        from experiments.common.routing_reports import collect_routing_summary
+        row=trace([event(policy_version='read-purpose-v2',eligible=True,would_bypass=True,
+            artifact_sha256=None,score=.99,threshold=.70,threshold_applied=False,
+            route_reason='ORDINARY_READ_BATCH',audit_parser_status='ok',raw_audit_decision='abstain',
+            final_monitor_decision='deny')])
+        row['dscg_framework'].update(audit_router_policy_version='read-purpose-v2',audit_router_threshold=.70,
+                                     audit_router_artifact_sha256=None)
+        self.fixture({'u0':row});report=collect_routing_summary(self.root)
+        self.assertEqual(report['configurations'][0]['calibration_status'],'rule_based_unvalidated')
+        self.assertEqual(report['totals']['shadow_would_save_tokens'],100)
+        self.assertEqual(report['totals']['shadow_monitor_cross_counts'],{'deny':1})
+        self.assertEqual(report['threshold_comparisons'],[])
+        from experiments.common.routing_reports import render_routing_summary
+        self.assertIn('候选免审的Shadow实际Monitor结果',render_routing_summary(report))
+
+    def test_shadow_request_failure_is_not_a_model_protocol_failure(self):
+        from experiments.common.routing_reports import collect_routing_summary
+        rows=[event(audit_parser_status='failure',mediation_failure_stage=stage) for stage in ('model_request','model_protocol','audit_record')]
+        self.fixture({'u0':trace(rows)});totals=collect_routing_summary(self.root)['totals']
+        self.assertEqual(totals['shadow_protocol_failure_batches'],1)
+        self.assertEqual(totals['shadow_request_failure_batches'],1)
+        self.assertEqual(totals['shadow_record_failure_batches'],1)
+
     def test_event_weighted_statistics_exclude_preflight_and_snapshots(self):
         from experiments.common.routing_reports import collect_routing_summary
         self.fixture({'u0': trace([event(), event(score=.8, would_bypass=False, router_total_latency_ms=20)], 'u0'),

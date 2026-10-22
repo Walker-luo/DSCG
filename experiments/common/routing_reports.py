@@ -17,6 +17,8 @@ import tempfile
 
 SCHEMA = 'dscg.l3-router-summary.v2'
 THRESHOLD_POLICY = 'threshold-read-v1'
+READ_POLICY = 'read-purpose-v2'
+DIRECT_POLICIES = {THRESHOLD_POLICY, READ_POLICY}
 MARKER = '<!-- ' + SCHEMA + ' -->'
 OWNED_SCHEMAS = (SCHEMA, 'dscg.l3-router-summary.v1')
 JSON_NAME, MD_NAME = 'l3_router_summary.json', 'l3_router_summary.md'
@@ -77,7 +79,7 @@ def _distribution(values):
 class _Stats:
     def __init__(self):
         self.c = Counter()
-        self.reasons, self.decisions, self.monitor, self.cross = (Counter() for _ in range(4))
+        self.reasons, self.decisions, self.monitor, self.cross, self.monitor_cross = (Counter() for _ in range(5))
         self.scores, self.latencies, self.thresholds = [], [], set()
         self.shadow_samples = []
         self.threshold_shadow = False
@@ -86,7 +88,7 @@ class _Stats:
     def observe_config(self, config):
         self.c['shadow_traces'] += config['mode'] == 'shadow'
         self.threshold_shadow |= config['mode'] == 'shadow' and config.get('policy_version') == THRESHOLD_POLICY
-        if config['mode'] == 'shadow' and config.get('policy_version') != THRESHOLD_POLICY and (not config['artifact_sha256'] or config['load_error']):
+        if config['mode'] == 'shadow' and config.get('policy_version') not in DIRECT_POLICIES and (not config['artifact_sha256'] or config['load_error']):
             self.uncalibrated = True
 
     def event(self, row):
@@ -135,6 +137,10 @@ class _Stats:
         self.monitor[monitor if monitor in ('allow', 'deny') else 'unknown'] += 1
         if row.get('mode') == 'shadow' and router and row.get('would_bypass') is True:
             self.cross[decision] += 1
+            self.monitor_cross[monitor if monitor in ('allow', 'deny') else 'unknown'] += 1
+            self.c['shadow_protocol_failure_batches'] += row.get('mediation_failure_stage') == 'model_protocol'
+            self.c['shadow_request_failure_batches'] += row.get('mediation_failure_stage') == 'model_request'
+            self.c['shadow_record_failure_batches'] += row.get('mediation_failure_stage') == 'audit_record'
             if _count(cost):
                 self.c['known_shadow_would_save_tokens'] += cost
             else:
@@ -171,7 +177,7 @@ class _Stats:
                 'would_bypass_batches', 'known_semantic_audit_calls', 'unknown_audit_call_records',
                 'known_semantic_audit_tokens', 'unknown_audit_cost_batches', 'unknown_shadow_cost_batches',
                 'invalid_event_records', 'unknown_audit_cost_traces', 'unknown_scope_groups',
-                'known_shadow_would_save_tokens')
+                'known_shadow_would_save_tokens', 'shadow_protocol_failure_batches', 'shadow_record_failure_batches', 'shadow_request_failure_batches')
         result = {k: self.c[k] for k in keys}
         n, eligible = self.c['previously_audited_batches'], self.c['eligible_batches']
         result.update(eligible_rate=eligible/n if n else None,
@@ -181,7 +187,7 @@ class _Stats:
                       shadow_would_save_tokens=None if not self.c['shadow_traces'] or self.uncalibrated or self.c['unknown_shadow_cost_batches'] or self.c['unknown_audit_cost_traces'] or self.c['unknown_scope_groups'] else self.c['known_shadow_would_save_tokens'],
                       actual_total_tokens_saved=None, route_reason_counts=dict(self.reasons),
                       raw_audit_decision_counts=dict(self.decisions), final_monitor_decision_counts=dict(self.monitor),
-                      shadow_audit_cross_counts=dict(self.cross),
+                      shadow_audit_cross_counts=dict(self.cross), shadow_monitor_cross_counts=dict(self.monitor_cross),
                       router_latency_p50_ms=_distribution(self.latencies)['p50'],
                       router_latency_p95_ms=_distribution(self.latencies)['p95'])
         if scores:
@@ -387,6 +393,9 @@ def collect_routing_summary(run_dir):
                                     row.get('eligible') is True and (row.get('policy_version') != THRESHOLD_POLICY
                                         or row.get('threshold') != config['threshold'])))
                                 or (row.get('policy_version') == THRESHOLD_POLICY and config['policy_version'] != THRESHOLD_POLICY)
+                                or (config['policy_version'] == READ_POLICY and row.get('eligible') is True and (
+                                    row.get('policy_version') != READ_POLICY or row.get('threshold_applied') is not False))
+                                or (row.get('policy_version') == READ_POLICY and config['policy_version'] != READ_POLICY)
                                 or any(k in row and type(row[k]) is not bool for k in ('eligible','would_bypass','actual_bypass','original_public_bypass'))
                                 or (row.get('model_config_sha256') and config['config_sha256'] and row['model_config_sha256'] != config['config_sha256'])):
                             issue('invalid_event', path)
@@ -435,6 +444,7 @@ def collect_routing_summary(run_dir):
         conf, stat = selected['configuration'], selected['stats']
         calibration = ('disabled' if conf['mode'] in {'off','baseline'} else
                        'empirical_threshold_uncalibrated' if conf['policy_version'] == THRESHOLD_POLICY else
+                       'rule_based_unvalidated' if conf['policy_version'] == READ_POLICY else
                        'uncalibrated' if not conf['artifact_sha256'] or conf['load_error'] else
                        'calibrated' if stat.thresholds else 'threshold_unobserved_or_uncertified')
         configurations.append({'configuration': conf, 'calibration_status': calibration,
@@ -460,7 +470,7 @@ def collect_routing_summary(run_dir):
                 for v in comparison_stats.values() if v['stats'].threshold_shadow],
             'issue_counts': dict(issue_counts), 'issues': issues, 'issues_truncated': sum(issue_counts.values()) > len(issues),
             'limitations': ['Recorded scored traces only; preflight, snapshots and current backend registry excluded.',
-                           'Legacy missing calibration remains unknown; threshold-read-v1 uses an empirical threshold without independent calibration.',
+                           'Legacy missing calibration remains unknown; threshold-read-v1 uses an empirical threshold. read-purpose-v2 selects by rules; scores/thresholds are diagnostic, without independent safety validation.',
                            'Audit disagreement is not a security oracle; selective actual Token savings remain unknown.',
                            'Audit Tokens here exclude preflight; do not add them again to run total Tokens.']}
 
@@ -476,6 +486,7 @@ def render_routing_summary(report):
              f"已记录的路由适用率：{eligible_rate}（分母排除原公开免审及L2前置拒绝）；不是安全通过率。", '',
              f"语义审计调用：{cell(total['semantic_audit_calls'])}；已记录计分轨迹审计Token：{total['known_semantic_audit_tokens']}；成本未知批次：{total['unknown_audit_cost_batches']}，另有{total['unknown_audit_cost_traces']}条轨迹缺少可用成本事件。", '',
              f"Shadow有效模拟节省Token：{cell(total['shadow_would_save_tokens'])}；selective实际节省：未知（无反事实）。", '',
+             f"候选免审的Shadow实际Monitor结果：{cell(total.get('shadow_monitor_cross_counts'))}；模型请求失败批次：{cell(total.get('shadow_request_failure_batches'))}；模型协议失败批次：{cell(total.get('shadow_protocol_failure_batches'))}；记录校验失败批次：{cell(total.get('shadow_record_failure_batches'))}。分歧不是安全标签。", '',
              '未校准时不能将would_bypass=false或已记录零值解释为已验证无收益。费用不含GOAL预检，不与运行总Token重复相加。', '',
              '## 攻击 / 场景', '',
              '| 攻击 | 场景 | 计划/读取/含事件 | 无候选/未记录 | 候选/原公开免审 | 适用/模拟/实际免审 | 审计调用 |',
@@ -493,7 +504,7 @@ def render_routing_summary(report):
         c, t = row['configuration'], row['totals']
         d = t['score_distribution']
         values = [c['mode'],c['prompt_profile'],('经验阈值、未独立校准' if row['calibration_status'] == 'empirical_threshold_uncalibrated' else row['calibration_status']),
-                  f"{str(c['config_sha256'] or 'unknown')[:12]} / {c['policy_version'] if c['policy_version'] == THRESHOLD_POLICY else str(c['artifact_sha256'] or 'missing')[:12]}",row['traces'],t['thresholds'],
+                  f"{str(c['config_sha256'] or 'unknown')[:12]} / {c['policy_version'] if c['policy_version'] in DIRECT_POLICIES else str(c['artifact_sha256'] or 'missing')[:12]}",row['traces'],t['thresholds'],
                   f"{cell(d['p50'])}/{cell(d['p95'])}", f"{cell(t['router_latency_p50_ms'])}/{cell(t['router_latency_p95_ms'])}"]
         lines.append('| '+' | '.join(map(cell, values))+' |')
     lines.extend(['', '## Shadow经验阈值比较（未独立校准）', '',

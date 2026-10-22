@@ -644,7 +644,7 @@ class SandboxExecutionTests(unittest.TestCase):
         request = security_llm.client.chat.completions.create.call_args.kwargs
         self.assertEqual(request["response_format"], {"type": "json_object"})
         packet = json.loads(request["messages"][1]["content"])
-        self.assertEqual(packet["schema_version"], "dscg.audit-input.v2")
+        self.assertEqual(packet["schema_version"], "dscg.audit-input.v3")
         action = packet["current_actions"][0]
         self.assertEqual(action["source_ids"], ["email:42"])
         self.assertEqual(action["untrusted_argument_data"]["role"], "system")

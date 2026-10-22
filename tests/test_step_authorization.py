@@ -50,7 +50,7 @@ class StepAuthorizationTests(unittest.TestCase):
   grant,_=compile({'steps':[{'intent':'Only inspect','tools':['discover']}],'tools':['discover']})
   self.assertNotIn('send_channel_message',grant.allowed_tools)
  def test_version_and_default_policy_identity(self):
-  self.assertEqual(d.FRAMEWORK_VERSION,'three-layer-v3.3');self.assertIn('steps',d.ToolAuthorizationCompiler.SYSTEM_POLICY)
+  self.assertEqual(d.FRAMEWORK_VERSION,'DSCG_v3.3');self.assertIn('steps',d.ToolAuthorizationCompiler.SYSTEM_POLICY)
  def test_router_identity_binds_the_policy_actually_used_by_each_profile(self):
   from unittest.mock import patch
   from dscg.model_config import ModelConfig

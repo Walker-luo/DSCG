@@ -1,5 +1,9 @@
 # 当前框架与平台展示交接
 
+2026-10-22当前内部身份为 **DSCG_v3.3**：L2保留原生定义与步骤授权；L3采用read-purpose-v2普通读取批次候选，personal/secret及效果性操作仍审计。shadow仅观察，selective才应用；分数/阈值仅诊断。当前动作增加effect/schema，修正审计代码长度校验。服务须重启，新name测量；无真实TSR/ASR结论。见[当前指南](./benchmark.md#默认-v33-策略与复测)和[实施记录](../workshop/completed/l3_read_policy_20261022.md)。以下有日期的v3.2/v3.3和直接阈值条目为历史阶段，不能覆盖本段。
+
+2026-10-22实验命名更新为DSCG_v3.2（原v4.2）：核心是L2完整原生工具定义及步骤覆盖；内部引擎身份仍three-layer-v3.3，不更改历史记录。最新结果显示L2漏授大幅减少，但L3读取阻断仍主导Slack损失，见[分析](../workshop/completed/slack_v32_analysis_20261022.md)。
+
 2026-10-22当前默认v3.3：L2采用完整原生schema和一次调用的步骤映射；L3及路由/Monitor不变。页面/API自动采用，服务须重启；旧显式候选协议保留。新name测试，结果与限制见[运行指南](./benchmark.md#默认-v33-策略与复测)及[小样本报告](../workshop/completed/l2_step_authorization_20261022.md)。下文v3.2条目为前序变更。
 
 2026-10-21最新默认为three-layer-v3.2（profile名仍legacy）：L2保留同请求步骤的合理候选工具，L3以用途/参数来源为主，允许准备读取取得未知事实，关键写入/外发参数仍须任务关联。页面/API直接采用新默认，不新增控件；服务须重启。审计协议、记录与回执失败分别报告，Monitor/票据保持。[测试与新运行名](./benchmark.md#默认-v33-策略与复测)。以下较早阶段说明保留历史上下文。
@@ -26,7 +30,7 @@ AgentDyn将受信任的system消息序列化为developer，正文为文本块数
 API失败时页面日志/SSE只返回类型与受限api_error，不再输出SDK异常正文/traceback；运行目录尽力保存execution_error.json，保留错误状态，不生成效用/安全成功标签。CLI执行与失败索引、screen尝试和phase账本同样记录诊断。非API异常沿用原排错路径。离线传输fixture及两套环境回归不证明远端服务已经恢复；复测步骤见[配置指南](./model_tool_configuration.md#消息角色兼容与请求排错)。
 
 
-更新时间：2026-10-19（新增显式Qwen效用候选和协议诊断；AgentDojo / AgentDyn 按环境自动识别；三层防御规则及默认开关保持）。当前默认版本 **three-layer-v3.3**。此前用户授权实现有限L1结构化投影，沿用L2工具视图/任务文件与L3动作正文审查；默认投影已接入factory、partial和网页API，架构说明同步。Spotlighting风格来源封装仍是不适用输入的回退。正式研究路线和闸门不改变。
+更新时间：2026-10-19（新增显式Qwen效用候选和协议诊断；AgentDojo / AgentDyn 按环境自动识别；三层防御规则及默认开关保持）。该阶段默认版本 **three-layer-v3.3**。此前用户授权实现有限L1结构化投影，沿用L2工具视图/任务文件与L3动作正文审查；默认投影已接入factory、partial和网页API，架构说明同步。Spotlighting风格来源封装仍是不适用输入的回退。正式研究路线和闸门不改变。
 
 ## 运行报告精简与L3汇总（2026-10-19）
 
@@ -100,7 +104,7 @@ L1不增加独立模型调用：此前支持的明确原生银行月支出任务
 | delegated_tasks | true，网页/API/partial `--no-delegated-tasks` | 有界明确任务来源展开；NoL2关闭 |
 | authorization_profile / delegated_task_reader | 默认None，仅宿主API | 受信配置，不由网页文本/工具返回创建 |
 | L3/use_security_checker | true，网页/API | 原动作审计 |
-| audit_router_mode/threshold | API off；CLI shadow，默认阈值0.70 | 直接阈值，internal/personal读取；API已透传，页面未新增控件 |
+| audit_router_mode/threshold | API off；CLI shadow，0.70保留作诊断 | read-purpose-v2规则候选；personal/secret仍审计；API已透传，页面无新增控件 |
 | trace_level | summary | standard判决/账本、full压缩诊断；保留实际字段覆盖 |
 
 网页完整/NoL1/NoL2/NoL3预设和自定义组合已接线。**V2风格**预设关闭L1、前置、视图与文件展开，但新版目录复核仍存在，不是历史V2精确复现。L2/L3全关时L1关闭；原生baseline始终走活动后端的原生工具循环，不带DSCG元数据。

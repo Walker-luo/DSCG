@@ -42,6 +42,10 @@ def build_packets(profile='source-context-v1'):
     set_tool_metadata(runtime, {name: metadata[name] for name in runtime.functions})
     checker = ActionSecurityChecker(SimpleNamespace(name='not-invoked'),
         sandbox=PermissionSandbox(sorted(runtime.functions)), prompt_profile=profile)
+    # This exporter is a frozen historical v1 fixture, not a current runtime packet.
+    checker._legacy_audit_input = True
+    if profile == 'legacy':
+        checker.SYSTEM_POLICY = json.loads(Path(__file__).with_name('utility_legacy_policies.json').read_text())['audit']
     fixture = json.loads(FIXTURE.read_text())
     rows = []
     for case in fixture['cases']:

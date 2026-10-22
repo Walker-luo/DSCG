@@ -1,16 +1,16 @@
 # DSCG 测试与优化计划
 
-更新时间：2026-10-21。当前主线是 **先修复 banking／Slack 的通用效用损失，再验证 L3 路由收益**；AgentDyn 的 L2 问题保留为独立后续事项。
+更新时间：2026-10-22。当前主线是 **先修复 banking／Slack 的通用效用损失，再验证 L3 路由收益**；AgentDyn 的 L2 问题保留为独立后续事项。
 
 本文维护工程待办；运行方法见 [完整测试](./docs/benchmark.md)、[小批量测试](./docs/partial_benchmark.md)及 [配置说明](./docs/model_tool_configuration.md)。正式研究路线仍以 [technical_route.md](../research/technical_route.md) 为准。
 
 ## 1. 当前范围与默认行为
 
 - AgentDojo 场景为 workspace/travel/banking/slack；按实际 `--suites`、任务清单或 cohort 固定范围，不将不同范围的分母混用。
-- full/partial/cohort 顺序执行；结果按 `<category>/<backend>/<model>_<name>/` 保存。partial 默认保留每场景前三用户×前三注入，cohort 只过滤注入前缀、不补位。
+- full/partial/cohort 按attack并行、每attack内顺序执行；结果按 `<category>/<backend>/<model>_<name>/` 保存。partial 默认保留每场景前三用户×前三注入，cohort 只过滤注入前缀、不补位。
 - DSCG 测量 CLI 默认 `shadow`，API/factory 默认 `off`。两者都保留 L3 语义审计；`off` 仅关闭新增路由。
 - 固定模型公开请求配置、工具目录、prompt profile、L1/L2 和审计设置。Git/工作树只作证据记录，不恢复源码扫描或源码哈希续跑门槛。
-- 本计划不改变默认防御、原生任务或评分，也不解锁参数/对象约束、动态扩权等机制。
+- 当前默认身份为DSCG_v3.3；不改变原生任务或评分，也不解锁参数/对象约束、动态扩权等机制。
 
 ## 2. AgentDojo：banking／Slack 的 TSR 问题与解决顺序
 
@@ -59,21 +59,21 @@
 
 [真实诊断报告](./workshop/completed/utility_diagnosis_20261021.md) · [导出/比较方法与响应格式](./docs/qwen_utility.md#2026-10-21固定分阶段诊断)。当前保留短版legacy；新task-alignment由用户下一轮benchmark显式检验，没有修改默认防御、协议、阈值或原始结果；尚未执行37项clean。
 
-**暂缓项：** 不先调路由阈值、扩展L1投影或增加证据预算。前两轮是shadow，v2虽为selective但无校准artifact，实际新增免审均为0；这不能解释为阈值导致误放或调阈值即可恢复TSR。这描述的是旧运行；当前已按第3节改为直接阈值与personal读取资格，仍待新实验验证。
+**暂缓项：** 不先调路由阈值、扩展L1投影或增加证据预算。前两轮是shadow，v2虽为selective但无校准artifact，实际新增免审均为0；这不能解释为阈值导致误放或调阈值即可恢复TSR。这描述的是旧运行；当前已按第3节改为普通读取规则候选，personal仍审计，仍待新实验验证。
 
 以上TSR分析阶段只更新计划；本次L3工程变更见第3节，模型和默认路由模式未变。未来模型调用另行确认预算；使用新运行名，保留历史结果，agent临时产物进入新的 `workshop/artifacts/<YYYYMMDD>_<task>/`。
 
-## 3. AgentDojo：直接阈值路由与shadow验证
+## 3. AgentDojo：DSCG_v3.3读取路由与shadow验证
 
-当前实现改为 `threshold-read-v1`：默认经验阈值0.70，资格扩大到完整有效、单个已授权的internal/personal幂等无sink读取；严格s<threshold才免审。CLI仍默认shadow，API off，selective显式启用。不再依赖独立标签或artifact；secret、写入/金融/外发仍审计。
+- [x] L2保留完整原生工具定义与单次步骤授权；L3加入当前effect/schema，明确读取先获得事实、后续写入再验证具体参数，不按任务ID补规则。
+- [x] read-purpose-v2将public/internal、幂等、无sink、L2允许/参数有效的普通读取及全读批次列为候选。personal/secret、效果性/混合批次仍审计；当前参数异常仍回退，历史错误/窗口截断不再强制新读取审计。
+- [x] 用户原文URL只有严格窄例外，不认证DNS/重定向或对象权限，不改变网页sink/AgentDyn handler风险标签。分数/阈值仅诊断，当前不扫描阈值。
+- [x] 超长violations明确归为协议失败，修复解析通过后记录超限的不一致；Monitor/回执/票据不绕过。新身份DSCG_v3.3、fresh name，历史绑定与诊断回放保留。
+- [x] shadow保留实际审计与Monitor判断；报告候选交叉、协议/请求/记录失败及未知成本。selective才应用候选，不把分歧当安全标签。
+- [ ] 后续用户启动固定banking/Slack新shadow，核对路由覆盖和真实阻断；再做同配置selective/baseline配对，报告TSR/ASR、联合成功、有效/错误分母、总Tokens和墙钟延迟。当前离线通过不证明效用/安全提升。
+- [ ] 私密频道/对象识别、独立终态与攻击安全验证仍待设计；不把工具级internal当作对象级公开认证。
 
-- [x] 直接阈值、完整入口透传、配置/缓存及一次性交接绑定；旧artifact参数非空报迁移错误。
-- [x] Shadow保留分项/s、资格/回退、审计协议与判决、Monitor结果、成本和延迟；根级报告比较0.65/0.70/0.75及本次阈值，不自动选择。
-- [ ] 先稳定第2节的提示与效用问题，再用新shadow检查新范围的免审覆盖、审计分歧及已知/未知Token；历史个人读取没有完整路由分数时不补造。
-- [ ] 手动冻结经验阈值，用新名称做selective/shadow匹配对照，检查原生TSR/ASR、联合成功、独立终态、总Tokens与延迟。观察不能替代安全真值。
-- [ ] 完整本地延迟和未消费receipt清理保持独立后续工程事项，不把执行票据清理当作receipt清理。
-
-旧独立分组校准器、候选预设与原统计要求保留为未来研究，已退出当前运行链；不删除历史材料，也不把默认0.70表述为已通过独立校准。[当前方案](./workshop/L3_checker_opt.md) · [参数](./docs/model_tool_configuration.md#l3直接阈值路由) · [报告](./docs/result_files.md)
+[当前规则](./docs/benchmark.md#默认-v33-策略与复测) · [实施记录](./workshop/completed/l3_read_policy_20261022.md)。历史threshold-read-v1及独立校准器保留，不控制当前免审。
 
 ## 4. AgentDyn：L2 专项问题（后续，待设计）
 
@@ -95,6 +95,6 @@ AgentDyn小样本baseline攻击ASR也为0，Qwen当轮GOAL预检失败；不能�
 
 ## 5. 交付要求
 
-每轮输出参数/配置表、成对结果与有效/错误分母、失败分类、完整成本和限制说明。当前优先交付 **banking／Slack 协议、授权及来源语义的分阶段对照**；L3经验阈值验证待配置稳定后继续，AgentDyn L2 保留为独立后续事项。
+每轮输出参数/配置表、成对结果与有效/错误分母、失败分类、完整成本和限制说明。当前优先交付 **banking／Slack 协议、授权及来源语义的分阶段对照**；L3读取规则的shadow/selective验证待用户实测，AgentDyn L2 保留为独立后续事项。
 
 E0 pending、I3 partial（24 valid/8 scope violations）、I2 locked不变；工程测试不替代研究闸门。详细历史统计、公式与修订前原文保留在[上一版归档](./workshop/artifacts/20261020_plan_scope_concise/plan.before.md)。
