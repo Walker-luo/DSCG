@@ -1,8 +1,12 @@
 # 测试结果文件与L3路由汇总
 
+## v3.5 候选诊断
+
+显式 `intent-evidence-v35` 的授权记录保存完整 `tool_permissions`；L3 full附件保存有界assessment，公开记录用 `assessment_sha256` 及完整原回复摘要绑定判决。三个分析字段限256/384/256字符；allow/deny的missing_evidence必须是空字符串，abstain必须说明缺失依据。模型写“None.”仍是非空，不自动修补；协议失败、Monitor拒绝及最终原生utility分别查看。分析文字不授予权限。当前候选使用v3输出协议与JSON Object，不修补响应，格式和实际审计设置进入配置身份；旧v1/v2原记录保留。默认仍v3.4；[后续真实迭代](../workshop/completed/v35_followup_20261023.md)最佳5/6、确认4/6，未达推广门槛。
+
 新运行以根目录作为查阅入口，不再生成场景report.txt、攻击级或根级all_report.txt、单独攻击错误TXT。旧报告保留，不自动清理。此改动只影响派生展示，不进入防御/缓存配置身份，不改变模型、路由策略、校准阈值或评分。
 
-## 当前规则的shadow观察（DSCG_v3.3）
+## 当前规则的shadow观察（DSCG_v3.4）
 
 read-purpose-v2按普通读取规则产生候选，不用分数/阈值筛选，不输出新规则阈值扫描。报告标记rule_based_unvalidated，分开统计候选的实际审计与Monitor判断、模型协议失败和审计记录校验失败；分歧不是安全标签。shadow仍执行审计，已知候选审计Token仅是反事实可省小计，selective实际总节省未知。缺失轨迹/成本保持未知，原公开免审不计为新增收益。[规则及边界](./benchmark.md#默认-v33-策略与复测)。
 
@@ -103,4 +107,8 @@ v3.2的审计事件保留`mediation_diagnostics`：`checker_parser_status`和受
 
 ## L2步骤记录（v3.3）
 
-默认授权的 `dscg_authorizations` 每条记录新增 `authorization_protocol=native-steps-v1` 和 `authorization_steps`（intent/tools）。该映射只记录一次授权模型的自述，不认证步骤完整、参数正确或任务成功。`allowed_tools` 仍是工具级有效授权；显式旧候选/受限授权没有这些字段时不补造。新协议和提示身份进入现有绑定，旧策略结果请保留并使用新运行名。
+默认授权的 `dscg_authorizations` 每条记录新增 `authorization_protocol=action-steps-v2` 和 `authorization_steps`（intent/tools）。只记录请求的动作步骤，不含已自动可用的读取，不再重复输出顶层tools。该映射只记录一次授权模型的自述，不认证步骤完整、参数正确或任务成功。`allowed_tools` 仍是工具级有效授权；显式旧候选/受限授权没有这些字段时不补造。新协议和提示身份进入现有绑定，旧策略结果请保留并使用新运行名。
+
+## v3.4判决诊断
+
+新默认审计记录的protocol_diagnostics标明output_contract=dscg.audit-decision.v2及实际response_format；字段失败仅记录固定字段路径、预期/实际类型、数量/长度和结束原因，不输出正文。模型协议、API、Monitor记录校验和回执交接失败分开统计。旧记录缺字段时不补造。有限代码/跨字段错误仍使原生效用失败，不能因是协议错误就删出TSR；主模型工具参数JSON基础设施错误仍沿用原有null处理。详见[当前契约](./benchmark.md#默认-v34-策略与复测)。

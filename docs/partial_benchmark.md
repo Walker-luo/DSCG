@@ -1,14 +1,30 @@
 # 小批量测试：run_partial_benchmark
 
-当前内部身份为 **DSCG_v3.3**（legacy）：L2保留原生定义与步骤授权，L3普通读取及全读批次按规则成为免审候选，个人/秘密读取和效果性操作继续审计。两入口共用核心策略，name不切换版本；历史DSCG_v3.2与原引擎标签不改写。新策略使用新name，冻结cohort轻量读取不变。[规则与边界](./benchmark.md#默认-v33-策略与复测)。
+## v3.5 显式候选（未提升默认）
+
+`--prompt-profile intent-evidence-v35` 在 full、partial、cohort 共用实现中选择 **DSCG_v3.5**；不传仍为 **legacy / DSCG_v3.4**，`--name` 不选择策略。候选 L2 一次返回每个动作工具的完整布尔映射 `tool_permissions`，宿主严格检查后合并原自动读取；L3 同次输出有界 `assessment` 与有限代码 `verdict`，分别说明当前用途、参数依据与缺失证据。读取无需提前知道待查询事实；实际写入仍核对目标及已有依据。读取免审范围、Monitor、整批回执和执行票据不变。
+
+本轮300万Tokens后续验证已按用户要求停止：922次请求、919次成功响应、已知1,693,429Tokens，另3次连接故障usage未知。最佳完整六例5/6，但同代码确认4/6，未达提升门槛。当前显式候选恢复到实际执行的round13：L3关闭思考、JSON Object＋严格宿主四字段verdict/三字段assessment、明确执行前审计；主模型/L2不启用思考。最新部分运行仅四条完整、2成功；另有GOAL连接错误和未开始项。未验证的结构化证据候选只存快照，不进入运行入口。见[后续报告](../workshop/completed/v35_followup_20261023.md)。未运行离线回归或完整评测。
+
+最初220次请求的独立阶段仍保留[历史报告](../workshop/completed/v35_live_iterations_20261023.md)，不与本轮合并预算或分母。
+
+显式试用需新名称，以下命令会发起真实模型调用；本次未执行这些扩大范围的命令。已有冻结cohort可继续按轻量规则读取；测量缓存仍绑定实际新协议/策略，不能跨策略reuse。
+
+```bash
+python -m experiments.run_partial_benchmark --suites banking slack \
+  --model-config config/models.local.toml --prompt-profile intent-evidence-v35 \
+  --audit-router-mode shadow --progress --name DSCG_v35_candidate_partial_01
+```
+
+当前内部身份为 **DSCG_v3.4**（legacy）：L2保留原生定义，只返回动作授权步骤；L3采用有限短码判决、支持的DashScope/Qwen组合使用严格Schema，其他提供方保留JSON Object与严格宿主校验。读取范围、默认任务前缀、并发和缓存规则不变。两入口共用策略；新name不能复用旧防御缓存，冻结cohort无需因防御更新重筛。[规则与边界](./benchmark.md#默认-v34-策略与复测)。
 
 ```bash
 python -m experiments.run_partial_benchmark --suites banking slack \
   --model-config config/models.local.toml --audit-router-mode shadow \
-  --progress --name DSCG_v3.3_shadow_partial_01
+  --progress --name DSCG_v3.4_shadow_partial_01
 ```
 
-此命令仍会调用真实模型，留待用户执行；本次仅离线验证。shadow继续审计，selective才应用新增免审，不能把shadow的候选统计当实际TSR提升。
+此命令会调用真实模型。v3.4与v3.5的固定案例验证均按用户要求跳过离线回归；上方命令本次未执行。shadow继续审计，selective才应用新增免审，不能把shadow的候选统计当实际TSR提升。
 
 DashScope/Qwen与DeepSeek的Chat请求角色由DSCG公共客户端分别适配，不修改conda包；更新后使用新运行名。AgentDyn首次请求的400/422定位、受限诊断字段和小范围复测要求见[消息角色兼容排错](./model_tool_configuration.md#消息角色兼容与请求排错)。旧测量缓存与新增请求身份不一致时拒绝复用，旧数据保留；冻结cohort只比较主模型ID/provider及环境与所选任务，详见[名单校验](./injection_precheck.md#2-中断和错误后续跑)。
 

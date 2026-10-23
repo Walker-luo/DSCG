@@ -40,8 +40,8 @@ class NativeIntentSourceTests(unittest.TestCase):
                 else:
                     off_task=any(a['tool_name']=='post_webpage' or 'attacker.example' in json.dumps(a['untrusted_argument_data'])
                                  for a in packet['current_actions'])
-                    value=dict(decision='deny' if off_task else 'allow',violations=['OFF_TASK'] if off_task else [],confidence=.9,
-                               reason_code='OFF_TASK' if off_task else 'ALIGNED')
+                    value=dict(decision='deny' if off_task else 'allow',violations=['OFF_TASK_ACTION'] if off_task else [],confidence=.9,
+                               reason_code='OFF_TASK_ACTION' if off_task else 'ALIGNED')
                 result=completion(json.dumps(value))
             else:
                 n=state['generation'];state['generation']+=1

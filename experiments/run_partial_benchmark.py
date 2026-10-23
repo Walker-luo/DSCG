@@ -17,11 +17,12 @@ from dscg.model_config import ModelConfigurationError, resolve_model_config
 from dscg.paths import RESULTS_DIR, BENCHMARK_RESULTS_DIR
 from dscg.audit_router import (DEFAULT_THRESHOLD, POLICY_VERSION as ROUTER_POLICY_VERSION,
                                validate_router_options, summarize_events, LocalAuditRouter)
-from dscg.input_isolation import FRAMEWORK_VERSION
+from dscg.input_isolation import FRAMEWORK_VERSION, framework_version_for_profile
 from dscg.l1_projection import MODES as L1_PROJECTION_MODES, PROFILE_SHA256 as L1_PROFILE_SHA256
 from dscg.pipelines.baseline import make_openai_compatible_pipeline
 from dscg.pipelines.defended import make_defended_pipeline, router_configuration_hash, defended_pipeline_name
 from dscg.prompt_profiles import PROFILES as PROMPT_PROFILES, validate_profile, profile_binding
+from dscg.intent_evidence import audit_model_settings
 from dscg.tool_metadata import ToolMetadataError, load_tool_metadata, validate_benchmark_tool_metadata, resolve_tool_metadata
 from experiments.common.benchmark_outcomes import project_outcomes
 from experiments.common.partial_reporting import collect_suite_report, write_run_overview
@@ -122,13 +123,13 @@ def _describe_pipeline(model_id, sec_model_id, *, origin, defense, **options):
             audit = resolve_model_config(sec_model_id, prefix='DSCG_SEC', fallback=main,
                 config_path=options.get('config_path'), **{
                     k: options.get('sec_' + k) for k in ('api_key', 'base_url', 'provider', 'api_key_env')})
-            security = audit.public_dict()
+            security = audit_model_settings(audit, prompt_profile)
             config_hash = router_configuration_hash(main, audit, input_isolation=isolation,
                 authorization_precheck=sandbox, l1_projection_mode=projection,
                 planning_tool_view=view, delegated_tasks=delegated,
                 audit_retries=options['audit_retries'], completion_prompt=options['completion_prompt'],
                 prompt_profile=prompt_profile, audit_router_threshold=options.get('audit_router_threshold', DEFAULT_THRESHOLD)
-                if options['audit_router_mode'] != 'off' else None)
+                if options['audit_router_mode'] != 'off' else None, use_sandbox=sandbox)
             if options['audit_router_mode'] != 'off':
                 router = LocalAuditRouter(options['audit_router_mode'], model_config_sha256=config_hash,
                                           threshold=options.get('audit_router_threshold', DEFAULT_THRESHOLD))
@@ -623,7 +624,7 @@ def _run_single_attack(
             "audit_retries": audit_retries, "completion_prompt": completion_prompt,
             "trace_level": None if origin else trace_level,
             "tool_metadata": tool_metadata, "tool_metadata_selection": metadata_selection, "source": source_revision(),
-            "defense_version": None if origin else FRAMEWORK_VERSION,
+            "defense_version": None if origin else framework_version_for_profile(prompt_profile),
             "input_isolation": bool(not origin and (use_sandbox or use_security_checker)),
             'l1_projection_mode': 'off' if origin else l1_projection_mode,
             'l1_projection_profile_sha256': None if origin else L1_PROFILE_SHA256,

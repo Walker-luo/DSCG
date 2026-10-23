@@ -1,8 +1,27 @@
 # DSCG 测试与优化计划
 
+## 2026-10-23 v3.5 后续停止交付
+
+用户追加300万Tokens、取消请求次数上限后完成后续真实迭代：最佳完整六例5/6、同代码确认4/6；未满足两次独立各至少5/6，默认仍legacy/DSCG_v3.4。922请求、919成功响应、已知1,693,429Tokens，3次连接故障usage未知；用户已要求停止真实调用。L3有限思考512/2048未通过，曾出现反例危险allow，未推广。当前显式v35恢复为实际执行的round13，关闭思考、严格JSON Object协议；最后部分运行四条完整、2成功，不补齐假标签。
+
+[后续报告](./workshop/completed/v35_followup_20261023.md) · [阶段计划与剩余候选](./workshop/L2_L3_v35_followup_20261023.md)。下一步仅保留：完整结构化记录的L3呈现（prepared14未调用、未入生产）和主模型多步骤查询遗漏。需新授权后再真实验证；不修补判决、不动态补权、不改原生任务或评分。本轮未做离线回归/完整评测，研究门槛不变。
+
+原220请求/384803Tokens的三轮阶段与4/6结论独立保留：[历史报告](./workshop/completed/v35_live_iterations_20261023.md)。
+
 更新时间：2026-10-22。当前主线是 **先修复 banking／Slack 的通用效用损失，再验证 L3 路由收益**；AgentDyn 的 L2 问题保留为独立后续事项。
 
 本文维护工程待办；运行方法见 [完整测试](./docs/benchmark.md)、[小批量测试](./docs/partial_benchmark.md)及 [配置说明](./docs/model_tool_configuration.md)。正式研究路线仍以 [technical_route.md](../research/technical_route.md) 为准。
+
+## 0. 最新优化方案（2026-10-22，v3.4实施）
+
+基于最新256条baseline成功/v3.3失败配对，优先改L3，详见[L2／L3完整方案](./workshop/L2_L3_optimization_20261022.md)。已按用户要求实施DSCG_v3.4；用户改为跳过离线回归、直接用Qwen验证固定失败案例。结果见[实施记录](./workshop/completed/v34_decision_contract_20261022.md)；以下旧阶段统计不作为最新成绩。
+
+- [x] L3使用已验证提供方的JSON Schema约束及有限短代码，保留严格宿主校验/Monitor；分开记录字段、请求与回执失败。
+- [x] L3只判断当前一步及参数事实依据，复核正确摘要、退款、地址与邀请被拒；先保留当前读取范围，shadow/selective另做同配置对照。
+- [x] L2保留完整原生定义，只输出动作授权步骤，由宿主求并集；覆盖后续请求动作，不动态补权或把文件注入变授权。
+- [x] 必要时澄清主模型查询、对象标识和实际执行反馈；不自动重试、催促或按任务ID追分。
+- [x] 完成固定6案例v3.4与5条baseline计分，第6条baseline预算未完成；160请求/297322Tokens。新策略0/6utility，协议通过但效用未恢复，停止扩大。
+- [ ] 针对实际包分离L3语义误拒和L2动作错配；离线回归、负例集、37用户clean仍未完成。历史v3.3只作观察对照，历史cohort/评分不改。
 
 ## 1. 当前范围与默认行为
 
@@ -10,7 +29,7 @@
 - full/partial/cohort 按attack并行、每attack内顺序执行；结果按 `<category>/<backend>/<model>_<name>/` 保存。partial 默认保留每场景前三用户×前三注入，cohort 只过滤注入前缀、不补位。
 - DSCG 测量 CLI 默认 `shadow`，API/factory 默认 `off`。两者都保留 L3 语义审计；`off` 仅关闭新增路由。
 - 固定模型公开请求配置、工具目录、prompt profile、L1/L2 和审计设置。Git/工作树只作证据记录，不恢复源码扫描或源码哈希续跑门槛。
-- 当前默认身份为DSCG_v3.3；不改变原生任务或评分，也不解锁参数/对象约束、动态扩权等机制。
+- 当前默认身份为DSCG_v3.4；不改变原生任务或评分，也不解锁参数/对象约束、动态扩权等机制。
 
 ## 2. AgentDojo：banking／Slack 的 TSR 问题与解决顺序
 

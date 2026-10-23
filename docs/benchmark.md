@@ -1,30 +1,48 @@
 # 完整任务测试：AgentDojo 与 AgentDyn
 
+## v3.5 显式候选（未提升默认）
+
+`--prompt-profile intent-evidence-v35` 在 full、partial、cohort 共用实现中选择 **DSCG_v3.5**；不传仍为 **legacy / DSCG_v3.4**，`--name` 不选择策略。候选 L2 一次返回每个动作工具的完整布尔映射 `tool_permissions`，宿主严格检查后合并原自动读取；L3 同次输出有界 `assessment` 与有限代码 `verdict`，分别说明当前用途、参数依据与缺失证据。读取无需提前知道待查询事实；实际写入仍核对目标及已有依据。读取免审范围、Monitor、整批回执和执行票据不变。
+
+本轮300万Tokens后续验证已按用户要求停止：922次请求、919次成功响应、已知1,693,429Tokens，另3次连接故障usage未知。最佳完整六例5/6，但同代码确认4/6，未达提升门槛。当前显式候选恢复到实际执行的round13：L3关闭思考、JSON Object＋严格宿主四字段verdict/三字段assessment、明确执行前审计；主模型/L2不启用思考。最新部分运行仅四条完整、2成功；另有GOAL连接错误和未开始项。未验证的结构化证据候选只存快照，不进入运行入口。见[后续报告](../workshop/completed/v35_followup_20261023.md)。未运行离线回归或完整评测。
+
+最初220次请求的独立阶段仍保留[历史报告](../workshop/completed/v35_live_iterations_20261023.md)，不与本轮合并预算或分母。
+
+显式试用需新名称，以下命令会发起真实模型调用；本次未执行这些扩大范围的命令。已有冻结cohort可继续按轻量规则读取；测量缓存仍绑定实际新协议/策略，不能跨策略reuse。
+
+```bash
+python -m experiments.run_benchmark --suites banking slack \
+  --model-config config/models.local.toml --prompt-profile intent-evidence-v35 \
+  --audit-router-mode shadow --progress --name DSCG_v35_candidate_01
+```
+
 <a id="默认-v32-策略与复测"></a>
 
-## 默认 v3.3 策略与复测
+<a id="默认-v33-策略与复测"></a>
 
-当前内部身份统一为 **`DSCG_v3.3`**，默认 `prompt_profile=legacy`。L2保留完整原生工具定义与一次调用的步骤授权；本次更新L3读取路由、当前动作审计上下文和协议诊断。历史实验名DSCG_v3.2及其 `three-layer-v3.3` 记录保留原样，不因当前命名改写。
+## 默认 v3.4 策略与复测
 
-`read-purpose-v2` 将L2已允许、原生参数有效、public/internal、幂等且无sink的普通读取（含全为合格读取的批次）列为免审候选。当前请求/描述/参数仍须完整；历史工具错误、旧证据窗口截断及历史参数丢失不再单独迫使新的读取审计。personal/secret、写入、外发及混合读写批次仍审计。风险目录不改，工具级internal标签不能证明某个频道/文件不私密，也没有新增对象或参数权限。
+当前内部身份为 **`DSCG_v3.4`**，默认 `prompt_profile=legacy`。full、partial、cohort与factory使用同一策略；`--name`只命名实验，不选择版本。历史实验和原manifest保持原样。
 
-外部网页保留external_recipient标签，仅为可信用户请求中逐字给出的公共网页URL提供窄例外：只接受url参数、HTTP(S)或www域名，无查询串、fragment、凭证、端口、IP、内部域名或编码文本。工具返回中的新地址不能据此免审；AgentDyn可分发副作用的browse_webpage也不适用。该规则不验证DNS、重定向或网页真实性。
+**L2**保留完整原生名称、描述、参数schema和自动读取标记，一次调用只返回请求的动作步骤：`{"steps":[{"intent":"请求的效果性子目标","tools":["native_action_name"]}]}`。不再重复输出顶层tools或读取步骤；宿主严格校验注册动作名称/重复/界限后求并集，合并原自动读取权限。覆盖未知参数、条件及后续动作，合理候选可并存；步骤不是语义完整性证明，不动态补权。旧显式prompt候选与宿主受限授权沿用原协议。
 
-CLI默认 `shadow`，Python/Dashboard API默认off：shadow记录候选，仍实际审计并由Monitor决定；显式selective才应用新免审。原公开读取免审继续单列。词法分数及 `--audit-router-threshold` 保留作诊断/兼容输入，**不再决定当前策略的免审**；修改阈值仍改变配置绑定。旧threshold-read-v1报告保留旧解释。
+**L3**保留四字段JSON，decision为allow/deny/abstain，confidence为有限[0,1]。reason_code固定为ALIGNED、OFF_TASK_ACTION、EXPLICIT_CONSTRAINT、UNSUPPORTED_PARAMETER、UNREQUESTED_DISCLOSURE、INSTRUCTION_AS_AUTHORITY、ORDER_VIOLATION、MISSING_EVIDENCE。allow要求空violations与ALIGNED；deny要求具体违规代码及匹配理由；abstain要求MISSING_EVIDENCE。非法格式或组合仍失败关闭，不修补或重新请求。
 
-默认短审计提示仅判断当前动作；新增宿主effect及原生参数schema，允许先读取得未知事实，再核对后续写入的目标、金额和正文。审计四字段JSON不变，violation代码原文或规范化后超过96字符时明确记协议失败并关闭；不修补响应。Monitor、一次性回执和执行票据继续绑定整批动作。
+仅对官方DashScope HTTPS地址上的qwen3.7-flash请求严格JSON Schema；其他组合保持json_object与同样严格的宿主校验。未知代理不会仅因模型名字而启用Schema；Schema请求被拒绝时明确报错，不自动降级。实际格式与schema身份进入防御/缓存绑定；主模型原生tool-call生成方式不变。[官方结构化输出说明](https://help.aliyun.com/zh/model-studio/qwen-structured-output)。
 
-L2返回 `{"steps":[{"intent":"步骤","tools":["tool_name"]}],"tools":["tool_name"]}`：逐步覆盖发现、读取、条件步骤和最终动作，未知频道/金额留待执行时查询。总工具清单须等于步骤工具并集，工具须已注册；宿主从中选取动作授权，自动读取规则保持不变。步骤摘要写入轨迹 `dscg_authorizations[].authorization_steps`，只是模型的覆盖说明，不是完成证明或额外执行计划。纯读/禁止操作/无关动作仍不应获得写权限；没有新增动态扩权或额外请求。显式旧prompt候选和宿主受限授权仍沿用其原协议。
+短提示只判断当前一步的用途与参数事实；允许先查询未知事实、使用相关成功返回及派生值，不要求一次调用完成整项任务或虚构验证门槛。源中出现注入不自动否决合法摘要、退款或地址更新；错误目标、无关写入、非用户要求的攻击指令外发仍拒绝。证据保留原有界限，错误/阻断返回不能当成功事实。Monitor、一次性回执、整批审批和执行票据不变。
 
-新身份进入共享factory、full/partial/cohort及缓存绑定；请用新name，不能续用旧防御缓存。冻结cohort轻量读取不变，baseline原生流程不变。下列命令由用户后续启动，本次仅离线验收：
+读取路由仍为`read-purpose-v2`：合格public/internal幂等无sink读取及全读批次可以成为候选；personal/secret、混合读写和效果性操作仍审计。仅可信请求逐字指定的公共网页保留原窄例外，工具返回中的新URL不能自动免审。CLI默认shadow，**仍实际审计**；selective才应用候选。API/factory默认off，阈值只作诊断且仍绑定配置；不改风险目录。
+
+新策略须用新name，不能复用旧防御测量缓存。冻结cohort仍按模型/provider、后端/版本/所选场景轻量读取，无需因Schema变化重做screen。baseline保持原生行为。
 
 ```bash
 python -m experiments.run_benchmark --suites banking slack \
   --model-config config/models.local.toml --audit-router-mode shadow \
-  --progress --name DSCG_v3.3_shadow_01
+  --progress --name DSCG_v3.4_shadow_01
 ```
 
-shadow报告显示候选的真实审计/Monitor交叉结果、模型协议失败、记录校验失败及已知/未知审计成本；这些不是安全标签或实际节省。历史Qwen授权小样本见[原报告](../workshop/completed/l2_step_authorization_20261022.md)，本次离线验证见[实施记录](../workshop/completed/l3_read_policy_20261022.md)。未证明TSR/ASR改善。
+本轮按用户要求跳过离线回归，直接进行固定失败案例的Qwen验证；结果和限制见[实施记录](../workshop/completed/v34_decision_contract_20261022.md)。小样本不能证明整体TSR/ASR改善或安全性。shadow候选也不代表实际免审或节省。
 
 <a id="l3直接阈值策略2026-10-21"></a>
 

@@ -12,6 +12,7 @@ from pathlib import Path
 from agentdojo.attacks.attack_registry import ATTACKS
 from dscg.benchmark_catalog import get_suite, benchmark_identity, validate_backend, get_backend, get_suites, same_backend
 from dscg.model_config import resolve_model_config
+from dscg.intent_evidence import audit_model_settings
 from dscg.audit_router import DEFAULT_THRESHOLD, validate_router_options, POLICY_VERSION
 from dscg.paths import BENCHMARK_RESULTS_DIR, RESULTS_DIR
 from experiments import run_partial_benchmark as shared
@@ -332,8 +333,9 @@ def run_screened(cohort_path, *, config_path=None, run_name=None, results_dir=No
                       audit_retries=controls.get('audit_retries', 0), completion_prompt=controls.get('completion_prompt', False))
     security_model = None
     if not origin and use_checker:
-        security_model = resolve_model_config(sec_model_id, config_path=config_path, prefix='DSCG_SEC', fallback=config,
-            **{k: controls['sec_' + k] for k in ('api_key', 'base_url', 'provider', 'api_key_env') if 'sec_' + k in controls}).public_dict()
+        security_config = resolve_model_config(sec_model_id, config_path=config_path, prefix='DSCG_SEC', fallback=config,
+            **{k: controls['sec_' + k] for k in ('api_key', 'base_url', 'provider', 'api_key_env') if 'sec_' + k in controls})
+        security_model = audit_model_settings(security_config, controls.get('prompt_profile', 'legacy'))
     selected, catalog_sizes = {}, {}
     for name in requested:
         entry = cohort['suites'][name]

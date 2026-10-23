@@ -2,7 +2,10 @@
 import hashlib
 import json
 
-PROFILES = ('legacy', 'protocol-v1', 'tool-semantics-v1', 'source-context-v1', 'task-alignment-v1')
+from dscg.intent_evidence import (PROFILE as V35_PROFILE, AUTH_POLICY as V35_AUTH_POLICY,
+    AUDIT_POLICY as V35_AUDIT_POLICY, MAIN_TASK_POLICY, ISOLATION_POLICY, REVIEW_RULES, DECISION_GUIDE, AUDIT_THINKING, AUDIT_FORMAT, AUDIT_PROTOCOL as V35_OUTPUT_PROTOCOL, ENVELOPE_SCHEMA, permission_schema)
+
+PROFILES = ('legacy', 'protocol-v1', 'tool-semantics-v1', 'source-context-v1', 'task-alignment-v1', V35_PROFILE)
 CATALOG_SCHEMA = 'dscg.authorization-tool-semantics.v1'
 
 TASK_ALIGNMENT_RULE = (
@@ -106,6 +109,8 @@ def semantic_catalog(profile):
 
 def audit_policy(legacy, profile):
     validate_profile(profile)
+    if profile == V35_PROFILE:
+        return V35_AUDIT_POLICY
     if profile == 'task-alignment-v1':
         return TASK_AUDIT_POLICY
     return legacy + (PROTOCOL_RULE if profile != 'legacy' else '') + (
@@ -114,6 +119,8 @@ def audit_policy(legacy, profile):
 
 def authorization_policy(legacy, profile, *, bounded=False):
     validate_profile(profile)
+    if profile == V35_PROFILE:
+        return legacy if bounded else V35_AUTH_POLICY
     if profile == 'task-alignment-v1':
         return legacy + '\n' + TASK_ALIGNMENT_RULE if bounded else TASK_AUTHORIZATION_POLICY
     return legacy + (AUTHORIZATION_RULE if semantic_catalog(profile) else '')
@@ -132,5 +139,12 @@ def profile_binding(profile):
         value = {'profile': profile, 'authorization': TASK_AUTHORIZATION_POLICY,
                  'bounded_authorization': TASK_ALIGNMENT_RULE, 'audit': TASK_AUDIT_POLICY,
                  'catalog_schema': 'legacy'}
+    if profile == V35_PROFILE:
+        value = {'profile': profile, 'authorization': V35_AUTH_POLICY, 'audit': V35_AUDIT_POLICY,
+                 'audit_thinking': {'official_qwen_only': AUDIT_THINKING}, 'audit_output_protocol': V35_OUTPUT_PROTOCOL,
+                 'audit_response_format': AUDIT_FORMAT,
+                 'planning_tool_order': 'native-registration-v1', 'main_task_policy': MAIN_TASK_POLICY, 'isolation_policy': ISOLATION_POLICY, 'review_rules': REVIEW_RULES, 'decision_guide': DECISION_GUIDE,
+                 'envelope_schema': ENVELOPE_SCHEMA, 'permission_schema_template': permission_schema(['registered_action']),
+                 'catalog_schema': 'native-tools-separated-v1', 'audit_input': 'dscg.audit-input.v5.10'}
     digest = hashlib.sha256(json.dumps(value, sort_keys=True, ensure_ascii=False).encode()).hexdigest()
     return {'prompt_profile': profile, 'prompt_profile_sha256': digest}

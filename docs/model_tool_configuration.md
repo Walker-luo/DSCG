@@ -1,6 +1,6 @@
 # 模型、工具与运行参数详解
 
-本文供首次运行或更换模型/工具的测试者使用，对应当前DSCG_v3.3。所有命令从DSCG/执行；激活`ipi`使用AgentDojo，激活`ipi-agentdyn`使用AgentDyn，相同运行入口自动识别实际安装。模型配置和工具风险目录是宿主输入；模型返回、网页正文或工具错误不能改写它们。
+本文供首次运行或更换模型/工具的测试者使用，对应当前DSCG_v3.4。所有命令从DSCG/执行；激活`ipi`使用AgentDojo，激活`ipi-agentdyn`使用AgentDyn，相同运行入口自动识别实际安装。模型配置和工具风险目录是宿主输入；模型返回、网页正文或工具错误不能改写它们。
 
 两个独立环境的安装入口是 [environment.yml](../environment.yml) 与 [environment-agentdyn.yml](../environment-agentdyn.yml)。保留已有环境和本地模型配置；运行前可离线自检：
 
@@ -300,3 +300,7 @@ python -m experiments.run_benchmark --suites banking slack --name DSCG_v3.3_shad
 先完成无需API的配置解析/schema/风险目录检查，再由测试者运行有限的干净工具任务与JSON协议检查，最后做匹配attack对照。以上离线检查只确认字段/覆盖，不证明模型理解正确、任务完成或安全有效。其他攻击选择、结果目录和评分口径见 [测试文件索引](./evaluation.md)。
 
 CLI结果按分类根/后端/运行目录保存：`results/partial_benchmark/agentdojo/qwen3.7-flash_baseline/`。results-dir仍指分类根；full、partial、screen/cohort共用路径规则。已有旧目录通过reuse原地恢复，选择顺序与限制见[结果指南](./benchmark.md#显式续跑示例)。
+
+## v3.4结构化判决
+
+仅默认legacy下的L2动作步骤与L3判决使用新契约。官方DashScope HTTPS地址上的qwen3.7-flash启用严格JSON Schema；自定义代理、DeepSeek及其他未确认组合维持JSON Object，宿主均严格校验。格式由解析后的provider/model/endpoint确定，不新增CLI开关；Schema被拒绝不在同任务中降级重问。主模型tool-call生成、思考配置、路由范围和阈值保持。有效格式/Schema/策略绑定缓存，须新name；冻结cohort不因该防御变化重筛。真实小样本尚未恢复效用，见[实施记录](../workshop/completed/v34_decision_contract_20261022.md)。

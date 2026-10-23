@@ -34,10 +34,10 @@ def catalog_fingerprint(runtime):
                                      separators=(',', ':')).encode()).hexdigest()
 
 
-def planning_runtime_view(runtime, allowed):
+def planning_runtime_view(runtime, allowed, *, preserve_order=False):
     """Expose whole definitions for valid granted tools, never mutate runtime."""
     metadata = metadata_for_runtime(runtime)
-    names = [name for name in sorted(runtime.functions)
+    names = [name for name in (runtime.functions if preserve_order else sorted(runtime.functions))
              if name in allowed and metadata[name].registered]
     definitions = []
     for name in names:

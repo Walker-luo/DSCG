@@ -1,10 +1,10 @@
 # 当前框架与平台展示交接
 
-2026-10-22当前内部身份为 **DSCG_v3.3**：L2保留原生定义与步骤授权；L3采用read-purpose-v2普通读取批次候选，personal/secret及效果性操作仍审计。shadow仅观察，selective才应用；分数/阈值仅诊断。当前动作增加effect/schema，修正审计代码长度校验。服务须重启，新name测量；无真实TSR/ASR结论。见[当前指南](./benchmark.md#默认-v33-策略与复测)和[实施记录](../workshop/completed/l3_read_policy_20261022.md)。以下有日期的v3.2/v3.3和直接阈值条目为历史阶段，不能覆盖本段。
+2026-10-22当前内部身份为 **DSCG_v3.4**：L2动作步骤与宿主并集、L3有限代码Schema及当前一步审计，共用full/partial/cohort factory；读取范围、评分和执行边界不变。服务需重启，新name测量；真实6案例utility仍全false，Schema协议通过不等于效用改善。见[指南](./benchmark.md#默认-v34-策略与复测)及[实施记录](../workshop/completed/v34_decision_contract_20261022.md)。以下有日期条目为历史阶段。
 
 2026-10-22实验命名更新为DSCG_v3.2（原v4.2）：核心是L2完整原生工具定义及步骤覆盖；内部引擎身份仍three-layer-v3.3，不更改历史记录。最新结果显示L2漏授大幅减少，但L3读取阻断仍主导Slack损失，见[分析](../workshop/completed/slack_v32_analysis_20261022.md)。
 
-2026-10-22当前默认v3.3：L2采用完整原生schema和一次调用的步骤映射；L3及路由/Monitor不变。页面/API自动采用，服务须重启；旧显式候选协议保留。新name测试，结果与限制见[运行指南](./benchmark.md#默认-v33-策略与复测)及[小样本报告](../workshop/completed/l2_step_authorization_20261022.md)。下文v3.2条目为前序变更。
+2026-10-22此前v3.3阶段：L2采用完整原生schema和一次调用的步骤映射；L3及路由/Monitor不变。页面/API自动采用，服务须重启；旧显式候选协议保留。新name测试，结果与限制见[运行指南](./benchmark.md#默认-v33-策略与复测)及[小样本报告](../workshop/completed/l2_step_authorization_20261022.md)。下文v3.2条目为前序变更。
 
 2026-10-21最新默认为three-layer-v3.2（profile名仍legacy）：L2保留同请求步骤的合理候选工具，L3以用途/参数来源为主，允许准备读取取得未知事实，关键写入/外发参数仍须任务关联。页面/API直接采用新默认，不新增控件；服务须重启。审计协议、记录与回执失败分别报告，Monitor/票据保持。[测试与新运行名](./benchmark.md#默认-v33-策略与复测)。以下较早阶段说明保留历史上下文。
 

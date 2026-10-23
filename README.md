@@ -17,7 +17,9 @@ DashScope/Qwen与DeepSeek的Chat请求由公共客户端分别适配：将上游
 
 ## 当前框架与工作流程
 
-当前内部身份统一为 **`DSCG_v3.3`**，默认 `prompt_profile=legacy`。L2保留完整原生工具定义与一次调用的步骤授权；本次更新L3读取路由、当前动作审计上下文和协议诊断。历史实验名DSCG_v3.2及其 `three-layer-v3.3` 记录保留原样，不因当前命名改写。
+显式候选 **DSCG_v3.5** 共用full/partial/cohort实现，使用 `--prompt-profile intent-evidence-v35` 和新名称。后续真实迭代最佳5/6、独立确认4/6，未通过推广门槛，**默认仍为v3.4**。本轮922次请求、已知1,693,429 Tokens，3次连接故障usage未知，用户已停止真实调用；当前候选L3关闭思考、JSON Object配严格宿主校验，未验证的结构化视图只存快照。[后续报告](./workshop/completed/v35_followup_20261023.md)列出逐轮结果及剩余失败；[原220次阶段](./workshop/completed/v35_live_iterations_20261023.md)独立保留。未做离线回归或完整评测。
+
+当前内部身份为 **`DSCG_v3.4`**，默认 `prompt_profile=legacy`。L2保留完整原生定义，只输出动作步骤，由宿主求授权并集；L3采用有限短码与严格宿主校验，官方DashScope上的qwen3.7-flash使用JSON Schema，其他组合保持JSON Object。接口拒绝时不自动降级/重试。历史实验名、manifest和原生评分保留原样。
 
 `read-purpose-v2` 将L2已允许、原生参数有效、public/internal、幂等且无sink的普通读取（含全为合格读取的批次）列为免审候选。当前请求/描述/参数仍须完整；历史工具错误、旧证据窗口截断及历史参数丢失不再单独迫使新的读取审计。personal/secret、写入、外发及混合读写批次仍审计。风险目录不改，工具级internal标签不能证明某个频道/文件不私密，也没有新增对象或参数权限。
 
@@ -25,9 +27,9 @@ DashScope/Qwen与DeepSeek的Chat请求由公共客户端分别适配：将上游
 
 CLI默认 `shadow`，Python/Dashboard API默认off：shadow记录候选，仍实际审计并由Monitor决定；显式selective才应用新免审。原公开读取免审继续单列。词法分数及 `--audit-router-threshold` 保留作诊断/兼容输入，**不再决定当前策略的免审**；修改阈值仍改变配置绑定。旧threshold-read-v1报告保留旧解释。
 
-默认短审计提示仅判断当前动作；新增宿主effect及原生参数schema，允许先读取得未知事实，再核对后续写入的目标、金额和正文。审计四字段JSON不变，violation代码原文或规范化后超过96字符时明确记协议失败并关闭；不修补响应。Monitor、一次性回执和执行票据继续绑定整批动作。
+默认短审计提示只判断当前一步与任务的关系，允许相关成功工具事实和派生参数；输出必须符合有限代码及decision组合规则，不修补响应。来源含注入不自动否决合法动作。Monitor、一次性回执和执行票据继续绑定整批动作。
 
-[运行与复测](./docs/benchmark.md#默认-v33-策略与复测) · [实施记录](./workshop/completed/l3_read_policy_20261022.md) · [此前Slack诊断](./workshop/completed/slack_v32_analysis_20261022.md)。仅离线验证，不宣称真实TSR/ASR改善。
+[运行与复测](./docs/benchmark.md#默认-v34-策略与复测) · [v3.4真实小样本](./workshop/completed/v34_decision_contract_20261022.md)。按用户要求跳过离线回归；6条新策略utility均false，未通过效用验证，不宣称TSR/ASR改善，不建议据此扩大测试。
 
 L1对有限任务投影工具返回，其余保留来源封装；L2在任务开始编译权限、每批调用前复核，L3判断当前动作。不是每轮依次调用三个模型。`audit_router_mode=off`只关闭新增免审路由，不关闭L3。显式历史候选仍见[效用诊断](./docs/qwen_utility.md#task-alignment-v1)。
 

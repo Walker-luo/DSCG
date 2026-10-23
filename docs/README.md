@@ -4,7 +4,7 @@
 
 | 入口 | 内容 |
 | --- | --- |
-| [项目 README](../README.md) | 当前three-layer-v3.3三层框架、使用命令和能力边界 |
+| [项目 README](../README.md) | 当前DSCG_v3.4三层框架、使用命令和能力边界 |
 | [实验工具索引](../experiments/README.md) | 当前测量、校准、元数据与审计入口；区分入口与共享实现 |
 | [模型、工具与运行参数](./model_tool_configuration.md) | 配置字段、信息获取、工具schema/风险分类、默认控制及排错 |
 | [测试文件索引](./evaluation.md) | 测试指南、主要入口、配置与结果文件的用途 |

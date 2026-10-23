@@ -5,7 +5,7 @@ from copy import deepcopy
 from pathlib import Path
 
 from dscg.benchmark_catalog import get_suites
-from dscg.input_isolation import FRAMEWORK_VERSION
+from dscg.input_isolation import FRAMEWORK_VERSION, framework_version_for_profile
 from dscg.audit_router import DEFAULT_THRESHOLD, validate_router_options
 from dscg.l1_projection import MODES as L1_PROJECTION_MODES
 from dscg.prompt_profiles import validate_profile, profile_binding
@@ -74,6 +74,7 @@ def normalize_config(payload):
     if profile != 'legacy' and (config['origin'] or not config['use_sandbox'] or not config['use_security_checker']):
         raise ValueError('candidate prompt profiles require the defended pipeline with L2 and checker')
     config['prompt_profile'] = profile
+    config['framework_version'] = None if config['origin'] else framework_version_for_profile(profile)
     config.pop('prompt_profile_sha256', None)
     config.update(profile_binding(profile))
     return config
