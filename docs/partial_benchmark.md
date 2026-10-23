@@ -1,5 +1,36 @@
 # 小批量测试：run_partial_benchmark
 
+## DSCG_v3.5 逐调用审计候选
+
+现有选项 `--prompt-profile intent-stage-v35` 选择新候选，full／partial／cohort及Python API共用，内部身份DSCG_v3.5。每批仍只调用一次审计模型，逐调用判决由宿主严格校验、整批汇总；任何拒绝或缺失证据都阻止整批执行，不执行部分批次。读取免审范围、Monitor、原生评分及cohort轻量规则不变。
+
+保留真实执行的R07：L2非思考，官方Qwen审计开启4096 Tokens有限思考、JSON Object＋严格宿主协议。新策略／修订用新结果名；实验名本身不选择策略，旧profile保持原义，默认仍legacy／DSCG_v3.4。
+
+固定12条开发诊断中，Slack TSR **5/6、ASR 0/6**，banking TSR **4/6、ASR 0/6**；同轮baseline TSR分别6/6、5/6。完整合法组件和效用门槛未过，未做确认或全量评测，不切换默认。后续版本因连接故障触及开发预留上限而停止，未经验证的修改已撤回。详见[实施报告](../workshop/completed/v35_stage_live_20261023.md)和[执行计划](../workshop/L2_L3_v35_stage_live_20261023.md)。本次未运行离线回归。
+
+两个入口均可显式传入 `--prompt-profile intent-stage-v35 --audit-router-mode selective`；Python API用 `prompt_profile="intent-stage-v35"`。full仍选所选场景全部任务，partial仍按原前缀／清单，cohort仍按冻结名单；该选项不自动选择本轮固定12条，也不代表已通过完整评测。使用新 `--name`，不跨策略复用缓存。
+
+## 当前 L3 迭代候选（DSCG_v3.5）
+
+`--prompt-profile intent-audit-v35` 选择本轮 L3 候选，内部身份为 **DSCG_v3.5**，由 full／partial／cohort 共享工厂执行；`--name` 仅命名结果。历史 `intent-evidence-v35` 和 `intent-stage-v36` 保留原义，默认仍为 `legacy / DSCG_v3.4`，完成真实验收前不提升默认。
+
+候选使用逐动作布尔L2及有界 assessment／verdict 审计；当前读取不要求未来事实，效果性操作仍核对真实目标、金额、正文与任务依据。Monitor、免审范围、原生评分和轻量cohort读取不变。新策略使用新名称，不跨配置复用旧缓存。
+
+本轮三轮已结束，合法组件8/12通过、危险反例12/12拒绝，未通过完整门槛；候选原生TSR／ASR未测，不切换默认。保留修订使用官方Qwen严格Schema和原宿主校验，其他提供商维持JSON Object。结果见[实施报告](../workshop/completed/v35_l3_iterations_20261023.md)及[迭代计划](../workshop/L3_v35_iterations_20261023.md)。按用户要求，仅运行真实Qwen小样本和必要静态检查，未做离线回归或全量评测；测试结束统一汇总结果。
+
+## v3.6 分层候选
+
+小批量入口同样支持 `--prompt-profile intent-stage-v36`，使用full／cohort共用防御。当前保留的是DSCG_v3.6-stage1（仅L2布尔授权，L3沿用v3.4）；默认仍为legacy／DSCG_v3.4；不改变原前三用户×前三注入及cohort前缀交集规则。
+
+```bash
+python -m experiments.run_partial_benchmark --suites banking slack \
+  --model-config config/models.local.toml --prompt-profile intent-stage-v36 \
+  --audit-router-mode selective --progress --name partial_v36_candidate_01
+```
+
+策略、缓存身份及验证限制见[完整指南](./benchmark.md#v36-分层候选未提升默认)和[实施记录](../workshop/completed/v36_slack_banking_20261023.md)。本次固定开发／确认任务清单独立于默认partial前缀，不能混用分母。优化结束后统一输出两个场景的TSR／ASR，不逐次播报成绩。
+
+
 ## v3.5 显式候选（未提升默认）
 
 `--prompt-profile intent-evidence-v35` 在 full、partial、cohort 共用实现中选择 **DSCG_v3.5**；不传仍为 **legacy / DSCG_v3.4**，`--name` 不选择策略。候选 L2 一次返回每个动作工具的完整布尔映射 `tool_permissions`，宿主严格检查后合并原自动读取；L3 同次输出有界 `assessment` 与有限代码 `verdict`，分别说明当前用途、参数依据与缺失证据。读取无需提前知道待查询事实；实际写入仍核对目标及已有依据。读取免审范围、Monitor、整批回执和执行票据不变。

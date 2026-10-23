@@ -1,11 +1,14 @@
 """Versioned, opt-in utility candidates. No permissions or runtime bypasses."""
 import hashlib
 import json
+from dscg import intent_stage as v36
+from dscg import intent_audit as v35_l3
+from dscg import intent_stage_v35 as v35_stage
 
 from dscg.intent_evidence import (PROFILE as V35_PROFILE, AUTH_POLICY as V35_AUTH_POLICY,
     AUDIT_POLICY as V35_AUDIT_POLICY, MAIN_TASK_POLICY, ISOLATION_POLICY, REVIEW_RULES, DECISION_GUIDE, AUDIT_THINKING, AUDIT_FORMAT, AUDIT_PROTOCOL as V35_OUTPUT_PROTOCOL, ENVELOPE_SCHEMA, permission_schema)
 
-PROFILES = ('legacy', 'protocol-v1', 'tool-semantics-v1', 'source-context-v1', 'task-alignment-v1', V35_PROFILE)
+PROFILES = ('legacy', 'protocol-v1', 'tool-semantics-v1', 'source-context-v1', 'task-alignment-v1', V35_PROFILE, v36.PROFILE, v35_l3.PROFILE, v35_stage.PROFILE)
 CATALOG_SCHEMA = 'dscg.authorization-tool-semantics.v1'
 
 TASK_ALIGNMENT_RULE = (
@@ -109,6 +112,13 @@ def semantic_catalog(profile):
 
 def audit_policy(legacy, profile):
     validate_profile(profile)
+    if profile == v35_stage.PROFILE:
+        return v35_stage.AUDIT_POLICY
+    if profile == v35_l3.PROFILE:
+        return v35_l3.AUDIT_POLICY
+    if profile == v36.PROFILE:
+        from dscg.pipelines.defended import ActionSecurityChecker
+        return ActionSecurityChecker.SYSTEM_POLICY if v36.STAGE == 1 else v36.AUDIT_POLICY
     if profile == V35_PROFILE:
         return V35_AUDIT_POLICY
     if profile == 'task-alignment-v1':
@@ -119,6 +129,12 @@ def audit_policy(legacy, profile):
 
 def authorization_policy(legacy, profile, *, bounded=False):
     validate_profile(profile)
+    if profile == v35_stage.PROFILE:
+        return legacy if bounded else v35_stage.AUTH_POLICY
+    if profile == v35_l3.PROFILE:
+        return legacy if bounded else v36.AUTH_POLICY
+    if profile == v36.PROFILE:
+        return legacy if bounded else v36.AUTH_POLICY
     if profile == V35_PROFILE:
         return legacy if bounded else V35_AUTH_POLICY
     if profile == 'task-alignment-v1':
@@ -131,6 +147,12 @@ def profile_binding(profile):
     validate_profile(profile)
     if profile == 'legacy':
         return {}
+    if profile == v35_stage.PROFILE:
+        return v35_stage.binding()
+    if profile == v35_l3.PROFILE:
+        return v35_l3.binding()
+    if profile == v36.PROFILE:
+        return v36.binding()
     value = {'profile': profile, 'protocol': PROTOCOL_RULE,
              'authorization': AUTHORIZATION_RULE if semantic_catalog(profile) else None,
              'catalog_schema': CATALOG_SCHEMA if semantic_catalog(profile) else None,

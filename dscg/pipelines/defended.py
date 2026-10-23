@@ -32,7 +32,10 @@ from dscg.authorization_steps import PROTOCOL as STEP_PROTOCOL, POLICY as STEP_P
 from dscg.decision_schema import (AUDIT_PROTOCOL, AUDIT_SCHEMA, action_schema, response_format,
                                   contract_identity, validate_audit, DecisionContractError,
                                   load_decision_json)
-from dscg.intent_evidence import (PROFILE as V35_PROFILE, AUTH_PROTOCOL as V35_AUTH_PROTOCOL,
+from dscg import intent_stage as v36
+from dscg import intent_audit as v35_l3
+from dscg import intent_stage_v35 as v35_stage
+from dscg.intent_evidence import (PROFILE as V35_PROFILE, is_intent_evidence, AUTH_PROTOCOL as V35_AUTH_PROTOCOL,
     AUDIT_PROTOCOL as V35_AUDIT_PROTOCOL, MAIN_TASK_POLICY, ISOLATION_POLICY, REVIEW_RULES, DECISION_GUIDE, ENVELOPE_SCHEMA, permission_schema, parse_permissions, parse_envelope, audit_request_options, audit_model_settings, audit_contract_identity, AUDIT_FORMAT)
 from dscg.input_isolation import FRAMEWORK_VERSION, ISOLATION_RULE, build_isolated_view, framework_version_for_profile
 from dscg.l1_projection import (MODES as L1_PROJECTION_MODES, PROFILE_SHA256 as L1_PROFILE_SHA256,
@@ -366,15 +369,20 @@ def _extract_content_text(value: Any) -> str | None:
     return None
 
 
-def _parse_audit_payload(content: str | None, *, legacy=False, finite_codes=False, intent_evidence=False) -> tuple[str, tuple[str, ...], float, str]:
+def _parse_audit_payload(content: str | None, *, legacy=False, finite_codes=False, intent_evidence=False, stage_action_ids=None) -> tuple[str, tuple[str, ...], float, str]:
     """Strictly validate the four-field audit response schema."""
 
     if not isinstance(content, str) or not content.strip():
         raise AuditSchemaError("audit response is empty", 'EMPTY_RESPONSE')
     try:
-        payload = load_decision_json(content) if finite_codes or intent_evidence else json.loads(content)
+        payload = load_decision_json(content) if finite_codes or intent_evidence or stage_action_ids is not None else json.loads(content)
     except (TypeError, ValueError) as exc:
         raise AuditSchemaError("audit response is not JSON", 'INVALID_JSON') from exc
+    if stage_action_ids is not None:
+        try:
+            return v35_stage.parse(payload, stage_action_ids)[0]
+        except DecisionContractError as exc:
+            raise AuditSchemaError('per-action audit rejected', exc.code, diagnostics=exc.diagnostics) from exc
     if intent_evidence:
         try:
             return parse_envelope(payload)[0]
@@ -441,7 +449,7 @@ def _is_valid_audit_record(record: Any, batch_fingerprint: str) -> bool:
     if not required.issubset(record) or record.get("schema_version") != AUDIT_SCHEMA_VERSION:
         return False
     protocol = record.get('protocol_diagnostics', {}).get('output_contract') if isinstance(record.get('protocol_diagnostics'), dict) else None
-    if protocol in (AUDIT_PROTOCOL, V35_AUDIT_PROTOCOL, 'dscg.intent-evidence.v1', 'dscg.intent-evidence.v2') and record.get('parser_status') == 'ok':
+    if protocol in (AUDIT_PROTOCOL, V35_AUDIT_PROTOCOL, 'dscg.intent-evidence.v1', 'dscg.intent-evidence.v2', v35_stage.PROTOCOL) and record.get('parser_status') == 'ok':
         try:
             validate_audit({key: record.get(key) for key in AUDIT_SCHEMA['required']})
         except DecisionContractError:
@@ -507,10 +515,10 @@ def _checker_observation(record):
             if type(raw.get(key)) is int and raw[key] >= 0:
                 safe[key] = raw[key]
         for key, values in {
-            'output_contract': (AUDIT_PROTOCOL, V35_AUDIT_PROTOCOL, 'dscg.intent-evidence.v1', 'dscg.intent-evidence.v2'), 'response_format': ('json_schema', 'json_object'),
-            'field_path': ('$', '$.decision', '$.violations', '$.confidence', '$.reason_code',
+            'output_contract': (AUDIT_PROTOCOL, V35_AUDIT_PROTOCOL, 'dscg.intent-evidence.v1', 'dscg.intent-evidence.v2', v35_stage.PROTOCOL), 'response_format': ('json_schema', 'json_object'),
+            'field_path': ('$.actions', '$.actions.action_id', '$', '$.decision', '$.violations', '$.confidence', '$.reason_code',
                            '$.verdict', '$.verdict.missing_evidence', '$.assessment', '$.assessment.purpose', '$.assessment.parameter_basis', '$.assessment.missing_evidence'),
-            'expected_type': ('four-field object', 'decision enum', 'unique violation codes',
+            'expected_type': ('per-action audit object', 'ordered per-action audit array', 'matching candidate ID', 'four-field object', 'decision enum', 'unique violation codes',
                               'finite number [0,1]', 'reason enum', 'consistent decision/codes', 'assessment/verdict object',
                               'bounded assessment object', 'five-field verdict object', 'bounded string', 'gap consistent with verdict'),
             'actual_type': ('dict', 'list', 'str', 'int', 'float', 'bool', 'NoneType'),
@@ -1086,8 +1094,9 @@ class ToolAuthorizationCompiler:
         self.prompt_profile = validate_profile(prompt_profile)
 
     def _catalog(self, runtime, metadata):
-        if self.prompt_profile in ('legacy', V35_PROFILE) and self.authorization_profile is None:
-            return native_catalog(runtime, metadata)
+        if self.prompt_profile in ('legacy', V35_PROFILE, v35_l3.PROFILE, v35_stage.PROFILE, v36.PROFILE) and self.authorization_profile is None:
+            native = native_catalog(runtime, metadata)
+            return v36.catalog(runtime, metadata, native) if self.prompt_profile in (v36.PROFILE, v35_l3.PROFILE, v35_stage.PROFILE) else native
         if not semantic_catalog(self.prompt_profile):
             return {name: str(getattr(runtime.functions[name], 'description', 'No description')).strip()
                     for name in sorted(runtime.functions)}
@@ -1166,7 +1175,7 @@ class ToolAuthorizationCompiler:
         prohibited, prepared, evidence_refs = frozenset(), frozenset(), ()
         step_mode = self.prompt_profile == 'legacy' and self.authorization_profile is None
         action_step_mode = step_mode and not getattr(self, '_legacy_audit_input', False)
-        permission_mode = self.prompt_profile == V35_PROFILE and self.authorization_profile is None
+        permission_mode = self.prompt_profile in (V35_PROFILE, v35_l3.PROFILE, v35_stage.PROFILE, v36.PROFILE) and self.authorization_profile is None
         permissions = ()
         decision_format = response_format(getattr(self.llm, 'dscg_model_config', None),
             action_schema(action_tools), 'dscg_action_steps_v2') if action_step_mode else {'type': 'json_object'}
@@ -1176,7 +1185,7 @@ class ToolAuthorizationCompiler:
         steps = ()
         base_policy = self.SYSTEM_POLICY if step_mode else self.CLASSIC_POLICY
         policy = authorization_policy(self.PROFILE_POLICY if profile is not None else base_policy,
-                                      'legacy' if self.prompt_profile == V35_PROFILE and self.authorization_profile is not None else self.prompt_profile, bounded=profile is not None)
+                                      'legacy' if self.prompt_profile in (V35_PROFILE, v35_l3.PROFILE, v35_stage.PROFILE, v36.PROFILE) and self.authorization_profile is not None else self.prompt_profile, bounded=profile is not None)
         authorization_mode = 'bounded-profile-v1' if profile is not None else 'legacy'
         if profile is not None:
             if not requires_model:
@@ -1251,7 +1260,7 @@ class ToolAuthorizationCompiler:
             ],
             "response_format": decision_format,
             "temperature": 0.0,
-            "timeout": 30.0,
+            "timeout": v35_stage.TIMEOUT if self.prompt_profile == v35_stage.PROFILE else 30.0,
         }
         reasoning_effort = getattr(self.llm, "reasoning_effort", None)
         if reasoning_effort is not None:
@@ -1543,7 +1552,7 @@ class OurFrameExecutor(agent_pipeline.BasePipelineElement):
             projection_request = trusted_request_for_view(messages, self._task_context)
             model_messages, stats = build_isolated_view(messages, runtime, trusted_request=projection_request,
                                                         projection_mode=self.l1_projection_mode,
-                                                        isolation_rule=ISOLATION_POLICY if self.authorization_compiler.prompt_profile == V35_PROFILE else ISOLATION_RULE)
+                                                        isolation_rule=ISOLATION_POLICY if is_intent_evidence(self.authorization_compiler.prompt_profile) else ISOLATION_RULE)
             accumulated = extra_args.setdefault("dscg_input_isolation", {
                 "schema_version": stats["schema_version"], "model_requests": 0,
                 "tool_results_rendered": 0, "escaped_results_rendered": 0,
@@ -1577,7 +1586,7 @@ class OurFrameExecutor(agent_pipeline.BasePipelineElement):
         counts = {'catalog_tools': len(runtime.functions), 'visible_tools': len(runtime.functions)}
         if self.planning_tool_view and self.sandbox is not None:
             planning_runtime, counts = planning_runtime_view(runtime, self.sandbox.allowed_tools,
-                preserve_order=self.authorization_compiler.prompt_profile == V35_PROFILE)
+                preserve_order=is_intent_evidence(self.authorization_compiler.prompt_profile))
         if self.sandbox is not None:
             self._l2_count(extra_args, 'planning_requests')
             self._l2_count(extra_args, 'catalog_tools_total', counts['catalog_tools'])
@@ -2394,7 +2403,9 @@ class ActionSecurityChecker(agent_pipeline.BasePipelineElement):
         self.intention = user_intention
         self.llm = llm
         self.sandbox = sandbox
-        self.timeout_seconds = timeout_seconds
+        self.timeout_seconds = v35_stage.TIMEOUT if prompt_profile == v35_stage.PROFILE else timeout_seconds
+        if prompt_profile == v35_stage.PROFILE and max_semantic_retries != 0:
+            raise ValueError('intent-stage-v35 audits each batch once')
         if max_semantic_retries not in (0, 1):
             raise ValueError("semantic audit retries must be 0 or 1")
         self.max_semantic_retries = max_semantic_retries
@@ -2471,7 +2482,7 @@ class ActionSecurityChecker(agent_pipeline.BasePipelineElement):
                 "arguments_sha256": _hash_json(raw_args),
                 "source_ids": _source_ids_for_call(call, extra_args),
             })
-        current_context = self.prompt_profile in ('legacy', V35_PROFILE) and not getattr(self, '_legacy_audit_input', False)
+        current_context = self.prompt_profile in ('legacy', V35_PROFILE, v35_l3.PROFILE, v35_stage.PROFILE, v36.PROFILE) and not getattr(self, '_legacy_audit_input', False)
         if current_context:
             statuses = metadata_for_runtime(runtime)
             for action in current_actions:
@@ -2521,7 +2532,7 @@ class ActionSecurityChecker(agent_pipeline.BasePipelineElement):
             },
         }
 
-        if self.prompt_profile == V35_PROFILE:
+        if is_intent_evidence(self.prompt_profile):
             packet['schema_version'] = 'dscg.audit-input.v5.10'
             packet['decision_contract'] = ENVELOPE_SCHEMA
             effects = [a['operation_effect'] for a in current_actions]
@@ -2538,6 +2549,9 @@ class ActionSecurityChecker(agent_pipeline.BasePipelineElement):
                 raw = action.pop('untrusted_argument_data')
                 action['candidate_arguments'] = raw
                 action.pop('arguments_sha256', None)
+            if self.prompt_profile == v35_stage.PROFILE:
+                for action, call in zip(current_actions, tool_calls):
+                    action.update(argument_flags(_tool_call_args(call)))
             for result in tool_results:
                 result['return_status'] = 'blocked' if str(result.get('error') or '').startswith('DSCG_BLOCKED:') else 'error' if result.get('error') else 'success'
         return packet
@@ -2557,7 +2571,9 @@ class ActionSecurityChecker(agent_pipeline.BasePipelineElement):
         return response_messages[-1] if response_messages else None
 
     def _model_audit_packet(self, packet):
-        if self.prompt_profile != V35_PROFILE:
+        if self.prompt_profile == v35_stage.PROFILE:
+            return v35_stage.model_view(packet)
+        if not is_intent_evidence(self.prompt_profile):
             return packet
         request = packet['trusted_user_request']
         view = {'trusted_task': {'user_request': request, 'authorization_context': packet['policy_features']},
@@ -2567,17 +2583,22 @@ class ActionSecurityChecker(agent_pipeline.BasePipelineElement):
                 'output_contract': DECISION_GUIDE,
                 'current_review': {'timing': 'before_execution',
                     'candidate_state': 'proposed_not_executed', 'stage': packet['review_stage'],
-                    'review_question': REVIEW_RULES[packet['review_stage']],
+                    'review_question': (v35_l3.REVIEW_RULES if self.prompt_profile == v35_l3.PROFILE else REVIEW_RULES)[packet['review_stage']],
                     'candidate_operations': packet['current_actions'],
                     'instruction': 'Judge ONLY these actual candidate operations; never replace them with the actions one would prefer.'}}
         if 'clarification' in packet:
             view['clarification'] = packet['clarification']
         return view
 
-    def _decision_format(self):
-        if self.prompt_profile == V35_PROFILE:
+    def _decision_format(self, packet=None):
+        if self.prompt_profile == v35_stage.PROFILE:
+            return v35_stage.decision_format(getattr(self.small_llm, 'dscg_model_config', None),
+                                            v35_stage.action_ids(packet) if packet is not None else None)
+        if self.prompt_profile == v35_l3.PROFILE:
+            return v35_l3.decision_format(getattr(self.small_llm, 'dscg_model_config', None))
+        if is_intent_evidence(self.prompt_profile):
             return {'type': AUDIT_FORMAT}
-        if self.prompt_profile != 'legacy' or getattr(self, '_legacy_audit_input', False):
+        if self.prompt_profile not in ('legacy', v36.PROFILE) or getattr(self, '_legacy_audit_input', False):
             return {'type': 'json_object'}
         return response_format(getattr(self.small_llm, 'dscg_model_config', None),
                                AUDIT_SCHEMA, 'dscg_audit_v2')
@@ -2589,17 +2610,19 @@ class ActionSecurityChecker(agent_pipeline.BasePipelineElement):
         if "json" not in self.SYSTEM_POLICY.casefold():
             raise AuditSchemaError("JSON mode requires an explicit JSON instruction")
         prompt = json.dumps(self._model_audit_packet(packet), ensure_ascii=False,
-                            sort_keys=self.prompt_profile != V35_PROFILE, separators=(",", ":"))
+                            sort_keys=not is_intent_evidence(self.prompt_profile), separators=(",", ":"))
         request_kwargs = {
             "model": getattr(self.small_llm, "name", "unknown-model"),
             "messages": [
                 {"role": "system", "content": self.SYSTEM_POLICY},
                 {"role": "user", "content": prompt},
             ],
-            "response_format": self._decision_format(),
+            "response_format": self._decision_format(packet),
             "temperature": 0.0,
             "timeout": self.timeout_seconds,
         }
+        if self.prompt_profile == v35_stage.PROFILE:
+            request_kwargs["messages"] = v35_stage.chat_messages(packet, self.SYSTEM_POLICY)
         reasoning_effort = getattr(self.small_llm, "reasoning_effort", None)
         if reasoning_effort is not None:
             request_kwargs["reasoning_effort"] = reasoning_effort
@@ -2790,8 +2813,9 @@ class ActionSecurityChecker(agent_pipeline.BasePipelineElement):
                 raw_hash = _hash_json(content if content is not None else "missing-audit-response")
                 validation = 'failed'
                 decision_value, violations, confidence, reason_code = _parse_audit_payload(content, legacy=getattr(self, '_legacy_audit_input', False),
-                    finite_codes=self.prompt_profile == 'legacy' and not getattr(self, '_legacy_audit_input', False),
-                    intent_evidence=self.prompt_profile == V35_PROFILE)
+                    finite_codes=self.prompt_profile in ('legacy', v36.PROFILE) and not getattr(self, '_legacy_audit_input', False),
+                    intent_evidence=is_intent_evidence(self.prompt_profile),
+                    stage_action_ids=v35_stage.action_ids(packet) if self.prompt_profile == v35_stage.PROFILE else None)
                 validation = 'passed'
                 decision = AuditDecision(
                     batch_fingerprint=batch_fingerprint,
@@ -2833,9 +2857,9 @@ class ActionSecurityChecker(agent_pipeline.BasePipelineElement):
                 'finish_reason': finish_reason or 'unknown',
                 'refusal_present': bool(refusal_present),
                 'field_validation': validation,
-                **({'output_contract': V35_AUDIT_PROTOCOL if self.prompt_profile == V35_PROFILE else AUDIT_PROTOCOL, 'response_format': self._decision_format()['type'],
+                **({'output_contract': v35_stage.PROTOCOL if self.prompt_profile == v35_stage.PROFILE else V35_AUDIT_PROTOCOL if is_intent_evidence(self.prompt_profile) else AUDIT_PROTOCOL, 'response_format': self._decision_format()['type'],
                     'response_length': len(content) if isinstance(content, str) else None,
-                    **field_diagnostics} if self.prompt_profile in ('legacy', V35_PROFILE) and not getattr(self, '_legacy_audit_input', False) else {}),
+                    **field_diagnostics} if self.prompt_profile in ('legacy', V35_PROFILE, v35_l3.PROFILE, v35_stage.PROFILE, v36.PROFILE) and not getattr(self, '_legacy_audit_input', False) else {}),
             }
             if failure_type and isinstance(content, str) and _trace_level(extra_args) == 'full':
                 _append_full_trace(extra_args, 'audit_protocol_response', {
@@ -2844,8 +2868,9 @@ class ActionSecurityChecker(agent_pipeline.BasePipelineElement):
                     'raw_response_sha256': raw_hash,
                     'response_preview': content[:2048], 'response_truncated': len(content) > 2048,
                 })
-            if self.prompt_profile == V35_PROFILE and decision.parser_status == 'ok':
-                assessment = parse_envelope(load_decision_json(content))[1]
+            if is_intent_evidence(self.prompt_profile) and decision.parser_status == 'ok':
+                assessment = (v35_stage.parse(load_decision_json(content), v35_stage.action_ids(packet))[1]
+                              if self.prompt_profile == v35_stage.PROFILE else parse_envelope(load_decision_json(content))[1])
                 record['assessment_sha256'] = _hash_json(assessment)
                 _append_full_trace(extra_args, 'audit_assessment', {'batch_fingerprint': batch_fingerprint, 'assessment': assessment})
             record["semantic_attempt"] = attempt + 1
@@ -2896,10 +2921,12 @@ def router_configuration_hash(main_config, sec_config, *, input_isolation, autho
                                'response_format': response_format(main_config, {}, 'dscg_action_steps_v2')['type']}
                                if use_sandbox and profile_hash is None else
                                {'protocol': 'configured-profile-json-object', 'response_format': 'json_object'} if use_sandbox else None}
-                          if prompt_profile == 'legacy' else {})
-    if prompt_profile == V35_PROFILE:
-        decision_contracts = {'audit': audit_contract_identity(sec_config),
+                          if prompt_profile in ('legacy', v36.PROFILE) else {})
+    if is_intent_evidence(prompt_profile):
+        decision_contracts = {'audit': (v35_stage.contract(sec_config) if prompt_profile == v35_stage.PROFILE else v35_l3.contract(sec_config) if prompt_profile == v35_l3.PROFILE else audit_contract_identity(sec_config)),
                               'authorization': {'protocol': V35_AUTH_PROTOCOL, 'response_format': response_format(main_config, {}, 'dscg_tool_permissions_v1')['type']} if profile_hash is None else {'protocol': 'configured-profile-json-object', 'response_format': 'json_object'}}
+    if prompt_profile == v36.PROFILE and use_sandbox and profile_hash is None:
+        decision_contracts['authorization'] = {'protocol': v36.AUTH_PROTOCOL, 'response_format': response_format(main_config, {}, 'dscg_tool_permissions_v1')['type']}
     return router_digest({**({'decision_contracts': decision_contracts} if decision_contracts else {}), **({"router_policy_version": ROUTER_POLICY_VERSION,
                                              "router_threshold": validate_router_options(audit_router_threshold),
                                              "router_scope": "ordinary-public-internal-read-batches-and-literal-public-web"}
@@ -2910,7 +2937,7 @@ def router_configuration_hash(main_config, sec_config, *, input_isolation, autho
                                            "main_system_prompt_sha256": _hash_json(load_system_message(None)),
                                            "audit_policy_sha256": _hash_json(audit_policy(ActionSecurityChecker.SYSTEM_POLICY if prompt_profile == 'legacy' else ActionSecurityChecker.CLASSIC_POLICY, prompt_profile)),
                                            "authorization_policy_sha256": _hash_json(authorization_policy(ToolAuthorizationCompiler.SYSTEM_POLICY if prompt_profile == 'legacy' and profile_hash is None else ToolAuthorizationCompiler.CLASSIC_POLICY, prompt_profile)),
-                                           "isolation_rule_sha256": _hash_json(ISOLATION_POLICY if prompt_profile == V35_PROFILE else ISOLATION_RULE),
+                                           "isolation_rule_sha256": _hash_json(ISOLATION_POLICY if is_intent_evidence(prompt_profile) else ISOLATION_RULE),
                                            "completion_rule_sha256": _hash_json(TASK_COMPLETION_PROMPT),
                                            "framework_version": framework_version_for_profile(prompt_profile),
                                            "input_isolation": input_isolation,"authorization_precheck": authorization_precheck,
@@ -2923,8 +2950,8 @@ def router_configuration_hash(main_config, sec_config, *, input_isolation, autho
                                            'delegated_task_bounds': [1536, 2048, 16384],
                                            'delegated_task_protocol': DELEGATION_VERSION,
                                            "audit_retries": audit_retries,"completion_prompt": completion_prompt,
-                                           "audit_timeout_seconds": AUDIT_TIMEOUT_SECONDS,
-                                           'audit_input_schema': 'dscg.audit-input.v5.10' if prompt_profile == V35_PROFILE else 'dscg.audit-input.v4' if prompt_profile == 'legacy' else AUDIT_INPUT_SCHEMA_VERSION,
+                                           "audit_timeout_seconds": v35_stage.TIMEOUT if prompt_profile == v35_stage.PROFILE else AUDIT_TIMEOUT_SECONDS,
+                                           'audit_input_schema': 'dscg.audit-input.per-action.v35' if prompt_profile == v35_stage.PROFILE else 'dscg.audit-input.v5.10' if is_intent_evidence(prompt_profile) else 'dscg.audit-input.v4' if prompt_profile in ('legacy', v36.PROFILE) else AUDIT_INPUT_SCHEMA_VERSION,
                                            'audit_evidence_version': EVIDENCE_VERSION,
                                            'audit_evidence_bounds': [FACT_BUDGET, MAX_RESULTS, MAX_CALL_ARGUMENTS],
                                            "input_bounds": [AUDIT_MAX_REQUEST_LENGTH,AUDIT_MAX_TOOL_DESCRIPTION_LENGTH,
@@ -3012,6 +3039,8 @@ def make_qwen_newFrame_pipeline(
     """
     audit_router_threshold = validate_router_options(audit_router_threshold, audit_router_artifact)
     validate_profile(prompt_profile)
+    if prompt_profile == v35_stage.PROFILE and audit_retries != 0:
+        raise ValueError('intent-stage-v35 requires audit_retries=0')
     if prompt_profile != 'legacy' and (not use_sandbox or not use_security_checker):
         raise ValueError('candidate prompt profiles require L2 and checker')
     if audit_router_mode not in {"off", "shadow", "selective"}:
@@ -3148,7 +3177,7 @@ def make_qwen_newFrame_pipeline(
     # 4. 构建主 Pipeline
     pipeline = TaskIsolatedPipeline([
         agent_pipeline.SystemMessage(load_system_message(None)
-            + ("\n\n" + MAIN_TASK_POLICY if prompt_profile == V35_PROFILE else "")
+            + ("\n\n" + MAIN_TASK_POLICY if is_intent_evidence(prompt_profile) else "")
             + ("\n\n" + TASK_COMPLETION_PROMPT if completion_prompt else "")),
         agent_pipeline.InitQuery(),
         new_executor,
@@ -3169,7 +3198,7 @@ def make_qwen_newFrame_pipeline(
         **({'decision_contracts': {'audit': contract_identity(sec_config, AUDIT_SCHEMA, 'dscg_audit_v2') if use_security_checker else None,
                                   'authorization_protocol': (STEP_PROTOCOL if profile_hash is None else 'configured-profile-json-object') if use_sandbox else None,
                                   'authorization_format': (response_format(main_config, {}, 'dscg_action_steps_v2')['type'] if profile_hash is None else 'json_object') if use_sandbox else None}}
-           if prompt_profile == 'legacy' else {}),
+           if prompt_profile in ('legacy', v36.PROFILE) else {}),
         "input_isolation": input_isolation, "authorization_precheck": authorization_precheck,
         'l1_projection_mode': l1_projection_mode, 'l1_projection_profile_sha256': L1_PROFILE_SHA256,
         'planning_tool_view': planning_tool_view, 'delegated_tasks': delegated_tasks,
@@ -3184,11 +3213,13 @@ def make_qwen_newFrame_pipeline(
         "audit_router_config_sha256": router_config_hash,
         "audit_router_load_error": audit_router.error if audit_router else None,
     }
-    if prompt_profile == V35_PROFILE:
+    if is_intent_evidence(prompt_profile):
         pipeline.dscg_optimization_config['decision_contracts'] = {
-            'audit': audit_contract_identity(sec_config) if use_security_checker else None,
+            'audit': (v35_stage.contract(sec_config) if prompt_profile == v35_stage.PROFILE else v35_l3.contract(sec_config) if prompt_profile == v35_l3.PROFILE else audit_contract_identity(sec_config)) if use_security_checker else None,
             'authorization_protocol': V35_AUTH_PROTOCOL if use_sandbox and profile_hash is None else 'configured-profile-json-object' if use_sandbox else None,
             'authorization_format': response_format(main_config, {}, 'dscg_tool_permissions_v1')['type'] if use_sandbox and profile_hash is None else 'json_object' if use_sandbox else None}
+    if prompt_profile == v36.PROFILE and use_sandbox and profile_hash is None:
+        pipeline.dscg_optimization_config['decision_contracts'].update(authorization_protocol=v36.AUTH_PROTOCOL, authorization_format=response_format(main_config, {}, 'dscg_tool_permissions_v1')['type'])
     new_executor.framework_config = pipeline.dscg_optimization_config
     pipeline.dscg_model_config = main_config.public_dict()
     if use_security_checker:

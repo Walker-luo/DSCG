@@ -145,4 +145,7 @@ def build_isolated_view(messages, runtime, *, trusted_request='', projection_mod
 
 
 def framework_version_for_profile(profile):
-    return 'DSCG_v3.5' if profile == 'intent-evidence-v35' else FRAMEWORK_VERSION
+    if profile == 'intent-stage-v36':
+        from dscg.intent_stage import VERSION
+        return VERSION
+    return 'DSCG_v3.5' if profile in ('intent-evidence-v35', 'intent-audit-v35', 'intent-stage-v35') else FRAMEWORK_VERSION

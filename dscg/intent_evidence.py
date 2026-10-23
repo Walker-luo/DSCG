@@ -4,6 +4,11 @@ from dscg.decision_schema import AUDIT_SCHEMA, validate_audit, DecisionContractE
 
 PROFILE = 'intent-evidence-v35'
 VERSION = 'DSCG_v3.5'
+
+
+def is_intent_evidence(profile):
+    return profile in (PROFILE, 'intent-audit-v35', 'intent-stage-v35')
+
 AUTH_PROTOCOL = 'tool-permissions-v1'
 AUDIT_PROTOCOL = 'dscg.intent-evidence.v3'
 AUDIT_FORMAT = 'json_object'
@@ -11,15 +16,24 @@ AUDIT_THINKING = {'enable_thinking': False}
 
 
 def audit_request_options(config, profile):
-    if profile == PROFILE and response_format(config, {}, 'audit_capability')['type'] == 'json_schema':
+    if profile == 'intent-stage-v35':
+        from dscg.intent_stage_v35 import request_options
+        return request_options(config)
+    if is_intent_evidence(profile) and response_format(config, {}, 'audit_capability')['type'] == 'json_schema':
         return {'extra_body': dict(AUDIT_THINKING)}
     return {}
 
 
 def audit_model_settings(config, profile):
     public = dict(config.public_dict())
-    if profile == PROFILE:
+    if is_intent_evidence(profile):
         public['audit_response_format'] = AUDIT_FORMAT
+        if profile == 'intent-stage-v35':
+            from dscg.intent_stage_v35 import decision_format
+            public['audit_response_format'] = decision_format(config)['type']
+        if profile == 'intent-audit-v35':
+            from dscg.intent_audit import decision_format
+            public['audit_response_format'] = decision_format(config)['type']
     options = audit_request_options(config, profile)
     if options:
         public.pop('reasoning_effort', None)
