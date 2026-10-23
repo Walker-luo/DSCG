@@ -1,0 +1,16 @@
+{
+  "stage1_sha256.json": 20,
+  "controls_input_sha256.json": 276,
+  "source_manifests": 24,
+  "matched_unique_queries": 48,
+  "preflight_count": 36,
+  "preflight_errors": 0,
+  "current_source_equals_audit_control": true,
+  "candidate_source_sha256": "23d0477bf86ae54be9c79692cf72aa30f295fdc74e4a83265a0ba173136457f8",
+  "matched_main_model": {
+    "model_id": "deepseek-flash",
+    "provider": "deepseek",
+    "base_url": "https://api.deepseek.com",
+    "api_key_env": "DEEPSEEK_API_KEY"
+  }
+}

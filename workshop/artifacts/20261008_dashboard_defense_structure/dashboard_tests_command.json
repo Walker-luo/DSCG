@@ -1,0 +1,11 @@
+{
+  "argv": [
+    "/opt/miniconda3/envs/ipi/bin/python",
+    "-c",
+    "import unittest; from pathlib import Path; import dscg.paths as paths; paths.DASHBOARD_RESULTS_DIR=Path('workshop/artifacts/20261008_dashboard_defense_structure/dashboard_runs').resolve(); result=unittest.TextTestRunner(verbosity=2).run(unittest.defaultTestLoader.discover('tests',pattern='test_dashboard*.py')); raise SystemExit(not result.wasSuccessful())"
+  ],
+  "environment": {
+    "PYTHONDONTWRITEBYTECODE": "1"
+  },
+  "exit_code": 0
+}

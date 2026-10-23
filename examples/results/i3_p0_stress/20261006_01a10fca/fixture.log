@@ -1,0 +1,53 @@
+ERROR conda.cli.main_run:execute(148): `conda run python -m experiments.i3_p0_stress --output examples/results/i3_p0_stress/20261006_01a10fca/report.json` failed. (See above for error)
+提醒：TaskResults 重构过程中出现小插曲（可能已处理）: name 'FunctionCall' is not defined
+
+For further information visit https://errors.pydantic.dev/2.12/u/undefined-annotation
+[DSCG MEDIATION] batch=9aff6dd9802a42bdad9dfdc1d7f04931 proposed=2 approved=2 blocked=0
+[DSCG MEDIATION] batch=c6f32cbd96d9444f8446d8b5cf91e235 proposed=1 approved=1 blocked=0
+[DSCG MEDIATION] batch=8ef89f92a8a549e1801b1549e5276522 proposed=2 approved=2 blocked=0
+[DSCG MEDIATION] batch=8dd0191e19944d50b59d7eb835b0de65 proposed=1 approved=0 blocked=1
+[DSCG MEDIATION] batch=2d1c09ba6580415cb38bf285d4693fa2 proposed=1 approved=1 blocked=0
+[DSCG MEDIATION] batch=fc9f4bff80dd48f6b677ff3846b4a83f proposed=2 approved=2 blocked=0
+[DSCG MEDIATION] batch=dddba214baf44e768e2e9529772f2a43 proposed=1 approved=0 blocked=1
+[DSCG MEDIATION] batch=a42c98eeeca24a58b7db21214598b7bb proposed=1 approved=1 blocked=0
+[DSCG MEDIATION] batch=81e5706785d34d41be11cad7a636f077 proposed=2 approved=2 blocked=0
+[DSCG MEDIATION] batch=0119e5cde67542809d4294ec36bd5aef proposed=1 approved=1 blocked=0
+[DSCG MEDIATION] batch=f4c178522b424e479e6634ad10da2026 proposed=1 approved=1 blocked=0
+[DSCG MEDIATION] batch=1f9ff3af0d4e4ceb9cf5d05502c9458e proposed=2 approved=2 blocked=0
+[DSCG MEDIATION] batch=87f5ea67bad14b108f9a351fa6993d4c proposed=1 approved=1 blocked=0
+[DSCG MEDIATION] batch=9e1311f8df0b428c9f97f393397c23d0 proposed=1 approved=1 blocked=0
+[DSCG MEDIATION] batch=85a28d9ab45d4350a387a742ed4b9680 proposed=2 approved=2 blocked=0
+[DSCG MEDIATION] batch=ea917cbe72c84a65bcacb381c63d628d proposed=1 approved=1 blocked=0
+[DSCG MEDIATION] batch=9e74bdba977447f6a3bc4ec0101fc094 proposed=1 approved=1 blocked=0
+[DSCG MEDIATION] batch=060e00c177f040b195e6e501cf47129a proposed=2 approved=2 blocked=0
+[DSCG MEDIATION] batch=9468e9f754a4477789329f5f9f57f2c4 proposed=1 approved=1 blocked=0
+[DSCG MEDIATION] batch=32b7e407f3064722aa8f3c67682a3d22 proposed=1 approved=1 blocked=0
+[DSCG MEDIATION] batch=67511c01f0de4f99b210656944572f98 proposed=1 approved=1 blocked=0
+[DSCG MEDIATION] batch=fed237aff56243b789dc5290a60982a7 proposed=1 approved=1 blocked=0
+[DSCG MEDIATION] batch=1966a5f88c1c43f595b48937b07b68a7 proposed=1 approved=1 blocked=0
+[DSCG MEDIATION] batch=e91e118b6ab541a5b08cfef048bff5eb proposed=1 approved=1 blocked=0
+[DSCG MEDIATION] batch=bc51628779204842bbd50145c1460b56 proposed=2 approved=2 blocked=0
+[DSCG MEDIATION] batch=cd2a7370e6f24f6ab7f6a59e19dabb13 proposed=1 approved=1 blocked=0
+[DSCG MEDIATION] batch=efb94739d3f5498a830a0be36cb16c68 proposed=2 approved=2 blocked=0
+[DSCG MEDIATION] batch=7e9dfc2b5169490eaaceb32914492ea4 proposed=1 approved=0 blocked=1
+[DSCG MEDIATION] batch=5c3a2e7f17da46f386f7374f76def0a4 proposed=1 approved=1 blocked=0
+[DSCG MEDIATION] batch=704b325407724488a33d7f5bb02ec012 proposed=2 approved=2 blocked=0
+[DSCG MEDIATION] batch=ad9e2b7bcbea4a4dac20b2b0f7db44a8 proposed=1 approved=0 blocked=1
+[DSCG MEDIATION] batch=1e82e441aa7f452b83083c5f07ec1e4a proposed=1 approved=1 blocked=0
+[DSCG MEDIATION] batch=c033b94983c14f91a393e4b9fbc4dc41 proposed=2 approved=2 blocked=0
+[DSCG MEDIATION] batch=24497aff1fc9468e8e0eaa64eb7f9b61 proposed=1 approved=1 blocked=0
+[DSCG MEDIATION] batch=224b895525d243319c02bd957e4ac3b7 proposed=1 approved=1 blocked=0
+[DSCG MEDIATION] batch=26c190c2c47f4506bf66bb3a862c10c1 proposed=2 approved=2 blocked=0
+[DSCG MEDIATION] batch=e279ae37f8d24cbd8a27219ce612696b proposed=1 approved=1 blocked=0
+[DSCG MEDIATION] batch=be582e4ba50c4adbb9044c5fa94a5d3c proposed=1 approved=1 blocked=0
+[DSCG MEDIATION] batch=7adf3c81ae1b4b1e9558c0bf62bf5790 proposed=2 approved=2 blocked=0
+[DSCG MEDIATION] batch=32e2c9b8720043a3832aeafd86aa4a8d proposed=1 approved=1 blocked=0
+[DSCG MEDIATION] batch=e8c9f4e794b442459b57c5cd72630782 proposed=1 approved=1 blocked=0
+[DSCG MEDIATION] batch=e17d64bdfc2944338a69ec8a23a742c4 proposed=2 approved=2 blocked=0
+[DSCG MEDIATION] batch=ebeb71e466274be9b4152caa11a97a3b proposed=1 approved=1 blocked=0
+[DSCG MEDIATION] batch=1aac61144b45437f86055bf146d2bd25 proposed=1 approved=1 blocked=0
+[DSCG MEDIATION] batch=a023360ea337433d87f1d4fc4e37c702 proposed=1 approved=1 blocked=0
+[DSCG MEDIATION] batch=6e5d65fd9404499c94d9256199207cf5 proposed=1 approved=1 blocked=0
+[DSCG MEDIATION] batch=a390330e28a04644bf2526491ac3f1a2 proposed=1 approved=1 blocked=0
+[DSCG MEDIATION] batch=36c80607085242d1815e9686daeebcc6 proposed=1 approved=1 blocked=0
+{"output": "examples/results/i3_p0_stress/20261006_01a10fca/report.json", "status": "partial", "counts": {"total": 24, "valid": 24, "invalid": 0, "error": 0, "skipped": 0, "scope_violations": 8, "tool_boundary_violations": 0}}

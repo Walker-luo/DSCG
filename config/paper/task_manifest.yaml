@@ -1,0 +1,61 @@
+manifest_id: dscg-agentdojo-v1.2-phase0
+manifest_status: provisional
+created_at: 2026-09-27
+benchmark: AgentDojo
+package_version: 0.1.35
+suite_version: v1.2
+selection_rule: >-
+  Core and expanded runs use every valid registered user/injection combination
+  after the manifest is generated. Pilot uses deterministic SHA-256 ranking with
+  seed 20260927 and takes two user tasks and two injection tasks per suite.
+suites:
+  workspace:
+    user_task_count: 40
+    injection_task_count: 14
+    pair_count: 560
+    registered_id_sha256: f19d6f9fd99971bd3ef8683f330a49a7dea10bc7c63256f96e6345e6154fb27d
+    smoke_user_ids: [user_task_0, user_task_1]
+    smoke_injection_ids: [injection_task_0, injection_task_1]
+  slack:
+    user_task_count: 21
+    injection_task_count: 5
+    pair_count: 105
+    registered_id_sha256: 202ab0fc2ffc8bea2620c59a7f4ac356aca0eb74d213201a630f2d78156dfd77
+    smoke_user_ids: [user_task_0, user_task_1]
+    smoke_injection_ids: [injection_task_1, injection_task_2]
+  travel:
+    user_task_count: 20
+    injection_task_count: 7
+    pair_count: 140
+    registered_id_sha256: 527cb8a08e9d5e48a830df1e57484a23ceff3da888617576c3f823225138f595
+    smoke_user_ids: [user_task_0, user_task_1]
+    smoke_injection_ids: [injection_task_6, injection_task_0]
+  banking:
+    user_task_count: 16
+    injection_task_count: 9
+    pair_count: 144
+    registered_id_sha256: d2d4b4b8faff8b82f7c742f9cc886daff7ca097daf0b6728d75712a6baf50bcc
+    smoke_user_ids: [user_task_0, user_task_1]
+    smoke_injection_ids: [injection_task_0, injection_task_1]
+  total:
+    user_task_count: 97
+    injection_task_count: 35
+    pair_count: 949
+attacks:
+  - id: important_instructions
+    status: available_in_current_entry
+    use: pilot_only_until_manifest_harness
+  - id: ignore_previous
+    status: requires_e0_harness
+  - id: tool_knowledge
+    status: requires_e0_harness
+  - id: adaptive_attack_with_fixed_budget
+    status: requires_e0_harness
+defenses: [A0, A1, A2, A3, A4]
+notes:
+  - registered_id_sha256 is SHA-256 of compact sorted-key JSON with lexically sorted users and injections arrays for each AgentDojo v1.2 suite.
+  - The 949 pair_count is a Cartesian upper bound, not a verified valid attack-pair denominator.
+  - E0-HARNESS must emit the complete exact task IDs and valid pairing manifest before confirmatory execution.
+  - The current partial entry takes the first two IDs and is not accepted as the frozen pilot selector.
+  - Any unavailable task or attack must be recorded with a denominator status; it cannot be silently removed.
+  - Workshop offline harness selection and replay helpers live in experiments/diagnostics/harness_audit.py; this does not unlock I2.

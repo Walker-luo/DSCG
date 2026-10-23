@@ -1,0 +1,124 @@
+{
+  "task": "l3_preset_20261019",
+  "status": "implemented_offline_verified",
+  "revision": "85bb54a6fbc91ce9e8a9034a293dfd827f1d9ad0",
+  "branch": "workshop",
+  "working_tree": "Uncommitted L3 preset implementation;9 initial user progress files preserved. No automatic commit.",
+  "parameters": {
+    "schema_version": "dscg.router-calibration-preset.v1",
+    "status": "development_candidate",
+    "grid": [
+      0.65,
+      0.7,
+      0.75
+    ],
+    "reference_threshold": 0.7,
+    "epsilon": 0.05,
+    "delta": 0.05,
+    "provenance": {
+      "date": "2026-10-19",
+      "benchmark": "agentdojo",
+      "runs": [
+        "qwen3.7-flash_DSCG",
+        "qwen3.7-flash_DSCG_v1"
+      ],
+      "read_scored_traces": [
+        1167,
+        1147
+      ],
+      "planned_scored_traces_per_run": 1167,
+      "missing_scored_traces": [
+        0,
+        20
+      ],
+      "eligible_events": [
+        429,
+        407
+      ],
+      "eligible_suites": [
+        "slack"
+      ],
+      "eligible_user_tasks_per_run": 16,
+      "observed_below_reference": [
+        178,
+        179
+      ]
+    },
+    "limitations": [
+      "Exploratory grid selected after observing historical shadow runs; validate on new independent labeled groups.",
+      "The two runs repeat correlated user tasks, not independent calibration/test splits.",
+      "Reference threshold is explanatory only; this preset is not a deployment artifact.",
+      "No independent safety labels or certified threshold exist in these observations.",
+      "No observed eligible events in banking or travel; do not infer savings for those suites."
+    ]
+  },
+  "files": {
+    "config/l3_router.calibration.json": "d23c5fb2d4c576a699fa312fcf9d1bb797c035be578186223228b8efac5503a1",
+    "experiments/calibration/calibrate_l3_router.py": "7a36ed9a10668a01ec6100dd90b03683d099e61304fba19230939d0838d93ba2",
+    "tests/test_l3_calibration_preset.py": "0ac9976b2fb9dc0c3864551300473dfaf2c180545379a18596e194c5d8c2a10c",
+    "README.md": "549db22f06d7d76f3186d6320b77e7afb35a6f7750746704bc0df5d4f6417b22",
+    "docs/model_tool_configuration.md": "bde9fc47d9a40fed185e0114ef562436d56af64bc5a9be95bd6a16f4fe853355",
+    "workshop/L3_checker_opt.md": "66e09eca9f98fc40eca4a776714592447ffe0da84ab3b1770ecff68f1c8e4faa",
+    "AGENTS.md": "1a4938fc5274fe9453490acf37a9c4151d8611213a9fca69629020353efb4f73",
+    "workshop/README.md": "3206af78138e79e4a4d69be004c775f85cae8b058c5c9bc7bfeb8f5505bb8ba3",
+    "workshop/completed/README.md": "81517549ea3cdb4dfc3457226f78b99060847fb05ab6ee92d890e48dc2df9531",
+    "workshop/completed/l3_preset_20261019.md": "5e3a53ea7067e3c37858dc23dfcb721cf23468183dc9f71da2bbe9e3032b594b"
+  },
+  "artifacts": {
+    "workshop/artifacts/20261019_l3_preset/start.json": "e017d74802d928c05e35130c3e23e60ce339cf54f9eedd31180e11f359c0a2e0",
+    "workshop/artifacts/20261019_l3_preset/red.log": "60f8bd8e0c224b32f83077e065994464ddf50900089547ed3242a9c368cc9295",
+    "workshop/artifacts/20261019_l3_preset/green.log": "0afefdcfc996f522007a9e38ec060764e5da17970226742d7f6609002d9d7260",
+    "workshop/artifacts/20261019_l3_preset/integration.log": "950b22c4b6dd646754b89133a7139a7ef4de97420e0deca98a7c0e44909101c0",
+    "workshop/artifacts/20261019_l3_preset/ipi.log": "f7ff943ff42f738767174998f7b4a5313056b6c95b8e0bf5cff9ec188e6424dc",
+    "workshop/artifacts/20261019_l3_preset/agentdyn.log": "33b7ee2ea54dc04dd4f60e33eb6631d68ebea3d60f6fafb7dd93dfee2446912a",
+    "workshop/artifacts/20261019_l3_preset/node.log": "b483d69c874675c8d8f8d39d1007fcd1bef4d3a334f90fe2683a7aca0e16718d",
+    "workshop/artifacts/20261019_l3_preset/preservation.json": "ddf2ffa47c5a274462e4841544e0db0499780ebd78c7f0c4d837d11afa3ef4f0",
+    "workshop/artifacts/20261019_l3_preset/validation.json": "d4028d0a314b327bda11d57d9fd77cd9600c7915588aac7266651c207a258246",
+    "workshop/artifacts/20261019_l3_preset/verify_delivery.py": "54345e1bea1c126166a6316eb90fd73696ace90c25a2ad0b7166ca1dfdd0f9b0",
+    "workshop/artifacts/20261019_l3_preset/review.md": "a753d7d499e86896938cd227389985a30d56ab377abafb8d895a927e08b232b8",
+    "workshop/artifacts/20261019_l3_preset/ledger.md": "d44771af224a3169f84c2322ba2b70693c0e0cacd8526ae2e77e3f62efe83d82"
+  },
+  "tests": {
+    "ipi": {
+      "command": "conda run -n ipi python -B -m unittest discover -s tests -v",
+      "exit_code": 0,
+      "total": 544,
+      "passed": 543,
+      "skipped": 1
+    },
+    "ipi-agentdyn": {
+      "command": "conda run -n ipi-agentdyn python -B -m unittest discover -s tests -v",
+      "exit_code": 0,
+      "total": 548,
+      "passed": 547,
+      "skipped": 1
+    },
+    "node": {
+      "command": "node --test tests/*.cjs",
+      "exit_code": 0,
+      "passed": 45
+    }
+  },
+  "protection": {
+    "checked_files": 2547,
+    "changed_protected_files": []
+  },
+  "sample_denominators": {
+    "new_contract_tests": 8,
+    "integration_synthetic_calibration_groups": [
+      16,
+      80
+    ],
+    "real_model_calls": 0,
+    "real_rollouts": 0,
+    "new_efficacy_samples": 0
+  },
+  "review": "Independent read-only reviewer: no Critical/Important; minor report link now resolved.",
+  "limitations": [
+    "Candidate grid is exploratory; no independent labels, calibrated deployment threshold or actual savings validated.",
+    "Repeated16 Slack user tasks in both historical runs are not independent calibration/test groups.",
+    "v1 locally missing20 scored traces; no inference about cause."
+  ],
+  "research_gates": "E0 pending; I3 partial24valid/8scope; I2 locked",
+  "next_action": "Prepare independent labeled/grouped data isolated from exploratory observations, then use preset offline; keep shadow until valid artifact."
+}

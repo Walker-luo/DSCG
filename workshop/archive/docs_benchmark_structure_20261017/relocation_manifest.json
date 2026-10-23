@@ -1,0 +1,233 @@
+{
+  "schema_version": 1,
+  "task": "DOCS-BENCHMARK-STRUCTURE",
+  "date": "2026-10-17",
+  "base_revision": "8c591e27390c77614dbf4d1ff46f98428c8b5e30",
+  "initial_working_tree": " D docs/framework_v2_followup_report.md\n D docs/i3_p0_stress_report.md\n",
+  "documents": [
+    {
+      "path": "docs/full_benchmark.md",
+      "original_storage": "workshop/archive/docs_benchmark_structure_20261017/originals/docs/full_benchmark.md",
+      "sha256_before": "e7538ab3e7941b2e5d673a446b52a6390818bf33b616daac48bcccacd3f2ea44",
+      "current_path": "docs/benchmark.md",
+      "operation": "rename_and_revise",
+      "sha256_after": "1acced02b4db3eb5452353c59b0c2dd121b7b8612d4d8b71ba1ec9ca9ca0151a"
+    },
+    {
+      "path": "docs/evaluation.md",
+      "original_storage": "workshop/archive/docs_benchmark_structure_20261017/originals/docs/evaluation.md",
+      "sha256_before": "63bb167b9a4d9f6ae2e6a474bbc8c06bf9e406a7eed7e1fabc079111b4dba9ee",
+      "current_path": "docs/evaluation.md",
+      "operation": "revise",
+      "sha256_after": "211a605603b50b5023a4b5398560637cf5a1d893ffede03c20ec4e9191495f6b"
+    },
+    {
+      "path": "AGENTS.md",
+      "original_storage": "workshop/archive/docs_benchmark_structure_20261017/originals/AGENTS.md",
+      "sha256_before": "8c1688a34b6d2069711605879837263c3276ab4bb1d7cbe9353587c11105f9e2",
+      "current_path": "AGENTS.md",
+      "operation": "revise",
+      "sha256_after": "960d016ebac72ffc4b2635c828e02930daad04895006fc3521d2cd1b1eef1d58"
+    },
+    {
+      "path": "L3_plan.md",
+      "original_storage": "workshop/archive/docs_benchmark_structure_20261017/originals/L3_plan.md",
+      "sha256_before": "38c432c49493b39d050c671e536508d5b5c5014ed32ea91518e5df611ef4ea87",
+      "current_path": "L3_plan.md",
+      "operation": "revise",
+      "sha256_after": "6db4302289b1023b12a452705fa2e23c1446363daea6944bd2bcfa8b691f2481"
+    },
+    {
+      "path": "README.md",
+      "original_storage": "workshop/archive/docs_benchmark_structure_20261017/originals/README.md",
+      "sha256_before": "710e147c5c8285ebf19d6457ba289407ba5ca8990057773c8318e0e7c24adb23",
+      "current_path": "README.md",
+      "operation": "revise",
+      "sha256_after": "46756b73c2420db935415adfca8bd2e79cfe0c90970205dc94eb4255edb566b9"
+    },
+    {
+      "path": "docs/README.md",
+      "original_storage": "workshop/archive/docs_benchmark_structure_20261017/originals/docs/README.md",
+      "sha256_before": "9e5e6ded5a60a98cb58196619562b8be71ec44dc7440631f34d9aee82a4b378d",
+      "current_path": "docs/README.md",
+      "operation": "revise",
+      "sha256_after": "b90ed004fe9bb54f3e64fc4ca3b321b4b2510ac3bdf626cd3c879969ab5ceaae"
+    },
+    {
+      "path": "docs/framework_updates.md",
+      "original_storage": "workshop/archive/docs_benchmark_structure_20261017/originals/docs/framework_updates.md",
+      "sha256_before": "2d76f6a265f2bad61326ab5f1ce71dcdb86b956666c5f9120f623f6cda333fab",
+      "current_path": "docs/framework_updates.md",
+      "operation": "revise",
+      "sha256_after": "1dad09bb35dc45584e3398b4a5a3de3926b958860a58d6c79625356c57839fca"
+    },
+    {
+      "path": "docs/injection_precheck.md",
+      "original_storage": "workshop/archive/docs_benchmark_structure_20261017/originals/docs/injection_precheck.md",
+      "sha256_before": "a2046afb823fe29e7ebde7035a8414546f3416b4a204bdaefbfbfed7d45b7243",
+      "current_path": "docs/injection_precheck.md",
+      "operation": "revise",
+      "sha256_after": "f82e5b29c5360efb8d9d05dde88f45248404f11780e1400310480342a30549f6"
+    },
+    {
+      "path": "docs/model_tool_configuration.md",
+      "original_storage": "workshop/archive/docs_benchmark_structure_20261017/originals/docs/model_tool_configuration.md",
+      "sha256_before": "24d68dc5eaa2e2474ba67dfb11acaa5525e65637d91415e9f228e6c2dda1d8cd",
+      "current_path": "docs/model_tool_configuration.md",
+      "operation": "revise",
+      "sha256_after": "848665ff991f29a10a91936469f079e3e74984134a76755236b609c59b8229d5"
+    },
+    {
+      "path": "experiments/README.md",
+      "original_storage": "workshop/archive/docs_benchmark_structure_20261017/originals/experiments/README.md",
+      "sha256_before": "a2254b0a97a829dba264769234efa0ea2e0ddc206e59d8cf0642e3fb19654046",
+      "current_path": "experiments/README.md",
+      "operation": "revise",
+      "sha256_after": "373f31283f2a1b3d3eeab4df24d4044eb85e8afdf7535636bd48fb170caa6457"
+    },
+    {
+      "path": "workshop/L2_opt.md",
+      "original_storage": "workshop/archive/docs_benchmark_structure_20261017/originals/workshop/L2_opt.md",
+      "sha256_before": "c6f3a421e6344d0c7c949522fb28bbf74fef92c63e604a4bf5151299ed1e3787",
+      "current_path": "workshop/L2_opt.md",
+      "operation": "revise",
+      "sha256_after": "f7737630edc78e6b410df531f411b22196f8558924974c1b056832a32bd42fe5"
+    },
+    {
+      "path": "workshop/README.md",
+      "original_storage": "workshop/archive/docs_benchmark_structure_20261017/originals/workshop/README.md",
+      "sha256_before": "11ca7c7ecc8637122c84e3699144aa177bca4e8a13eb8e1bbfacad00072039c9",
+      "current_path": "workshop/README.md",
+      "operation": "revise",
+      "sha256_after": "703689d69afdb0f90f50b4d684e5e97e0864189f821950e28cdb43ee56218568"
+    },
+    {
+      "path": "workshop/completed/README.md",
+      "original_storage": "workshop/archive/docs_benchmark_structure_20261017/originals/workshop/completed/README.md",
+      "sha256_before": "892b9e9bbdb12831386574962274a7f54653c36ca53a758e67d804bb2b6fcfd7",
+      "current_path": "workshop/completed/README.md",
+      "operation": "revise",
+      "sha256_after": "9b8f1aae9a3aef555ace0c00c96f336b9ba7e82df25397e672e6e416c5920622"
+    },
+    {
+      "path": "workshop/completed/configuration_docs_20261013.md",
+      "original_storage": "workshop/archive/docs_benchmark_structure_20261017/originals/workshop/completed/configuration_docs_20261013.md",
+      "sha256_before": "9ebad484bfcd8ee5dfa334c0da05654b0c08754c9e8e588bce8e6260d8ee6473",
+      "current_path": "workshop/completed/configuration_docs_20261013.md",
+      "operation": "revise",
+      "sha256_after": "8762c58b3e2faafe27cd322849cf87bc84244c6a3095240b7f7bad29fb366220"
+    },
+    {
+      "path": "workshop/completed/full_benchmark_20261015.md",
+      "original_storage": "workshop/archive/docs_benchmark_structure_20261017/originals/workshop/completed/full_benchmark_20261015.md",
+      "sha256_before": "9de6fb860b41fd05bbf2fc498299cbc93468fcc819d4d486363d3f51c75d5b31",
+      "current_path": "workshop/completed/full_benchmark_20261015.md",
+      "operation": "revise",
+      "sha256_after": "cf2b53d5b2605d8f9f7193716d58b396e500a4cf3ce9296afea9605fa4afa099"
+    },
+    {
+      "path": "workshop/completed/full_suites_20261017.md",
+      "original_storage": "workshop/archive/docs_benchmark_structure_20261017/originals/workshop/completed/full_suites_20261017.md",
+      "sha256_before": "b5c741120a714629f8fcf8b743c7f28248720e252d31a89f4e566109eda988f3",
+      "current_path": "workshop/completed/full_suites_20261017.md",
+      "operation": "revise",
+      "sha256_after": "b457501a2f77feab1f268cdb2a379886e71eed523ba22400c0aaa40cace97832"
+    },
+    {
+      "path": "workshop/completed/partial_cohort_20261017.md",
+      "original_storage": "workshop/archive/docs_benchmark_structure_20261017/originals/workshop/completed/partial_cohort_20261017.md",
+      "sha256_before": "2b67232cede202c2a00ae86080e8919abe5466ff77694cb92dd43d4852dd6671",
+      "current_path": "workshop/completed/partial_cohort_20261017.md",
+      "operation": "revise",
+      "sha256_after": "23d053a83c42e593f4526a406fd76efb9b3224018e1c2af84290c8747ff5a42b"
+    },
+    {
+      "path": "workshop/completed/partial_reporting_20261010.md",
+      "original_storage": "workshop/archive/docs_benchmark_structure_20261017/originals/workshop/completed/partial_reporting_20261010.md",
+      "sha256_before": "66da63d2069055b358610005b0ddcaafe2f53a12787469f3e4eff0954cba824b",
+      "current_path": "workshop/completed/partial_reporting_20261010.md",
+      "operation": "revise",
+      "sha256_after": "6f19d381a66beb0971c14f73384dcb672550f4916f52d5736b0caa0ef6341046"
+    },
+    {
+      "path": "workshop/completed/partial_suites_20261017.md",
+      "original_storage": "workshop/archive/docs_benchmark_structure_20261017/originals/workshop/completed/partial_suites_20261017.md",
+      "sha256_before": "d4c777ed5111497b7a24a82ab25e20ec81cbf902300ca1b9062252c04f25a5a9",
+      "current_path": "workshop/completed/partial_suites_20261017.md",
+      "operation": "revise",
+      "sha256_after": "54d8202ad7b70da64f75f66e86f03dc4ec9540f55c8eddd595d0fa3b3df57dd5"
+    },
+    {
+      "path": "workshop/completed/workshop_optimization_report.md",
+      "original_storage": "workshop/archive/docs_benchmark_structure_20261017/originals/workshop/completed/workshop_optimization_report.md",
+      "sha256_before": "7558c3e1069c26a7466fef26799f003a73e4a725a7364dd046e17c7bf3ce5e53",
+      "current_path": "workshop/completed/workshop_optimization_report.md",
+      "operation": "revise",
+      "sha256_after": "65bd19b9d244dac45d0564bedd60db25d586dc519531f894a67596104bb9b55d"
+    },
+    {
+      "path": "docs/dashboard.md",
+      "original_storage": "workshop/archive/docs_benchmark_structure_20261017/originals/docs/dashboard.md",
+      "sha256_before": "2501b992f6ce4651d742214ec00a6712e9de23af42c8ac6af5ccf4a0af110e86",
+      "current_path": "docs/dashboard.md",
+      "operation": "revise",
+      "sha256_after": "b9513b59362b93047646a881454debf1cdb2abcada045288c73d7710e0bf9f40"
+    },
+    {
+      "path": "experiments/run_partial_benchmark.py",
+      "original_storage": "workshop/archive/docs_benchmark_structure_20261017/originals/experiments/run_partial_benchmark.py",
+      "sha256_before": "f9b3e961ee51b811ac2afbc124414c5519091c728f10f58fd26bcc31233c2fc6",
+      "current_path": "experiments/run_partial_benchmark.py",
+      "sha256_after": "23141f4ac84d7c3d4b211abb6d03bb03b51cc93a26c49ba0c7cfba5dc1dbb6a1",
+      "operation": "authorized_cli_shadow_default_and_compatibility"
+    },
+    {
+      "path": "experiments/injection_cohort_compatibility.json",
+      "original_storage": "workshop/archive/docs_benchmark_structure_20261017/originals/experiments/injection_cohort_compatibility.json",
+      "sha256_before": "0c9864d1d7fb566fab1815416e6e2963995392208bbd89e2b115db9859383942",
+      "current_path": "experiments/injection_cohort_compatibility.json",
+      "sha256_after": "0d3f6f60616ca52d47c487e25d655534722e9b42131761817332fdaacd19e667",
+      "operation": "authorized_cli_shadow_default_and_compatibility"
+    },
+    {
+      "path": "tests/test_full_benchmark.py",
+      "original_storage": "workshop/archive/docs_benchmark_structure_20261017/originals/tests/test_full_benchmark.py",
+      "sha256_before": "0d23fd7c0b4d47392431047d112560b75b8f35c75a5faecfb8c46d5e6dcd5202",
+      "current_path": "tests/test_full_benchmark.py",
+      "sha256_after": "8c222e8ac2aab1d2645876610858d513ea9849098dc38b60c60550c95c471a22",
+      "operation": "authorized_cli_shadow_default_and_compatibility"
+    }
+  ],
+  "new_files": [
+    {
+      "path": "docs/partial_benchmark.md",
+      "sha256": "c5716f8e2777d45489ce899a70e33958c301434232ea514e08aac44eafc09bde"
+    },
+    {
+      "path": "tests/test_cli_router_defaults.py",
+      "sha256": "7acdfbd22a8e967af0bef3f1096f7e73119e3326a18ae7d11d3634ec8cccabe3"
+    },
+    {
+      "path": "workshop/completed/docs_benchmark_structure_20261017.md",
+      "sha256": "1fd13d1e84aa620736da5e4b7304cd2d4173cc16d98c3d4e5e865b28c0a30b61"
+    },
+    {
+      "path": "workshop/archive/docs_benchmark_structure_20261017/README.md",
+      "sha256": "de6e5c4fa36cdd05c52fc97bf5260cacb695ca769328636067628014af6487b1"
+    }
+  ],
+  "preserved_user_deletions": [
+    "docs/framework_v2_followup_report.md",
+    "docs/i3_p0_stress_report.md"
+  ],
+  "previous_archives_preserved": {
+    "files": 244,
+    "hashes_reference": "workshop/artifacts/20261017_docs_benchmark_structure/before.json"
+  },
+  "authorization": "User additionally selected CLI shadow default with native baseline/NoChecker off compatibility; API/factory defaults remain off.",
+  "limits": [
+    "No original result, attempt, cohort or previous archive bytes rewritten.",
+    "No compatibility alias retained for full_benchmark.md.",
+    "No real model requests or benchmark samples."
+  ]
+}

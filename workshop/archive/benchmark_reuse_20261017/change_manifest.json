@@ -1,0 +1,155 @@
+{
+  "schema_version": 1,
+  "task": "BENCHMARK-REUSE",
+  "date": "2026-10-17",
+  "base_revision": "cee87b851e44d8c1a9d699eb6fd177ea965d817b",
+  "initial_working_tree": "",
+  "originals": [
+    {
+      "path": "experiments/run_partial_benchmark.py",
+      "original_storage": "workshop/archive/benchmark_reuse_20261017/originals/experiments/run_partial_benchmark.py",
+      "sha256_before": "e7a8a4961df88fa9183782d416da129fae7ef868b17ac6b00a5a300d52335690",
+      "sha256_after": "f5e81729b76eb4e9350a66cadcbb3b911ea746a65076b93fa6587dfe48159de4"
+    },
+    {
+      "path": "experiments/run_benchmark.py",
+      "original_storage": "workshop/archive/benchmark_reuse_20261017/originals/experiments/run_benchmark.py",
+      "sha256_before": "3adef3d419d36c68f7b7e6a57bdce56aeddf613277304b30f604b41c1f981644",
+      "sha256_after": "3828caf595c6de03aa593be3a71ca1fc8da2e5790b79c863becec4cc06386ad6"
+    },
+    {
+      "path": "experiments/run_injection_precheck.py",
+      "original_storage": "workshop/archive/benchmark_reuse_20261017/originals/experiments/run_injection_precheck.py",
+      "sha256_before": "60b73202a366288482651c6a441e6e7609ca2634f97106bb3198e47ffa349bba",
+      "sha256_after": "60b73202a366288482651c6a441e6e7609ca2634f97106bb3198e47ffa349bba"
+    },
+    {
+      "path": "experiments/common/partial_controls.py",
+      "original_storage": "workshop/archive/benchmark_reuse_20261017/originals/experiments/common/partial_controls.py",
+      "sha256_before": "0a636f0c11b9d034d03d388063a2aef3a159dc67e855747835682435f6f470af",
+      "sha256_after": "69393387932d0c0077f78397f9de76a26fb30a4902127e9be0efc012db93a1a2"
+    },
+    {
+      "path": "experiments/common/injection_cohort.py",
+      "original_storage": "workshop/archive/benchmark_reuse_20261017/originals/experiments/common/injection_cohort.py",
+      "sha256_before": "d25d996ead1098a4f6d3b8816da6ce11af11f7c6e817f50f7f7f6954aaa9c7de",
+      "sha256_after": "d1505dc5d3994dfcc172137625f2f6b91625a64df22f019be30d612bb81b96da"
+    },
+    {
+      "path": "experiments/common/injection_cohort_compatibility.json",
+      "original_storage": "workshop/archive/benchmark_reuse_20261017/originals/experiments/common/injection_cohort_compatibility.json",
+      "sha256_before": "6f22ba9c886cba74bfc17f017666bd9332747823ea8f2dff4a319c403541aeab",
+      "sha256_after": "505dd2e79bd18b590c4a4fb28661e83f5156cd9761a3497a892cecac12c5f774"
+    },
+    {
+      "path": "tests/test_partial_attacks.py",
+      "original_storage": "workshop/archive/benchmark_reuse_20261017/originals/tests/test_partial_attacks.py",
+      "sha256_before": "0659d3da8f4c9372bc615fbc0300a0fd74245b1e0187d17cf277548b9b4b94dd",
+      "sha256_after": "ae17476befdc813cf16301b27cdbb99e0bf985a06eec8144577c82d7bf78ad03"
+    },
+    {
+      "path": "README.md",
+      "original_storage": "workshop/archive/benchmark_reuse_20261017/originals/README.md",
+      "sha256_before": "7faca5f2c3bcf9e390a2b9d716a3b27c77f1b2529c6a3e78c378c4bf542f3714",
+      "sha256_after": "7a691a6ae8b1bc78baae3cdddf0385f71a68cb78b9910408cb58eb7ec73ac5ff"
+    },
+    {
+      "path": "AGENTS.md",
+      "original_storage": "workshop/archive/benchmark_reuse_20261017/originals/AGENTS.md",
+      "sha256_before": "a45cac001ccfd525c98f25c87cfc717ec1c4748dc1f14de133fc3e92a8a4a487",
+      "sha256_after": "f0c7464365d5e74b7cacc7578372c993f4131e2f68ddd7f93b3ad3896eae20b1"
+    },
+    {
+      "path": "docs/benchmark.md",
+      "original_storage": "workshop/archive/benchmark_reuse_20261017/originals/docs/benchmark.md",
+      "sha256_before": "1acced02b4db3eb5452353c59b0c2dd121b7b8612d4d8b71ba1ec9ca9ca0151a",
+      "sha256_after": "a869c9f940c61e01d164a2e3bac4119504a25781f0d21c5bea6f5489c7c58d27"
+    },
+    {
+      "path": "docs/partial_benchmark.md",
+      "original_storage": "workshop/archive/benchmark_reuse_20261017/originals/docs/partial_benchmark.md",
+      "sha256_before": "c5716f8e2777d45489ce899a70e33958c301434232ea514e08aac44eafc09bde",
+      "sha256_after": "d4d699b427150a10dec35548f53c8ca0fb8f9f4989c080fb6b37e68af351bafc"
+    },
+    {
+      "path": "docs/injection_precheck.md",
+      "original_storage": "workshop/archive/benchmark_reuse_20261017/originals/docs/injection_precheck.md",
+      "sha256_before": "d4e8f20e3991611175a65c0cf288919e6b5dfa3b943a0b987a181e5cb9de27c3",
+      "sha256_after": "6bd78b4760523c16484d6c13f3a920070338260ceee560094ef5fec7cceb050b"
+    },
+    {
+      "path": "docs/evaluation.md",
+      "original_storage": "workshop/archive/benchmark_reuse_20261017/originals/docs/evaluation.md",
+      "sha256_before": "ba7b27e964b15015f17c6a0bb2e1807d2782fa5fe99660c90d5f02d1c7b74dfe",
+      "sha256_after": "b3fbf208d94243deb5cad281945faffb53f7918a04e53281344d1fc3691a9339"
+    },
+    {
+      "path": "docs/model_tool_configuration.md",
+      "original_storage": "workshop/archive/benchmark_reuse_20261017/originals/docs/model_tool_configuration.md",
+      "sha256_before": "ed385b27636df9a0312da1d179199679ab77936af994a21d3ce4f3aea58e8aea",
+      "sha256_after": "b1211d8f3c3d0ef8fca0aeae53b8a165bd678f7eb615576d7dbb698a31191611"
+    },
+    {
+      "path": "experiments/README.md",
+      "original_storage": "workshop/archive/benchmark_reuse_20261017/originals/experiments/README.md",
+      "sha256_before": "03a57171d3de46e641bcd75760ad87c0ca5577748fb95c8cfc8046e4a0d61351",
+      "sha256_after": "b5e70e1eeeb86dc57f1e68d329126ff2eb0bcd257755d161c4b5a9b7b9603f38"
+    },
+    {
+      "path": "workshop/README.md",
+      "original_storage": "workshop/archive/benchmark_reuse_20261017/originals/workshop/README.md",
+      "sha256_before": "fa7a78950e56ae9caaa6f5232abdd03c3d40254a0412eedb4569b6df31fb692d",
+      "sha256_after": "397375629da9b73cdb2359589e74d3e9d293457ce799418942535c1e5ffd23f7"
+    },
+    {
+      "path": "workshop/completed/README.md",
+      "original_storage": "workshop/archive/benchmark_reuse_20261017/originals/workshop/completed/README.md",
+      "sha256_before": "cbbfff98226c95a085cc6cb8a60c9cdca108f80c948a42726683e391dea39a36",
+      "sha256_after": "f9d161883571a325faebc1ad35a6eed74a9865a75b5fcbc630b91a9dc68b75db"
+    },
+    {
+      "path": "tests/test_partial_cohort.py",
+      "original_storage": "workshop/archive/benchmark_reuse_20261017/originals/tests/test_partial_cohort.py",
+      "sha256_before": "2eac32ce1dffa6296eb67a85908d9d3149fd3bdf79773d4e5014d48e47f97af4",
+      "sha256_after": "de4dd4904d0e49af1c82286c9f1fec4454f139194a45ebf1948c609e5b75612b"
+    },
+    {
+      "path": "tests/test_partial_suites.py",
+      "original_storage": "workshop/archive/benchmark_reuse_20261017/originals/tests/test_partial_suites.py",
+      "sha256_before": "d0ca07696ed988b06c02e18f8975089c810c71a001eb630b66b19f40493da18b",
+      "sha256_after": "223bc52998a53d810036a4bf2890040703202ed57131a3135f401eab5897a614"
+    }
+  ],
+  "new_files": [
+    {
+      "path": "experiments/common/benchmark_reuse.py",
+      "sha256": "5aa0f44cb9c4b7603d9bb6432e28407181c0d20040dd8d07b0a1c458d2e77703"
+    },
+    {
+      "path": "experiments/common/benchmark_reuse_compatibility.json",
+      "sha256": "e644e30c5270a2feac0f10a206b101a2762ec528e965d71a3945f327b5e47fe7"
+    },
+    {
+      "path": "tests/test_benchmark_reuse.py",
+      "sha256": "0b9b994f7576db680278be62302d6fd8bf3dd50dadbd6b96fb7eac792ca95623"
+    },
+    {
+      "path": "tests/fixtures/benchmark_reuse_source_20261017.json",
+      "sha256": "8786d9537f0bd112f8db251f86b2ee8a644082cab2ade4be3b4e778b740537a1"
+    },
+    {
+      "path": "workshop/completed/benchmark_reuse_20261017.md",
+      "sha256": "2cfd02f6a07fb848736d75500d30060cd3001b385e11c25c964de721cf94effd"
+    },
+    {
+      "path": "workshop/completed/benchmark_reuse_20261017_plan.md",
+      "sha256": "ef079e59825c6411dbe11b144da4cbed8cd3c0513ba0707c4cc3affbcac10c3e"
+    },
+    {
+      "path": "workshop/archive/benchmark_reuse_20261017/README.md",
+      "sha256": "84b096e228cd69aad2c00e4d80105963ddd08e1ed7e750c7244bad851fc12e43"
+    }
+  ],
+  "historical_evidence": "Prior archives and all user result files unchanged; existing valid caches/manifests retained on explicit reuse.",
+  "limits": "Native cache rules retained; old baseline missing explicit native-defense evidence rejects; no real model runs."
+}

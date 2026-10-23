@@ -1,0 +1,82 @@
+{
+  "date": "2026-10-08",
+  "scope": "Targeted novelty screening and unimplemented authorization audit calibration hypothesis; not exhaustive review",
+  "novelty_status": "unverified; substantial overlap risk",
+  "search_queries": [
+    "prompt injection defense counterfactual action causal intervention tool agent",
+    "prompt injection defense differential counterfactual intent user task ablation",
+    "prompt injection defense tool action relabeling equivariance permutation",
+    "MELON Provable Defense arxiv",
+    "prompt injection counterfactual defense agent task",
+    "prompt injection contrastive authorization",
+    "prompt injection metamorphic defense",
+    "prompt injection auditor canary",
+    "prompt injection judge negative controls",
+    "prompt injection task counterfactual audit",
+    "prompt injection calibration guard contrastive",
+    "prompt injection over-defense auditor denial service",
+    "prompt injection guard denial-of-service defense",
+    "guardrail prompt injection false positives attack auditor"
+  ],
+  "sources": [
+    {
+      "title": "AttriGuard: Defeating Indirect Prompt Injection in LLM Agents via Causal Attribution of Tool Invocations",
+      "authors": "Yu He et al.",
+      "year": 2026,
+      "url": "https://arxiv.org/html/2603.10749v1",
+      "status": "preprint v1",
+      "read_scope": "Abstract, introduction and method outline; action causal attribution overlap"
+    },
+    {
+      "title": "AgentSentry: Mitigating Indirect Prompt Injection in LLM Agents via Temporal Causal Diagnostics and Context Purification",
+      "authors": "Tian Zhang et al.",
+      "year": 2026,
+      "url": "https://arxiv.org/html/2602.22724v1",
+      "status": "preprint v1",
+      "read_scope": "Primary abstract/structure; counterfactual re-execution and purification"
+    },
+    {
+      "title": "Counterfactual Evaluation for Blind Attack Detection in LLM-based Evaluation Systems",
+      "authors": "Lijia Liu et al.",
+      "year": 2025,
+      "url": "https://arxiv.org/html/2507.23453v1",
+      "status": "preprint v1",
+      "read_scope": "Sections2-3 incl.false ground-truth intervention and SE/CFE decision table"
+    },
+    {
+      "title": "Calibrate Before Use: Improving Few-shot Performance of Language Models",
+      "authors": "Zihao Zhao et al.",
+      "year": 2021,
+      "url": "https://proceedings.mlr.press/v139/zhao21c.html",
+      "status": "ICML2021 primary proceedings",
+      "read_scope": "Primary proceedings abstract; context-free calibration overlap"
+    },
+    {
+      "title": "CAPTURE: Context-Aware Prompt Injection Testing and Robustness Enhancement",
+      "authors": "Gauri Kholkar, Ratinder Ahuja",
+      "year": 2025,
+      "url": "https://arxiv.org/abs/2505.12368",
+      "status": "preprint primary abstract",
+      "read_scope": "Context-aware guardrail and over-defense evaluation"
+    },
+    {
+      "title": "Counterfactual Components for AI Control Protocols",
+      "authors": "Patryk Wielopolski, Oleksii Furman",
+      "year": 2026,
+      "url": "https://apartresearch.com/sprints/projects/counterfactual-components-for-ai-control-protocols-ibli",
+      "status": "Research project/hackathon page; not peer-reviewed paper",
+      "read_scope": "Author/project description of counterfactual monitor and controlled task perturbations"
+    }
+  ],
+  "excluded_lookup": "One attempted MELON arXiv ID resolved to an unrelated audio-deepfake paper and is excluded; OpenReview MELON PDF was behind verification. MELON method is not relied on here.",
+  "new_model_calls": 0,
+  "new_benchmark_samples": 0,
+  "planned_candidate_cases": 48,
+  "runtime_implementation": false,
+  "limitations": [
+    "Retrieved overlap axes do not establish publication novelty.",
+    "No benchmarks, training or live auditor probes were run.",
+    "Deployment-valid positive-control generation and comparable model scores remain unresolved.",
+    "All control branches are diagnostic; existing scope permissions remain unenforced."
+  ]
+}

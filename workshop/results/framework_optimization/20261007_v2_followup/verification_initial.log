@@ -1,0 +1,4 @@
+Traceback (most recent call last):
+  File "/Users/luo/Desktop/AgentDefence/DSCG/examples/results/framework_optimization/20261007_v2_followup/verify_followup.py", line 61, in <module>
+    assert preflight_count == 36 and preflight_errors == 0
+AssertionError

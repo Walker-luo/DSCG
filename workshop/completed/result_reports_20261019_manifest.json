@@ -1,0 +1,159 @@
+{
+  "task": "result_reports_20261019",
+  "status": "implemented_offline_verified",
+  "revision": "e8546dd2214717868b26ba3a5b0c7c287bac5980",
+  "working_tree": "uncommitted implementation and documentation changes; no original user results overwritten",
+  "files": {
+    "AGENTS.md": "4d9c6cd33c35418034709da465c2957a3810822ea312d138549a1193af36098f",
+    "README.md": "31afb0582babde4905489d44901ea010b7b6a50b5145db0ef90ebb3bed9bdb30",
+    "dashboard/app.py": "139301ef8b2a7cb467db4207abdc3f4879fcc1e64d662c67a40bbb04ed44f80a",
+    "dashboard/evaluation.py": "b2a3a438f29ec9424a568932bc54e9293ee68f8939276f9ebafaed8c245b2363",
+    "experiments/common/partial_reporting.py": "afa9c822a830b4a504dc70a7c03138eb546c6331e83a30620e70cfa9c160cec9",
+    "experiments/common/routing_reports.py": "91db51131eec01f765b8c0713ad0ce5fcb12897698723f829513ab9c8f5d8aff",
+    "experiments/diagnostics/summarize_results.py": "e9d01fb7677994aeb692e6562ad485fd98941a8e4333b5240d4b7f2bf06ea028",
+    "experiments/run_partial_benchmark.py": "3c41fd050746a27c2971936caa35f567e004392faf6d7ece168222b056cc616d",
+    "tests/test_routing_reports.py": "1b5c51c3df29fde9a8a1616671b9d20879c678b7d450cd589eb8003471859f5e",
+    "tests/test_partial_reporting.py": "02aed0c9e35367c86a66dfb3a9346e7dbb1fc84b0e74497d93c4bcdafba4ffcd",
+    "tests/test_partial_attacks.py": "13b4c0c22293586a83f6d8ded1d601194bd6d63fcafeb8e2b0bc833f98738e81",
+    "tests/test_serial_runner.py": "d101d4a7241da540135b8bfe1ddc9f3323b3a5c9640d44989be6e4f6ce8825ed",
+    "tests/test_dashboard_evaluation.py": "8936acb695b8fa589a181fcee64627827960cf535a28a6adf832fb0689e20a9f",
+    "tests/test_partial_ablation.py": "d2d4af9f910433ed6906696d7f311fedc596b84e58a30b9bb734e9addba7e7de",
+    "docs/result_files.md": "70959a8f436f71d77a3ff46461288f38af58b472bac0cdabc6855593f14958de",
+    "docs/benchmark.md": "563d67239d528d3a8fa0fb26eb75a161a2034ec1bbb95279a5ea0a69fb3ecb9c",
+    "docs/framework_updates.md": "f267f2951a1d0167c5149b1814064c539115c21596337a5994cdfe2288a7d9e8",
+    "docs/evaluation.md": "d0da2b0acbf385050f719e57756a3d0e03f2bd02f4fbdcb503ccf53fc5a7ebf5",
+    "docs/README.md": "0b3fe6d8206b21945db99cefcd3ddf45375974c727008088a70ba80c54a76b54",
+    "experiments/README.md": "537b40de869e2d7634f38484f7b16a19104593bb5fb2de6fc73bca4e66ed799d",
+    "workshop/README.md": "2aa17106d9d29e888870d1d6f9570d4dca420cdb229511719717a493cd06d531",
+    "workshop/completed/README.md": "ffbbfd68466dc92838e3f7b924ed079623dc7551edf7081617a05f40c9dd6521",
+    "workshop/completed/result_reports_20261019.md": "f997029bf5c2e8bdb182e5ee7510aff5f8e89e5247e9189a5c94aed3c1d9a7fe",
+    "workshop/completed/result_reports_20261019_plan.md": "ccfcf488b40c53a56da372134bfa889b64c7ebc700e6db7b65524f65627792d0"
+  },
+  "artifacts": {
+    "workshop/artifacts/20261019_result_reports/start.json": "7d63f748b6c4b6fd83647f2cc859351ca68915c6453f6cf3815c7ed625b3cc33",
+    "workshop/artifacts/20261019_result_reports/original_run_hashes.json": "ecd0ccef7d01c4f02d59ea78353126393a941ad0be13134163745d4ec85bab64",
+    "workshop/artifacts/20261019_result_reports/routing_red.log": "29677cf1b4fd147b3965ccc824e9b38aa49e663e8fb41435bb8f6f8e000cfde4",
+    "workshop/artifacts/20261019_result_reports/review_completeness_red.log": "1feb7143351a26d287607b47b71a7b99bff5fcab6197ed49768008665333e44f",
+    "workshop/artifacts/20261019_result_reports/review_completeness_green.log": "1d32b4c2b789e1d5792c8be5b245d39f563c958673227a8877de10560aa8176b",
+    "workshop/artifacts/20261019_result_reports/review_routing_tests_ipi.log": "f6c3ac7250483119a7a8c32b86340aa2084cb35a5554f631b8f39b3686904241",
+    "workshop/artifacts/20261019_result_reports/delivery_ipi.log": "c754631131acd607ac2167cdecf327d9e04718eb380467741f18982f8425a1ab",
+    "workshop/artifacts/20261019_result_reports/delivery_agentdyn.log": "4749768acf5c667017ecc9c0ac530dbd165d3207ab0af162c6d1786a145949fd",
+    "workshop/artifacts/20261019_result_reports/delivery_node.log": "07486698968bb6086c1941ca37c70fb0666c7f84f1aa73ee368a3e4321de0c3d",
+    "workshop/artifacts/20261019_result_reports/backfill.log": "575031ce88a48448cd9a30783ba7173e20957699399ad515922bacc88436a1f3",
+    "workshop/artifacts/20261019_result_reports/validation.json": "84716768f975a2d76494a201cec40ac55a83266d8de2e6980b3d888ca5063be9",
+    "workshop/artifacts/20261019_result_reports/verify_delivery.py": "02bf4321385da68829648d6fe36055b1cdec9e943aedffdb2a355e634761faa3",
+    "workshop/artifacts/20261019_result_reports/root_conclusion_red.log": "f343744c7c66db1a3dff66c57f1b4c16072f59d4caf937316a90d34db0b362b0",
+    "workshop/artifacts/20261019_result_reports/root_conclusion_green.log": "10768db051073b9febbbde1cb65aa2061ae9118386deae95f3fba5cffe31041b"
+  },
+  "tests": {
+    "ipi": {
+      "command": "conda run -n ipi python -B -m unittest discover -s tests -v",
+      "exit_code": 0,
+      "total": 531,
+      "passed": 530,
+      "skipped": 1
+    },
+    "ipi-agentdyn": {
+      "command": "conda run -n ipi-agentdyn python -B -m unittest discover -s tests -v",
+      "exit_code": 0,
+      "total": 535,
+      "passed": 534,
+      "skipped": 1
+    },
+    "node": {
+      "command": "node --test tests/*.cjs",
+      "exit_code": 0,
+      "passed": 45
+    }
+  },
+  "preservation": {
+    "original_files": 1279,
+    "changed_original_files": [],
+    "new_files": [
+      "l3_router_summary.json",
+      "l3_router_summary.md"
+    ],
+    "new_file_sha256": {
+      "l3_router_summary.json": "5561564ba5b6cf57b0d0a185d1f2d4711fc99d5bfe3b96eb2ba4bc9965b440ba",
+      "l3_router_summary.md": "a0ae44c786e7a7e640c1d86f60a1f563b6c094c47550635c93cb27923ffd76c0"
+    },
+    "coverage": {
+      "planned_traces": 1167,
+      "read_traces": 1167,
+      "event_traces": 1135,
+      "no_candidate_traces": 32,
+      "disabled_traces": 0,
+      "unrecorded_traces": 0,
+      "missing_traces": 0,
+      "corrupt_traces": 0,
+      "inconsistent_traces": 0,
+      "outside_run_traces": 0
+    },
+    "totals": {
+      "candidate_batches": 4309,
+      "previously_audited_batches": 2483,
+      "eligible_batches": 429,
+      "original_public_bypass_batches": 1826,
+      "l2_rejected_batches": 0,
+      "actual_bypass_batches": 0,
+      "would_bypass_batches": 0,
+      "known_semantic_audit_calls": 2483,
+      "unknown_audit_call_records": 0,
+      "known_semantic_audit_tokens": 5035179,
+      "unknown_audit_cost_batches": 1,
+      "unknown_shadow_cost_batches": 0,
+      "invalid_event_records": 0,
+      "unknown_audit_cost_traces": 0,
+      "unknown_scope_groups": 0,
+      "known_shadow_would_save_tokens": 0,
+      "eligible_rate": 0.17277486910994763,
+      "new_bypass_rate": 0.0,
+      "eligible_bypass_rate": 0.0,
+      "semantic_audit_calls": 2483,
+      "shadow_would_save_tokens": null,
+      "actual_total_tokens_saved": null,
+      "route_reason_counts": {
+        "READ_AUDIT_BYPASS": 1826,
+        "NOT_INTERNAL_IDEMPOTENT_READ": 1595,
+        "SINGLE_AUTHORIZED_INTERNAL_READ_REQUIRED": 129,
+        "ARTIFACT_INVALID_OR_MISSING": 429,
+        "INCOMPLETE_INPUT": 330
+      },
+      "raw_audit_decision_counts": {
+        "not_audited": 1826,
+        "allow": 1163,
+        "abstain": 664,
+        "deny": 656
+      },
+      "final_monitor_decision_counts": {
+        "allow": 3380,
+        "deny": 929
+      },
+      "shadow_audit_cross_counts": {},
+      "router_latency_p50_ms": 3.7684720009565353,
+      "router_latency_p95_ms": 8.751299232244492
+    },
+    "repeat_exit_code": 1,
+    "repeat_message": "Cannot summarize stored run: routing report exists; use --refresh for tool-owned reports"
+  },
+  "denominators": {
+    "model_calls": 0,
+    "new_rollouts": 0,
+    "efficacy_samples": 0,
+    "historical_scored_traces": 1167,
+    "router_events": 4309
+  },
+  "limitations": [
+    "No model efficacy/security/calibration validation.",
+    "Directory locking cannot fully identify active remote Dashboard processes; stop runs before offline generation.",
+    "Atomic per file, not a two-file transaction.",
+    "Unknown scope and incomplete traces prevent complete savings/cost conclusions."
+  ],
+  "next_action": "Use the compact root reports in new user runs; separately validate calibrated routing and model outcomes.",
+  "environment": {
+    "ipi_python": "3.10.21",
+    "ipi-agentdyn_python": "3.10.21",
+    "node": "v22.23.1"
+  },
+  "initial_handoff_snapshot": "workshop/artifacts/20261019_result_reports/initial_handoff_snapshot/"
+}

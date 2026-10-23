@@ -1,0 +1,15 @@
+{
+  "task": "20261015_parameter_plan",
+  "original_readme": {
+    "path": "README.md",
+    "saved_path": "workshop/archive/parameter_plan_20261015/originals/README.md",
+    "sha256": "5671ab2be1559b2b5ecc33cdc8320a5c67d3a056a09dcfac37281a49f5cd8ede"
+  },
+  "current_files": {
+    "README.md": "9a2724ca7a73df45746decf2e1884042a54ea2488c7904e9aeb8d74de2f5e25d",
+    "plan.md": "953a636236413034b8fade44d501aa9e708ccbb2981f689a4bc1ef30b12ca109"
+  },
+  "validation_path": "workshop/artifacts/20261015_parameter_plan/validation.json",
+  "validation_sha256": "513dc217d41f751cb83d096873de01320f230efbc1875f90575a9ba3bd3c6754",
+  "note": "Documentation-only revision; previous snapshots and migration expectations unchanged"
+}

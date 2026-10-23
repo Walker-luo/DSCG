@@ -7,66 +7,63 @@
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
   <link href="/static/css/style.css" rel="stylesheet">
+  <link href="/static/css/experiment.css" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 </head>
-<body>
-  <header class="app-header">
-    <a class="brand" href="/" aria-label="DSCG 首页">
-      <span class="brand-mark"><i class="bi bi-shield-lock-fill"></i></span>
-      <span class="brand-copy"><strong>DSCG</strong><small>Agent Security Evaluation</small></span>
-    </a>
-    <div class="header-actions">
-      <button class="btn btn-sm btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#architecture-modal"><i class="bi bi-diagram-3"></i><span>防御架构</span></button>
-      <button class="btn btn-sm btn-outline-secondary" id="btn-history-analysis" data-bs-toggle="modal" data-bs-target="#history-analysis-modal"><i class="bi bi-graph-up"></i><span>历史分析</span></button>
-      <span id="status-indicator" class="run-status idle" role="status"><span class="status-dot"></span><span>就绪</span></span>
-      <button class="btn btn-sm icon-button" onclick="location.reload()" aria-label="刷新页面" title="刷新页面"><i class="bi bi-arrow-clockwise"></i></button>
-    </div>
-  </header>
+<body class="experiment-page" data-framework-version="{{ framework_version }}">
+  {% include '_header.html' %}
 
   <div class="app-shell">
     <aside class="sidebar">
       <div class="sidebar-heading">
-        <div><span class="section-kicker">Experiment setup</span><h1>实验配置</h1></div>
-        <span class="version-badge">AgentDojo v1.2</span>
+        <div><h1>实验配置</h1><p>选择模型、评测范围与防御组合</p></div>
+        <a class="mobile-workspace-link" href="#evaluation-workspace">查看工作台</a><span id="benchmark-badge" class="version-badge" title="当前进程识别的基准">基准未加载</span>
       </div>
 
       <div class="sidebar-body">
         <section class="config-section" aria-labelledby="config-basic">
-          <h2 id="config-basic"><span>01</span> 运行与模型</h2>
-          <div class="field-group"><label class="form-label" for="run-label">运行标签</label><input type="text" id="run-label" class="form-control form-control-sm" placeholder="例如：P0.1 regression"></div>
-          <div class="field-group"><label class="form-label" for="pipeline-type">评测对象</label><select id="pipeline-type" class="form-select form-select-sm"><option value="newframe">DSCG 完整防御</option><option value="origin">原始模型 Baseline</option></select></div>
+          <h2 id="config-basic">评测对象与模型</h2>
+          <div class="field-group"><label class="form-label" for="run-label">运行名称</label><input type="text" id="run-label" class="form-control form-control-sm" placeholder="例如：{{ framework_version }} · 新对照" maxlength="120"><small class="field-help">框架或配置改变时使用新名称，保留原实验身份。</small></div>
+          <div class="field-group"><label class="form-label" for="pipeline-type">评测对象</label><select id="pipeline-type" class="form-select form-select-sm"><option value="newframe">DSCG · 三层防御</option><option value="origin">原生 Baseline / 防御</option></select></div>
           <div class="field-group"><label class="form-label" for="model-id">主模型</label><select id="model-id" class="form-select form-select-sm"><option value="" selected>Local/Env 配置</option></select></div>
-          <div class="field-group" id="sec-model-group"><label class="form-label" for="sec-model-id">安全审计模型</label><select id="sec-model-id" class="form-select form-select-sm"><option value="" selected>Local/Env 配置</option></select></div>
+          <div class="field-group" id="sec-model-group"><label class="form-label" for="sec-model-id">L3 审计模型</label><select id="sec-model-id" class="form-select form-select-sm"><option value="" selected>Local/Env 配置</option></select><small class="field-help">L2 授权使用主模型；L3 可使用独立审计模型。</small></div>
         </section>
 
         <section class="config-section" aria-labelledby="config-scope">
-          <h2 id="config-scope"><span>02</span> 场景范围</h2>
-          <div class="suite-grid">
-            <label class="suite-option" for="suite-workspace"><input class="form-check-input suite-cb" type="checkbox" id="suite-workspace" value="workspace" checked><span><strong>Workspace</strong><small data-suite-count="workspace">40 × 14</small></span></label>
-            <label class="suite-option" for="suite-travel"><input class="form-check-input suite-cb" type="checkbox" id="suite-travel" value="travel"><span><strong>Travel</strong><small data-suite-count="travel">20 × 7</small></span></label>
-            <label class="suite-option" for="suite-banking"><input class="form-check-input suite-cb" type="checkbox" id="suite-banking" value="banking"><span><strong>Banking</strong><small data-suite-count="banking">16 × 9</small></span></label>
-            <label class="suite-option" for="suite-slack"><input class="form-check-input suite-cb" type="checkbox" id="suite-slack" value="slack"><span><strong>Slack</strong><small data-suite-count="slack">21 × 5</small></span></label>
-          </div>
+          <h2 id="config-scope">场景与攻击</h2>
+          <div class="suite-grid" id="suite-grid" aria-live="polite"><small class="field-help">正在读取当前环境的场景目录…</small></div>
+          <small class="field-help" id="backend-status" role="status"></small>
           <div class="field-group"><label class="form-label" for="run-attack">评测模式</label><select id="run-attack" class="form-select form-select-sm"><option value="true" selected>对抗评测（含注入）</option><option value="false">良性效用评测</option></select></div>
-          <div class="field-group" id="attack-type-group"><label class="form-label" for="attack-name">攻击类型</label><select id="attack-name" class="form-select form-select-sm"><option value="important_instructions" selected>重要指令注入</option><option value="manual_system_prompt_extraction">系统提示词提取</option><option value="data_leakage">数据泄露</option><option value="injection_delimiters">分隔符注入</option><option value="ignore_previous">忽略前文指令</option><option value="malicious_sandbox">恶意沙箱</option></select></div>
+          <div class="field-group" id="attack-type-group"><label class="form-label" for="attack-name">攻击类型</label><select id="attack-name" class="form-select form-select-sm"><option value="" selected>正在读取攻击目录…</option></select></div>
+          <div class="limit-grid">
+            <div class="field-group"><label class="form-label" for="max-user-tasks">用户任务上限</label><input type="number" id="max-user-tasks" class="form-control form-control-sm" value="0" min="0" step="1"></div>
+            <div class="field-group" id="injection-limit-group"><label class="form-label" for="max-injection-tasks">注入任务上限</label><input type="number" id="max-injection-tasks" class="form-control form-control-sm" value="0" min="0" step="1"></div>
+          </div>
+          <small class="field-help">0 表示全部；有限子集按固定 seed 排序选取，可在高级设置中查看。</small>
         </section>
 
         <section class="config-section" aria-labelledby="config-defense">
-          <h2 id="config-defense"><span>03</span> 防御与采样</h2>
+          <h2 id="config-defense">防御组合 <span class="framework-version">{{ framework_version }}</span></h2>
           <div id="ablation-group" class="toggle-list">
-            <label class="toggle-row" for="use-sandbox"><span><i class="bi bi-funnel"></i><strong>权限沙箱</strong><small>确定性工具白名单</small></span><input class="form-check-input" type="checkbox" id="use-sandbox" checked></label>
-            <label class="toggle-row" for="use-security-checker"><span><i class="bi bi-shield-check"></i><strong>安全校验器</strong><small>动作序列语义审计</small></span><input class="form-check-input" type="checkbox" id="use-security-checker" checked></label>
+            <div class="field-group"><label class="form-label" for="defense-preset">配置预设</label><select id="defense-preset" class="form-select form-select-sm"><option value="full">完整三层</option><option value="no-l1">移除 L1 · 工具返回隔离</option><option value="no-l2">移除 L2 · 工具授权</option><option value="no-l3">移除 L3 · 动作审计</option><option value="v2">V2 风格对照 · 关闭新增入口</option><option value="custom">自定义组合</option></select></div>
+            <label class="toggle-row layer-one" for="use-input-isolation"><span><i class="bi bi-braces"></i><strong>L1 · 工具返回隔离</strong><small>月支出任务投影交易字段；其余保留来源封装</small></span><input class="form-check-input" type="checkbox" id="use-input-isolation" checked></label>
+            <label class="toggle-row layer-two" for="use-sandbox"><span><i class="bi bi-key"></i><strong>L2 · 可信任务工具授权</strong><small>按任务编译可用工具，默认整批前置检查</small></span><input class="form-check-input" type="checkbox" id="use-sandbox" checked></label>
+            <label class="precheck-option" for="authorization-precheck"><input class="form-check-input" type="checkbox" id="authorization-precheck" checked><span>候选批次在 L3 前校验权限</span></label>
+            <label class="precheck-option" for="planning-tool-view"><input class="form-check-input" type="checkbox" id="planning-tool-view" checked><span>规划器仅展示已授权工具</span></label>
+            <label class="precheck-option" for="delegated-tasks"><input class="form-check-input" type="checkbox" id="delegated-tasks" checked><span>展开明确授权的任务来源</span></label>
+            <small class="field-help delegation-help">明确执行文件时先经监控读取，再编译完整任务；总结文件不会展开。</small>
+            <label class="toggle-row layer-three" for="use-security-checker"><span><i class="bi bi-shield-check"></i><strong>L3 · 当前动作语义审计</strong><small>外发同时审查正文与目的地，避免转发无关攻击目标</small></span><input class="form-check-input" type="checkbox" id="use-security-checker" checked></label>
+            <p class="config-note" id="layer-config-note">执行仍由 Monitor 与一次性票据控制。默认不重审，完成提示关闭。</p>
           </div>
           <div class="field-group" id="defense-group" style="display:none;"><label class="form-label" for="defense">AgentDojo 防御</label><select id="defense" class="form-select form-select-sm"><option value="" selected>无防御</option><option value="tool_filter">工具过滤器</option><option value="transformers_pi_detector">注入检测器</option><option value="spotlighting_with_delimiting">定界高亮</option><option value="repeat_user_prompt">重复用户提示</option></select></div>
-          <div class="limit-grid">
-            <div class="field-group"><label class="form-label" for="max-user-tasks">用户任务上限</label><input type="number" id="max-user-tasks" class="form-control form-control-sm" value="0" min="0" placeholder="0 = 全部"></div>
-            <div class="field-group"><label class="form-label" for="max-injection-tasks">注入任务上限</label><input type="number" id="max-injection-tasks" class="form-control form-control-sm" value="0" min="0" placeholder="0 = 全部"></div>
-          </div>
-          <div class="field-group metadata-path-group"><label class="form-label" for="tool-metadata-path">工具风险元数据 <span class="field-optional">可选</span></label><input type="text" id="tool-metadata-path" class="form-control form-control-sm" placeholder="config/tools.local.toml" spellcheck="false"><small class="field-help">填写项目内 TOML 路径；未分类工具按 critical 处理。</small></div>
         </section>
 
-        <section class="config-section connection-section" aria-labelledby="config-connection">
-          <h2 id="config-connection"><span>04</span> 自定义 API 连接 <em>可选</em></h2>
+        <details class="config-section connection-section" id="advanced-config">
+          <summary>高级设置 <span>日志、子集与连接</span></summary>
+          <div class="advanced-fields">
+          <div class="field-group" id="trace-level-group"><label class="form-label" for="trace-level">轨迹级别</label><select id="trace-level" class="form-select form-select-sm"><option value="summary">Summary · 紧凑统计（默认）</option><option value="standard">Standard · 判决与动作记录</option><option value="full">Full · 完整诊断与压缩附录</option></select><small class="field-help">三层路由统计在各级别均保留；Full 会增加序列化和写入开销。</small></div>
+          <div class="field-group"><label class="form-label" for="selection-seed">子集选择 seed</label><input id="selection-seed" type="number" min="0" step="1" value="20260927" class="form-control form-control-sm"><small class="field-help">网页按 seed 排序；partial CLI 使用注册顺序前缀。跨入口对比需核对任务 ID。</small></div>
+          <div class="field-group metadata-path-group"><label class="form-label" for="tool-metadata-path">工具风险元数据 <span class="field-optional">可选</span></label><input type="text" id="tool-metadata-path" class="form-control form-control-sm" placeholder="留空使用本地 / 内置目录" spellcheck="false"><small class="field-help">未知或无效工具按 critical 处理。</small></div>
           <p class="section-help"><i class="bi bi-lock"></i>仅用于本次运行；留空则使用环境变量或 TOML 配置。</p>
           <div class="connection-block">
             <div class="connection-title">主模型连接</div>
@@ -96,35 +93,51 @@
               <input type="url" id="sec-base-url" class="form-control form-control-sm" placeholder="留空则使用 Provider 默认地址" spellcheck="false">
             </div>
           </div>
-        </section>
+          </div>
+        </details>
 
+        <a class="history-shortcut" href="/history"><i class="bi bi-graph-up"></i><span>到历史分析比较与下载结果</span><i class="bi bi-chevron-right"></i></a>
+      </div>
+
+      <div class="run-dock">
         <div class="run-preview" aria-live="polite">
-          <div><span>场景</span><strong id="preview-suites">1 / 4</strong></div>
-          <div><span>预计任务</span><strong id="preview-tasks">560</strong></div>
+          <div><span>场景</span><strong id="preview-suites">0 / 0</strong></div>
+          <div><span>预计任务</span><strong id="preview-tasks">未加载</strong></div>
           <div><span>防御模式</span><strong id="preview-defense">完整防御</strong></div>
         </div>
+        <p id="config-error" class="config-error" role="alert" hidden></p>
         <div class="run-actions">
           <button id="btn-run" class="btn btn-run"><i class="bi bi-play-fill"></i><span>开始评测</span></button>
           <button id="btn-stop" class="btn btn-outline-danger" style="display:none;"><i class="bi bi-plug"></i><span>断开实时日志</span></button>
         </div>
 
-        <section class="quick-compare" aria-labelledby="quick-compare-title">
-          <h2 id="quick-compare-title">结果对比</h2>
-          <div class="quick-actions"><button class="btn btn-sm btn-outline-secondary" onclick="quickCompare('baseline_vs_newframe')">Baseline / DSCG</button><button class="btn btn-sm btn-outline-secondary" onclick="quickCompare('ablation_study')">消融实验</button><button class="btn btn-sm btn-outline-secondary" onclick="quickCompare('defense_comparison')">防御基线</button></div>
-        </section>
       </div>
     </aside>
 
-    <main class="main-content">
+    <main class="main-content" id="evaluation-workspace">
       <div class="workspace-heading">
-        <div><span class="section-kicker">Evaluation workspace</span><h2>安全评测工作台</h2></div>
+        <div><h2>安全评测工作台</h2><p>查看运行状态、任务结果与实际成本</p></div><a class="mobile-workspace-link" href="#config-basic">返回配置</a>
         <div id="current-run-badge" class="run-context" style="display:none;"><span>当前运行</span><strong id="current-run-id">-</strong></div>
       </div>
 
+      <section class="framework-strip" aria-label="待启动防御配置">
+        <div class="framework-strip-heading"><span>待启动配置</span><strong id="workspace-framework">{{ framework_version }}</strong><span id="workspace-mode">对抗评测</span></div>
+        <div class="framework-layer-grid">
+          <div id="preview-layer-l1" class="framework-layer layer-one"><span>L1</span><div><strong>工具返回隔离</strong><small>有限交易投影，其他任务保留原文封装</small></div><b>启用</b></div>
+          <div id="preview-layer-l2" class="framework-layer layer-two"><span>L2</span><div><strong>可信任务工具授权</strong><small>编译权限，检查候选批次</small></div><b>启用</b></div>
+          <div id="preview-layer-l3" class="framework-layer layer-three"><span>L3</span><div><strong>当前动作语义审计</strong><small>核对外发正文与目的地</small></div><b>启用</b></div>
+        </div>
+        <p id="framework-flow">任务授权 → 已授权工具视图 → 主模型候选 → L2 整批前置 → L3 → Monitor / 票据执行</p>
+        <p id="delegation-flow" class="delegation-flow"><strong>明确委托任务来源</strong><span>指定文件、唯一邮件或网页 → 监控读取 → 原要求 + 完整任务 → 一次授权编译 → 规划与 L3 共享有效任务</span></p>
+        <p id="workspace-audit-note" class="workspace-audit-note">选择性路由默认 off，L3 仍启用；公开无外发读取沿用免审。</p>
+      </section>
+      <div class="workspace-controls"><label for="workspace-run">已保存运行</label><select id="workspace-run" class="form-select form-select-sm"><option value="">暂无运行</option></select><button type="button" class="btn btn-sm btn-outline-secondary" onclick="loadAllRuns()" aria-label="刷新运行列表"><i class="bi bi-arrow-repeat"></i></button><a href="/history">历史分析与导出</a></div>
+      <div id="run-progress" class="run-progress" hidden aria-live="polite"><div><strong id="progress-phase">准备运行</strong><span id="progress-count">0 / 0 个场景完成</span></div><progress id="suite-progress" value="0" max="1" aria-label="已完成场景"></progress><small>进度按已完成场景统计，任务执行详情见日志。</small></div>
+
       <nav class="workspace-tabs" aria-label="评测结果视图">
         <ul class="nav nav-tabs" id="main-tabs" role="tablist">
-          <li class="nav-item" role="presentation"><button class="nav-link active" id="tab-live" data-bs-toggle="tab" data-bs-target="#panel-live" type="button" role="tab"><i class="bi bi-terminal"></i>运行日志</button></li>
-          <li class="nav-item" role="presentation"><button class="nav-link" id="tab-overview" data-bs-toggle="tab" data-bs-target="#panel-overview" type="button" role="tab"><i class="bi bi-grid-1x2"></i>结果概览</button></li>
+          <li class="nav-item" role="presentation"><button class="nav-link active" id="tab-overview" data-bs-toggle="tab" data-bs-target="#panel-overview" type="button" role="tab" aria-selected="true" aria-controls="panel-overview"><i class="bi bi-grid-1x2"></i>结果概览</button></li>
+          <li class="nav-item" role="presentation"><button class="nav-link" id="tab-live" data-bs-toggle="tab" data-bs-target="#panel-live" type="button" role="tab" aria-selected="false" aria-controls="panel-live"><i class="bi bi-terminal"></i>运行日志</button></li>
           <li class="nav-item" role="presentation"><button class="nav-link" id="tab-charts" data-bs-toggle="tab" data-bs-target="#panel-charts" type="button" role="tab"><i class="bi bi-bar-chart"></i>指标图表</button></li>
           <li class="nav-item" role="presentation"><button class="nav-link" id="tab-detail" data-bs-toggle="tab" data-bs-target="#panel-detail" type="button" role="tab"><i class="bi bi-table"></i>任务明细</button></li>
           <li class="nav-item" role="presentation"><button class="nav-link" id="tab-compare" data-bs-toggle="tab" data-bs-target="#panel-compare" type="button" role="tab"><i class="bi bi-columns-gap"></i>运行对比</button></li>
@@ -133,7 +146,7 @@
       </nav>
 
       <div class="tab-content" id="main-tab-content">
-        <section class="tab-pane fade show active" id="panel-live" role="tabpanel">
+        <section class="tab-pane fade" id="panel-live" role="tabpanel" aria-labelledby="tab-live">
           <div class="panel-toolbar">
             <div><strong>事件流</strong><span class="toolbar-caption" id="live-context">等待运行</span></div>
             <div class="toolbar-actions"><label class="filter-toggle" for="filter-errors"><input class="form-check-input" type="checkbox" id="filter-errors"><span>仅错误</span></label><button class="btn btn-sm icon-button" onclick="clearLogs()" aria-label="清空日志" title="清空日志"><i class="bi bi-eraser"></i></button><button class="btn btn-sm icon-button" onclick="scrollLogsToBottom()" aria-label="滚动到底部" title="滚动到底部"><i class="bi bi-arrow-down"></i></button><button class="btn btn-sm btn-outline-secondary" id="btn-auto-scroll" onclick="toggleAutoScroll()"><i class="bi bi-check-circle"></i>自动滚动</button></div>
@@ -141,7 +154,7 @@
           <div class="log-viewer" id="log-viewer"><div class="empty-state log-placeholder"><i class="bi bi-terminal"></i><strong>暂无运行日志</strong><span>状态与安全判决将在运行后显示</span></div></div>
         </section>
 
-        <section class="tab-pane fade" id="panel-overview" role="tabpanel"><div class="panel-body" id="overview-content"><div class="empty-state"><i class="bi bi-grid-1x2"></i><strong>暂无汇总结果</strong><span>选择或完成一次运行后显示</span></div></div></section>
+        <section class="tab-pane fade show active" id="panel-overview" role="tabpanel" aria-labelledby="tab-overview"><div class="panel-body" id="overview-content"><div class="evaluation-empty"><div class="empty-illustration" aria-hidden="true"><i class="bi bi-braces"></i><i class="bi bi-key"></i><i class="bi bi-shield-check"></i></div><h3>准备一次可对比的评测</h3><p>在左侧配置模型与场景，开始评测后查看 TSR、ASR、Token 消耗与三层路由记录。</p><div class="empty-metric-guide"><span><b>TSR</b>任务完成情况</span><span><b>ASR</b>原生攻击判定</span><span><b>Tokens</b>主模型 + 审计模型</span></div><a href="/history">查看已有实验的历史分析</a></div></div></section>
 
         <section class="tab-pane fade" id="panel-charts" role="tabpanel">
           <div class="panel-body"><div class="data-toolbar"><label for="chart-data-source">运行数据</label><select id="chart-data-source" class="form-select form-select-sm"><option value="">选择运行</option></select><button class="btn btn-sm btn-outline-secondary" onclick="refreshCharts()"><i class="bi bi-arrow-repeat"></i>载入</button></div><div class="row g-3" id="charts-container"><div class="col-12 empty-state"><i class="bi bi-bar-chart-line"></i><strong>暂无图表数据</strong><span>选择一条已完成的运行记录</span></div></div><div class="row g-3 mt-0" id="charts-row-2"></div></div>
@@ -163,102 +176,69 @@
   </div>
 
   <div class="modal fade" id="architecture-modal" tabindex="-1" aria-labelledby="architecture-title" aria-hidden="true">
-    <div class="modal-dialog modal-xl modal-dialog-centered"><div class="modal-content">
-      <div class="modal-header"><div><span class="section-kicker">P0.2–P0.5 execution path</span><h5 class="modal-title" id="architecture-title">DSCG 确定性执行防线</h5></div><button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="关闭"></button></div>
-      <div class="modal-body"><div class="architecture-diagram">
-        <div class="arch-lane"><span class="arch-lane-label">授权先行</span><div class="arch-flow"><div class="arch-box arch-input"><i class="bi bi-person-check"></i><strong>可信用户回合</strong><small>TrustedTaskRequest</small></div><i class="bi bi-arrow-right arch-arrow"></i><div class="arch-box arch-compiler"><i class="bi bi-file-earmark-lock"></i><strong>编译授权契约</strong><small>LLM + schema validation</small></div><i class="bi bi-arrow-right arch-arrow"></i><div class="arch-box arch-sandbox"><i class="bi bi-shield-lock"></i><strong>安装不可变契约</strong><small>PermissionSandbox</small></div></div></div>
-        <div class="arch-connector"><i class="bi bi-arrow-down"></i><span>契约安装完成后才生成候选动作</span></div>
-        <div class="arch-lane"><span class="arch-lane-label">动作仲裁</span><div class="arch-flow"><div class="arch-box arch-model"><i class="bi bi-cpu"></i><strong>候选动作</strong><small>Main Executor / LLM</small></div><i class="bi bi-arrow-right arch-arrow"></i><div class="arch-box arch-checker"><i class="bi bi-shield-check"></i><strong>结构化审计</strong><small>ActionSecurityChecker</small></div><i class="bi bi-arrow-right arch-arrow"></i><div class="arch-box arch-monitor"><i class="bi bi-diagram-3"></i><strong>统一仲裁</strong><small>ReferenceMonitor + Ledger</small></div><i class="bi bi-arrow-right arch-arrow"></i><div class="arch-box arch-exec"><i class="bi bi-ticket-perforated"></i><strong>一次性执行票据</strong><small>TicketedToolsExecutor</small></div><i class="bi bi-arrow-right arch-arrow"></i><div class="arch-box arch-tool"><i class="bi bi-gear"></i><strong>真实工具</strong><small>ToolsExecutor</small></div></div></div>
-        <div class="arch-recovery"><i class="bi bi-arrow-return-left"></i><span>阻断动作 → 结构化工具错误 → 主模型重规划 → 重新经过审计、仲裁和票据校验</span></div>
-        <div class="arch-details"><div><span>01</span><h6>授权契约</h6><p><code>OurFrameExecutor</code> 只根据可信用户回合、固定策略、注册工具和显式风险元数据编译契约；<code>PermissionSandbox</code> 保存并检查工具级权限，候选动作不能给自己扩权。</p></div><div><span>02</span><h6>结构化审计</h6><p><code>ActionSecurityChecker</code> 读取当前候选动作和有限动作历史，输出 <code>allow/deny/abstain</code> 风险信号。它不能授予权限；低风险公共读取可走确定性旁路。</p></div><div><span>03</span><h6>统一仲裁</h6><p><code>ReferenceMonitor</code> 先检查工具注册和 Sandbox，再结合审计结果逐个判定，并把每个动作写入 <code>ActionLedger</code>。混合批次先全量判定，再逐动作提交。</p></div><div><span>04</span><h6>票据执行与边界</h6><p>只有绑定 action_id、调用指纹、契约版本和 nonce 的一次性票据能经 <code>TicketedToolsExecutor</code> 到达真实工具；当前主要覆盖工具级授权，参数级 Contract 和 provenance 属于后续 P1/P2。</p></div></div>
-      </div></div>
-    </div></div>
-  </div>
-
-  <div class="modal fade history-analysis-modal" id="history-analysis-modal" tabindex="-1" aria-labelledby="history-analysis-title" aria-hidden="true">
     <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable"><div class="modal-content">
-      <div class="modal-header"><div><span class="section-kicker">Historical results</span><h5 class="modal-title" id="history-analysis-title">历史实验分析</h5></div><button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="关闭"></button></div>
-      <div class="modal-body history-panel">
-        <div class="history-layout">
-          <fieldset class="history-run-selection">
-            <div class="history-list-heading">
-              <legend>历史实验结果</legend>
-              <span id="history-selection-count" aria-live="polite">0 项已选</span>
+      <div class="modal-header"><div><span class="section-kicker">当前已实施 · {{ framework_version }}</span><h5 class="modal-title" id="architecture-title">DSCG 三层防御结构</h5></div><button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="关闭"></button></div>
+      <div class="modal-body">
+        <p class="arch-status">完整防御默认启用以下三层；L1 不新增模型调用，审计重试为 0，完成提示关闭。L2 编译权限后只向规划器展示已授权工具，候选执行前仍复核。明确要求执行指定文件、唯一邮件或任务网页时，先经监控读取，再编译完整有效任务；普通返回不能扩权。网页可关闭工具视图与明确任务来源展开；宿主任务 profile 仅通过 API 配置，未配置时沿用原授权策略。</p>
+        <div class="architecture-diagram">
+          <div class="arch-lane" data-defense-layer="input-isolation">
+            <span class="arch-lane-label">第一层 · 工具返回隔离</span>
+            <div class="arch-flow">
+              <div class="arch-box arch-input"><i class="bi bi-file-text"></i><strong>外部结果与错误正文</strong><small>原消息保留给日志与审计</small></div>
+              <i class="bi bi-arrow-right arch-arrow" aria-hidden="true"></i>
+              <div class="arch-box arch-compiler"><i class="bi bi-braces"></i><strong>有限字段投影 / 来源封装</strong><small>月支出省略交易备注；不适用则保留原文</small></div>
+              <i class="bi bi-arrow-right arch-arrow" aria-hidden="true"></i>
+              <div class="arch-box arch-model"><i class="bi bi-cpu"></i><strong>主模型规划视图</strong><small>无关注入用概述，必要引用保留</small></div>
             </div>
-            <div class="history-select-actions">
-              <button type="button" class="btn btn-sm btn-outline-secondary" id="history-select-all">全选</button>
-              <button type="button" class="btn btn-sm btn-outline-secondary" id="history-clear-selection">清空</button>
-              <span id="history-catalog-count" class="history-catalog-count" aria-live="polite"></span>
+          </div>
+          <div class="arch-connector"><i class="bi bi-arrow-down" aria-hidden="true"></i><span>L1 投影仅支持原生银行月支出任务，不认证事实；必要分析与引用保留原文。L2 授权只来自可信任务与宿主策略</span></div>
+          <div class="arch-lane" data-defense-layer="authorization">
+            <span class="arch-lane-label">第二层 · 可信任务工具授权</span>
+            <div class="arch-flow">
+              <div class="arch-box arch-input"><i class="bi bi-person-check"></i><strong>有效用户任务</strong><small>明确委托的文件先准备读取</small></div>
+              <i class="bi bi-arrow-right arch-arrow" aria-hidden="true"></i>
+              <div class="arch-box arch-compiler"><i class="bi bi-list-check"></i><strong>编译授权与工具视图</strong><small>冻结目录 · 新用户任务替换授权</small></div>
+              <i class="bi bi-arrow-right arch-arrow" aria-hidden="true"></i>
+              <div class="arch-box arch-sandbox"><i class="bi bi-funnel"></i><strong>候选权限前置检查</strong><small>非法混合批次整体拒绝</small></div>
             </div>
-            <div id="history-run-list" class="history-run-list" role="group" aria-label="选择历史实验结果">
-              <div class="empty-state"><strong>正在读取 results/</strong></div>
+          </div>
+          <div class="arch-connector"><i class="bi bi-arrow-down" aria-hidden="true"></i><span>规划和 L3 使用同一有效任务；未授权工具即使被模型编造仍拒绝，目录变化不自动扩权</span></div>
+          <div class="arch-lane" data-defense-layer="audit">
+            <span class="arch-lane-label">第三层 · 当前动作语义审计</span>
+            <div class="arch-flow">
+              <div class="arch-box arch-model"><i class="bi bi-cpu"></i><strong>当前候选动作</strong><small>工具、参数与有限动作历史</small></div>
+              <i class="bi bi-arrow-right arch-arrow" aria-hidden="true"></i>
+              <div class="arch-box arch-checker"><i class="bi bi-shield-check"></i><strong>任务对齐审计</strong><small>外发同时核对正文与目的地</small></div>
+              <i class="bi bi-arrow-right arch-arrow" aria-hidden="true"></i>
+              <div class="arch-box arch-checker"><i class="bi bi-clipboard-check"></i><strong>结构化风险判断</strong><small>允许 / 拒绝 / 不确定</small></div>
             </div>
-          </fieldset>
-
-          <section class="history-view-controls" aria-label="分析视图设置">
-            <div class="field-group">
-              <label class="form-label" for="history-suite-select">场景</label>
-              <select id="history-suite-select" class="form-select form-select-sm">
-                <option value="all">全部场景</option>
-              </select>
+          </div>
+          <div class="arch-connector"><i class="bi bi-arrow-down" aria-hidden="true"></i><span>审计提供风险判断，最终执行仍由原授权与监控器仲裁</span></div>
+          <div class="arch-lane" data-execution-infrastructure="monitor-ticket">
+            <span class="arch-lane-label">执行基础设施 · Monitor / 一次性票据</span>
+            <div class="arch-flow">
+              <div class="arch-box arch-monitor"><i class="bi bi-diagram-3"></i><strong>统一执行仲裁</strong><small>白名单、元数据、审计与动作状态</small></div>
+              <i class="bi bi-arrow-right arch-arrow" aria-hidden="true"></i>
+              <div class="arch-box arch-exec"><i class="bi bi-ticket-perforated"></i><strong>一次性执行许可</strong><small>绑定原调用 · 使用后失效</small></div>
+              <i class="bi bi-arrow-right arch-arrow" aria-hidden="true"></i>
+              <div class="arch-box arch-tool"><i class="bi bi-gear"></i><strong>真实工具执行</strong><small>结果返回主模型</small></div>
             </div>
-            <div class="field-group">
-              <label class="form-label" for="history-metric-select">指标</label>
-              <select id="history-metric-select" class="form-select form-select-sm">
-                <option value="utility_rate">任务效用率 TSR</option>
-                <option value="attack_success_rate">攻击成功率 ASR</option>
-                <option value="defense_success_rate">防御成功率</option>
-                <option value="total_tokens">Token 消耗</option>
-              </select>
-            </div>
-            <div class="field-group">
-              <label class="form-label" for="history-chart-type">图表形式</label>
-              <select id="history-chart-type" class="form-select form-select-sm">
-                <option value="line">折线图</option>
-                <option value="bar">分组柱状</option>
-                <option value="radar">雷达对比</option>
-                <option value="scatter">TSR-ASR 散点</option>
-                <option value="heatmap">任务结果热图</option>
-              </select>
-            </div>
-            <button type="button" class="btn btn-primary history-analyze-button" id="history-analyze">
-              <i class="bi bi-graph-up-arrow" aria-hidden="true"></i>生成分析
-            </button>
-            <p id="history-analysis-status" class="history-analysis-status" role="status" aria-live="polite"></p>
-          </section>
+          </div>
+          <div class="arch-recovery"><i class="bi bi-arrow-return-left"></i><span>工具反馈经 L1 返回主模型；重规划的新候选重新经过 L2、L3 和票据校验。对象与数据范围仍存在缺口。</span></div>
+          <div class="arch-details">
+            <div><span>已生效 · L1 输出规则</span><h6>概述无关注入，保留必要引用</h6><p>原始事实、正文与错误保留给审计和日志。日常摘要或发送任务以概述说明被忽略的无关指令，避免复述攻击目标；明确分析、安全报告与必要引用仍可保留原文。这是软规划提示，不是最终输出过滤。</p></div>
+            <div><span>已生效 · 审计输入</span><h6>保留有界相关任务证据</h6><p>最多 8 条当前任务相关调用与返回共享 8,192 字符，调用参数、遗漏和截断均显式记录；文件大小比较保留完整元数据。事实仍不可信；候选工具的宿主描述最多 512 字符。</p></div>
+            <div><span>已生效 · L3 外发审查</span><h6>正文与目的地一并核对</h6><p>安全提醒夹带无关攻击链接也可能偏离任务；必要来源链接和显式安全分析仍可保留。有效公开无外发读取沿用免审。已授权且无 sink 的读取，原 Monitor 仍可能覆盖有效 deny；不确定或错误阻断。</p></div>
+            <div><span>L3 可选算法路由</span><h6>off 仍保留动作审计</h6><p>off 关闭新增选择性路由；shadow 只观察，selective 须满足硬条件与兼容校准。目前默认 off，无可部署阈值；模式和 artifact 仅有 API/CLI 入口。网页不提供路由控制。关闭整个 L3 使用“动作审计”开关。</p></div>
+            <div><span>任务来源边界</span><h6>完整任务展开，超限失败</h6><p>仅支持有限的明确执行句式；正文最多 1,536 字符，完整有效任务最多 2,048 字符，序列化返回最多 16,384 字符。总结、普通返回与递归委托不升级权限；用户确认后文件被污染的情形不在此功能范围。</p></div>
+            <div><span>当前能力边界</span><h6>工具级约束</h6><p>对象、目的地、参数与数据权限尚未强制约束，最终纯文本回答不经动作审计。默认仍授予有效读取工具；宿主 profile 可选且无默认业务规则。单次观测不能证明安全增益或成本节省，原研究闸门状态不变。</p></div>
+          </div>
         </div>
-
-        <section class="history-visual-section" aria-labelledby="history-chart-title">
-          <div class="history-chart-heading">
-            <div><span class="section-kicker">Historical results</span><h2 id="history-chart-title">历史结果分析</h2></div>
-            <span id="history-source-caption" class="history-source-caption"></span>
-          </div>
-          <div class="chart-container history-chart-container">
-            <div id="history-canvas-wrap" class="history-canvas-wrap" hidden>
-              <canvas id="history-chart" role="img" aria-label="历史实验指标图表"></canvas>
-            </div>
-            <div id="history-heatmap-container" class="history-heatmap-container" hidden></div>
-            <div id="history-chart-empty" class="empty-state history-chart-empty">
-              <i class="bi bi-graph-up"></i><strong>选择结果并生成分析</strong><span>可比较不同优化版本及其各场景表现</span>
-            </div>
-          </div>
-        </section>
-
-        <section class="history-table-section" aria-labelledby="history-summary-title">
-          <h3 id="history-summary-title">指标明细</h3>
-          <div class="table-responsive">
-            <table class="table table-dark table-hover table-sm" id="history-summary-table">
-              <thead><tr><th>实验</th><th>场景</th><th>TSR (%)</th><th>ASR (%)</th><th>防御率 (%)</th><th>Tokens</th><th>任务数</th></tr></thead>
-              <tbody><tr><td colspan="7">尚无分析数据</td></tr></tbody>
-            </table>
-          </div>
-        </section>
       </div>
     </div></div>
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
   <script src="/static/js/app.js"></script>
-  <script src="/static/js/history.js"></script>
 </body>
 </html>

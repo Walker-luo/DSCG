@@ -1,0 +1,17 @@
+test_actual_audit_request_contains_untrusted_facts_and_excludes_old_tasks (test_audit_tool_context.AuditToolContextTests) ... ok
+test_actual_request_carries_registered_tool_semantics (test_audit_tool_context.AuditToolContextTests) ... ok
+test_even_audit_allow_cannot_expand_tools_after_poisoned_feedback (test_audit_tool_context.AuditToolContextTests) ... ok
+test_tool_errors_and_unicode_are_data_and_arguments_stay_unchanged (test_audit_tool_context.AuditToolContextTests) ... ok
+test_tool_feedback_cannot_supply_or_override_host_semantics (test_audit_tool_context.AuditToolContextTests) ... ok
+test_window_is_four_results_with_per_result_bound_and_separate_flags (test_audit_tool_context.AuditToolContextTests) ... ok
+test_checkout_without_local_file_uses_shipped_catalog (test_audit_tool_context.BuiltinMetadataDefaultsTests) ... ok
+test_existing_local_override_wins_and_explicit_missing_still_errors (test_audit_tool_context.BuiltinMetadataDefaultsTests) ... ok
+
+----------------------------------------------------------------------
+Ran 8 tests in 0.012s
+
+OK
+提醒：TaskResults 重构过程中出现小插曲（可能已处理）: name 'FunctionCall' is not defined
+
+For further information visit https://errors.pydantic.dev/2.12/u/undefined-annotation
+[DSCG MEDIATION] batch=eed413ac987f4d73a31470d1d81a5131 proposed=1 approved=0 blocked=1

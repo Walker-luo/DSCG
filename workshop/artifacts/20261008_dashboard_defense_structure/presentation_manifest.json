@@ -1,0 +1,12 @@
+{
+  "scope": "Display existing retained V2 stage1 only; no new defense mechanism",
+  "files": {
+    "dashboard/templates/index.html": "880319555b66224bef4cf10aa00a118904225b72f58a69a053d085f737f99c15",
+    "dashboard/static/css/style.css": "b2fe011c47e03b968277df985dd6c98de10fe8931c7a5bd49b402fb0f4cf27da",
+    "dashboard/templates/_header.html": "00cbaf0dca48b7f3848474df179c3fea3b7134be745711daf13bd9d4deba1098"
+  },
+  "defense_layers": 2,
+  "execution_infrastructure": "Monitor/tickets",
+  "new_model_calls": 0,
+  "new_benchmark_samples": 0
+}

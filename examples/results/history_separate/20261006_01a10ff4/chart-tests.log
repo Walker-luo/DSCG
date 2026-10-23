@@ -1,0 +1,70 @@
+TAP version 13
+# Subtest: each selected metric gets its own chart with only that metric's data
+ok 1 - each selected metric gets its own chart with only that metric's data
+  ---
+  duration_ms: 1.2905
+  type: 'test'
+  ...
+# Subtest: a single suite keeps experiment identity and colors in separate charts
+ok 2 - a single suite keeps experiment identity and colors in separate charts
+  ---
+  duration_ms: 0.173209
+  type: 'test'
+  ...
+# Subtest: experiment colors and styles stay stable across metrics, order, and subset changes
+ok 3 - experiment colors and styles stay stable across metrics, order, and subset changes
+  ---
+  duration_ms: 0.893625
+  type: 'test'
+  ...
+# Subtest: additional experiments receive distinct colors instead of recycling the five-color palette
+ok 4 - additional experiments receive distinct colors instead of recycling the five-color palette
+  ---
+  duration_ms: 0.106708
+  type: 'test'
+  ...
+# Subtest: percentage endpoints stay inside cartesian, radar and scatter plot bounds
+ok 5 - percentage endpoints stay inside cartesian, radar and scatter plot bounds
+  ---
+  duration_ms: 0.605833
+  type: 'test'
+  ...
+# Subtest: tokens get their own chart in K units with no shared percentage axis
+ok 6 - tokens get their own chart in K units with no shared percentage axis
+  ---
+  duration_ms: 0.147125
+  type: 'test'
+  ...
+# Subtest: unsupported radar combinations and empty selections are rejected
+ok 7 - unsupported radar combinations and empty selections are rejected
+  ---
+  duration_ms: 0.216541
+  type: 'test'
+  ...
+# Subtest: scatter skips missing metrics and uses the same experiment colors
+ok 8 - scatter skips missing metrics and uses the same experiment colors
+  ---
+  duration_ms: 0.072791
+  type: 'test'
+  ...
+# Subtest: legend markers use each experiment's line color including radar fill transparency
+ok 9 - legend markers use each experiment's line color including radar fill transparency
+  ---
+  duration_ms: 0.312541
+  type: 'test'
+  ...
+# Subtest: single-suite axis labels wrap experiment names to fit independent panels
+ok 10 - single-suite axis labels wrap experiment names to fit independent panels
+  ---
+  duration_ms: 0.273291
+  type: 'test'
+  ...
+1..10
+# tests 10
+# suites 0
+# pass 10
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 57.167542

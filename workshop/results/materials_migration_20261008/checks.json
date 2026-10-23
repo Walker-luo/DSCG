@@ -1,0 +1,35 @@
+{
+  "commands": [
+    {
+      "cwd": "/Users/luo/Desktop/AgentDefence/DSCG",
+      "command": "/opt/miniconda3/envs/ipi/bin/python workshop/results/materials_migration_20261008/move_materials.py",
+      "exit_code": 0,
+      "summary": "11 documents/catalog, 282 diagnostic artifacts moved; 293 original hashes retained; raw results moved0"
+    },
+    {
+      "cwd": "/Users/luo/Desktop/AgentDefence/DSCG",
+      "command": "/opt/miniconda3/envs/ipi/bin/python workshop/verify_migration.py",
+      "exit_code": 0,
+      "summary": "293 canonical/original/legacy hash checks;58local links;41Python syntax;22script roots;runtime/route unchanged"
+    },
+    {
+      "cwd": "/Users/luo/Desktop/AgentDefence/DSCG",
+      "command": "PYTHONDONTWRITEBYTECODE=1 /opt/miniconda3/envs/ipi/bin/python -m unittest discover -s workshop/results/framework_optimization/20261007_v2_followup -p test_evidence_scoring.py -v",
+      "exit_code": 0,
+      "summary": "8/8 offline evidence scoring checks;0model calls"
+    },
+    {
+      "cwd": "/Users/luo/Desktop/AgentDefence/DSCG",
+      "command": "git diff --check",
+      "exit_code": 0
+    },
+    {
+      "cwd": "/Users/luo/Desktop/AgentDefence/research",
+      "command": "git diff --check",
+      "exit_code": 0
+    }
+  ],
+  "runtime_regression_rerun": false,
+  "new_benchmark_samples": 0,
+  "preserved_preexisting_change": " D System_TODO.md"
+}

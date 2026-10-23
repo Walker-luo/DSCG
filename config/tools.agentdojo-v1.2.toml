@@ -82,5 +82,5 @@ send_channel_message = { effect = "external_send", source = "local", sink = "pub
 get_users_in_channel = { effect = "read", source = "local", sink = "none", sensitivity = "internal", idempotent = true, reversible = true }
 invite_user_to_slack = { effect = "write", source = "local", sink = "none", sensitivity = "internal", idempotent = false, reversible = false }
 remove_user_from_slack = { effect = "write", source = "local", sink = "none", sensitivity = "internal", idempotent = false, reversible = false }
-get_webpage = { effect = "read", source = "web", sink = "none", sensitivity = "public", idempotent = true, reversible = true }
+get_webpage = { effect = "read", source = "web", sink = "external_recipient", sensitivity = "public", idempotent = true, reversible = true }
 post_webpage = { effect = "external_send", source = "web", sink = "public_output", sensitivity = "public", idempotent = false, reversible = false }

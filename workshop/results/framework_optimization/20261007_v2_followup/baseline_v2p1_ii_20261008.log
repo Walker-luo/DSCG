@@ -1,0 +1,72 @@
+/opt/miniconda3/envs/ipi/lib/python3.10/site-packages/agentdojo/benchmark.py:209: UserWarning: Not all injection tasks were solved as user tasks.
+  warnings.warn("Not all injection tasks were solved as user tasks.")
+本次攻击 (1): important_instructions
+开始实验 - 模型: 本地/环境配置, 攻击: important_instructions, 防御: 无（baseline）
+
+正在测试套件: workspace...
+已解析模型配置 - 主模型: deepseek-flash, 审计模型: 无
+本次运行名称: baseline_v2p1_ii_20261008，结果目录: /Users/luo/Desktop/AgentDefence/DSCG/results/partial_benchmark/deepseek-flash_baseline_v2p1_ii_20261008/important_instructions
+
+--- 套件统计 [workspace] ---
+总计 User Tasks 数量: 40
+总计 Injection Tasks 数量: 14
+本次评测任务数量 - User Tasks: 3/40, Injection Tasks: 3/14, 预计任务组合: 9
+缓存策略: 强制重跑 （可用 --force-rerun 或 DSCG_FORCE_RERUN=1 强制重跑）
+实际完成评测任务数量: 9
+✅ [workspace] 测试完成！
+📄 文本报告: /Users/luo/Desktop/AgentDefence/DSCG/results/partial_benchmark/deepseek-flash_baseline_v2p1_ii_20261008/important_instructions/workspace/report.txt
+📊 数据表格(用于画图): /Users/luo/Desktop/AgentDefence/DSCG/results/partial_benchmark/deepseek-flash_baseline_v2p1_ii_20261008/important_instructions/workspace/detailed_results.csv
+📈 得分汇总: /Users/luo/Desktop/AgentDefence/DSCG/results/partial_benchmark/deepseek-flash_baseline_v2p1_ii_20261008/important_instructions/workspace/summary.json
+
+
+正在测试套件: travel...
+已解析模型配置 - 主模型: deepseek-flash, 审计模型: 无
+本次运行名称: baseline_v2p1_ii_20261008，结果目录: /Users/luo/Desktop/AgentDefence/DSCG/results/partial_benchmark/deepseek-flash_baseline_v2p1_ii_20261008/important_instructions
+
+--- 套件统计 [travel] ---
+总计 User Tasks 数量: 20
+总计 Injection Tasks 数量: 7
+本次评测任务数量 - User Tasks: 3/20, Injection Tasks: 3/7, 预计任务组合: 9
+缓存策略: 强制重跑 （可用 --force-rerun 或 DSCG_FORCE_RERUN=1 强制重跑）
+实际完成评测任务数量: 9
+✅ [travel] 测试完成！
+📄 文本报告: /Users/luo/Desktop/AgentDefence/DSCG/results/partial_benchmark/deepseek-flash_baseline_v2p1_ii_20261008/important_instructions/travel/report.txt
+📊 数据表格(用于画图): /Users/luo/Desktop/AgentDefence/DSCG/results/partial_benchmark/deepseek-flash_baseline_v2p1_ii_20261008/important_instructions/travel/detailed_results.csv
+📈 得分汇总: /Users/luo/Desktop/AgentDefence/DSCG/results/partial_benchmark/deepseek-flash_baseline_v2p1_ii_20261008/important_instructions/travel/summary.json
+
+
+正在测试套件: banking...
+已解析模型配置 - 主模型: deepseek-flash, 审计模型: 无
+本次运行名称: baseline_v2p1_ii_20261008，结果目录: /Users/luo/Desktop/AgentDefence/DSCG/results/partial_benchmark/deepseek-flash_baseline_v2p1_ii_20261008/important_instructions
+
+--- 套件统计 [banking] ---
+总计 User Tasks 数量: 16
+总计 Injection Tasks 数量: 9
+本次评测任务数量 - User Tasks: 3/16, Injection Tasks: 3/9, 预计任务组合: 9
+缓存策略: 强制重跑 （可用 --force-rerun 或 DSCG_FORCE_RERUN=1 强制重跑）
+实际完成评测任务数量: 9
+✅ [banking] 测试完成！
+📄 文本报告: /Users/luo/Desktop/AgentDefence/DSCG/results/partial_benchmark/deepseek-flash_baseline_v2p1_ii_20261008/important_instructions/banking/report.txt
+📊 数据表格(用于画图): /Users/luo/Desktop/AgentDefence/DSCG/results/partial_benchmark/deepseek-flash_baseline_v2p1_ii_20261008/important_instructions/banking/detailed_results.csv
+📈 得分汇总: /Users/luo/Desktop/AgentDefence/DSCG/results/partial_benchmark/deepseek-flash_baseline_v2p1_ii_20261008/important_instructions/banking/summary.json
+
+
+正在测试套件: slack...
+已解析模型配置 - 主模型: deepseek-flash, 审计模型: 无
+本次运行名称: baseline_v2p1_ii_20261008，结果目录: /Users/luo/Desktop/AgentDefence/DSCG/results/partial_benchmark/deepseek-flash_baseline_v2p1_ii_20261008/important_instructions
+
+--- 套件统计 [slack] ---
+总计 User Tasks 数量: 21
+总计 Injection Tasks 数量: 5
+本次评测任务数量 - User Tasks: 3/21, Injection Tasks: 3/5, 预计任务组合: 9
+缓存策略: 强制重跑 （可用 --force-rerun 或 DSCG_FORCE_RERUN=1 强制重跑）
+实际完成评测任务数量: 9
+✅ [slack] 测试完成！
+📄 文本报告: /Users/luo/Desktop/AgentDefence/DSCG/results/partial_benchmark/deepseek-flash_baseline_v2p1_ii_20261008/important_instructions/slack/report.txt
+📊 数据表格(用于画图): /Users/luo/Desktop/AgentDefence/DSCG/results/partial_benchmark/deepseek-flash_baseline_v2p1_ii_20261008/important_instructions/slack/detailed_results.csv
+📈 得分汇总: /Users/luo/Desktop/AgentDefence/DSCG/results/partial_benchmark/deepseek-flash_baseline_v2p1_ii_20261008/important_instructions/slack/summary.json
+
+✅ 所选场景的报告已合并
+📚 总报告: /Users/luo/Desktop/AgentDefence/DSCG/results/partial_benchmark/deepseek-flash_baseline_v2p1_ii_20261008/important_instructions/all_report.txt
+
+📋 攻击执行清单: /Users/luo/Desktop/AgentDefence/DSCG/results/partial_benchmark/deepseek-flash_baseline_v2p1_ii_20261008/attack_manifest.json

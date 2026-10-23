@@ -1,0 +1,136 @@
+TAP version 13
+# Subtest: each selected metric gets its own chart with only that metric's data
+ok 1 - each selected metric gets its own chart with only that metric's data
+  ---
+  duration_ms: 1.11725
+  type: 'test'
+  ...
+# Subtest: a single suite keeps experiment identity and colors in separate charts
+ok 2 - a single suite keeps experiment identity and colors in separate charts
+  ---
+  duration_ms: 0.554
+  type: 'test'
+  ...
+# Subtest: experiment colors and styles stay stable across metrics, order, and subset changes
+ok 3 - experiment colors and styles stay stable across metrics, order, and subset changes
+  ---
+  duration_ms: 0.417667
+  type: 'test'
+  ...
+# Subtest: additional experiments receive distinct colors instead of recycling the five-color palette
+ok 4 - additional experiments receive distinct colors instead of recycling the five-color palette
+  ---
+  duration_ms: 0.114167
+  type: 'test'
+  ...
+# Subtest: legacy styles retain their colors and receive usable identity badges
+ok 5 - legacy styles retain their colors and receive usable identity badges
+  ---
+  duration_ms: 0.105292
+  type: 'test'
+  ...
+# Subtest: architecture identity shares a stable badge and style across attacks without merging data
+ok 6 - architecture identity shares a stable badge and style across attacks without merging data
+  ---
+  duration_ms: 0.115417
+  type: 'test'
+  ...
+# Subtest: bar identity labels include zero values and skip hidden or missing observations
+ok 7 - bar identity labels include zero values and skip hidden or missing observations
+  ---
+  duration_ms: 0.153541
+  type: 'test'
+  ...
+# Subtest: multiple attacks keep the model color while exposing distinct attack badges and line styles
+ok 8 - multiple attacks keep the model color while exposing distinct attack badges and line styles
+  ---
+  duration_ms: 0.1875
+  type: 'test'
+  ...
+# Subtest: percentage endpoints stay inside cartesian, radar and scatter plot bounds
+ok 9 - percentage endpoints stay inside cartesian, radar and scatter plot bounds
+  ---
+  duration_ms: 0.4785
+  type: 'test'
+  ...
+# Subtest: tokens get their own chart in K units with no shared percentage axis
+ok 10 - tokens get their own chart in K units with no shared percentage axis
+  ---
+  duration_ms: 0.34725
+  type: 'test'
+  ...
+# Subtest: unsupported radar combinations and empty selections are rejected
+ok 11 - unsupported radar combinations and empty selections are rejected
+  ---
+  duration_ms: 0.223667
+  type: 'test'
+  ...
+# Subtest: scatter skips missing metrics and uses the same experiment colors
+ok 12 - scatter skips missing metrics and uses the same experiment colors
+  ---
+  duration_ms: 0.366334
+  type: 'test'
+  ...
+# Subtest: legend markers use each experiment's line color including radar fill transparency
+ok 13 - legend markers use each experiment's line color including radar fill transparency
+  ---
+  duration_ms: 0.095958
+  type: 'test'
+  ...
+# Subtest: single-suite axis labels wrap experiment names to fit independent panels
+ok 14 - single-suite axis labels wrap experiment names to fit independent panels
+  ---
+  duration_ms: 0.060875
+  type: 'test'
+  ...
+# Subtest: folder, model and attack filters compose without merging model runs
+ok 15 - folder, model and attack filters compose without merging model runs
+  ---
+  duration_ms: 0.932417
+  type: 'test'
+  ...
+# Subtest: dependent options reset unavailable values when changing folders
+ok 16 - dependent options reset unavailable values when changing folders
+  ---
+  duration_ms: 12.934208
+  type: 'test'
+  ...
+# Subtest: hidden selections are removed before analyze/export and select-all uses only visible runs
+ok 17 - hidden selections are removed before analyze/export and select-all uses only visible runs
+  ---
+  duration_ms: 0.101542
+  type: 'test'
+  ...
+# Subtest: multiple framework versions retain separate runs under the same attack
+ok 18 - multiple framework versions retain separate runs under the same attack
+  ---
+  duration_ms: 0.21425
+  type: 'test'
+  ...
+# Subtest: catalog refresh preserves an explicit empty model selection and removes unavailable versions
+ok 19 - catalog refresh preserves an explicit empty model selection and removes unavailable versions
+  ---
+  duration_ms: 0.165041
+  type: 'test'
+  ...
+# Subtest: pending analyses cannot restore results hidden by a new filter and the newest request wins
+ok 20 - pending analyses cannot restore results hidden by a new filter and the newest request wins
+  ---
+  duration_ms: 0.133166
+  type: 'test'
+  ...
+# Subtest: actual filter events keep all selected versions after changing attacks and clear models across refresh
+ok 21 - actual filter events keep all selected versions after changing attacks and clear models across refresh
+  ---
+  duration_ms: 15.96675
+  type: 'test'
+  ...
+1..21
+# tests 21
+# suites 0
+# pass 21
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 56.199
