@@ -1,3 +1,4 @@
+# Frozen v3.4 controls; intent-flow defaults are tested in test_intent_flow*.py.
 import json
 import tempfile
 import unittest
@@ -39,7 +40,7 @@ class SelectiveAuditTests(unittest.TestCase):
                 self.requests+=1
                 if response=='error':raise TimeoutError()
                 return json.dumps(dict(decision=response,violations=[],confidence=0.5,reason_code='TEST'))
-        c=Auditor(SimpleNamespace(name='offline',client=None),sandbox=sandbox,precheck=pre,audit_router=router,router_verifier=v);c.requests=0
+        c=Auditor(SimpleNamespace(name='offline',client=None),sandbox=sandbox,precheck=pre,audit_router=router,router_verifier=v, prompt_profile='legacy-v34');c.requests=0
         monitor=d.ReferenceMonitor(sandbox,True,precheck=pre,audit_router=router,router_verifier=v)
         return pre,c,monitor,d.TicketedToolsExecutor(monitor)
 

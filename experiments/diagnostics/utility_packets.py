@@ -60,7 +60,7 @@ def build_packets(profile='source-context-v1'):
         rows.append({'id': case['id'], 'category': case['category'],
                      'authored_expectation': case['expected'], 'packet': packet})
     return {'schema_version': 'dscg.utility-packets.v1', 'prompt_profile': profile,
-            **profile_binding(profile), 'system_policy': checker.SYSTEM_POLICY,
+            **profile_binding('legacy-v34' if profile == 'legacy' else profile), 'system_policy': checker.SYSTEM_POLICY,
             'model_calls': 0, 'executed_tools': 0, 'limitations': fixture['limitations'], 'cases': rows}
 
 

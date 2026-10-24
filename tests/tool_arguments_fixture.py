@@ -48,6 +48,7 @@ def factory(origin,**options):
             allowed={'use_sandbox','use_security_checker','trace_level','audit_retries','completion_prompt',
                      'audit_router_mode','audit_router_artifact','audit_router_threshold','planning_tool_view',
                      'delegated_tasks','l1_projection_mode','prompt_profile','tool_metadata'}
+            options={**options,'prompt_profile':'legacy-v34'}
             result=defended.make_defended_pipeline(model_config=CONFIG,sec_model_config=CONFIG,
                                                   **{k:v for k,v in options.items() if k in allowed})
     result[0]._fixture_clients=clients

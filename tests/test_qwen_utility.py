@@ -1,3 +1,4 @@
+# Frozen v3.4 controls; intent-flow defaults are tested in test_intent_flow*.py.
 from tests.authorization_fixture import adapt_client
 """Protocol and prompt-candidate regression; no model network requests."""
 import json
@@ -51,7 +52,7 @@ class AuditProtocolDiagnosticsTests(unittest.TestCase):
     def audit(self, llm, level='summary'):
         r = runtime()
         sandbox = d.PermissionSandbox(['get_webpage'])
-        checker = d.ActionSecurityChecker(llm, sandbox=sandbox)
+        checker = d.ActionSecurityChecker(llm, sandbox=sandbox, prompt_profile='legacy-v34')
         call = FunctionCall(function='get_webpage', args={'url': 'https://article.example'}, id='read')
         state = checker.query('Read https://article.example', r, EmptyEnv(), [
             {'role': 'user', 'content': [{'type': 'text', 'content': 'Read https://article.example'}]},
@@ -62,7 +63,7 @@ class AuditProtocolDiagnosticsTests(unittest.TestCase):
     def test_default_audit_request_is_compact_and_keeps_data_and_json_contract(self):
         response = '{"decision":"allow","violations":[],"confidence":0.9,"reason_code":"ALIGNED"}'
         llm = model(response)
-        checker = d.ActionSecurityChecker(llm)
+        checker = d.ActionSecurityChecker(llm, prompt_profile='legacy-v34')
         packet = {'trusted_user_request': 'Read the requested article',
                   'current_actions': [{'tool_name': 'get_webpage',
                                        'untrusted_argument_data': {'url': 'https://article.example'}}]}
@@ -210,7 +211,8 @@ class PromptProfileTests(unittest.TestCase):
                                    'prompt_profile_sha256': 'client-forged'})
         self.assertNotEqual(active['prompt_profile_sha256'], 'client-forged')
         active = normalize_config({'suites': list(get_suites()), 'prompt_profile_sha256': 'client-forged'})
-        self.assertNotIn('prompt_profile_sha256', active)
+        self.assertNotEqual(active['prompt_profile_sha256'], 'client-forged')
+        self.assertEqual(active['framework_version'], 'DSCG_v3.5')
 
     def test_full_partial_and_cohort_cli_forward_profile_without_model_requests(self):
         from experiments import run_benchmark as full, run_partial_benchmark as partial
@@ -278,11 +280,11 @@ class PromptProfileTests(unittest.TestCase):
         self.assertNotEqual(original, changed.tool_catalog_sha256)
 
     def test_default_native_and_explicit_protocol_catalogues(self):
-        for profile in ('legacy', 'protocol-v1'):
+        for profile in ('legacy-v34', 'protocol-v1'):
             llm = model('{"tools":[]}')
             d.ToolAuthorizationCompiler(llm, prompt_profile=profile).compile(d.TrustedTaskRequest('Read the webpage'), runtime())
             packet = json.loads(llm.client.chat.completions.create.call_args.kwargs['messages'][1]['content'])
-            self.assertIsInstance(packet['available_tools']['post_webpage'], dict if profile=='legacy' else str)
+            self.assertIsInstance(packet['available_tools']['post_webpage'], dict if profile=='legacy-v34' else str)
 
     def test_profiles_are_explicit_and_unknown_profile_fails_before_clients(self):
         with patch.object(d, 'create_openai_client') as create:

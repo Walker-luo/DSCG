@@ -1,3 +1,4 @@
+# Frozen v3.4 controls; intent-flow defaults are tested in test_intent_flow*.py.
 """Factory wiring must apply the view and reject candidates before audit."""
 from copy import deepcopy
 import unittest
@@ -24,7 +25,7 @@ class ThreeLayerPipelineTests(unittest.TestCase):
         self.client.chat.completions.create.return_value=type('Response',(),{'choices':[
             type('Choice',(),{'message':type('Message',(),{'content':'{"tools": []}','refusal':None})(),'finish_reason':'stop'})()]})()
         with patch('dscg.pipelines.defended.create_openai_client',return_value=self.client):
-            pipeline,_,_=make_defended_pipeline(model_config=self.config,sec_model_config=self.config,**flags)
+            pipeline,_,_=make_defended_pipeline(model_config=self.config,sec_model_config=self.config,**flags, prompt_profile='legacy-v34')
         planner=Planner(call);pipeline.task_executor.llm=planner
         return pipeline,planner
     def runtime(self):
@@ -78,7 +79,7 @@ class ThreeLayerPipelineTests(unittest.TestCase):
         for l1,l2 in ((True,True),(False,True),(True,False),(False,False)):
             pipeline,_=self.build(call,input_isolation=l1,authorization_precheck=l2)
             names.append(pipeline.name)
-            self.assertIn(FRAMEWORK_VERSION, pipeline.name)
+            self.assertIn('DSCG_v3.4', pipeline.name)
         self.assertEqual(len(set(names)),4)
         self.assertNotEqual(names[0],'offline-newFrame-OursFull')
 

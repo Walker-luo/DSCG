@@ -16,7 +16,10 @@ class _CompletionsProxy:
         record['api_calls'] += 1
         started = perf_counter()
         try:
-            response = self._completions.create(*args, **kwargs)
+            completions = self._completions
+            if tracker._no_retries.get():
+                completions = tracker._client.with_options(max_retries=0).chat.completions
+            response = completions.create(*args, **kwargs)
             usage = getattr(response, 'usage', None)
             if usage:
                 prompt = usage.prompt_tokens or 0
@@ -47,6 +50,7 @@ class TokenTrackerClient:
     def __init__(self, client, default_phase='generation'):
         self._client = client
         self._phase = ContextVar('dscg_api_phase', default=default_phase)
+        self._no_retries = ContextVar('dscg_no_retries', default=False)
         self.reset()
 
     def get_total_tokens(self):
@@ -67,6 +71,15 @@ class TokenTrackerClient:
 
     def snapshot(self):
         return deepcopy(dict(self._phases))
+
+    @contextmanager
+    def without_retries(self):
+        """New intent requests keep adapters/accounting while disabling SDK retries."""
+        token = self._no_retries.set(True)
+        try:
+            yield
+        finally:
+            self._no_retries.reset(token)
 
     @property
     def chat(self):

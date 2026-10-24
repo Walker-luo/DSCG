@@ -1,3 +1,4 @@
+# Frozen v3.4 controls; intent-flow defaults are tested in test_intent_flow*.py.
 from types import SimpleNamespace
 import unittest
 
@@ -86,7 +87,7 @@ class PermissionSandboxTests(unittest.TestCase):
 
         llm = FakeLLM()
         sandbox = PermissionSandbox([])
-        executor = OurFrameExecutor(llm, sandbox=sandbox)
+        executor = OurFrameExecutor(llm, sandbox=sandbox, prompt_profile='legacy-v34')
         runtime = self._runtime("send_message")
 
         executor.query(

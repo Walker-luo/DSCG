@@ -1,5 +1,16 @@
 # DSCG Research Handoff
 
+## Default DSCG_v3.5 intent flow (2026-10-24)
+
+- User approved replacing legacy default with DSCG_v3.5 across full/partial/cohort/factory; explicit legacy-v34 preserves v3.4. Other old candidates retain their meanings. Names do not select strategies. Keep historical results/cohorts/bindings and existing workspace moves/deletions/conflict markers; no commits or staging.
+- L2 makes two main-client requests: intent-only authorization_steps, then global tools from full trusted request/all intents/native catalogue. Merge automatic reads; freeze grants, no per-intent tool map or dynamic grants. Bounded host profiles retain old protocols/ceilings and disable automatic intent state.
+- Independent main-client intent_progress observes real ledger/tool returns; successful None is execution evidence, blocked/errors and main claims are not. Effects must belong to current intent. Strict evidence references/forward transitions; failed prerequisites remain unfulfilled, independent intents may continue. One final-answer continuation per intent, real ambiguity ends awaiting_user. No parameter repair or post-run execution.
+- L3 primary goal is current intent, original request remains complete constraints; strict finite four-field verdict. Registered authorized schema-valid effect=read + public/internal bypass L3 in off/shadow/selective, including external/query/internal-host URLs and internal private-channel tools. No URL/provenance/object-private filter; accept tool-level privacy/exfiltration limitation. Personal/secret and effects stay audited, with valid deny enforced.
+- Mixed batches retain order; read mask/semantic subset share one-use whole-batch receipt bound to intent/catalogue/auth/context. Tickets bind intent state. New protocols/prompts/Schema bind caches; use new names, never migrate old bindings; cohort lightweight reading unchanged. NoL2 explicitly disables intent flow; no normal compilation-error downgrade. NoChecker retains L2/progress.
+- authorization_intents/authorization_tools/intent_progress count actual usage, disable SDK retries while preserving adapters/accounting. Native generation sampling is unchanged. Flow API/protocol errors are task-local infrastructure errors with null labels, not capability failures or tool-arguments JSON errors.
+- Evidence workshop/artifacts/20261024_intent_flow_v35/; report workshop/completed/intent_flow_v35_20261024.md. No paid/live calls; prior budgets remain CLOSED. Offline fixtures do not prove TSR/ASR improvement, semantic quality or safety. Pre-existing regression failures were measured before edits and must be reported separately.
+- Final offline verification: new31 tests pass in ipi (AgentDyn29pass/2native-scene skips). Full ipi729 retains baseline23failures/5errors/10skips; AgentDyn733 retains24failures/5errors with5skips. Failure/error header sets unchanged, sockets0; do not claim full regression green. All18308 original results/download files match initial hashes; HEAD/index unchanged, no staging. CLI help/syntax/new doc links/diff checks pass; pre-existing missing plan/report links and user moves retained.
+
 <<<<<<< Updated upstream
 =======
 ## Single-attempt injection screening (2026-10-24)

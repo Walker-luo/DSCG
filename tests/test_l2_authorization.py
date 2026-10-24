@@ -1,3 +1,4 @@
+# Frozen v3.4 controls; intent-flow defaults are tested in test_intent_flow*.py.
 from authorization_fixture import adapt_client
 """Tool exposure must not change authority or the registered execution runtime."""
 import json
@@ -63,7 +64,7 @@ class PlanningViewTests(unittest.TestCase):
         runtime, effects = make_runtime()
         llm = model('{"tools": []}')
         sandbox = d.PermissionSandbox()
-        state = d.OurFrameExecutor(llm, sandbox, planning_tool_view=True).query(
+        state = d.OurFrameExecutor(llm, sandbox, planning_tool_view=True, prompt_profile='legacy-v34').query(
             'Read facts', runtime, EmptyEnv(), [user('Read facts')], {})
         view = llm.views[0]
         self.assertEqual(set(view.functions), {'read_data'})
@@ -78,7 +79,7 @@ class PlanningViewTests(unittest.TestCase):
         runtime, _ = make_runtime()
         llm = model('not JSON')
         sandbox = d.PermissionSandbox(['write_data'])
-        d.OurFrameExecutor(llm, sandbox, planning_tool_view=True).query(
+        d.OurFrameExecutor(llm, sandbox, planning_tool_view=True, prompt_profile='legacy-v34').query(
             'Read facts', runtime, EmptyEnv(), [user('Read facts')], {})
         self.assertEqual(llm.views[0].functions, {})
         self.assertEqual(sandbox.policy_state, d.SandboxPolicyState.ERROR)
@@ -87,7 +88,7 @@ class PlanningViewTests(unittest.TestCase):
         runtime, _ = make_runtime()
         llm = model('{"tools": ["write_data"]}', '{"tools": []}')
         sandbox = d.PermissionSandbox()
-        executor = d.OurFrameExecutor(llm, sandbox, planning_tool_view=True)
+        executor = d.OurFrameExecutor(llm, sandbox, planning_tool_view=True, prompt_profile='legacy-v34')
         first = executor.query('Update record', runtime, EmptyEnv(), [user('Update record')], {})
         self.assertTrue(sandbox.assess('write_data', runtime)[0])
         executor.query('Now only read', runtime, EmptyEnv(), [*first[3], user('Now only read')], first[4])
@@ -99,7 +100,7 @@ class PlanningViewTests(unittest.TestCase):
         runtime, _ = make_runtime()
         llm = model('{"tools": ["write_data"]}')
         sandbox = d.PermissionSandbox()
-        executor = d.OurFrameExecutor(llm, sandbox, planning_tool_view=True)
+        executor = d.OurFrameExecutor(llm, sandbox, planning_tool_view=True, prompt_profile='legacy-v34')
         state = executor.query('Update record', runtime, EmptyEnv(), [user('Update record')], {})
         runtime.functions['write_data'].description = 'Create a different payment.'
         allowed, reason = sandbox.assess('write_data', runtime)
@@ -122,7 +123,7 @@ class PlanningViewTests(unittest.TestCase):
         runtime, effects = make_runtime()
         llm = model('{"tools": []}')
         sandbox = d.PermissionSandbox()
-        state = d.OurFrameExecutor(llm, sandbox, planning_tool_view=True).query(
+        state = d.OurFrameExecutor(llm, sandbox, planning_tool_view=True, prompt_profile='legacy-v34').query(
             'Read facts', runtime, EmptyEnv(), [user('Read facts')], {})
         state[3].append({'role': 'assistant', 'content': [], 'tool_calls': [
             FunctionCall(function='write_data', args={}, id='invented')]})
@@ -136,7 +137,7 @@ class PlanningViewTests(unittest.TestCase):
     def test_catalog_change_after_approval_cannot_execute_replacement(self):
         runtime, effects = make_runtime()
         sandbox = d.PermissionSandbox()
-        grant = d.ToolAuthorizationCompiler(model('{"tools": ["write_data"]}')).compile(
+        grant = d.ToolAuthorizationCompiler(model('{"tools": ["write_data"]}'), prompt_profile='legacy-v34').compile(
             d.TrustedTaskRequest('Update record'), runtime)
         sandbox.install_contract(grant)
         call = FunctionCall(function='write_data', args={}, id='approved')
@@ -187,7 +188,7 @@ class PlanningViewTests(unittest.TestCase):
         set_tool_metadata(runtime, {'update': dict(effect='write', source='local', sink='none',
                           sensitivity='internal', idempotent=False, reversible=False)})
         sandbox = d.PermissionSandbox()
-        sandbox.install_contract(d.ToolAuthorizationCompiler(model('{"tools": ["update"]}')).compile(
+        sandbox.install_contract(d.ToolAuthorizationCompiler(model('{"tools": ["update"]}'), prompt_profile='legacy-v34').compile(
             d.TrustedTaskRequest('Update record'), runtime))
         call = FunctionCall(function='update', args={}, id='dependency-change')
         state = ('Update record', runtime, Env(), [{'role': 'assistant', 'content': [], 'tool_calls': [call]}], {})
@@ -201,7 +202,7 @@ class PlanningViewTests(unittest.TestCase):
 
     def test_replacing_code_on_same_callable_invalidates_task_grant(self):
         runtime, effects = make_runtime()
-        grant = d.ToolAuthorizationCompiler(model('{"tools": ["write_data"]}')).compile(
+        grant = d.ToolAuthorizationCompiler(model('{"tools": ["write_data"]}'), prompt_profile='legacy-v34').compile(
             d.TrustedTaskRequest('Update record'), runtime)
         sandbox = d.PermissionSandbox()
         sandbox.install_contract(grant)
@@ -230,7 +231,7 @@ class BoundedProfileTests(unittest.TestCase):
     def compile(self, payload, profile=None, request=None):
         runtime, _ = make_runtime()
         llm = model(payload)
-        compiler = d.ToolAuthorizationCompiler(llm, authorization_profile=profile or self.profile())
+        compiler = d.ToolAuthorizationCompiler(llm, authorization_profile=profile or self.profile(), prompt_profile='legacy-v34')
         return compiler.compile(d.TrustedTaskRequest(request or self.request), runtime), llm, runtime
 
     def test_profile_adds_only_host_required_reads_and_records_actual_evidence(self):
@@ -248,7 +249,7 @@ class BoundedProfileTests(unittest.TestCase):
             return 'secret'
         register_tool_metadata(runtime, 'read_secret', dict(effect='read', source='local', sink='none',
                           sensitivity='secret', idempotent=True, reversible=False))
-        grant = d.ToolAuthorizationCompiler(model(self.payload()), authorization_profile=self.profile()).compile(
+        grant = d.ToolAuthorizationCompiler(model(self.payload()), authorization_profile=self.profile(), prompt_profile='legacy-v34').compile(
             d.TrustedTaskRequest(self.request), runtime)
         self.assertNotIn('read_secret', grant.allowed_tools)
 
@@ -271,7 +272,7 @@ class BoundedProfileTests(unittest.TestCase):
     def test_unmatched_task_uses_legacy_protocol_without_added_call(self):
         runtime, _ = make_runtime()
         llm = model('{"tools": []}')
-        grant = d.ToolAuthorizationCompiler(llm, authorization_profile=self.profile()).compile(
+        grant = d.ToolAuthorizationCompiler(llm, authorization_profile=self.profile(), prompt_profile='legacy-v34').compile(
             d.TrustedTaskRequest('Only read facts'), runtime)
         self.assertEqual(grant.allowed_tools, {'read_data'})
         self.assertEqual(grant.public_dict()['profile_status'], 'unsupported_task_fallback')
@@ -287,7 +288,7 @@ class BoundedProfileTests(unittest.TestCase):
             profile = self.profile(prerequisites=((source, (target,)),))
             llm = model(self.payload())
             with self.subTest(target=target), self.assertRaises(d.AuthorizationCompilationError):
-                d.ToolAuthorizationCompiler(llm, authorization_profile=profile).compile(
+                d.ToolAuthorizationCompiler(llm, authorization_profile=profile, prompt_profile='legacy-v34').compile(
                     d.TrustedTaskRequest(self.request), runtime)
             llm.client.chat.completions.create.assert_not_called()
 
@@ -301,7 +302,7 @@ class BoundedProfileTests(unittest.TestCase):
         profile = self.profile(allowed_seed_tools=frozenset({'read_data'}), prerequisites=(),
                                deterministic_reads=frozenset({'read_data'}))
         llm = model()
-        grant = d.ToolAuthorizationCompiler(llm, authorization_profile=profile).compile(
+        grant = d.ToolAuthorizationCompiler(llm, authorization_profile=profile, prompt_profile='legacy-v34').compile(
             d.TrustedTaskRequest(self.request), runtime)
         self.assertEqual(grant.allowed_tools, {'read_data'})
         llm.client.chat.completions.create.assert_not_called()

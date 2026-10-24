@@ -71,7 +71,7 @@ def normalize_config(payload):
     config['l1_projection_mode'] = mode if config['input_isolation'] else 'off'
     config["framework_version"] = None if config["origin"] else FRAMEWORK_VERSION
     profile = validate_profile(config.get('prompt_profile', 'legacy'))
-    if profile != 'legacy' and (config['origin'] or not config['use_sandbox'] or not config['use_security_checker']):
+    if profile not in ('legacy', 'legacy-v34') and (config['origin'] or not config['use_sandbox'] or not config['use_security_checker']):
         raise ValueError('candidate prompt profiles require the defended pipeline with L2 and checker')
     config['prompt_profile'] = profile
     config['framework_version'] = None if config['origin'] else framework_version_for_profile(profile)

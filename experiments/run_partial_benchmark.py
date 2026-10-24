@@ -85,7 +85,7 @@ def _validate_router_controls(origin, use_security_checker, mode, use_sandbox=Tr
 
 def _validate_prompt_profile(origin, use_sandbox, use_checker, profile):
     validate_profile(profile)
-    if profile != 'legacy' and (origin or not use_sandbox or not use_checker):
+    if profile not in ('legacy', 'legacy-v34') and (origin or not use_sandbox or not use_checker):
         raise ValueError('candidate prompt profiles require the defended pipeline with L2 and checker')
 
 
@@ -890,7 +890,7 @@ def cli(argv: list[str] | None = None, *, task_scope: str = 'partial', entrypoin
     parser.add_argument('--no-tool-view', action='store_true', help='L2 对照：规划器展示完整工具目录，保留执行权限检查。')
     parser.add_argument('--no-delegated-tasks', action='store_true', help='关闭显式任务文件展开，用于原任务编译对照。')
     parser.add_argument('--prompt-profile', choices=PROMPT_PROFILES, default='legacy',
-                        help='Explicit staged utility candidate; legacy keeps the current default policy')
+                        help='legacy=DSCG_v3.5 意图流程（默认）；legacy-v34=历史v3.4对照；其余为显式旧候选')
     parser.add_argument('--l1-projection-mode', choices=('off','shadow','projected'), default='projected',
                         help='L1有限交易投影，默认projected；off保留旧来源封装，shadow只观察。')
     # None selects the profile default below: DSCG shadow, baseline/NoChecker off.

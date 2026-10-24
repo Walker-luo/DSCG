@@ -1,3 +1,4 @@
+# Frozen v3.4 controls; intent-flow defaults are tested in test_intent_flow*.py.
 """Rule-based read candidates, shadow separation, and strict audit contracts."""
 import json
 from types import SimpleNamespace
@@ -97,7 +98,7 @@ class ReadPolicyTests(unittest.TestCase):
                 requests=0
                 def _request_audit(self,*args):
                     self.requests+=1;return json.dumps(dict(decision='abstain',violations=[],confidence=.5,reason_code='MISSING_LATER_TARGET'))
-            checker=Checker(SimpleNamespace(name='offline',client=None),sandbox=self.sandbox,precheck=pre,audit_router=router,router_verifier=verifier);monitor=d.ReferenceMonitor(self.sandbox,True,precheck=pre,audit_router=router,router_verifier=verifier)
+            checker=Checker(SimpleNamespace(name='offline',client=None),sandbox=self.sandbox,precheck=pre,audit_router=router,router_verifier=verifier, prompt_profile='legacy-v34');monitor=d.ReferenceMonitor(self.sandbox,True,precheck=pre,audit_router=router,router_verifier=verifier)
             state=('Find the channel with most users',self.runtime,EmptyEnv(),[dict(role='assistant',content=[],tool_calls=calls)],{})
             for element in (pre,checker,monitor,d.TicketedToolsExecutor(monitor)):state=element.query(*state)
             self.assertEqual(checker.requests,1 if mode=='shadow' else 0)
@@ -106,7 +107,7 @@ class ReadPolicyTests(unittest.TestCase):
 
     def test_second_read_mutation_invalidates_the_whole_receipt(self):
         router=a.LocalAuditRouter('selective'); verifier=a.RouterReceiptVerifier(); pre=d.ToolAuthorizationPrecheck(self.sandbox)
-        checker=d.ActionSecurityChecker(SimpleNamespace(name='offline'),sandbox=self.sandbox,precheck=pre,audit_router=router,router_verifier=verifier)
+        checker=d.ActionSecurityChecker(SimpleNamespace(name='offline'),sandbox=self.sandbox,precheck=pre,audit_router=router,router_verifier=verifier, prompt_profile='legacy-v34')
         monitor=d.ReferenceMonitor(self.sandbox,True,precheck=pre,audit_router=router,router_verifier=verifier)
         calls=[self.call(id='a'),self.call(args={'name':'random'},id='b')]
         state=('Read the channel facts',self.runtime,EmptyEnv(),[dict(role='assistant',content=[],tool_calls=calls)],{})
@@ -115,14 +116,14 @@ class ReadPolicyTests(unittest.TestCase):
         self.assertEqual(self.effects,[])
 
     def test_past_argument_loss_does_not_become_current_argument_loss(self):
-        checker=d.ActionSecurityChecker(SimpleNamespace(name='offline'),sandbox=self.sandbox)
+        checker=d.ActionSecurityChecker(SimpleNamespace(name='offline'),sandbox=self.sandbox, prompt_profile='legacy-v34')
         packet=checker._audit_packet('Read channel facts',self.runtime,[self.call()],{})
         packet['recent_tool_results']=[dict(content_truncated=False,omitted_fields=[],error='old error',call_arguments_truncated=True,call_arguments_nonfinite_or_unsupported=True)]
         flags=checker._router_flags('Read channel facts',self.runtime,[self.call()],packet)
         self.assertTrue(a.LocalAuditRouter('shadow').assess(packet,flags,self.runtime,[self.call()],self.sandbox)['would_bypass'])
 
     def test_current_action_packet_exposes_effect_and_native_schema(self):
-        checker=d.ActionSecurityChecker(SimpleNamespace(name='offline'),sandbox=self.sandbox)
+        checker=d.ActionSecurityChecker(SimpleNamespace(name='offline'),sandbox=self.sandbox, prompt_profile='legacy-v34')
         packet=checker._audit_packet('Read the page then send the summary',self.runtime,[self.call()],{})
         self.assertEqual(packet['schema_version'],'dscg.audit-input.v3')
         self.assertEqual(packet['current_actions'][0]['operation_effect'],'read')
@@ -138,4 +139,4 @@ class ReadPolicyTests(unittest.TestCase):
         record=d.AuditDecision('f'*64,decision,vs,confidence,reason,'a'*64,'b'*64,'offline',1.,'ok').public_dict()
         self.assertTrue(d._is_valid_audit_record(record,'f'*64))
 
-    def test_unified_internal_identity(self):self.assertEqual(d.FRAMEWORK_VERSION,'DSCG_v3.4')
+    def test_unified_internal_identity(self):self.assertEqual(d.framework_version_for_profile('legacy-v34'),'DSCG_v3.4')

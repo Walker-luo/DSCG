@@ -5,7 +5,7 @@ import json
 from dscg.intent_evidence import (PROFILE as V35_PROFILE, AUTH_POLICY as V35_AUTH_POLICY,
     AUDIT_POLICY as V35_AUDIT_POLICY, MAIN_TASK_POLICY, ISOLATION_POLICY, REVIEW_RULES, DECISION_GUIDE, AUDIT_THINKING, AUDIT_FORMAT, AUDIT_PROTOCOL as V35_OUTPUT_PROTOCOL, ENVELOPE_SCHEMA, permission_schema)
 
-PROFILES = ('legacy', 'protocol-v1', 'tool-semantics-v1', 'source-context-v1', 'task-alignment-v1', V35_PROFILE)
+PROFILES = ('legacy', 'legacy-v34', 'protocol-v1', 'tool-semantics-v1', 'source-context-v1', 'task-alignment-v1', V35_PROFILE)
 CATALOG_SCHEMA = 'dscg.authorization-tool-semantics.v1'
 
 TASK_ALIGNMENT_RULE = (
@@ -109,6 +109,11 @@ def semantic_catalog(profile):
 
 def audit_policy(legacy, profile):
     validate_profile(profile)
+    if profile == 'legacy':
+        from dscg.intent_flow import AUDIT_POLICY
+        return AUDIT_POLICY
+    if profile == 'legacy-v34':
+        return legacy
     if profile == V35_PROFILE:
         return V35_AUDIT_POLICY
     if profile == 'task-alignment-v1':
@@ -119,6 +124,9 @@ def audit_policy(legacy, profile):
 
 def authorization_policy(legacy, profile, *, bounded=False):
     validate_profile(profile)
+    if profile == 'legacy' and not bounded:
+        from dscg.intent_flow import INTENT_POLICY
+        return INTENT_POLICY
     if profile == V35_PROFILE:
         return legacy if bounded else V35_AUTH_POLICY
     if profile == 'task-alignment-v1':
@@ -129,8 +137,12 @@ def authorization_policy(legacy, profile, *, bounded=False):
 def profile_binding(profile):
     """Legacy adds no binding fields, preserving its historical configuration."""
     validate_profile(profile)
-    if profile == 'legacy':
+    if profile == 'legacy-v34':
         return {}
+    if profile == 'legacy':
+        from dscg.intent_flow import identity
+        return {'prompt_profile': profile, 'prompt_profile_sha256': hashlib.sha256(
+            json.dumps(identity(), sort_keys=True, ensure_ascii=False).encode()).hexdigest()}
     value = {'profile': profile, 'protocol': PROTOCOL_RULE,
              'authorization': AUTHORIZATION_RULE if semantic_catalog(profile) else None,
              'catalog_schema': CATALOG_SCHEMA if semantic_catalog(profile) else None,

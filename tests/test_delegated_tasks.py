@@ -1,3 +1,4 @@
+# Frozen v3.4 controls; intent-flow defaults are tested in test_intent_flow*.py.
 from tests.authorization_fixture import adapt_client
 """Explicit clean task sources must use real mediation and one effective task."""
 from copy import deepcopy
@@ -44,7 +45,7 @@ class Planner:
 
 class Auditor(d.ActionSecurityChecker):
     def __init__(self, sandbox, precheck, decision='allow'):
-        super().__init__(SimpleNamespace(name='offline-auditor'), sandbox=sandbox, precheck=precheck)
+        super().__init__(SimpleNamespace(name='offline-auditor'), sandbox=sandbox, precheck=precheck, prompt_profile='legacy-v34')
         self.packets, self.decision = [], decision
 
     def _request_audit(self, q, extra, packet):
@@ -94,7 +95,7 @@ def fixture(body=ORDER, fail_read=False, summary=False, private=False, recipient
     })
     planner = Planner(summary=summary, recipient=recipient)
     sandbox = d.PermissionSandbox()
-    executor = d.OurFrameExecutor(planner, sandbox, delegated_tasks=True, delegated_task_reader=reader)
+    executor = d.OurFrameExecutor(planner, sandbox, delegated_tasks=True, delegated_task_reader=reader, prompt_profile='legacy-v34')
     precheck = d.ToolAuthorizationPrecheck(sandbox)
     auditor = Auditor(sandbox, precheck)
     monitor = d.ReferenceMonitor(sandbox, True, precheck=precheck)

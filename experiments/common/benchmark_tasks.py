@@ -8,6 +8,7 @@ import warnings
 from agentdojo import benchmark
 from agentdojo.agent_pipeline.llms.openai_llm import _openai_to_tool_call
 from experiments.common.error_diagnostics import execution_error_diagnostics
+from dscg.intent_flow import IntentFlowError
 
 
 class _TaskToolJSONAbort(Exception):
@@ -115,6 +116,10 @@ class _TaskPipelineProbe:
         try:
             with self.observe_main_models():
                 return self.pipeline.query(*args, **kwargs)
+        except IntentFlowError as exc:
+            self.error = {'reason_code': exc.reason_code, 'intent_stage': exc.stage,
+                          'execution_error': execution_error_diagnostics(exc)}
+            raise _TaskToolJSONAbort(exc.reason_code) from None
         except json.JSONDecodeError as exc:
             tb = exc.__traceback__
             while tb is not None:
@@ -188,7 +193,7 @@ def run_native_suite(pipeline, suite, attack, logdir, force_rerun, *,
             if any(value is False for value in goal_results.values()):
                 warnings.warn('Not all injection tasks were solved as user tasks.')
             if any(value is None for value in goal_results.values()):
-                warnings.warn('GOAL preflight tool-JSON errors are unresolved, not capability failures.')
+                warnings.warn('GOAL preflight infrastructure errors are unresolved, not capability failures.')
         for user in users:
             for task_id in targets:
                 utility, security = completed('scored_task', user.ID, task_id,

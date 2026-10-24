@@ -1,3 +1,4 @@
+# Frozen v3.4 controls; intent-flow defaults are tested in test_intent_flow*.py.
 """External fetches need auditing, with legal-fetch negative controls."""
 import json
 import unittest
@@ -36,7 +37,7 @@ class WebRoutingTests(unittest.TestCase):
                     executed.append(url);return 'page'
                 set_tool_metadata(runtime,{'get_webpage':load_tool_metadata('config/tools.agentdojo-v1.2.toml')['get_webpage']})
                 llm=SimpleNamespace(name='fixture',query=lambda q,r,e,m,a: (q,r,e,[*m,{'role':'assistant','content':json.dumps({'decision':decision,'violations':[],'confidence':1.0,'reason_code':'FIXTURE'})}],a))
-                sandbox=PermissionSandbox();sandbox.install_contract(ToolAuthorizationCompiler(llm).compile(TrustedTaskRequest(request),runtime));checker=ActionSecurityChecker(llm,sandbox=sandbox)
+                sandbox=PermissionSandbox();sandbox.install_contract(ToolAuthorizationCompiler(llm, prompt_profile='legacy-v34').compile(TrustedTaskRequest(request),runtime));checker=ActionSecurityChecker(llm,sandbox=sandbox, prompt_profile='legacy-v34')
                 monitor=ReferenceMonitor(sandbox,True)
                 call=FunctionCall(function='get_webpage',args={'url':url},id='1')
                 state=(request,runtime,EmptyEnv(),[{'role':'assistant','content':[], 'tool_calls':[call]}],{})

@@ -1,3 +1,4 @@
+# Frozen v3.4 controls; intent-flow defaults are tested in test_intent_flow*.py.
 """Direct-threshold routing preserves authorization and mediated execution."""
 import json
 import math
@@ -91,7 +92,7 @@ class ThresholdRouterTests(unittest.TestCase):
                     return json.dumps(dict(decision='allow', violations=[], confidence=.9, reason_code='invalid code'))
 
             checker = Auditor(SimpleNamespace(name='offline', client=None), sandbox=sandbox,
-                precheck=pre, audit_router=router, router_verifier=verifier)
+                precheck=pre, audit_router=router, router_verifier=verifier, prompt_profile='legacy-v34')
             checker.requests = 0
             monitor = d.ReferenceMonitor(sandbox, True, precheck=pre, audit_router=router, router_verifier=verifier)
             state = ('Read budget report', self.runtime, EmptyEnv(), [dict(role='assistant', content=[],

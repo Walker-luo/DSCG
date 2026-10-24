@@ -1,3 +1,4 @@
+# Frozen v3.4 controls; intent-flow defaults are tested in test_intent_flow*.py.
 import json
 import unittest
 from types import SimpleNamespace
@@ -16,7 +17,7 @@ class BoundedReauditTests(unittest.TestCase):
         set_tool_metadata(self.runtime,{'read_private':dict(effect='read',source='local',sink='none',sensitivity='secret',idempotent=True,reversible=True)})
         self.messages=[{'role':'assistant','content':[], 'tool_calls':[FunctionCall(function='read_private',args={},id='1')]}]
     def checker(self, outcomes, enabled=True):
-        checker=ActionSecurityChecker(SimpleNamespace(name='fixture'), sandbox=PermissionSandbox(['read_private']), max_semantic_retries=1 if enabled else 0)
+        checker=ActionSecurityChecker(SimpleNamespace(name='fixture'), sandbox=PermissionSandbox(['read_private']), max_semantic_retries=1 if enabled else 0, prompt_profile='legacy-v34')
         checker._request_audit=Mock(side_effect=[json.dumps(dict(decision=o,violations=[],confidence=1.0,reason_code='FIXTURE')) if isinstance(o,str) and o in ['allow','abstain','deny'] else o for o in outcomes])
         return checker
     def test_one_semantic_abstain_can_be_clarified_without_dropping_history(self):

@@ -1,3 +1,4 @@
+# Frozen v3.4 controls; intent-flow defaults are tested in test_intent_flow*.py.
 from authorization_fixture import adapt_client
 """Authorization compiler protocol and diagnostics, without model calls."""
 import json
@@ -44,7 +45,7 @@ class AuthorizationDefaultsTests(unittest.TestCase):
         requests, contracts = [], []
         for reverse in (False, True):
             llm = model()
-            contract = ToolAuthorizationCompiler(llm).compile(
+            contract = ToolAuthorizationCompiler(llm, prompt_profile='legacy-v34').compile(
                 TrustedTaskRequest("Read my payments and adjust the existing rent if needed."), runtime(reverse))
             request = llm.client.chat.completions.create.call_args.kwargs
             self.assertEqual(request.get("temperature"), 0.0)
@@ -75,7 +76,7 @@ class AuthorizationDefaultsTests(unittest.TestCase):
             with self.subTest(code=code):
                 sandbox = PermissionSandbox(["send_money"])
                 extra = {}
-                OurFrameExecutor(llm, sandbox=sandbox).query("adjust payment", runtime(), EmptyEnv(),
+                OurFrameExecutor(llm, sandbox=sandbox, prompt_profile='legacy-v34').query("adjust payment", runtime(), EmptyEnv(),
                     [{"role": "user", "content": [{"type": "text", "content": "adjust payment"}]}], extra)
                 record = _compact_authorization_record(extra["dscg_authorization"])
                 self.assertEqual(record.get("error_code"), code)
@@ -86,6 +87,6 @@ class AuthorizationDefaultsTests(unittest.TestCase):
     def test_empty_request_has_error_code_without_api_call(self):
         llm = model()
         with self.assertRaises(ValueError) as caught:
-            ToolAuthorizationCompiler(llm).compile(TrustedTaskRequest(" "), runtime())
+            ToolAuthorizationCompiler(llm, prompt_profile='legacy-v34').compile(TrustedTaskRequest(" "), runtime())
         self.assertEqual(getattr(caught.exception, "reason_code", None), "AUTH_EMPTY_REQUEST")
         llm.client.chat.completions.create.assert_not_called()

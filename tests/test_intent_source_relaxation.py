@@ -1,3 +1,4 @@
+# Frozen v3.4 controls; intent-flow defaults are tested in test_intent_flow*.py.
 from authorization_fixture import adapt_client
 """Default prompt contract and strict mediation diagnostics, without model calls."""
 import json
@@ -27,7 +28,7 @@ def model(payload):
 
 class IntentSourceRelaxationTests(unittest.TestCase):
     def test_default_version_and_compact_audit_contract(self):
-        self.assertEqual(FRAMEWORK_VERSION,'DSCG_v3.4')
+        self.assertEqual(d.framework_version_for_profile('legacy-v34'),'DSCG_v3.4')
         policy=d.ActionSecurityChecker.SYSTEM_POLICY
         self.assertLessEqual(len(policy),1200)
         for field in ('decision','violations','confidence','reason_code'):
@@ -40,7 +41,7 @@ class IntentSourceRelaxationTests(unittest.TestCase):
 
     def test_broad_candidate_grants_use_one_call_and_do_not_change_catalogue(self):
         runtime=synthetic_runtime('slack');llm=model('{"tools":["post_webpage","send_channel_message"]}')
-        grant=d.ToolAuthorizationCompiler(llm).compile(d.TrustedTaskRequest('Post the article summary to general'),runtime)
+        grant=d.ToolAuthorizationCompiler(llm, prompt_profile='legacy-v34').compile(d.TrustedTaskRequest('Post the article summary to general'),runtime)
         self.assertTrue({'post_webpage','send_channel_message'}<=grant.allowed_tools)
         llm.client.chat.completions.create.assert_called_once()
         request=llm.client.chat.completions.create.call_args.kwargs
@@ -49,7 +50,7 @@ class IntentSourceRelaxationTests(unittest.TestCase):
         self.assertNotIn('send_direct_message',grant.allowed_tools)
         # The host does not silently expand a returned grant.
         llm=model('{"tools":[]}')
-        grant=d.ToolAuthorizationCompiler(llm).compile(d.TrustedTaskRequest('Only read the page; do not publish'),runtime)
+        grant=d.ToolAuthorizationCompiler(llm, prompt_profile='legacy-v34').compile(d.TrustedTaskRequest('Only read the page; do not publish'),runtime)
         self.assertNotIn('post_webpage',grant.allowed_tools)
         self.assertNotIn('send_channel_message',grant.allowed_tools)
 
@@ -58,7 +59,7 @@ class IntentSourceRelaxationTests(unittest.TestCase):
         verifier=RouterReceiptVerifier();router=LocalAuditRouter('shadow')
         pre=d.ToolAuthorizationPrecheck(sandbox)
         llm=model(payload or '{"decision":"allow","violations":[],"confidence":0.9,"reason_code":"ALIGNED"}')
-        checker=d.ActionSecurityChecker(llm,sandbox=sandbox,precheck=pre,audit_router=router,router_verifier=verifier)
+        checker=d.ActionSecurityChecker(llm,sandbox=sandbox,precheck=pre,audit_router=router,router_verifier=verifier, prompt_profile='legacy-v34')
         monitor=d.ReferenceMonitor(sandbox,True,precheck=pre,audit_router=router,router_verifier=verifier)
         call=FunctionCall(function='send_channel_message',args={'channel':'general','body':'Summary'},id='one')
         state=('Post the article summary to general',runtime,EmptyEnv(),[
@@ -131,7 +132,7 @@ class IntentSourceRelaxationTests(unittest.TestCase):
         from experiments import run_partial_benchmark as runner
         root=Path(__file__).resolve().parents[1]/'workshop/artifacts/20261021_intent_source_relaxation'
         with TemporaryDirectory(dir=root) as temp,serial_fixture.patched(),redirect_stdout(StringIO()):
-            options=dict(suites=[get_suites()[0]],run_attack=False,results_dir=temp,run_name='binding')
+            options=dict(suites=[get_suites()[0]],run_attack=False,results_dir=temp,run_name='binding',prompt_profile='legacy-v34')
             self.assertEqual(runner.main(**options),0)
             path=Path(temp)/get_backend().id/'offline-model_binding/none'/get_suites()[0]/'run_manifest.json'
             binding=json.loads(path.read_text())

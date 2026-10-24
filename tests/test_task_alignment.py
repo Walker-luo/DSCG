@@ -31,7 +31,7 @@ class TaskAlignmentTests(unittest.TestCase):
         runtime = synthetic_runtime('slack')
         request = d.TrustedTaskRequest('Read the page and send its summary to the team channel; do not edit the page.')
         catalogs, prompts = {}, {}
-        for name in ('legacy',PROFILE):
+        for name in ('legacy-v34',PROFILE):
             llm=model('{"tools":["send_channel_message"]}')
             grant=d.ToolAuthorizationCompiler(llm,prompt_profile=name).compile(request,runtime)
             self.assertIn('send_channel_message',grant.allowed_tools)
@@ -41,10 +41,10 @@ class TaskAlignmentTests(unittest.TestCase):
             kwargs=llm.client.chat.completions.create.call_args.kwargs
             catalogs[name]=json.loads(kwargs['messages'][1]['content'])
             prompts[name]=kwargs['messages'][0]['content']
-        self.assertIsInstance(catalogs['legacy']['available_tools']['send_channel_message'],dict)
+        self.assertIsInstance(catalogs['legacy-v34']['available_tools']['send_channel_message'],dict)
         self.assertIsInstance(catalogs[PROFILE]['available_tools']['send_channel_message'],str)
-        self.assertIn('parameters',catalogs['legacy']['available_tools']['send_channel_message'])
-        self.assertNotEqual(prompts['legacy'],prompts[PROFILE])
+        self.assertIn('parameters',catalogs['legacy-v34']['available_tools']['send_channel_message'])
+        self.assertNotEqual(prompts['legacy-v34'],prompts[PROFILE])
         # The new default is shorter; this historical candidate keeps its own budget.
         self.assertLessEqual(len(prompts[PROFILE]),1084)
         self.assertFalse(profiles.semantic_catalog(PROFILE))

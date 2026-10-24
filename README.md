@@ -17,38 +17,29 @@ DashScope/Qwen与DeepSeek的Chat请求由公共客户端分别适配：将上游
 
 ## 当前框架与工作流程
 
-显式候选 **DSCG_v3.5** 共用full/partial/cohort实现，使用 `--prompt-profile intent-evidence-v35` 和新名称。后续真实迭代最佳5/6、独立确认4/6，未通过推广门槛，**默认仍为v3.4**。本轮922次请求、已知1,693,429 Tokens，3次连接故障usage未知，用户已停止真实调用；当前候选L3关闭思考、JSON Object配严格宿主校验，未验证的结构化视图只存快照。[后续报告](./workshop/completed/v35_followup_20261023.md)列出逐轮结果及剩余失败；[原220次阶段](./workshop/completed/v35_live_iterations_20261023.md)独立保留。未做离线回归或完整评测。
+当前默认 **legacy / DSCG_v3.5**：L2先生成只有intent的步骤，再依据完整任务和全部步骤选取全局工具白名单；白名单在任务内冻结。主模型按当前意图执行，独立进度判定根据真实返回推进，提前结束每意图最多一次继续反馈。L3以当前意图为目标，同时保留完整原请求约束。显式 `--prompt-profile legacy-v34` 保留v3.4对照，历史候选保持原义，不因同名v3.5自动叠加。
 
-当前内部身份为 **`DSCG_v3.4`**，默认 `prompt_profile=legacy`。L2保留完整原生定义，只输出动作步骤，由宿主求授权并集；L3采用有限短码与严格宿主校验，官方DashScope上的qwen3.7-flash使用JSON Schema，其他组合保持JSON Object。接口拒绝时不自动降级/重试。历史实验名、manifest和原生评分保留原样。
+已授权、参数有效且已注册的public/internal读取固定免审，包括工具结果中的博客网址；personal/secret读取及效果性动作仍审计。该规则不按URL来源、查询串、内网地址或sink筛选，不提供对象级隐私判断；当前internal频道读取也包含private频道。混合批次只审计非免审子集，Monitor、整批回执和一次性票据仍校验原始批次及当前意图状态。
 
-`read-purpose-v2` 将L2已允许、原生参数有效、public/internal、幂等且无sink的普通读取（含全为合格读取的批次）列为免审候选。当前请求/描述/参数仍须完整；历史工具错误、旧证据窗口截断及历史参数丢失不再单独迫使新的读取审计。personal/secret、写入、外发及混合读写批次仍审计。风险目录不改，工具级internal标签不能证明某个频道/文件不私密，也没有新增对象或参数权限。
+CLI路由默认shadow、API/factory默认off保持；固定读取免审在off/shadow/selective均生效，阈值不控制它。`authorization_intents`、`authorization_tools`、`intent_progress`均计入实际成本，不能假定调用或Tokens减少。新策略使用新实验名；旧结果不改写，旧冻结cohort不重筛，测量缓存不跨策略复用。
 
-外部网页保留external_recipient标签，仅为可信用户请求中逐字给出的公共网页URL提供窄例外：只接受url参数、HTTP(S)或www域名，无查询串、fragment、凭证、端口、IP、内部域名或编码文本。工具返回中的新地址不能据此免审；AgentDyn可分发副作用的browse_webpage也不适用。该规则不验证DNS、重定向或网页真实性。
-
-CLI默认 `shadow`，Python/Dashboard API默认off：shadow记录候选，仍实际审计并由Monitor决定；显式selective才应用新免审。原公开读取免审继续单列。词法分数及 `--audit-router-threshold` 保留作诊断/兼容输入，**不再决定当前策略的免审**；修改阈值仍改变配置绑定。旧threshold-read-v1报告保留旧解释。
-
-默认短审计提示只判断当前一步与任务的关系，允许相关成功工具事实和派生参数；输出必须符合有限代码及decision组合规则，不修补响应。来源含注入不自动否决合法动作。Monitor、一次性回执和执行票据继续绑定整批动作。
-
-[运行与复测](./docs/benchmark.md#默认-v34-策略与复测) · [v3.4真实小样本](./workshop/completed/v34_decision_contract_20261022.md)。按用户要求跳过离线回归；6条新策略utility均false，未通过效用验证，不宣称TSR/ASR改善，不建议据此扩大测试。
-
-L1对有限任务投影工具返回，其余保留来源封装；L2在任务开始编译权限、每批调用前复核，L3判断当前动作。不是每轮依次调用三个模型。`audit_router_mode=off`只关闭新增免审路由，不关闭L3。显式历史候选仍见[效用诊断](./docs/qwen_utility.md#task-alignment-v1)。
+[完整测试指南](./docs/benchmark.md#默认-v35-意图流程) · [partial指南](./docs/partial_benchmark.md) · [本轮实施记录](./workshop/completed/intent_flow_v35_20261024.md)。本轮不调用真实模型，离线通过不证明TSR／ASR改善；旧v3.5候选成绩仍见[历史报告](./workshop/completed/v35_followup_20261023.md)。
 
 ```mermaid
 flowchart TD
-    U[可信用户任务] --> C[L2 一次编译工具授权]
-    C --> M[主模型规划]
-    M --> P{L2批次校验}
-    P -->|拒绝| D[阻断并反馈]
-    P -->|通过| R{原公开免审或selective规则候选}
-    R -->|是| V[Monitor与一次性票据]
-    R -->|否，含shadow| A[L3当前动作审计]
+    U[可信用户请求] --> I[L2 生成意图列表]
+    I --> W[L2 选择全局工具白名单]
+    W --> M[主模型按当前意图规划]
+    M --> P[L2权限和原生参数检查]
+    P --> R{public或internal读取}
+    R -->|是| V[Monitor与绑定票据]
+    R -->|否| A[L3 当前意图与原请求约束审计]
     A --> V
-    V -->|允许| E[工具执行]
-    V -->|拒绝| D
-    E --> L[L1投影或来源封装]
-    D --> L
-    L --> M
-    M -->|无工具调用| F[最终回答]
+    V --> E[按原顺序执行获准动作]
+    E --> L[L1来源视图]
+    L --> G[独立意图进度判断]
+    G -->|未完成或下一意图| M
+    G -->|完成或需要用户澄清| F[最终汇报]
 ```
 
 ### 历史Clean通用误伤修正（v3.1）
@@ -64,11 +55,11 @@ L3改为当前任务内最多8条调用—返回对（保留最近4条，再补�
 | 部分 | 输入与行为 | 何时工作 / 模型调用 |
 | --- | --- | --- |
 | **L1：有限投影与来源隔离** | 在明确的银行月支出任务中，严格解析原生交易返回，仅向规划器呈现全部交易的六个结构字段，省略自由文本 subject；其余正文/错误保留完整来源封装与转义。原始历史继续供 L3 和日志使用，字段不因此变成可信事实。 | 每次主模型请求从原历史重建独立视图，不反复套壳；**无独立模型调用**。投影可减少适用返回的字符，封装和本地解析仍有开销。 |
-| **L2：可信任务工具授权** | 编译任务白名单，只向规划器展示有效已授权工具，保留完整执行目录。显式委托任务文件先经监控读取，再编译完整任务。候选检查注册、权限和元数据，任一非法则整批拒绝。 | 普通任务通常一次授权调用；有效纯读取目录可零调用。任务文件采用确定性准备读取后一次完整编译，准备读取本身可能需 L3。每批候选本地复核，目录变化阻断。 |
-| **L3：当前动作语义审计** | 对 L2 通过的具体工具、参数、有限动作历史和不可信返回判断任务对齐；外发同时检查正文与目的地，避免安全提醒把无关攻击目标发出。当前任务最多8条调用—返回对，保留最近4条，再补相关旧证据，正文/参数/错误共享8192字符；候选工具描述最多512字符。 | 全部为有效 public read、sink=none 时沿用免审；其他批次默认**至多一次审计调用**。最终纯文本回答不经过该动作审计。 |
+| **L2：可信任务工具授权** | 编译任务白名单，只向规划器展示有效已授权工具，保留完整执行目录。显式委托任务文件先经监控读取，再编译完整任务。候选检查注册、权限和元数据，任一非法则整批拒绝。 | 默认普通任务两次授权调用，分别生成意图和选择工具；显式v3.4及宿主受限profile保留原调用协议。任务文件采用确定性准备读取后完整编译；默认仍为两阶段，准备读取本身可能需 L3。每批候选本地复核，目录变化阻断。 |
+| **L3：当前动作语义审计** | 对 L2 通过的具体工具、参数、有限动作历史和不可信返回判断任务对齐；外发同时检查正文与目的地，避免安全提醒把无关攻击目标发出。当前任务最多8条调用—返回对，保留最近4条，再补相关旧证据，正文/参数/错误共享8192字符；候选工具描述最多512字符。 | public/internal有效读取固定免审；其余非空子集默认至多一次语义审计（显式重审参数另计）。最终纯文本回答不经动作审计，但要判断意图进度。 |
 | **Monitor / 一次性票据** | 执行前再次复核权限、候选和审计结果；票据只能执行原调用一次，过期、篡改与重放阻断。 | 所有真实工具执行都要经过；这是执行基础设施。 |
 
-L2 默认沿用原授权编译策略：有效读取工具进入权限集合，写入/动作工具按任务选择。工具视图减少不可用工具描述，不自动收紧全部读取权限。可选宿主 profile 才对有限任务启用正负证据和必要读取闭包；默认没有内置业务 profile。个人/秘密读取仍送入 L3，其阻断受下文读取例外影响。
+L2 默认沿用原授权编译策略：有效读取工具进入权限集合，写入/动作工具按任务选择。工具视图减少不可用工具描述，不自动收紧全部读取权限。可选宿主 profile 才对有限任务启用正负证据和必要读取闭包；默认没有内置业务 profile。个人/秘密读取仍送入 L3；新默认尊重其有效deny，旧只读deny例外仅保留在历史对照。
 
 **两个基准的适用范围：**AgentDojo保留现有银行有限投影；AgentDyn三个场景没有新增投影profile，L1使用完整来源封装。下文97/144条历史记录保持原实验身份，不代表本次双基准改造的新成绩。`read_file(path=...)` 的文本返回可沿用有限文件委托；`browse_webpage` 可能执行网页 handler，不能作为纯读取委托入口，也不能免审。工具级授权不能约束其内部每个 handler 或目标参数。
 
@@ -97,39 +88,25 @@ python -m experiments.run_partial_benchmark --name l1_projected_new --l1-project
 
 默认 `planning_tool_view=true`。假如注册目录有查询、发送、付款三个工具，本任务仅授权查询，规划请求就只携带查询工具的完整 schema。隐藏工具即使被模型编造出来仍会被执行入口拒绝；视图不会修改宿主 runtime。新实际 user 回合重新编译并**替换**旧授权；工具新增、删除、schema/描述或 callable 变化会使当前授权失效，不因“缺工具”或错误返回自动补权。它不提供通用跨轮指代解析或继承旧禁令。
 
-API 可传入 `ToolAuthorizationProfile`（[实现](./dscg/l2_authorization.py)）：宿主冻结任务匹配模式、可选工具和必要只读关系。适用任务复用一次授权调用，输出 `tools / prohibited_tools / evidence`；本地检查原文片段、注册工具与只读闭包，禁用能力与必要读取冲突则失败。原文位置检查不能证明语义理解正确。未匹配任务回退原协议；纯读取目录保持零授权调用。真实 profile 范围和独立授权标签尚待选择，网页不提供模型自选规则。
+API 可传入 `ToolAuthorizationProfile`（[实现](./dscg/l2_authorization.py)）：宿主冻结任务匹配模式、可选工具和必要只读关系。适用任务复用一次授权调用，输出 `tools / prohibited_tools / evidence`；本地检查原文片段、注册工具与只读闭包，禁用能力与必要读取冲突则失败。原文位置检查不能证明语义理解正确。该显式宿主profile不启用自动意图管理，保留原协议及零调用读取分支；未匹配任务仍沿用该受限profile的既有回退协议。真实 profile 范围和独立授权标签尚待选择，网页不提供模型自选规则。
 
 默认 `delegated_tasks=true`。例如“请完成 order.txt 中的任务”，干净文件写着“检查库存，不足时发送补货邮件”：
 
 1. 宿主只授予准备读取能力，经原前置检查、L3、Monitor 和票据读取指定文件，此时不授权发送。
-2. 成功返回形成有效任务 `T_eff = 原用户要求（限制保留）+ 指定文件任务`，撤销准备授权，再编译一次完整业务权限；规划器和 L3 使用同一 T_eff。原始 user/tool 消息保持原样，不伪造 user 回合。
+2. 成功返回形成有效任务 `T_eff = 原用户要求（限制保留）+ 指定文件任务`，撤销准备授权，再编译完整业务权限（默认两阶段）；规划器和 L3 使用同一 T_eff。原始 user/tool 消息保持原样，不伪造 user 回合。
 3. 库存结果中的额外指令仍是普通数据，不能扩权。“总结 order.txt”也不走任务展开。
 
-首版仅识别有限的明确中英文执行句式，附加限制仅支持“only query inventory, do not send”等有限下游条款；禁止准备读取或未覆盖限制在读取前失败。支持注册 `read_file(path/file_path)`、AgentDojo 云盘 `get_file_by_id` 和受信宿主 reader 适配；另支持明确指定发件人＋准确主题的唯一邮件，以及用户指定URL的任务网页；网页读取不因委托免审；仅符合当前窄URL规则时可成为路由候选。不遍历/递归任务来源；有前置步骤的有序复合委托保留原流程，不提前展开后续来源，不引入新的调度机制。缺失、歧义、读取错误、未监控返回或超限内容失败关闭。任务正文最多1536字符，完整 T_eff 经审计规范化后最多2048字符，序列化返回最多16384字符，不摘要或截断任务。**用户已确认但该任务文件被污染的情况按用户要求排除**；本功能不验证任务文件安全，也不实现参数/对象/数据授权。准备阶段仍是工具级授权，不能据此宣称硬约束了读取对象。
+首版仅识别有限的明确中英文执行句式，附加限制仅支持“only query inventory, do not send”等有限下游条款；禁止准备读取或未覆盖限制在读取前失败。支持注册 `read_file(path/file_path)`、AgentDojo 云盘 `get_file_by_id` 和受信宿主 reader 适配；另支持明确指定发件人＋准确主题的唯一邮件，以及用户指定URL的任务网页；默认公开网页按工具敏感度固定免审；个人/秘密任务源仍审计。不遍历/递归任务来源；有前置步骤的有序复合委托保留原流程，不提前展开后续来源，不引入新的调度机制。缺失、歧义、读取错误、未监控返回或超限内容失败关闭。任务正文最多1536字符，完整 T_eff 经审计规范化后最多2048字符，序列化返回最多16384字符，不摘要或截断任务。**用户已确认但该任务文件被污染的情况按用户要求排除**；本功能不验证任务文件安全，也不实现参数/对象/数据授权。准备阶段仍是工具级授权，不能据此宣称硬约束了读取对象。
 
 可在网页关闭工具视图/任务展开，或用 partial CLI `--no-tool-view --no-delegated-tasks` 做对照；独立工具视图 A0/A1 比较应两组都关闭展开、固定 L1/L3和任务 ID。详细已实现/待测项见 [L2实施报告](./workshop/completed/l2_implementation_20261012.md) 和 [候选余项](./workshop/L2_opt.md)。
 
-### L3 直接阈值路由
+<a id="l3-直接阈值路由"></a>
 
-当前v3.2默认L3提示为1050英文字符，聚焦当前工具用途、准备读取与参数来源；L2为844字符，保留合理候选。字符数不是实测Token降幅。严格解析、Monitor和路由不变；提示内容进入既有配置绑定，更新后使用新run名。此前3262→1919字符的阶段记录见[历史提示压缩报告](./workshop/completed/l3_audit_prompt_20261021.md)，当前改动与验证见[实施记录](./workshop/completed/intent_source_relaxation_20261021.md)。
+### L3 历史阈值路由与当前边界
 
-本地算法仍使用字符三元组计算任务—工具距离、参数新颖度、不可信支持增量及近期失败比例，取最大值为 `s`。当前策略为 `threshold-read-v1`：**符合资格且 `s < threshold` 才免审**，默认经验阈值 `0.70`，没有独立风险校准保证，也不需要 artifact。
+默认v3.5使用read-sensitivity-v1固定读取免审，与历史threshold-read-v1、read-purpose-v2路由区分。阈值保留作配置绑定／诊断，不决定新策略的免审。`l3_router_summary`解释路由事件；固定敏感度免审应查看任务JSON的`dscg_layer_routing.sensitivity_read_bypass_actions`、审计摘要中的`READ_SENSITIVITY_BYPASS`和实际API成本，不能据旧shadow候选数声称本轮节省或安全。
 
-资格限于单个已授权、元数据有效、幂等、无 sink、internal 或 personal 的读取；参数schema、输入完整性与长度检查保留。secret读取、写入、金融、删除、邀请和外发仍审计；原公开读取免审单独统计。banking余额/交易/常设转账/用户信息可参与，IBAN与文件读取仍按secret审计。Monitor、一次性交接和执行票据保留。
-
-CLI默认shadow，Python/Dashboard API默认off；off只关闭路由，不关闭L3。shadow执行真实审计并记录模拟结果，selective才可能省去本次审计，不新增分类器或模型调用。
-
-```bash
-python -m experiments.run_benchmark --suites banking slack --name l3_threshold_shadow_new \
-  --audit-router-mode shadow --audit-router-threshold 0.70
-# 确定经验阈值后，用新的运行名显式选择selective；不保证安全或TSR收益
-python -m experiments.run_benchmark --suites banking slack --name l3_threshold_selective_new \
-  --audit-router-mode selective --audit-router-threshold 0.70
-```
-
-运行根部 `l3_router_summary.md/json` 比较0.65/0.70/0.75及本次阈值，按攻击/场景/配置列出模拟免审、审计分歧、协议失败和已记录Token。它用于人工选择阈值，不自动调参；分歧不是误放率，模拟Token不是实际节省，缺失数据保留未知。
-
-旧 `--audit-router-artifact` 非空时报迁移错误；历史记录仍按原策略读取，不补造免审。切换策略或阈值须新run名，旧缓存不能跨策略复用。独立校准工具和[历史预设](./config/l3_router.calibration.json)保留为未来扩展，已退出当前运行链。配置见[阈值说明](./docs/model_tool_configuration.md#l3直接阈值路由)，后续任务见[plan.md](./plan.md)，实现与边界见[L3方案](./workshop/L3_checker_opt.md)。
+显式legacy-v34保留旧read-purpose-v2语义，历史阈值报告和独立校准器不改写。旧artifact非空仍拒绝。[当前规则](./docs/model_tool_configuration.md#l3读取路由) · [历史阈值记录](./workshop/artifacts/20261021_l3_threshold/)。
 
 ### 例子：读邮件并发送预算摘要
 
@@ -145,7 +122,7 @@ python -m experiments.run_benchmark --suites banking slack --name l3_threshold_s
 
 ### 读取例外、开销与当前边界
 
-原 Monitor 保留 `READ_ONLY_SOURCE_ALLOW`：**已授权且无 sink 的读取，收到有效审计 deny 仍可能执行**；abstain、错误或无效记录阻断。这一例外不适用于上例中的外发，也不能覆盖 L2 整批拒绝。public read 免审是原有能力，不能重复算作本次三层节省。
+显式legacy-v34的历史 Monitor 保留 `READ_ONLY_SOURCE_ALLOW`：**已授权且无 sink 的读取，收到有效审计 deny 仍可能执行**；abstain、错误或无效记录阻断。这一例外不适用于上例中的外发，也不能覆盖 L2 整批拒绝。默认v3.5按public/internal敏感度直接免审，并尊重personal/secret的有效deny。两种策略统计不得混用，不能重复计算历史公开读取节省。
 
 默认 `audit_retries=0`、`completion_prompt=false`。API 可用 `input_isolation=False, authorization_precheck=False, planning_tool_view=False, delegated_tasks=False` 建立 V2 风格对照（仍保留新版目录复核，不等于历史 V2）；默认 pipeline 名区分版本和实际开关，显式指定名称时仍需使用新名字。普通任务的工具视图无新增独立推理调用，但深拷贝/目录核验有本地开销，封装和有效任务随历史重复计费。任务文件准备读取可能增加审计/输入成本；profile 证据也可能增加授权 Tokens。私有读取或写入较多时 L3 仍频繁触发，已有单次历史/当前运行的成本记录，但完整成本对照与可归因的节省仍未验收。
 

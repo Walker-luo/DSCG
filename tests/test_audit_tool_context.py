@@ -1,3 +1,4 @@
+# Frozen v3.4 controls; intent-flow defaults are tested in test_intent_flow*.py.
 """Current-task tool facts reach the auditor without granting authority."""
 import json
 from pathlib import Path
@@ -37,7 +38,7 @@ class AuditToolContextTests(unittest.TestCase):
         self.llm = SimpleNamespace(name="offline", client=Mock())
         self.llm.client.chat.completions.create.return_value = SimpleNamespace(choices=[SimpleNamespace(
             message=SimpleNamespace(content=json.dumps(dict(decision="allow", violations=[], confidence=1, reason_code="FIXTURE")), refusal=None), finish_reason="stop")])
-        self.checker = ActionSecurityChecker(self.llm, sandbox=self.sandbox)
+        self.checker = ActionSecurityChecker(self.llm, sandbox=self.sandbox, prompt_profile='legacy-v34')
         self.call = FunctionCall(function="get_webpage", args={"url":"https://article.example"}, id="fetch-1")
 
     def packet(self, messages):

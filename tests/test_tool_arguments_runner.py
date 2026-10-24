@@ -31,7 +31,7 @@ class ToolArgumentsRunnerTests(unittest.TestCase):
             comparisons=[]
             for progress,dispatch in [(False,inline),(True,spawned)]:
                 name=f'{origin}_{progress}'
-                options=dict(origin=origin,suites=[suite],attack=attacks,results_dir=self.root,run_name=name,progress=progress)
+                options=dict(prompt_profile='legacy-v34',origin=origin,suites=[suite],attack=attacks,results_dir=self.root,run_name=name,progress=progress)
                 with self.subTest(origin=origin,progress=progress),fixture.patched(), \
                      patch.object(runner,'iter_attack_results',side_effect=dispatch),redirect_stdout(StringIO()) as output:
                     self.assertEqual(runner.main(**options),1,output.getvalue())

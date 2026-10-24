@@ -141,14 +141,15 @@ def _model(client):
 
 
 def _component(client, profile, *, authorization=False, input_revision='authorized-v2'):
+    effective_profile = 'legacy-v34' if profile == 'legacy' and input_revision == 'legacy-v1' else profile
     component = (d.ToolAuthorizationCompiler if authorization else d.ActionSecurityChecker)(
-        _model(client), prompt_profile=profile)
+        _model(client), prompt_profile=effective_profile)
     if input_revision == 'legacy-v1':
         component._legacy_audit_input = True
         # Frozen historical responses must never be rebound to today's default prompts.
         if authorization: component.CLASSIC_POLICY = _LEGACY_POLICIES['authorization']
         component.SYSTEM_POLICY = (_LEGACY_POLICIES['authorization'] if authorization else
-                                   audit_policy(_LEGACY_POLICIES['audit'], profile))
+                                   audit_policy(_LEGACY_POLICIES['audit'], effective_profile))
     return component
 
 

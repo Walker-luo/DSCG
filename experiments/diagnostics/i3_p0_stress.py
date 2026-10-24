@@ -125,7 +125,7 @@ def _run_ticket_case(case: str, mode: str, evidence: dict) -> dict[str, Any]:
     def approve(call):
         state = ("trusted request", runtime, EmptyEnv(), [_assistant(call)], args)
         if mode == "scripted_audit_allow":
-            state = ActionSecurityChecker(_audit_model()).query(*state)
+            state = ActionSecurityChecker(_audit_model(), prompt_profile='legacy-v34').query(*state)
         return monitor.query(*state)
 
     def finish(result, **extra):
@@ -334,7 +334,7 @@ def _run_recovery(manifest, case, mode, evidence):
 
     model = _RecoveryModel(manifest, case, world)
     sandbox = PermissionSandbox()
-    generator = OurFrameExecutor(model, sandbox)
+    generator = OurFrameExecutor(model, sandbox, prompt_profile='legacy-v34')
     monitor = ReferenceMonitor(sandbox, require_audit=mode == "scripted_audit_allow")
     observed_tickets = {}
 
@@ -355,7 +355,7 @@ def _run_recovery(manifest, case, mode, evidence):
     contract = sandbox.contract
     components = []
     if mode == "scripted_audit_allow":
-        components.append(ActionSecurityChecker(_audit_model()))
+        components.append(ActionSecurityChecker(_audit_model(), prompt_profile='legacy-v34'))
     components += [monitor, executor, generator]
     state = agent_pipeline.ToolsExecutionLoop(components, max_iters=5).query(*state)
     effects = world["effects"]

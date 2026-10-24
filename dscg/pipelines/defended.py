@@ -28,6 +28,7 @@ from agentdojo.benchmark import TaskResults
 
 #! 统计token消耗
 from dscg.token_tracking import TokenTrackerClient
+from dscg import intent_flow as flow
 from dscg.authorization_steps import PROTOCOL as STEP_PROTOCOL, POLICY as STEP_POLICY, LEGACY_PROTOCOL as LEGACY_STEP_PROTOCOL, native_catalog, parse_steps
 from dscg.decision_schema import (AUDIT_PROTOCOL, AUDIT_SCHEMA, action_schema, response_format,
                                   contract_identity, validate_audit, DecisionContractError,
@@ -142,6 +143,7 @@ class ExecutionTicket:
     contract_version: str
     nonce: str
     signature: str
+    intent_state_sha256: str = ""
 
 
 @dataclass(frozen=True)
@@ -565,6 +567,8 @@ def _compact_authorization_record(record: dict) -> dict:
         "allowed_tools",
         "authorization_protocol",
         "authorization_steps",
+        "authorization_stages",
+        "error_stage",
         "tool_permissions",
         "implicit_read_tools",
         'authorization_mode', 'profile_status', 'task_phase',
@@ -596,6 +600,8 @@ def _compact_audit_record(record: dict) -> dict:
         "blocked_actions",
         "protocol_diagnostics",
         "mediation_diagnostics",
+        "intent_flow",
+        "semantic_batch_fingerprint",
     )
     return {key: deepcopy(record[key]) for key in keys if key in record}
 
@@ -607,6 +613,7 @@ def _compact_action_record(record: dict) -> dict:
         key: deepcopy(record[key])
         for key in (
             "action_id",
+            "intent_id",
             "batch_id",
             "call_id",
             "tool_name",
@@ -788,7 +795,7 @@ def _sync_trace_context(extra_args: dict) -> None:
         "dscg_audit_summary": _audit_summary(audits),
         "dscg_action_summary": _action_summary(actions),
     }
-    for key in ("dscg_input_isolation", "dscg_l1_projection", "dscg_layer_routing", "dscg_framework", "dscg_router_events", "dscg_l2", "dscg_audit_evidence"):
+    for key in ("dscg_input_isolation", "dscg_l1_projection", "dscg_layer_routing", "dscg_framework", "dscg_router_events", "dscg_l2", "dscg_audit_evidence", "dscg_intent_flow"):
         if key in extra_args:
             context[key] = deepcopy(extra_args[key])
             if key == 'dscg_l1_projection' and level != 'full':
@@ -862,7 +869,7 @@ class ActionLedger:
     def __init__(self):
         self._records: dict[str, dict] = {}
 
-    def propose(self, call, batch_id: str, contract_version: str, metadata_status=None) -> str:
+    def propose(self, call, batch_id: str, contract_version: str, metadata_status=None, intent_id=None) -> str:
         action_id = uuid4().hex
         self._records[action_id] = {
             "action_id": action_id,
@@ -876,6 +883,8 @@ class ActionLedger:
             "state": ActionState.PROPOSED.value,
             "transitions": [{"state": ActionState.PROPOSED.value, "reason_code": "MODEL_PROPOSAL"}],
         }
+        if intent_id is not None:
+            self._records[action_id]["intent_id"] = intent_id
         if metadata_status is not None:
             public_metadata = metadata_status.public_dict()
             self._records[action_id].update({
@@ -999,6 +1008,7 @@ class ToolAuthorizationContract:
     authorization_steps: tuple[tuple[str, tuple[str, ...]], ...] = ()
     authorization_protocol: str = ''
     authorization_permissions: tuple[tuple[str, bool], ...] = ()
+    authorization_intents: tuple[str, ...] = ()
 
     def public_dict(self) -> dict:
         record = {
@@ -1022,7 +1032,10 @@ class ToolAuthorizationContract:
         }
         if self.authorization_protocol:
             record['authorization_protocol'] = self.authorization_protocol
-            if self.authorization_protocol == V35_AUTH_PROTOCOL:
+            if self.authorization_protocol == flow.AUTH_PROTOCOL:
+                record['authorization_steps'] = [{'intent': intent} for intent in self.authorization_intents]
+                record['authorization_stages'] = ['authorization_intents', 'authorization_tools']
+            elif self.authorization_protocol == V35_AUTH_PROTOCOL:
                 record['tool_permissions'] = dict(self.authorization_permissions)
             else:
                 record['authorization_steps'] = [{'intent':intent,'tools':list(tools)} for intent,tools in self.authorization_steps]
@@ -1086,7 +1099,7 @@ class ToolAuthorizationCompiler:
         self.prompt_profile = validate_profile(prompt_profile)
 
     def _catalog(self, runtime, metadata):
-        if self.prompt_profile in ('legacy', V35_PROFILE) and self.authorization_profile is None:
+        if self.prompt_profile in ('legacy', 'legacy-v34', V35_PROFILE) and self.authorization_profile is None:
             return native_catalog(runtime, metadata)
         if not semantic_catalog(self.prompt_profile):
             return {name: str(getattr(runtime.functions[name], 'description', 'No description')).strip()
@@ -1164,7 +1177,7 @@ class ToolAuthorizationCompiler:
                 profile = None
                 profile_status = 'unsupported_task_fallback'
         prohibited, prepared, evidence_refs = frozenset(), frozenset(), ()
-        step_mode = self.prompt_profile == 'legacy' and self.authorization_profile is None
+        step_mode = self.prompt_profile in ('legacy', 'legacy-v34') and self.authorization_profile is None
         action_step_mode = step_mode and not getattr(self, '_legacy_audit_input', False)
         permission_mode = self.prompt_profile == V35_PROFILE and self.authorization_profile is None
         permissions = ()
@@ -1174,9 +1187,18 @@ class ToolAuthorizationCompiler:
             decision_format = response_format(getattr(self.llm, 'dscg_model_config', None),
                 permission_schema(action_tools), 'dscg_tool_permissions_v1')
         steps = ()
+        intents = ()
+        flow_mode = self.prompt_profile == 'legacy' and self.authorization_profile is None and not getattr(self, '_legacy_audit_input', False)
         base_policy = self.SYSTEM_POLICY if step_mode else self.CLASSIC_POLICY
+        policy_profile = self.prompt_profile
+        if self.prompt_profile == 'legacy' and self.authorization_profile is not None:
+            # An explicitly configured host profile keeps its existing one-call
+            # protocol both when matched and on its ordinary fallback path.
+            policy_profile = 'legacy-v34'
+        if self.prompt_profile == V35_PROFILE and self.authorization_profile is not None:
+            policy_profile = 'legacy-v34'
         policy = authorization_policy(self.PROFILE_POLICY if profile is not None else base_policy,
-                                      'legacy' if self.prompt_profile == V35_PROFILE and self.authorization_profile is not None else self.prompt_profile, bounded=profile is not None)
+                                      policy_profile, bounded=profile is not None)
         authorization_mode = 'bounded-profile-v1' if profile is not None else 'legacy'
         if profile is not None:
             if not requires_model:
@@ -1208,7 +1230,8 @@ class ToolAuthorizationCompiler:
                 user_request_sha256=_authorization_hash(request.text),
                 tool_catalog_sha256=_authorization_hash(catalog),
                 system_policy_sha256=_authorization_hash({
-                    "prompt": policy,
+                    **({"intent_flow": flow.identity()} if flow_mode else {}),
+                    "prompt": flow.INTENT_POLICY if flow_mode else policy,
                     "tool_metadata_schema": TOOL_METADATA_SCHEMA_VERSION,
                     "temperature": 0.0,
                     **({"decision_contract": decision_format} if action_step_mode or permission_mode else {}),
@@ -1222,12 +1245,22 @@ class ToolAuthorizationCompiler:
                     if status.error_code
                 )),
                 runtime_catalog_sha256=catalog_fingerprint(runtime),
-                authorization_steps=steps, authorization_permissions=permissions,
-                authorization_protocol=V35_AUTH_PROTOCOL if permission_mode else (STEP_PROTOCOL if action_step_mode else LEGACY_STEP_PROTOCOL) if step_mode else '',
+                authorization_steps=steps, authorization_permissions=permissions, authorization_intents=intents,
+                authorization_protocol=flow.AUTH_PROTOCOL if flow_mode else V35_AUTH_PROTOCOL if permission_mode else (STEP_PROTOCOL if action_step_mode else LEGACY_STEP_PROTOCOL) if step_mode else '',
                 authorization_mode=authorization_mode, profile_status=profile_status,
                 profile_sha256=self.authorization_profile.identity() if self.authorization_profile else '',
                 prohibited_tools=prohibited, preparatory_read_tools=prepared, evidence_refs=evidence_refs,
             )
+
+        if flow_mode:
+            try:
+                intents, selected = flow.compile_authorization(self.llm, request.text, catalog, set(catalog))
+            except flow.IntentFlowError as exc:
+                error = AuthorizationCompilationError(exc.reason_code)
+                error.stage = exc.stage
+                raise error from exc
+            allowed.update(selected)
+            return contract()
 
         # 2. 如果没有写/动作工具，直接返回
         if not requires_model:
@@ -1366,9 +1399,11 @@ class OurFrameExecutor(agent_pipeline.BasePipelineElement):
         self.delegated_tasks = bool(delegated_tasks and sandbox is not None)
         self.delegated_task_reader = delegated_task_reader
         self._task_context = None
+        self.intent_flow = None
 
     def reset_task_context(self):
         self._task_context = None
+        self.intent_flow = None
 
     @staticmethod
     def _l2_count(extra_args, key, amount=1):
@@ -1377,6 +1412,7 @@ class OurFrameExecutor(agent_pipeline.BasePipelineElement):
 
     def _publish_grant(self, grant, extra_args):
         self.sandbox.install_contract(grant)
+        self.intent_flow = flow.IntentFlow(grant.authorization_intents, self._task_context.effective_request) if grant.authorization_intents else None
         record = grant.public_dict()
         record['policy_state'] = self.sandbox.policy_state.value
         extra_args['dscg_authorization'] = record
@@ -1394,6 +1430,9 @@ class OurFrameExecutor(agent_pipeline.BasePipelineElement):
                   'policy_state': 'error', 'error_code': getattr(error, 'reason_code', 'AUTH_INTERNAL_ERROR')}
         extra_args['dscg_authorization'] = record
         _publish_authorization_record(extra_args, record)
+        if self.authorization_compiler.prompt_profile == 'legacy' and self.authorization_compiler.authorization_profile is None:
+            self.intent_flow = None
+            raise flow.IntentFlowError(record['error_code'], getattr(error, 'stage', 'authorization'))
 
     def _start_delegation(self, request, source, runtime, env, extra_args):
         metadata = self.authorization_compiler._runtime_metadata(runtime)
@@ -1463,6 +1502,7 @@ class OurFrameExecutor(agent_pipeline.BasePipelineElement):
                 else getattr(last_input, "role", None))
         if self.sandbox is not None and (role == "user" or not messages):
             self._task_context = None
+            self.intent_flow = None
             if self.on_authority_replaced is not None:
                 self.on_authority_replaced()
             # Revoke before compilation and before any candidate generation.
@@ -1503,6 +1543,7 @@ class OurFrameExecutor(agent_pipeline.BasePipelineElement):
                     self._authorization_cache_key = cache_key
                     self._authorization_cache_contract = grant
                 self.sandbox.install_contract(grant)
+                self.intent_flow = flow.IntentFlow(grant.authorization_intents, user_text) if grant.authorization_intents else None
                 record = grant.public_dict()
                 if authorization_reused:
                     record["authorization_reused"] = True
@@ -1510,6 +1551,7 @@ class OurFrameExecutor(agent_pipeline.BasePipelineElement):
                 self.sandbox.mark_error(exc)
                 record["error_type"] = type(exc).__name__
                 record["error_code"] = getattr(exc, "reason_code", "AUTH_INTERNAL_ERROR")
+                record["error_stage"] = getattr(exc, "stage", "authorization")
             record["policy_state"] = self.sandbox.policy_state.value
             extra_args["dscg_authorization"] = record
             # Print a redacted summary even when the surrounding benchmark logger
@@ -1522,6 +1564,11 @@ class OurFrameExecutor(agent_pipeline.BasePipelineElement):
             # )
             # Trace metadata is persisted without adding messages to the model context.
             _publish_authorization_record(extra_args, record)
+            if (self.authorization_compiler.prompt_profile == 'legacy'
+                    and self.authorization_compiler.authorization_profile is None
+                    and record['policy_state'] == 'error'):
+                raise flow.IntentFlowError(record.get('error_code', 'AUTH_INTERNAL_ERROR'),
+                    record.get('error_stage', 'authorization'))
 
         elif (self.sandbox is not None and self.sandbox.contract is not None
               and self.sandbox.contract.runtime_catalog_sha256
@@ -1583,8 +1630,56 @@ class OurFrameExecutor(agent_pipeline.BasePipelineElement):
             self._l2_count(extra_args, 'catalog_tools_total', counts['catalog_tools'])
             self._l2_count(extra_args, 'visible_tools_total', counts['visible_tools'])
             _sync_trace_context(extra_args)
+        if self.intent_flow is not None:
+            if messages and messages[-1].get('role') == 'tool' and self.intent_flow.current:
+                self._observe_intent(messages, extra_args, runtime=runtime)
+            return self._generate_with_intents(query, runtime, planning_runtime, env, messages, model_messages, extra_args)
         _, _, _, [*_, response_msg], _ = self.llm.query(query, planning_runtime, env, model_messages, extra_args)
         return query, runtime, env, [*messages, response_msg], extra_args
+
+    def _observe_intent(self, messages, extra_args, *, final=False, runtime=None):
+        before = self.intent_flow.binding()
+        catalog = native_catalog(runtime, metadata_for_runtime(runtime)) if runtime is not None else {}
+        catalog = {name: spec for name, spec in catalog.items() if name in self.sandbox.allowed_tools}
+        try:
+            self.intent_flow.observe(self.llm, messages, _get_action_ledger(extra_args).snapshot(), final=final,
+                exhausted=bool(final and self.intent_flow.current and
+                    self.intent_flow.current['intent_id'] in self.intent_flow.continuations), catalog=catalog)
+        except flow.IntentFlowError as exc:
+            extra_args['dscg_intent_flow'] = {**self.intent_flow.snapshot(), 'error_code': exc.reason_code}
+            _sync_trace_context(extra_args)
+            raise
+        if before != self.intent_flow.binding() and self.on_authority_replaced:
+            self.on_authority_replaced()
+        extra_args['dscg_intent_flow'] = self.intent_flow.snapshot()
+        _append_full_trace(extra_args, 'intent_progress', self.intent_flow.snapshot())
+        _sync_trace_context(extra_args)
+
+    def _generate_with_intents(self, query, runtime, planning_runtime, env, messages, model_messages, extra_args):
+        raw, view = list(messages), list(model_messages)
+        # Each intent has at most one corrective final-answer continuation.
+        for _ in range(2 * len(self.intent_flow.steps) + 1):
+            active = self.intent_flow.current
+            if not active:
+                planning_runtime, _ = planning_runtime_view(runtime, [])
+            guidance = self.intent_flow.guidance()
+            _, _, _, generated, _ = self.llm.query(query, planning_runtime, env,
+                [*view, dict(role='system', content=[ad_types.text_content_block_from_string(guidance)])], extra_args)
+            response = generated[-1]
+            raw.append(response); view.append(response)
+            if response.get('tool_calls'):
+                extra_args['dscg_intent_flow'] = self.intent_flow.snapshot()
+                _sync_trace_context(extra_args)
+                return query, runtime, env, raw, extra_args
+            if not active:
+                return query, runtime, env, raw, extra_args
+            self._observe_intent(raw, extra_args, final=True, runtime=runtime)
+            current = self.intent_flow.current
+            if not current:
+                return query, runtime, env, raw, extra_args
+            if current['intent_id'] == active['intent_id'] and not self.intent_flow.continue_once():
+                raise flow.IntentFlowError('INTENT_NO_PROGRESS')
+        raise flow.IntentFlowError('INTENT_ITERATION_BOUND')
 
 
 class PermissionSandbox(agent_pipeline.BasePipelineElement):
@@ -1818,6 +1913,17 @@ def _host_router_binding(query, runtime, calls, sandbox, router, messages, extra
             "model_config_sha256": router.model_config_sha256}
 
 
+def _host_intent_binding(query, runtime, calls, sandbox, messages, extra_args, active_flow):
+    state = ToolAuthorizationPrecheck(sandbox).check(calls, runtime) if sandbox is not None else None
+    return dict(task_id=extra_args.get('dscg_task_id'), task_sha256=_hash_json(query), batch_fingerprint=_batch_fingerprint(calls),
+        authorization_state=state.state_sha256 if state else 'no-sandbox',
+        catalog_sha256=router_catalog_snapshot(runtime)[0], context_sha256=_hash_json(messages),
+        action_history_sha256=_hash_json(extra_args.get('dscg_action_ledger', [])),
+        source_ids_sha256=_hash_json(extra_args.get('dscg_source_ids', {})),
+        intent_state_sha256=active_flow.binding() if active_flow is not None else None,
+        read_policy=flow.READ_POLICY)
+
+
 def _publish_router_event(extra_args, event):
     extra_args.setdefault("dscg_router_events", []).append(deepcopy(event))
     _routing_count(extra_args, "router_candidate_batches")
@@ -1902,7 +2008,9 @@ class ReferenceMonitor(agent_pipeline.BasePipelineElement):
 
     def __init__(self, sandbox: PermissionSandbox | None, require_audit: bool,
                  precheck: ToolAuthorizationPrecheck | None = None,
-                 audit_router=None, router_verifier=None):
+                 audit_router=None, router_verifier=None, intent_read_policy=False, intent_flow_getter=None):
+        self.intent_read_policy = intent_read_policy
+        self.intent_flow_getter = intent_flow_getter
         self.sandbox = sandbox
         self.require_audit = require_audit
         self.precheck = precheck
@@ -1918,19 +2026,22 @@ class ReferenceMonitor(agent_pipeline.BasePipelineElement):
         with self._ticket_lock:
             self._issued.clear()
 
-    def _sign(self, action_id: str, call_fingerprint: str, contract_version: str, nonce: str) -> str:
-        payload = f"{action_id}|{call_fingerprint}|{contract_version}|{nonce}".encode("utf-8")
+    def _sign(self, action_id: str, call_fingerprint: str, contract_version: str, nonce: str, intent_state="") -> str:
+        payload = (f"{action_id}|{call_fingerprint}|{contract_version}|{nonce}" + ("|"+intent_state if intent_state else "")).encode("utf-8")
         return hmac.new(self._secret, payload, sha256).hexdigest()
 
     def _issue(self, action_id: str, call, contract_version: str) -> ExecutionTicket:
         call_fingerprint = _tool_call_fingerprint(call)
         nonce = secrets.token_hex(16)
+        active_flow = self.intent_flow_getter() if self.intent_flow_getter else None
+        intent_state = active_flow.binding() if active_flow is not None else ""
         ticket = ExecutionTicket(
             action_id=action_id,
             call_fingerprint=call_fingerprint,
             contract_version=contract_version,
             nonce=nonce,
-            signature=self._sign(action_id, call_fingerprint, contract_version, nonce),
+            signature=self._sign(action_id, call_fingerprint, contract_version, nonce, intent_state),
+            intent_state_sha256=intent_state,
         )
         with self._ticket_lock:
             self._issued[action_id] = ticket
@@ -1948,9 +2059,12 @@ class ReferenceMonitor(agent_pipeline.BasePipelineElement):
         if not isinstance(ticket, ExecutionTicket):
             return False, "INVALID_EXECUTION_TICKET"
         expected_signature = self._sign(
-            ticket.action_id, ticket.call_fingerprint, ticket.contract_version, ticket.nonce
+            ticket.action_id, ticket.call_fingerprint, ticket.contract_version, ticket.nonce, ticket.intent_state_sha256
         )
-        if (not hmac.compare_digest(ticket.signature, expected_signature)
+        active_flow = self.intent_flow_getter() if self.intent_flow_getter else None
+        current_intent_state = active_flow.binding() if active_flow is not None else ""
+        if (ticket.intent_state_sha256 != current_intent_state
+                or not hmac.compare_digest(ticket.signature, expected_signature)
                 or ticket.call_fingerprint != _tool_call_fingerprint(call)):
             return False, "INVALID_EXECUTION_TICKET"
         with self._ticket_lock:
@@ -1992,9 +2106,36 @@ class ReferenceMonitor(agent_pipeline.BasePipelineElement):
         mediation['audit_record_status'] = 'valid' if record_valid else 'missing' if audit is None else 'invalid'
         mediation['router_handoff_status'] = 'not_required'
         router_token = extra_args.pop("_dscg_router_receipt", None)
-        if self._router_handoff_required or (isinstance(audit, dict) and (audit.get("reason_code") == "SELECTIVE_READ_BYPASS"
+        flow_record = self.intent_read_policy or (isinstance(audit, dict) and 'intent_flow' in audit)
+        flow_exempt = set()
+        if flow_record:
+            token = extra_args.pop('_dscg_intent_receipt', None)
+            active_flow = self.intent_flow_getter() if self.intent_flow_getter else None
+            try:
+                binding = _host_intent_binding(query, runtime, tool_calls, self.sandbox, messages, extra_args, active_flow)
+                mask = audit.get('intent_flow', {}) if isinstance(audit, dict) else {}
+                expected = [i for i, c in enumerate(tool_calls) if flow.exempt_read(runtime, c, self.sandbox)]
+                if active_flow is not None and active_flow.current is None:
+                    expected = []
+                if self.precheck and self.precheck.check(tool_calls, runtime).rejected:
+                    expected = []
+                audit_valid = bool(record_valid and self.router_verifier is not None and
+                    mask.get('state_sha256') == binding['intent_state_sha256'] and
+                    mask.get('exempt_indices') == expected and
+                    mask.get('audited_indices') == [i for i in range(len(tool_calls)) if i not in expected] and
+                    self.router_verifier.consume(token, binding, audit))
+                if audit_valid:
+                    flow_exempt = set(expected)
+            except Exception:
+                audit_valid = False
+            if self.router_verifier:
+                self.router_verifier.discard(token)
+                self.router_verifier.discard(router_token)
+            mediation['intent_handoff_status'] = 'valid' if audit_valid else 'invalid'
+            mediation['router_handoff_status'] = 'valid' if audit_valid else 'invalid'
+        if not flow_record and (self._router_handoff_required or (isinstance(audit, dict) and (audit.get("reason_code") == "SELECTIVE_READ_BYPASS"
                                       or audit.get("route_source") in {"local_read_policy", "local_threshold_algorithm"}
-                                      or router_token is not None)):
+                                      or router_token is not None))):
             try:
                 binding = _host_router_binding(query, runtime, tool_calls, self.sandbox, self.audit_router, messages, extra_args)
                 audit_valid = bool(audit_valid and self.require_audit and self.audit_router is not None
@@ -2018,6 +2159,8 @@ class ReferenceMonitor(agent_pipeline.BasePipelineElement):
         extra_args.pop("_dscg_precheck_result", None)
 
         # Register every proposal before deciding any member of the batch.
+        current_flow = self.intent_flow_getter() if self.intent_flow_getter else None
+        current_intent = current_flow.current if current_flow is not None else None
         proposed = [
             (
                 ledger.propose(
@@ -2025,6 +2168,7 @@ class ReferenceMonitor(agent_pipeline.BasePipelineElement):
                     batch_id,
                     contract_version,
                     metadata.get(_tool_call_name(call)),
+                    intent_id=current_intent["intent_id"] if current_intent else None,
                 ),
                 call,
             )
@@ -2045,6 +2189,18 @@ class ReferenceMonitor(agent_pipeline.BasePipelineElement):
                 if not allowed:
                     decisions.append((action_id, call, False, reason_code))
                     continue
+            if flow_record:
+                if current_flow is not None and current_flow.current is None:
+                    decisions.append((action_id, call, False, 'INTENT_TERMINAL'))
+                    continue
+                try:
+                    runtime.functions[tool_name].parameters.model_validate(_tool_call_args(call))
+                except Exception:
+                    decisions.append((action_id, call, False, 'INVALID_ARGUMENT_SCHEMA'))
+                    continue
+                if audit_valid and index in flow_exempt:
+                    decisions.append((action_id, call, True, 'READ_SENSITIVITY_BYPASS'))
+                    continue
             # A semantic audit is supplementary: it can deny a deterministic
             # allow, but an allow can never bypass the Sandbox above. When the
             # checker is enabled, an invalid/missing/abstaining audit defaults
@@ -2056,7 +2212,8 @@ class ReferenceMonitor(agent_pipeline.BasePipelineElement):
                 # turn a model's sensitivity warning into a utility failure;
                 # later write/send actions still require their own approval.
                 if (
-                    status is not None
+                    not flow_record
+                    and status is not None
                     and status.registered
                     and status.metadata.effect == "read"
                     and status.metadata.sink == "none"
@@ -2389,7 +2546,10 @@ class ActionSecurityChecker(agent_pipeline.BasePipelineElement):
         audit_router=None,
         router_verifier=None,
         prompt_profile='legacy',
+        intent_flow_getter=None,
     ):
+        self.intent_flow_getter = intent_flow_getter
+        self._flow_dispatch = False
         self.small_llm = small_llm
         self.intention = user_intention
         self.llm = llm
@@ -2402,7 +2562,7 @@ class ActionSecurityChecker(agent_pipeline.BasePipelineElement):
         self.audit_router = audit_router
         self.router_verifier = router_verifier
         self.prompt_profile = validate_profile(prompt_profile)
-        self.SYSTEM_POLICY = audit_policy(type(self).SYSTEM_POLICY if self.prompt_profile == 'legacy' else type(self).CLASSIC_POLICY, self.prompt_profile)
+        self.SYSTEM_POLICY = audit_policy(type(self).SYSTEM_POLICY if self.prompt_profile in ('legacy', 'legacy-v34') else type(self).CLASSIC_POLICY, self.prompt_profile)
 
     def _handoff_record(self,query,runtime,calls,messages,extra_args,record):
         # Active routing authenticates every checker outcome, so a public
@@ -2471,7 +2631,7 @@ class ActionSecurityChecker(agent_pipeline.BasePipelineElement):
                 "arguments_sha256": _hash_json(raw_args),
                 "source_ids": _source_ids_for_call(call, extra_args),
             })
-        current_context = self.prompt_profile in ('legacy', V35_PROFILE) and not getattr(self, '_legacy_audit_input', False)
+        current_context = self.prompt_profile in ('legacy', 'legacy-v34', V35_PROFILE) and not getattr(self, '_legacy_audit_input', False)
         if current_context:
             statuses = metadata_for_runtime(runtime)
             for action in current_actions:
@@ -2540,6 +2700,17 @@ class ActionSecurityChecker(agent_pipeline.BasePipelineElement):
                 action.pop('arguments_sha256', None)
             for result in tool_results:
                 result['return_status'] = 'blocked' if str(result.get('error') or '').startswith('DSCG_BLOCKED:') else 'error' if result.get('error') else 'success'
+        if self.prompt_profile == 'legacy' and not getattr(self, '_legacy_audit_input', False):
+            active_flow = self.intent_flow_getter() if self.intent_flow_getter else None
+            current = active_flow.current if active_flow is not None else None
+            packet['schema_version'] = 'dscg.audit-input.intent-flow.v1'
+            packet['original_user_request'] = query
+            packet['current_intent'] = current['intent'] if current else None
+            packet['intent_state_sha256'] = active_flow.binding() if active_flow is not None else None
+            if current:
+                packet['trusted_user_request'] = current['intent']
+            else:
+                packet['intent_context'] = 'no_l2_intent_contract'
         return packet
 
     def _fallback_query(self, query, env, prompt: str):
@@ -2577,7 +2748,7 @@ class ActionSecurityChecker(agent_pipeline.BasePipelineElement):
     def _decision_format(self):
         if self.prompt_profile == V35_PROFILE:
             return {'type': AUDIT_FORMAT}
-        if self.prompt_profile != 'legacy' or getattr(self, '_legacy_audit_input', False):
+        if self.prompt_profile not in ('legacy', 'legacy-v34') or getattr(self, '_legacy_audit_input', False):
             return {'type': 'json_object'}
         return response_format(getattr(self.small_llm, 'dscg_model_config', None),
                                AUDIT_SCHEMA, 'dscg_audit_v2')
@@ -2654,7 +2825,59 @@ class ActionSecurityChecker(agent_pipeline.BasePipelineElement):
             parser_status="failure",
         )
 
+    def _query_intent_flow(self, query, runtime, env, messages, extra_args):
+        last = messages[-1] if messages else None
+        calls = last.get('tool_calls') if isinstance(last, dict) and last.get('role') == 'assistant' else None
+        if not calls:
+            return query, runtime, env, messages, extra_args
+        active_flow = self.intent_flow_getter() if self.intent_flow_getter else None
+        terminal = active_flow is not None and active_flow.current is None
+        rejected = self.precheck is not None and self.precheck.check(calls, runtime).rejected
+        exempt = [] if terminal or rejected else [i for i, c in enumerate(calls) if flow.exempt_read(runtime, c, self.sandbox)]
+        audited = [i for i in range(len(calls)) if i not in exempt]
+        before = len(extra_args.get('dscg_audit_decisions', []))
+        if audited and not terminal:
+            subset = dict(last, tool_calls=[calls[i] for i in audited])
+            self._flow_dispatch = True
+            try:
+                self.query(query, runtime, env, [*messages[:-1], subset], extra_args)
+            finally:
+                self._flow_dispatch = False
+            record = deepcopy(extra_args.pop('_dscg_audit_decision', {}))
+            if self.router_verifier:
+                self.router_verifier.discard(extra_args.pop('_dscg_router_receipt', None))
+            # Preserve the actual semantic input/reply identity inside a full-batch record.
+            record['semantic_batch_fingerprint'] = record.get('batch_fingerprint')
+            record['batch_fingerprint'] = _batch_fingerprint(calls)
+        else:
+            decision = AuditDecision(batch_fingerprint=_batch_fingerprint(calls),
+                decision='deny' if terminal else 'allow', violations=('OFF_TASK_ACTION',) if terminal else (),
+                confidence=1.0, reason_code='INTENT_TERMINAL' if terminal else 'READ_SENSITIVITY_BYPASS',
+                audit_input_sha256=_hash_json({'calls': [_tool_call_fingerprint(c) for c in calls], 'policy': flow.READ_POLICY}),
+                raw_response_sha256=_hash_json('host-read-policy'), model_version='host-read-sensitivity',
+                latency_ms=0.0, parser_status='deterministic_bypass')
+            record = decision.public_dict()
+            record['semantic_attempt'] = 0
+        binding = _host_intent_binding(query, runtime, calls, self.sandbox, messages, extra_args, active_flow)
+        record['intent_flow'] = dict(state_sha256=binding['intent_state_sha256'],
+            exempt_indices=exempt, audited_indices=audited, read_policy=flow.READ_POLICY)
+        del extra_args.setdefault('dscg_audit_decisions', [])[before:]
+        _publish_audit_record(extra_args, record)
+        extra_args['_dscg_audit_decision'] = record
+        old = extra_args.pop('_dscg_intent_receipt', None)
+        if self.router_verifier:
+            self.router_verifier.discard(old)
+            extra_args['_dscg_intent_receipt'] = self.router_verifier.issue(binding, record)
+        if exempt:
+            _routing_count(extra_args, 'sensitivity_read_bypass_batches')
+            extra_args['dscg_layer_routing']['sensitivity_read_bypass_actions'] = (
+                extra_args['dscg_layer_routing'].get('sensitivity_read_bypass_actions', 0)+len(exempt))
+        _sync_trace_context(extra_args)
+        return query, runtime, env, messages, extra_args
+
     def query(self, query, runtime, env, messages, extra_args):
+        if self.prompt_profile == 'legacy' and not self._flow_dispatch and not getattr(self, '_legacy_audit_input', False):
+            return self._query_intent_flow(query, runtime, env, messages, extra_args)
         extra_args.pop("_dscg_audit_decision", None)
         old_token = extra_args.pop("_dscg_router_receipt", None)
         if self.router_verifier is not None:
@@ -2790,7 +3013,7 @@ class ActionSecurityChecker(agent_pipeline.BasePipelineElement):
                 raw_hash = _hash_json(content if content is not None else "missing-audit-response")
                 validation = 'failed'
                 decision_value, violations, confidence, reason_code = _parse_audit_payload(content, legacy=getattr(self, '_legacy_audit_input', False),
-                    finite_codes=self.prompt_profile == 'legacy' and not getattr(self, '_legacy_audit_input', False),
+                    finite_codes=self.prompt_profile in ('legacy', 'legacy-v34') and not getattr(self, '_legacy_audit_input', False),
                     intent_evidence=self.prompt_profile == V35_PROFILE)
                 validation = 'passed'
                 decision = AuditDecision(
@@ -2835,7 +3058,7 @@ class ActionSecurityChecker(agent_pipeline.BasePipelineElement):
                 'field_validation': validation,
                 **({'output_contract': V35_AUDIT_PROTOCOL if self.prompt_profile == V35_PROFILE else AUDIT_PROTOCOL, 'response_format': self._decision_format()['type'],
                     'response_length': len(content) if isinstance(content, str) else None,
-                    **field_diagnostics} if self.prompt_profile in ('legacy', V35_PROFILE) and not getattr(self, '_legacy_audit_input', False) else {}),
+                    **field_diagnostics} if self.prompt_profile in ('legacy', 'legacy-v34', V35_PROFILE) and not getattr(self, '_legacy_audit_input', False) else {}),
             }
             if failure_type and isinstance(content, str) and _trace_level(extra_args) == 'full':
                 _append_full_trace(extra_args, 'audit_protocol_response', {
@@ -2891,12 +3114,16 @@ def router_configuration_hash(main_config, sec_config, *, input_isolation, autho
                               profile_hash=None, reader_hash=None, audit_retries=0, completion_prompt=False,
                               prompt_profile='legacy', audit_router_threshold=None, use_sandbox=True):
     """Describe the router request/configuration identity without creating clients."""
+    authorization_policy_profile = ('legacy-v34' if profile_hash is not None
+        and prompt_profile in ('legacy', V35_PROFILE) else prompt_profile)
     decision_contracts = ({'audit': contract_identity(sec_config, AUDIT_SCHEMA, 'dscg_audit_v2'),
                            'authorization': {'protocol': STEP_PROTOCOL,
                                'response_format': response_format(main_config, {}, 'dscg_action_steps_v2')['type']}
                                if use_sandbox and profile_hash is None else
                                {'protocol': 'configured-profile-json-object', 'response_format': 'json_object'} if use_sandbox else None}
-                          if prompt_profile == 'legacy' else {})
+                          if prompt_profile in ('legacy', 'legacy-v34') else {})
+    if prompt_profile == 'legacy':
+        decision_contracts = flow.decision_contracts(main_config, sec_config, enabled=use_sandbox, bounded=profile_hash is not None)
     if prompt_profile == V35_PROFILE:
         decision_contracts = {'audit': audit_contract_identity(sec_config),
                               'authorization': {'protocol': V35_AUTH_PROTOCOL, 'response_format': response_format(main_config, {}, 'dscg_tool_permissions_v1')['type']} if profile_hash is None else {'protocol': 'configured-profile-json-object', 'response_format': 'json_object'}}
@@ -2908,8 +3135,8 @@ def router_configuration_hash(main_config, sec_config, *, input_isolation, autho
                                            "temperature": 0.0,
                                            "reasoning_effort": [reasoning_effort_for_config(main_config),audit_model_settings(sec_config, prompt_profile).get('reasoning_effort')],
                                            "main_system_prompt_sha256": _hash_json(load_system_message(None)),
-                                           "audit_policy_sha256": _hash_json(audit_policy(ActionSecurityChecker.SYSTEM_POLICY if prompt_profile == 'legacy' else ActionSecurityChecker.CLASSIC_POLICY, prompt_profile)),
-                                           "authorization_policy_sha256": _hash_json(authorization_policy(ToolAuthorizationCompiler.SYSTEM_POLICY if prompt_profile == 'legacy' and profile_hash is None else ToolAuthorizationCompiler.CLASSIC_POLICY, prompt_profile)),
+                                           "audit_policy_sha256": _hash_json(audit_policy(ActionSecurityChecker.SYSTEM_POLICY if prompt_profile in ('legacy', 'legacy-v34') else ActionSecurityChecker.CLASSIC_POLICY, prompt_profile)),
+                                           "authorization_policy_sha256": _hash_json(authorization_policy(ToolAuthorizationCompiler.SYSTEM_POLICY if prompt_profile in ('legacy', 'legacy-v34') and profile_hash is None else ToolAuthorizationCompiler.CLASSIC_POLICY, authorization_policy_profile)),
                                            "isolation_rule_sha256": _hash_json(ISOLATION_POLICY if prompt_profile == V35_PROFILE else ISOLATION_RULE),
                                            "completion_rule_sha256": _hash_json(TASK_COMPLETION_PROMPT),
                                            "framework_version": framework_version_for_profile(prompt_profile),
@@ -2924,7 +3151,7 @@ def router_configuration_hash(main_config, sec_config, *, input_isolation, autho
                                            'delegated_task_protocol': DELEGATION_VERSION,
                                            "audit_retries": audit_retries,"completion_prompt": completion_prompt,
                                            "audit_timeout_seconds": AUDIT_TIMEOUT_SECONDS,
-                                           'audit_input_schema': 'dscg.audit-input.v5.10' if prompt_profile == V35_PROFILE else 'dscg.audit-input.v4' if prompt_profile == 'legacy' else AUDIT_INPUT_SCHEMA_VERSION,
+                                           'audit_input_schema': 'dscg.audit-input.v5.10' if prompt_profile == V35_PROFILE else 'dscg.audit-input.v4' if prompt_profile in ('legacy', 'legacy-v34') else AUDIT_INPUT_SCHEMA_VERSION,
                                            'audit_evidence_version': EVIDENCE_VERSION,
                                            'audit_evidence_bounds': [FACT_BUDGET, MAX_RESULTS, MAX_CALL_ARGUMENTS],
                                            "input_bounds": [AUDIT_MAX_REQUEST_LENGTH,AUDIT_MAX_TOOL_DESCRIPTION_LENGTH,
@@ -3012,7 +3239,7 @@ def make_qwen_newFrame_pipeline(
     """
     audit_router_threshold = validate_router_options(audit_router_threshold, audit_router_artifact)
     validate_profile(prompt_profile)
-    if prompt_profile != 'legacy' and (not use_sandbox or not use_security_checker):
+    if prompt_profile not in ('legacy', 'legacy-v34') and (not use_sandbox or not use_security_checker):
         raise ValueError('candidate prompt profiles require L2 and checker')
     if audit_router_mode not in {"off", "shadow", "selective"}:
         raise ValueError("audit_router_mode must be off/shadow/selective")
@@ -3082,7 +3309,7 @@ def make_qwen_newFrame_pipeline(
 
     security_checker = None
     audit_router = None
-    router_verifier = RouterReceiptVerifier() if audit_router_mode != "off" else None
+    router_verifier = RouterReceiptVerifier() if audit_router_mode != "off" or prompt_profile == "legacy" else None
     router_config_hash = None
     if use_security_checker:
         # Omitting sec_model_id intentionally reuses the primary model config.
@@ -3124,12 +3351,14 @@ def make_qwen_newFrame_pipeline(
             max_semantic_retries=audit_retries,
             precheck=precheck,
             audit_router=audit_router, router_verifier=router_verifier,
-            prompt_profile=prompt_profile,
+            prompt_profile=prompt_profile, intent_flow_getter=lambda: new_executor.intent_flow,
         )
 
     # 3. Every candidate batch passes through the same monitor and ticketed executor.
     reference_monitor = ReferenceMonitor(my_sandbox, require_audit=use_security_checker, precheck=precheck,
-                                         audit_router=audit_router,router_verifier=router_verifier)
+                                         audit_router=audit_router,router_verifier=router_verifier,
+                                         intent_read_policy=prompt_profile == "legacy",
+                                         intent_flow_getter=lambda: new_executor.intent_flow)
     new_executor.on_authority_replaced = reference_monitor.revoke_tickets
     ticketed_executor = TicketedToolsExecutor(reference_monitor)
     loop_components = []
@@ -3169,7 +3398,7 @@ def make_qwen_newFrame_pipeline(
         **({'decision_contracts': {'audit': contract_identity(sec_config, AUDIT_SCHEMA, 'dscg_audit_v2') if use_security_checker else None,
                                   'authorization_protocol': (STEP_PROTOCOL if profile_hash is None else 'configured-profile-json-object') if use_sandbox else None,
                                   'authorization_format': (response_format(main_config, {}, 'dscg_action_steps_v2')['type'] if profile_hash is None else 'json_object') if use_sandbox else None}}
-           if prompt_profile == 'legacy' else {}),
+           if prompt_profile in ('legacy', 'legacy-v34') else {}),
         "input_isolation": input_isolation, "authorization_precheck": authorization_precheck,
         'l1_projection_mode': l1_projection_mode, 'l1_projection_profile_sha256': L1_PROFILE_SHA256,
         'planning_tool_view': planning_tool_view, 'delegated_tasks': delegated_tasks,
@@ -3184,6 +3413,14 @@ def make_qwen_newFrame_pipeline(
         "audit_router_config_sha256": router_config_hash,
         "audit_router_load_error": audit_router.error if audit_router else None,
     }
+    if prompt_profile == 'legacy':
+        pipeline.dscg_optimization_config['decision_contracts'] = flow.decision_contracts(
+            main_config, sec_config if use_security_checker else None,
+            enabled=use_sandbox, bounded=profile_hash is not None)
+        pipeline.dscg_optimization_config['read_exemption_policy'] = flow.READ_POLICY
+        pipeline.dscg_optimization_config['intent_flow_enabled'] = bool(use_sandbox and profile_hash is None)
+        pipeline.dscg_optimization_config['intent_flow_disabled_reason'] = (
+            'explicit_no_sandbox' if not use_sandbox else 'host_profile' if profile_hash else None)
     if prompt_profile == V35_PROFILE:
         pipeline.dscg_optimization_config['decision_contracts'] = {
             'audit': audit_contract_identity(sec_config) if use_security_checker else None,

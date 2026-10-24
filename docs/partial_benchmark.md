@@ -1,30 +1,22 @@
 # 小批量测试：run_partial_benchmark
 
-## v3.5 显式候选（未提升默认）
+## 默认 DSCG_v3.5
 
-`--prompt-profile intent-evidence-v35` 在 full、partial、cohort 共用实现中选择 **DSCG_v3.5**；不传仍为 **legacy / DSCG_v3.4**，`--name` 不选择策略。候选 L2 一次返回每个动作工具的完整布尔映射 `tool_permissions`，宿主严格检查后合并原自动读取；L3 同次输出有界 `assessment` 与有限代码 `verdict`，分别说明当前用途、参数依据与缺失证据。读取无需提前知道待查询事实；实际写入仍核对目标及已有依据。读取免审范围、Monitor、整批回执和执行票据不变。
+full、partial、cohort 共用默认 `legacy / DSCG_v3.5` 意图流程：L2 先生成纯 intent 步骤，再选全局工具白名单；根据真实工具执行结果独立判断意图进度，L3 围绕当前 intent 和完整原请求约束审计。明确任务不会因未知可查询参数而直接要求用户补充；真正含糊的对象仍须澄清。每个意图提前结束最多一次继续反馈，不替模型补执行。
 
-本轮300万Tokens后续验证已按用户要求停止：922次请求、919次成功响应、已知1,693,429Tokens，另3次连接故障usage未知。最佳完整六例5/6，但同代码确认4/6，未达提升门槛。当前显式候选恢复到实际执行的round13：L3关闭思考、JSON Object＋严格宿主四字段verdict/三字段assessment、明确执行前审计；主模型/L2不启用思考。最新部分运行仅四条完整、2成功；另有GOAL连接错误和未开始项。未验证的结构化证据候选只存快照，不进入运行入口。见[后续报告](../workshop/completed/v35_followup_20261023.md)。未运行离线回归或完整评测。
-
-最初220次请求的独立阶段仍保留[历史报告](../workshop/completed/v35_live_iterations_20261023.md)，不与本轮合并预算或分母。
-
-显式试用需新名称，以下命令会发起真实模型调用；本次未执行这些扩大范围的命令。已有冻结cohort可继续按轻量规则读取；测量缓存仍绑定实际新协议/策略，不能跨策略reuse。
+已注册、L2允许且参数有效的 public/internal 读取固定免审，包括来自工具结果的博客网址；personal/secret 读取、写入与外发仍审计。免审按工具标签判断，不检查URL或对象隐私；private频道若仍标为internal也免审。混合批次保留次序，分别处理免审读取与待审计动作。`off/shadow/selective` 均不重新审计固定免审读取。
 
 ```bash
-python -m experiments.run_partial_benchmark --suites banking slack \
-  --model-config config/models.local.toml --prompt-profile intent-evidence-v35 \
-  --audit-router-mode shadow --progress --name DSCG_v35_candidate_partial_01
+python -m experiments.run_partial_benchmark \
+  --model-config config/models.local.toml --progress --name DSCG_v35_partial_01
+
+# 显式 v3.4 对照，使用独立名称
+python -m experiments.run_partial_benchmark \
+  --model-config config/models.local.toml --prompt-profile legacy-v34 \
+  --progress --name DSCG_v34_control_partial_01
 ```
 
-当前内部身份为 **DSCG_v3.4**（legacy）：L2保留原生定义，只返回动作授权步骤；L3采用有限短码判决、支持的DashScope/Qwen组合使用严格Schema，其他提供方保留JSON Object与严格宿主校验。读取范围、默认任务前缀、并发和缓存规则不变。两入口共用策略；新name不能复用旧防御缓存，冻结cohort无需因防御更新重筛。[规则与边界](./benchmark.md#默认-v34-策略与复测)。
-
-```bash
-python -m experiments.run_partial_benchmark --suites banking slack \
-  --model-config config/models.local.toml --audit-router-mode shadow \
-  --progress --name DSCG_v3.4_shadow_partial_01
-```
-
-此命令会调用真实模型。v3.4与v3.5的固定案例验证均按用户要求跳过离线回归；上方命令本次未执行。shadow继续审计，selective才应用新增免审，不能把shadow的候选统计当实际TSR提升。
+命令会调用真实模型，本次实施未执行。两阶段授权与 `intent_progress` 独立计入主模型成本，不承诺耗时或Token减少。API／协议失败作为任务错误，排除计分分母。旧v3.4缓存不能跨策略reuse；冻结cohort仍按轻量规则读取，不需重筛。历史 `intent-evidence-v35` 候选保持旧含义，不是当前默认。[完整机制与边界](./benchmark.md#默认-v35-意图流程)；[实施记录](../workshop/completed/intent_flow_v35_20261024.md)。
 
 DashScope/Qwen与DeepSeek的Chat请求角色由DSCG公共客户端分别适配，不修改conda包；更新后使用新运行名。AgentDyn首次请求的400/422定位、受限诊断字段和小范围复测要求见[消息角色兼容排错](./model_tool_configuration.md#消息角色兼容与请求排错)。旧测量缓存与新增请求身份不一致时拒绝复用，旧数据保留；冻结cohort只比较主模型ID/provider及环境与所选任务，详见[名单校验](./injection_precheck.md#2-中断和错误后续跑)。
 
@@ -111,7 +103,7 @@ python -m experiments.run_partial_benchmark --attack typical \
 
 默认typical为ignore_previous、important_instructions、tool_knowledge；具体攻击可重复指定，all查询当前已验证后端注册表并排除manual。injecagent仅显式/all。DoS按首个注册目标、not utility单独计分。上游部分参考调用与GOAL不一致，接入不证明攻击强度。
 
-DSCG CLI默认router shadow，保留L3审计并记录算法观测；baseline/NoChecker默认off，Python factory/API原默认off不变。显式off不关闭L3，no-checker才关闭语义审计。重试0、completion_prompt=false、trace summary保持；selective使用read-purpose-v2的读取规则，无需artifact；--audit-router-threshold保留作诊断，不决定免审。个人/秘密和混合读写仍审计，旧artifact参数非空报迁移错误。策略/阈值仍绑定，须新run名。
+DSCG CLI默认router shadow，baseline/NoChecker默认off，Python factory/API仍默认off。v3.5的public/internal固定读取免审在这些模式下均生效；其他动作继续L3审计。阈值仅保留作诊断并绑定配置，旧artifact非空仍拒绝；NoChecker才关闭语义审计，但保留意图进度。新策略须用新运行名。
 
 AgentDojo保留现有银行L1有限profile；AgentDyn没有新增profile，完整来源封装保留。动态网页/OTP操作按副作用审计；Monitor/票据仍是工具级边界。框架参数见 [配置指南](./model_tool_configuration.md#5-运行控制默认值用途及设置入口)。
 

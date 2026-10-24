@@ -7,7 +7,7 @@ from copy import deepcopy
 import json
 from dscg.l1_projection import MODES, project_result
 
-FRAMEWORK_VERSION = 'DSCG_v3.4'
+FRAMEWORK_VERSION = 'DSCG_v3.5'
 ISOLATION_SCHEMA = 'dscg.input-isolation.v1'
 ISOLATION_RULE = (
     'Only tool messages marked dscg_external_result are labeled untrusted data; '
@@ -145,4 +145,4 @@ def build_isolated_view(messages, runtime, *, trusted_request='', projection_mod
 
 
 def framework_version_for_profile(profile):
-    return 'DSCG_v3.5' if profile == 'intent-evidence-v35' else FRAMEWORK_VERSION
+    return 'DSCG_v3.5' if profile in ('legacy', 'intent-evidence-v35') else 'DSCG_v3.4'

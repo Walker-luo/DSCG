@@ -1,3 +1,4 @@
+# Frozen v3.4 controls; intent-flow defaults are tested in test_intent_flow*.py.
 """Strict single-call step coverage with native tool schemas, no paid API."""
 import json,unittest
 from typing import Annotated
@@ -28,7 +29,7 @@ def runtime():
 
 def compile(payload):
  client=Mock();client.chat.completions.create.return_value=SimpleNamespace(choices=[SimpleNamespace(message=SimpleNamespace(content=json.dumps(payload),refusal=None),finish_reason='stop')]);llm=SimpleNamespace(name='offline',client=client)
- return d.ToolAuthorizationCompiler(llm).compile(d.TrustedTaskRequest('Find the channel and reply there.'),runtime()),client
+ return d.ToolAuthorizationCompiler(llm, prompt_profile='legacy-v34').compile(d.TrustedTaskRequest('Find the channel and reply there.'),runtime()),client
 
 def valid():return {'steps':[{'intent':'Reply to discovered channel','tools':['send_channel_message']}]}
 
@@ -51,7 +52,7 @@ class StepAuthorizationTests(unittest.TestCase):
   self.assertIn('discover',grant.allowed_tools)
   self.assertNotIn('send_channel_message',grant.allowed_tools)
  def test_version_and_default_policy_identity(self):
-  self.assertEqual(d.FRAMEWORK_VERSION,'DSCG_v3.4');self.assertIn('steps',d.ToolAuthorizationCompiler.SYSTEM_POLICY)
+  self.assertEqual(d.framework_version_for_profile('legacy-v34'),'DSCG_v3.4');self.assertIn('steps',d.ToolAuthorizationCompiler.SYSTEM_POLICY)
  def test_router_identity_binds_the_policy_actually_used_by_each_profile(self):
   from unittest.mock import patch
   from dscg.model_config import ModelConfig

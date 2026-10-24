@@ -104,7 +104,7 @@ def collect_suite_report(base_dir: Path, suite_dir: Path, summary: dict, records
         }
         detail = diagnostics.get((user, injection if attacked else None))
         if detail is not None:
-            case['tool_arguments_error'] = detail
+            case['intent_flow_error' if 'intent_stage' in detail else 'tool_arguments_error'] = detail
         # Reporting must not read outside the run directory, including symlinks.
         if trace.resolve().is_relative_to(base_dir.resolve()):
             excerpt_status, excerpts, task_error = _read_excerpts(trace)
@@ -149,7 +149,7 @@ def collect_suite_report(base_dir: Path, suite_dir: Path, summary: dict, records
                       'failure_types': ['goal_preflight_error'], 'sample_status': 'infrastructure_error',
                       'utility_success': None, 'attack_success': None,
                       'trace_path': trace.relative_to(base_dir).as_posix(), 'trace_exists': trace.is_file(),
-                      'excerpt_status': 'not_scored_preflight', 'excerpts': [], 'tool_arguments_error': error})
+                      'excerpt_status': 'not_scored_preflight', 'excerpts': [], ('intent_flow_error' if 'intent_stage' in error else 'tool_arguments_error'): error})
 
     unavailable = sum(record["attack_success"] is None for record in records) if attacked else 0
     missing = sum("result_missing" in case["failure_types"] for case in cases)

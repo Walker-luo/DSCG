@@ -1,3 +1,4 @@
+# Frozen v3.4 controls; intent-flow defaults are tested in test_intent_flow*.py.
 """Deterministic rejection saves audits without partial execution or stale grants."""
 import unittest
 from types import SimpleNamespace
@@ -8,7 +9,7 @@ from dscg.tool_metadata import set_tool_metadata
 
 class RecordingAuditor(d.ActionSecurityChecker):
     def __init__(self,sandbox,precheck):
-        super().__init__(SimpleNamespace(name='offline-auditor',client=None),sandbox=sandbox,precheck=precheck)
+        super().__init__(SimpleNamespace(name='offline-auditor',client=None),sandbox=sandbox,precheck=precheck, prompt_profile='legacy-v34')
         self.requests=[]
     def _request_audit(self,q,e,packet):
         self.requests.append(packet)

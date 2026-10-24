@@ -1,3 +1,4 @@
+# Frozen v3.4 controls; intent-flow defaults are tested in test_intent_flow*.py.
 from authorization_fixture import step_content
 """Native AgentDojo tools/predicates + authored MockTransport, never model efficacy."""
 from contextlib import redirect_stdout
@@ -61,7 +62,7 @@ class NativeIntentSourceTests(unittest.TestCase):
         try:
             with TemporaryDirectory(dir=root) as temp,patch.object(d,'create_openai_client',side_effect=client),redirect_stdout(StringIO()):
                 pipe,main,audit=d.make_defended_pipeline(model_config=config,sec_model_config=config,
-                    tool_metadata=load_tool_metadata(resolve_tool_metadata(backend=get_backend()).path),audit_router_mode='shadow')
+                    tool_metadata=load_tool_metadata(resolve_tool_metadata(backend=get_backend()).path),audit_router_mode='shadow', prompt_profile='legacy-v34')
                 pipe.name='none';ensure_native_cache_model_ready();steps=[]
                 with logging.OutputLogger(temp):
                     result=run_native_suite(pipe,suite,None,Path(temp),False,user_tasks=[user_id],injection_tasks=[],
