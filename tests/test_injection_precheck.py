@@ -84,15 +84,108 @@ class InjectionPrecheckTests(unittest.TestCase):
     def cohort(self):
         return json.loads((self.output / 'cohort.json').read_text())
 
+    def test_single_pass_never_uses_a_second_chance_success(self):
+        self.suite.outcomes[1] = [False, True]
+        self.assertEqual(self.screen(), 0)
+        self.assertEqual(self.suite.executed, ['injection_task_0', 'injection_task_1'])
+        self.assertEqual(self.cohort()['suites']['workspace']['injection_task_ids'], ['injection_task_0'])
+        self.assertEqual(self.screen(), 0)
+        self.assertEqual(len(self.suite.executed), 2)
+
+    def test_single_error_is_separate_and_never_retried_on_resume(self):
+        self.suite.outcomes[1] = [RuntimeError('private provider details'), True]
+        self.assertEqual(self.screen(), 1)
+        cohort = self.cohort()
+        self.assertEqual(cohort['decisions']['workspace']['injection_task_1']['status'], 'error')
+        self.assertEqual(cohort['suites']['workspace']['injection_task_ids'], ['injection_task_0'])
+        original = (self.output / 'cohort.json').read_bytes()
+        self.assertEqual(self.screen(), 1)
+        self.assertEqual(self.suite.executed, ['injection_task_0', 'injection_task_1'])
+        self.assertEqual((self.output / 'cohort.json').read_bytes(), original)
+        self.assertNotIn('private provider details', original.decode())
+
+    def test_auxiliary_reports_keep_aggregates_not_duplicate_evidence(self):
+        self.assertEqual(self.screen(), 0)
+        status = json.loads((self.output / 'status.json').read_text())
+        self.assertNotIn('decisions', status)
+        self.assertNotIn('reuse_rejections', status)
+        self.assertEqual(status['counts'], {'kept': 1, 'excluded': 1})
+        summary = (self.output / 'summary.md').read_text()
+        self.assertIn('workspace', summary)
+        self.assertIn('cohort.json', summary)
+        self.assertNotIn('injection_task_0', summary)
+        self.assertEqual(len(self.cohort()['decisions']['workspace']), 2)
+
+    def test_interrupted_started_target_is_skipped_and_only_unstarted_target_runs(self):
+        with patch.object(precheck, 'make_openai_compatible_pipeline', side_effect=KeyboardInterrupt), redirect_stdout(StringIO()):
+            self.assertEqual(precheck.cli(['screen', '--name', 'screen', '--suites', 'workspace',
+                '--results-dir', str(self.root / 'screens')]), 130)
+        self.assertEqual(self.screen(), 1)
+        self.assertEqual(self.suite.executed, ['injection_task_1'])
+        self.assertEqual(self.cohort()['decisions']['workspace']['injection_task_0']['status'], 'error')
+
+    def test_old_pending_two_failure_rule_transitions_without_retesting_or_rewriting_attempts(self):
+        self.assertEqual(self.screen(), 0)
+        (self.output / 'cohort.json').unlink()
+        manifest = self.output / 'screen_manifest.json'
+        binding = json.loads(manifest.read_text())
+        binding['rule'] = cohort_module.LEGACY_RULE
+        manifest.write_text(json.dumps(binding))
+        originals = {p: p.read_bytes() for p in [manifest, *self.output.rglob('attempt.json')]}
+        self.assertEqual(self.screen(), 0)
+        self.assertEqual(self.suite.executed, ['injection_task_0', 'injection_task_1'])
+        self.assertEqual(self.cohort()['selection_rule'], precheck.RULE)
+        self.assertEqual(self.cohort()['decisions']['workspace']['injection_task_1']['status'], 'excluded')
+        for path, data in originals.items():
+            self.assertEqual(path.read_bytes(), data)
+
+    def test_old_frozen_two_failure_cohort_keeps_its_original_meaning(self):
+        self.assertEqual(self.screen(), 0)
+        cohort = self.cohort()
+        binding = cohort['binding']
+        # Construct a genuine second native fixture trace to represent a past two-failure run.
+        directory = precheck._attempt_directory(self.output, 'workspace', 'injection_task_1')
+        extra = precheck._native_attempt(directory, self.suite,
+            self.suite.get_injection_task_by_id('injection_task_1'), self.config, binding)
+        cohort['decisions']['workspace']['injection_task_1']['attempts'].append(extra)
+        binding['rule'] = cohort_module.LEGACY_RULE
+        cohort['selection_rule'] = cohort_module.LEGACY_RULE
+        cohort['cohort_sha256'] = precheck._digest({k: v for k, v in cohort.items() if k != 'cohort_sha256'})
+        path = self.output / 'cohort.json'
+        path.write_text(json.dumps(cohort))
+        manifest = self.output / 'screen_manifest.json'
+        manifest.write_text(json.dumps(binding))
+        originals = {p: p.read_bytes() for p in [path, manifest, *self.output.rglob('attempt.json')]}
+        self.assertEqual(self.screen(), 0)
+        self.assertEqual(len(self.suite.executed), 3)
+        for p, content in originals.items():
+            self.assertEqual(p.read_bytes(), content)
+
+    def test_reused_error_is_skipped_without_a_new_model_attempt(self):
+        root, _ = self.historical(error='historical infrastructure error')
+        self.assertEqual(self.screen(reuse_from=root), 1)
+        self.assertEqual(self.suite.executed, ['injection_task_1'])
+        self.assertEqual(self.cohort()['decisions']['workspace']['injection_task_0']['status'], 'error')
+
+    def test_frozen_error_trace_hash_still_prevents_silent_evidence_changes(self):
+        self.suite.outcomes[1] = [('error', 'offline failure')]
+        self.assertEqual(self.screen(), 1)
+        record = self.cohort()['decisions']['workspace']['injection_task_1']['attempts'][0]
+        path = Path(record['trace_path'])
+        path.write_text(path.read_text() + '\n')
+        with self.assertRaises(ValueError):
+            self.screen()
+        self.assertEqual(len(self.suite.executed), 2)
+
     def test_native_precheck_runs_goals_only_and_freezes_all_user_ids(self):
         self.assertEqual(self.screen(), 0)
         cohort = self.cohort()
-        self.assertEqual(self.suite.executed, ['injection_task_0', 'injection_task_1', 'injection_task_1'])
+        self.assertEqual(self.suite.executed, ['injection_task_0', 'injection_task_1'])
         self.assertEqual(cohort['suites']['workspace']['user_task_ids'],
                          ['user_task_0', 'user_task_1', 'user_task_2', 'user_task_3'])
         self.assertEqual(cohort['suites']['workspace']['injection_task_ids'], ['injection_task_0'])
         self.assertEqual(cohort['decisions']['workspace']['injection_task_1']['status'], 'excluded')
-        self.assertEqual(len(list(self.output.rglob('none.json'))), 3)
+        self.assertEqual(len(list(self.output.rglob('none.json'))), 2)
 
     def test_progress_is_visible_before_model_work_and_after_each_result(self):
         stream = StringIO()
@@ -107,7 +200,8 @@ class InjectionPrecheckTests(unittest.TestCase):
         self.assertTrue(all('开始尝试' in value for value in snapshots), text)
         self.assertIn('[1/2]', text)
         self.assertIn('[2/2]', text)
-        self.assertIn('复测', text)
+        self.assertIn('只测一次', text)
+        self.assertNotIn('失败复测', text)
         self.assertIn('保留=1', text)
         self.assertIn('排除=1', text)
         self.assertNotIn('goal 0', text)
@@ -145,23 +239,23 @@ class InjectionPrecheckTests(unittest.TestCase):
         self.assertFalse((output / 'cohort.json').exists())
         self.assertEqual(len(list(output.rglob('attempt.json'))), 1)
 
-    def test_second_attempt_success_keeps_target_and_resume_does_no_work(self):
+    def test_first_failure_excludes_target_even_if_second_attempt_would_succeed(self):
         self.suite.outcomes[1] = [False, True]
         self.assertEqual(self.screen(), 0)
         original = (self.output / 'cohort.json').read_bytes()
-        self.assertEqual(self.cohort()['suites']['workspace']['injection_task_ids'], ['injection_task_0', 'injection_task_1'])
+        self.assertEqual(self.cohort()['suites']['workspace']['injection_task_ids'], ['injection_task_0'])
         self.assertEqual(self.screen(), 0)
         self.assertEqual((self.output / 'cohort.json').read_bytes(), original)
-        self.assertEqual(len(self.suite.executed), 3)
+        self.assertEqual(len(self.suite.executed), 2)
 
-    def test_api_error_is_unresolved_and_resume_preserves_old_attempt(self):
+    def test_api_error_is_recorded_separately_and_resume_preserves_old_attempt(self):
         self.suite.outcomes[1] = [RuntimeError('provider private detail'), False, False]
         self.assertEqual(self.screen(), 1)
-        self.assertFalse((self.output / 'cohort.json').exists())
+        self.assertTrue((self.output / 'cohort.json').exists())
         paths = list(self.output.rglob('attempt.json'))
         originals = {p: p.read_bytes() for p in paths}
-        self.assertEqual(self.screen(), 0)
-        self.assertEqual(self.cohort()['decisions']['workspace']['injection_task_1']['status'], 'excluded')
+        self.assertEqual(self.screen(), 1)
+        self.assertEqual(self.cohort()['decisions']['workspace']['injection_task_1']['status'], 'error')
         for p, original in originals.items():
             self.assertEqual(p.read_bytes(), original)
         self.assertNotIn('provider private detail', (self.output / 'status.json').read_text())
@@ -171,7 +265,7 @@ class InjectionPrecheckTests(unittest.TestCase):
         self.suite.injection_tasks['injection_task_0'].GOAL = 'changed goal'
         with self.assertRaises(ValueError):
             self.screen()
-        self.assertEqual(len(self.suite.executed), 3)
+        self.assertEqual(len(self.suite.executed), 2)
 
     def historical(self, *, utility=True, goal='goal 0', model=None, error=None):
         root = self.root / 'historical'
@@ -196,18 +290,18 @@ class InjectionPrecheckTests(unittest.TestCase):
         root, trace = self.historical()
         original = trace.read_bytes()
         self.assertEqual(self.screen(reuse_from=root), 0)
-        self.assertEqual(self.suite.executed, ['injection_task_1', 'injection_task_1'])
+        self.assertEqual(self.suite.executed, ['injection_task_1'])
         self.assertEqual(trace.read_bytes(), original)
         self.assertEqual(self.cohort()['decisions']['workspace']['injection_task_0']['attempts'][0]['origin'], 'reused')
 
-    def test_historical_failure_counts_as_first_failure(self):
+    def test_historical_failure_is_final_without_new_goal_execution(self):
         root, _ = self.historical(utility=False)
         self.suite.outcomes[0] = [False]
         self.assertEqual(self.screen(reuse_from=root), 0)
-        self.assertEqual(self.suite.executed.count('injection_task_0'), 1)
+        self.assertEqual(self.suite.executed.count('injection_task_0'), 0)
         self.assertEqual(self.cohort()['decisions']['workspace']['injection_task_0']['status'], 'excluded')
 
-    def test_later_compatible_historical_success_overrides_earlier_failure(self):
+    def test_later_historical_success_does_not_override_first_compatible_failure(self):
         root, trace = self.historical(utility=False)
         later = root / 'tool_knowledge/workspace/injection_task_0/none/none.json'
         later.parent.mkdir(parents=True)
@@ -217,7 +311,7 @@ class InjectionPrecheckTests(unittest.TestCase):
         manifest.write_bytes((root / 'ignore_previous/workspace/run_manifest.json').read_bytes())
         self.assertEqual(self.screen(reuse_from=root), 0)
         self.assertNotIn('injection_task_0', self.suite.executed)
-        self.assertEqual(self.cohort()['decisions']['workspace']['injection_task_0']['status'], 'kept')
+        self.assertEqual(self.cohort()['decisions']['workspace']['injection_task_0']['status'], 'excluded')
 
     def test_empty_suite_is_explicitly_skipped_and_all_empty_is_rejected(self):
         self.suite.outcomes = {0: [False, False], 1: [False, False]}
@@ -239,7 +333,9 @@ class InjectionPrecheckTests(unittest.TestCase):
         self.assertEqual(self.screen(), 1)
         attempt = next((self.output / 'attempts/workspace/injection_task_0').rglob('attempt.json'))
         attempt.unlink()  # Simulate interruption after TraceLogger completed, before wrapper bookkeeping.
-        self.assertEqual(self.screen(), 0)
+        (self.output / 'cohort.json').unlink()
+        self.assertEqual(self.screen(), 1)
+        self.assertEqual(json.loads(attempt.read_text())['origin'], 'recovered')
         self.assertEqual(self.suite.executed.count('injection_task_0'), 1)
 
     def test_cli_preserves_shadow_full_and_rejects_unknown_attacks_without_models(self):
@@ -315,33 +411,35 @@ class InjectionPrecheckTests(unittest.TestCase):
         manifest = self.output / 'screen_manifest.json'; manifest.write_text(json.dumps(binding))
         originals = {p: p.read_bytes() for p in [cohort_path, manifest, *self.output.rglob('attempt.json')]}
         self.assertEqual(self.screen(), 0)
-        self.assertEqual(len(self.suite.executed), 3)
+        self.assertEqual(len(self.suite.executed), 2)
         for p, content in originals.items():
             self.assertEqual(p.read_bytes(), content)
 
     def test_old_pending_screen_resumes_without_repeating_completed_goal(self):
         self.suite.outcomes[1] = [RuntimeError('offline'), False, False]
         self.assertEqual(self.screen(), 1)
+        (self.output / 'cohort.json').unlink()
         binding = self.legacy_binding()
         manifest = self.output / 'screen_manifest.json'; manifest.write_text(json.dumps(binding))
         for p in self.output.rglob('attempt_manifest.json'):
             record = json.loads(p.read_text()); record['binding_sha256'] = precheck._digest(binding)
             p.write_text(json.dumps(record))
         original = manifest.read_bytes()
-        self.assertEqual(self.screen(), 0)
+        self.assertEqual(self.screen(), 1)
         self.assertEqual(self.suite.executed.count('injection_task_0'), 1)
         self.assertEqual(manifest.read_bytes(), original)
 
     def test_pending_screen_preserves_previous_aggregates_and_configuration_only_record(self):
         self.suite.outcomes[1] = [RuntimeError('offline'), False, False]
         self.assertEqual(self.screen(), 1)
+        (self.output / 'cohort.json').unlink()
         manifest = self.output / 'screen_manifest.json'
         value = json.loads(manifest.read_text())
         value['source']['source_sha256'] = {'old.py':'historical'}
         manifest.write_text(json.dumps(value))
         original_manifest = manifest.read_bytes()
         originals = {name:(self.output/name).read_bytes() for name in ('status.json','summary.md')}
-        self.assertEqual(self.screen(), 0)
+        self.assertEqual(self.screen(), 1)
         self.assertEqual(manifest.read_bytes(), original_manifest)
         for name, data in originals.items():
             snapshots = list((self.output/'compatibility').glob('*/snapshot/'+name))
@@ -363,7 +461,7 @@ class InjectionPrecheckTests(unittest.TestCase):
             record = json.loads(p.read_text()); record['binding_sha256'] = precheck._digest(binding)
             p.write_text(json.dumps(record))
         originals = {p: p.read_bytes() for p in [manifest, *self.output.rglob('attempt.json')]}
-        self.assertEqual(self.screen(), 0)
+        self.assertEqual(self.screen(), 1)
         self.assertEqual(self.suite.executed.count('injection_task_0'), 1)
         for p, content in originals.items():
             self.assertEqual(p.read_bytes(), content)
@@ -379,7 +477,7 @@ class InjectionPrecheckTests(unittest.TestCase):
         current['source_sha256'] = {'dscg/pipelines/baseline.py': '0' * 64}
         with patch.object(cohort_module, 'source_revision', return_value=current):
             self.assertEqual(self.screen(), 0)
-        self.assertEqual(len(self.suite.executed), 3)
+        self.assertEqual(len(self.suite.executed), 2)
 
     def test_old_cohort_provenance_does_not_repeat_goals(self):
         self.screen()
@@ -396,7 +494,7 @@ class InjectionPrecheckTests(unittest.TestCase):
         manifest.write_text(json.dumps(binding))
         originals = {p: p.read_bytes() for p in [manifest, cohort_path, *self.output.rglob('attempt.json')]}
         self.assertEqual(self.screen(), 0)
-        self.assertEqual(self.suite.executed, ['injection_task_0', 'injection_task_1', 'injection_task_1'])
+        self.assertEqual(self.suite.executed, ['injection_task_0', 'injection_task_1'])
         for p, data in originals.items():
             self.assertEqual(p.read_bytes(), data)
         current = precheck._binding(self.config, ['workspace'])
@@ -413,9 +511,9 @@ class InjectionPrecheckTests(unittest.TestCase):
         self.suite.outcomes[1] = [('error', 'offline context_length_exceeded'), False, False]
         self.assertEqual(self.screen(), 1)
         status = json.loads((self.output / 'status.json').read_text())
-        self.assertEqual(status['decisions']['workspace']['injection_task_1']['attempts'][0]['status'], 'error')
-        self.assertEqual(self.screen(), 0)
-        self.assertEqual(len(self.cohort()['decisions']['workspace']['injection_task_1']['attempts']), 3)
+        self.assertEqual(status['counts']['error'], 1)
+        self.assertEqual(self.screen(), 1)
+        self.assertEqual(len(self.cohort()['decisions']['workspace']['injection_task_1']['attempts']), 1)
 
     def test_empty_scene_is_skipped_while_nonempty_scene_keeps_all_users(self):
         empty = FakeSuite(); empty.name = 'travel'; empty.outcomes = {0: [False, False], 1: [False, False]}

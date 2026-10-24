@@ -1,4 +1,4 @@
-"""Direct injection-goal screening with live progress and immutable evidence."""
+"""Single-attempt injection-goal screening with compact reports and immutable evidence."""
 import argparse
 from collections import Counter
 from contextlib import contextmanager
@@ -17,7 +17,7 @@ from experiments import run_partial_benchmark as shared
 from experiments.common.partial_controls import source_revision, guard_run
 from experiments.common.result_paths import resolve_run_path
 from experiments.common.injection_cohort import (
-    SCHEMA, RULE, LIMITATIONS, _digest, _file_hash, _read, _write_new, _replace,
+    SCHEMA, RULE, LEGACY_RULE, LIMITATIONS, _digest, _file_hash, _read, _write_new, _replace,
     _lock, _binding, _trace_status, _decision, _validate_screen_cohort_data,
     _bindings_compatible, _binding_error, _source_compatible, _record_compatibility, run_screened,
 )
@@ -52,7 +52,7 @@ def _reuse(reuse_from, suite_name, task, binding):
     if reuse_from is None:
         return [], []
     root = Path(reuse_from).resolve()
-    rejected, compatible, seen = [], [], set()
+    rejected, compatible = [], []
     for path in sorted(root.glob(f'*/{suite_name}/{task.ID}/none/none.json')):
         try:
             if not path.resolve().is_relative_to(root):
@@ -65,21 +65,16 @@ def _reuse(reuse_from, suite_name, task, binding):
                     or selection.get('suite_version') != 'v1.2' or task.ID not in selection.get('injections', [])):
                 raise ValueError('historical configuration mismatch')
             status, utility = _trace_status(path, suite_name, task, binding['source']['agentdojo'])
-            if status == 'error':
-                raise ValueError('historical native error')
             trace_hash = _file_hash(path)
-            if trace_hash in seen:
-                continue
-            seen.add(trace_hash)
             compatible.append({'origin': 'reused', 'status': status, 'native_utility': utility,
                     'trace_path': str(path.resolve()), 'trace_sha256': trace_hash,
                     'manifest_path': str(manifest_path.resolve()), 'manifest_sha256': _file_hash(manifest_path),
                     'reuse_checks': ['baseline', 'public-model-config', 'backend-metadata',
                                      'agentdojo-version', 'suite-version', 'task-id', 'GOAL', 'complete-native-result'],
                     'api_accounting': None, 'total_tokens': None})
+            break  # First compatible record only; do not search for a second-chance success.
         except (OSError, ValueError, KeyError, TypeError, AttributeError):
             rejected.append({'path': str(path), 'reason': 'incompatible_or_incomplete_direct_goal_record'})
-    # Examine all matching attacks before deciding: an existing success wins.
     return compatible, rejected
 
 
@@ -167,20 +162,18 @@ def _report(root, binding, decisions, rejected):
     report = {'schema_version': SCHEMA, 'benchmark': benchmark_identity(), 'binding_sha256': _digest(binding), 'counts': dict(counts),
               'expected_targets': sum(len(e['injection_tasks']) for e in binding['catalog'].values()),
               'processed_targets': sum(counts.values()),
-              'attempt_counts': dict(Counter(a['status'] for a in attempts)), 'decisions': decisions,
-              'reuse_rejections': rejected, 'known_attempt_tokens': sum(a.get('total_tokens') or 0 for a in attempts),
-              'unknown_cost_attempts': sum(a.get('total_tokens') is None for a in attempts),
-              'limitations': LIMITATIONS}
+              'selection_rule': RULE, 'attempt_counts': dict(Counter(a['status'] for a in attempts)),
+              'reuse_rejection_counts': dict(rejected), 'known_attempt_tokens': sum(a.get('total_tokens') or 0 for a in attempts),
+              'unknown_cost_attempts': sum(a.get('total_tokens') is None for a in attempts)}
     _replace(root / 'status.json', report)
     lines = ['# Injection 目标直接预检', '', '范围：无防御 baseline；不执行注入攻击。', '',
-             '| 场景 | 目标 | 状态 | 有效成功/失败 | 错误 |', '| --- | --- | --- | --- | --- |']
+             '每目标一次，成功保留，失败或错误跳过；错误不计作有效失败。', '',
+             '| 场景 | 已处理/目标 | 保留 | 排除 | 错误跳过 |', '| --- | --- | --- | --- | --- |']
     for name, tasks in decisions.items():
-        for task_id, decision in tasks.items():
-            c = Counter(a['status'] for a in decision['attempts'])
-            lines.append(f"| {name} | {task_id} | {decision['status']} | {c['pass']}/{c['fail']} | {c['error']} |")
-    lines += ['', 'excluded 表示本轮两次有效测试未完成，不表示目标永远无法完成。',
-              '主动拒绝、执行偏差及评分疑点须查看 status.json 中的逐次原始轨迹；不自动推断失败原因。',
-              f"已知尝试 Tokens：{report['known_attempt_tokens']}；成本未知尝试：{report['unknown_cost_attempts']}。", '', *LIMITATIONS]
+        c = Counter(d['status'] for d in tasks.values())
+        lines.append(f"| {name} | {len(tasks)}/{len(binding['catalog'][name]['injection_tasks'])} | {c['kept']} | {c['excluded']} | {c['error']} |")
+    lines += ['', f"已知尝试 Tokens：{report['known_attempt_tokens']}；成本未知尝试：{report['unknown_cost_attempts']}。", '',
+              '详情见[冻结名单](cohort.json)与[原始尝试](attempts/)。直接失败不证明间接攻击不能成功。']
     (root / 'summary.md').write_text('\n'.join(lines) + '\n', encoding='utf-8')
     return report
 
@@ -204,46 +197,43 @@ def screen(*, config_path, run_name, results_dir=None, reuse_from=None, suites=N
         manifest_path = root / 'screen_manifest.json'
         resumed = manifest_path.exists()
         binding = _read(manifest_path) if resumed else current_binding
-        if not _bindings_compatible(binding, current_binding):
+        compatible = _bindings_compatible(binding, current_binding)
+        legacy_transition = (binding.get('rule') == LEGACY_RULE
+                             and _bindings_compatible({**binding, 'rule': RULE}, current_binding))
+        if not compatible and not legacy_transition:
             raise ValueError(_binding_error(binding, current_binding))
         guard_run(manifest_path, binding)
         _record_compatibility(root, binding, current_binding)
         total = sum(len(e['injection_tasks']) for e in binding['catalog'].values())
         progress.emit(f'模型={config.model_id}；目标={total}；模式={"续跑" if resumed else "首次运行"}；输出={root}')
-        progress.emit(f'复用来源={reuse_from or "未指定"}；规则：任一次成功保留，两次有效失败排除，错误待解决。')
+        progress.emit(f'复用来源={reuse_from or "未指定"}；每目标只测一次：成功保留，失败/错误跳过。')
         if (root / 'cohort.json').exists():
-            _validate_screen_cohort_data(_read(root / 'cohort.json'), config)
+            frozen = _validate_screen_cohort_data(_read(root / 'cohort.json'), config)
             progress.emit(f'冻结名单已存在，核验通过，无新增模型调用：{root / "cohort.json"}')
-            return 0
-        decisions, rejected = {}, []
+            return int(any(d['status'] == 'error' for tasks in frozen['decisions'].values() for d in tasks.values()))
+        decisions, rejected = {}, Counter()
         ordinal = 0
         if (root / 'status.json').exists():
-            rejected = _read(root / 'status.json').get('reuse_rejections', [])
+            previous = _read(root / 'status.json')
+            rejected.update(previous.get('reuse_rejection_counts', {}))
+            rejected.update(r['reason'] for r in previous.get('reuse_rejections', []))
         for name, entry in binding['catalog'].items():
             suite = get_suite('v1.2', name)
             decisions[name] = {}
             for task_id in entry['injection_tasks']:
                 ordinal += 1
                 label = f'[{ordinal}/{total}] {name}/{task_id}'
-                progress.emit(f'{label} 检查已有尝试与复用记录。')
                 task = suite.get_injection_task_by_id(task_id)
                 attempts = _attempts(root, name, task_id, binding)
-                if attempts:
-                    progress.emit(f'{label} 恢复已有尝试={len(attempts)}，状态={_decision(attempts)}。')
                 if not attempts:
                     reused, rejected_records = _reuse(reuse_from, name, task, binding)
-                    rejected.extend(rejected_records)
+                    rejected.update(r['reason'] for r in rejected_records)
                     for record in reused:
                         _write_new(_attempt_directory(root, name, task_id) / 'attempt.json', record)
                         attempts.append(record)
-                    if reused:
-                        progress.emit(f'{label} 复用历史尝试={len(reused)}，状态={_decision(attempts)}。')
-                    if rejected_records:
-                        progress.emit(f'{label} 不兼容或不完整记录={len(rejected_records)}，继续补测。')
-                while _decision(attempts) == 'unresolved':
+                if not attempts:
                     directory = _attempt_directory(root, name, task_id)
-                    retest = any(a['status'] == 'fail' for a in attempts)
-                    progress.emit(f'{label} 开始尝试 {directory.name}（{"失败复测" if retest else "新尝试"}）。')
+                    progress.emit(f'{label} 开始尝试（仅一次）。')
                     started = time.monotonic()
                     with progress.waiting(label):
                         attempt = _native_attempt(directory, suite, task, config, binding)
@@ -252,13 +242,11 @@ def screen(*, config_path, run_name, results_dir=None, reuse_from=None, suites=N
                     progress.emit(f'{label} 结果={attempt["status"]}；耗时={time.monotonic() - started:.1f}s；'
                                   f'Tokens={tokens if tokens is not None else "未知"}'
                                   + (f'；错误类型={attempt.get("error_type", "NativeTraceError")}' if attempt['status'] == 'error' else ''))
-                    if attempt['status'] == 'error':
-                        break  # No implicit network retry; a later invocation can resume.
                 decisions[name][task_id] = {'status': _decision(attempts), 'attempts': attempts}
                 report = _report(root, binding, decisions, rejected)
                 counts = report['counts']
                 progress.emit(f'{label} 判定={decisions[name][task_id]["status"]}；累计：'
-                              f'保留={counts.get("kept", 0)} 排除={counts.get("excluded", 0)} 未决={counts.get("unresolved", 0)}。')
+                              f'保留={counts.get("kept", 0)} 排除={counts.get("excluded", 0)} 错误跳过={counts.get("error", 0)}。')
         report = _report(root, binding, decisions, rejected)
         if report['counts'].get('unresolved', 0):
             progress.emit(f'存在待解决目标，未生成名单；以同一条 screen 命令续跑。报告：{root / "summary.md"}；明细：{root / "status.json"}')
@@ -271,8 +259,8 @@ def screen(*, config_path, run_name, results_dir=None, reuse_from=None, suites=N
         cohort['cohort_sha256'] = _digest(cohort)
         _validate_screen_cohort_data(cohort, config)
         _write_new(root / 'cohort.json', cohort)
-        progress.emit(f'完成：{dict(report["counts"])}；报告：{root / "summary.md"}；名单：{root / "cohort.json"}')
-        return 0
+        progress.emit(f'完成：{dict(report["counts"])}；名单：{root / "cohort.json"}')
+        return int(bool(report['counts'].get('error', 0)))
 
 
 def cli(argv=None):

@@ -187,7 +187,7 @@ python -m dscg.benchmark_catalog
 
 **全部任务的正式对照使用 `experiments.run_benchmark`**，当前框架与无防御 baseline 的命令、任务/攻击规模和续跑方法见 [全量测试指南](./docs/benchmark.md)。下面的 partial 命令仅用于小规模回归。
 
-需要先检查攻击目标是否可直接完成时，使用 [Injection 目标预检](./docs/injection_precheck.md) 的 `run_injection_precheck screen`：提供实时进度、同身份新预检复用、失败复测和冻结名单。后续测量统一使用 `run_benchmark`，加 `--cohort PATH` 时保留全部 user tasks 并记录为 screened 子集；不加时仍为完整 full。两类结果分别命名、分别报告。
+需要先检查攻击目标是否可直接完成时，使用 [Injection 目标预检](./docs/injection_precheck.md) 的 `run_injection_precheck screen`：每目标只尝试一次，成功保留，失败/错误跳过；续跑仅处理未开始目标。status仅统计、summary每场景一行，完整判定与证据保留在cohort和attempts。旧冻结名单不重筛。后续测量统一使用 `run_benchmark`，加 `--cohort PATH` 时保留全部 user tasks 并记录为 screened 子集；不加时仍为完整 full。两类结果分别命名、分别报告。
 
 以下命令在 `ipi` 或 `ipi-agentdyn` 均可执行，无需基准参数、额外任务清单或工具目录参数。使用新运行名称保存每次对照：
 

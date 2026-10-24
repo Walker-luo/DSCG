@@ -14,21 +14,24 @@ python -m experiments.run_injection_precheck screen \
   --model-config config/models.local.toml --name injection_screen_01
 ```
 
-AgentDojo默认覆盖workspace14/travel7/banking9/slack5共35目标；AgentDyn为shopping9/github9/dailylife10共28目标。可用对应场景的suites选择子集。每目标首次一次有效成功即保留，两次有效失败才排除；API/上下文错误、缺失或损坏结果不计有效失败，有未决目标则不生成cohort。上游部分参考调用是占位内容，按原生轨迹与真实终态审查，不修改目标或标准答案。
+AgentDojo默认覆盖workspace14/travel7/banking9/slack5共35目标；AgentDyn为shopping9/github9/dailylife10共28目标。可用对应场景的suites选择子集。**每目标只执行一次完整GOAL轨迹：成功保留，失败跳过，不再复测。** 一条轨迹仍可包含多次模型请求和工具调用。
+
+API/上下文错误、中断或损坏记录单列为`error`，不计有效失败，也不纳入cohort或自动重试。处理完其他目标后仍生成只含成功目标的cohort；有错误时退出码为1，提示本次筛选不完整，不阻止你读取已生成名单。原生失败但没有运行错误时退出码为0。上游部分参考调用是占位内容，按原生轨迹与真实终态审查，不修改目标或标准答案。
 
 实时输出总量、逐目标状态、耗时和已知Token；执行中每15秒等待提示不额外调用模型。默认输出：
 
 ```text
 results/injection_precheck/<benchmark_id>/<model_id>_injection_screen_01/
   screen_manifest.json
-  status.json
-  summary.md
-  cohort.json  # 全部目标完成判定后生成
+  status.json    # 仅总量、成功/失败/错误数、已知Token及未知成本数
+  summary.md     # 每场景一行，不逐任务重复展开
+  cohort.json    # 完整判定、任务名单及证据引用
+  attempts/      # 单次记录、绑定和原始轨迹
 ```
 
 results-dir表示预检分类根，程序追加`<backend>/<model>_<name>/`。相同screen命令优先使用新目录，新路径不存在时才查找旧`<model>_<backend>_<name>/`并原地续跑；新路径存在但绑定缺失/损坏/不符时拒绝，不回退旧目录。旧cohort与attempt不移动、不改写。screen续跑仍依赖原证据路径；测量读取已冻结cohort不依赖这些路径。
 
-具体尝试保留独立原生轨迹、原始错误与哈希，冻结名单引用证据。成本未知保持未知，screen成本与后续攻击原生预检分别记录。
+具体尝试保留独立原生轨迹、原始错误与哈希，冻结名单引用证据。status不再重复decisions/逐次轨迹和复用拒绝路径，只保留统计；完整详情查看cohort及attempts。已有旧文件不删除或搬移，旧冻结名单不重写。成本未知保持未知，screen成本与后续攻击原生预检分别记录。
 
 可选只读复用同一后端、模型和任务配置的baseline预检（--reuse-from是证据来源，区别于测量入口的--reuse）：
 
@@ -39,11 +42,13 @@ python -m experiments.run_injection_precheck screen \
   --name injection_screen_02
 ```
 
-将目录换成实际模型/运行名。核对后端元数据、模型公开配置、版本、任务ID、GOAL和完整原生结果；相同轨迹不重复计数。源码哈希、预检脚本及任务实现源码变化不再成为兼容门槛，历史兼容映射不参与运行。原始轨迹、引用manifest及cohort哈希仍检查；跨基准或缺少必要身份时拒绝。
+将目录换成实际模型/运行名。核对后端元数据、模型公开配置、版本、任务ID、GOAL和完整原生结果；按路径排序取首条兼容记录作为唯一尝试，失败/错误也不再补测，不继续寻找后续成功。源码哈希、预检脚本及任务实现源码变化不再成为兼容门槛，历史兼容映射不参与运行。原始轨迹、引用manifest及cohort哈希仍检查；跨基准或缺少必要身份时拒绝。
 
 ## 2. 中断和错误后续跑
 
-保持模型/后端/任务/GOAL/规则配置、name和输出根，重新执行同一screen命令。已判定目标不重跑，不足两次有效失败的目标补测；错误/中断尝试原字节保留，新尝试用新目录。冻结cohort已生成则核验后直接返回；旧manifest、attempt、cohort均不改写。源码差异另记configuration-only记录，不认证源码等价。
+保持模型/后端/任务/GOAL配置、name和输出根，重新执行同一screen命令。只执行尚未开始的目标；已有失败、错误和中断尝试不重跑，原字节保留。已完成但未写attempt记录的原生轨迹会恢复记账。冻结cohort已生成则核验后直接返回，不发模型请求；含error的名单继续返回1。
+
+旧“两次失败”规则的**已冻结cohort**保留原语义和原字节；旧的未完成screen允许在其他身份相同时改用单次规则，按每目标首条尝试判定，不再补测。原manifest/attempt不改写，规则转换记入compatibility，新cohort声明单次规则。该变更不要求重筛已经冻结的历史名单。源码差异另记configuration-only记录，不认证源码等价。
 
 screen没有force-rerun；需要全新预检使用新name。配置冲突不覆盖原结果。仅记录Git/Python/包版本供追溯，不做工程源码扫描；缺少后端、模型或任务身份不能通过手改manifest补造。
 
