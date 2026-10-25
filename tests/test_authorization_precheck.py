@@ -12,7 +12,7 @@ class RecordingAuditor(d.ActionSecurityChecker):
         self.requests=[]
     def _request_audit(self,q,e,packet):
         self.requests.append(packet)
-        return '{"decision":"allow","violations":[],"confidence":0.9,"reason_code":"TASK_ALIGNED"}'
+        return '{"decision":"allow","violations":[],"confidence":0.9,"reason_code":"ALIGNED"}'
 
 
 class AuthorizationPrecheckTests(unittest.TestCase):
@@ -65,7 +65,7 @@ class AuthorizationPrecheckTests(unittest.TestCase):
     def test_public_read_keeps_existing_bypass(self):
         _,p,c,m,e=self.components();state=self.run_chain(self.state('read_data'),p,c,m,e)
         self.assertEqual(self.executed,['read']);self.assertEqual(c.requests,[])
-        self.assertEqual(state[4]['dscg_audit_decision']['reason_code'],'READ_AUDIT_BYPASS')
+        self.assertEqual(state[4]['dscg_audit_decision']['reason_code'],'NON_SENSITIVE_READ_BYPASS')
     def test_private_read_is_still_audited_once(self):
         self.metadata['read_data']['sensitivity']='personal';set_tool_metadata(self.runtime,self.metadata)
         _,p,c,m,e=self.components();state=self.run_chain(self.state('read_data'),p,c,m,e)

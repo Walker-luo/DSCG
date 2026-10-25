@@ -48,7 +48,7 @@ class AuthorizationDefaultsTests(unittest.TestCase):
                 TrustedTaskRequest("Read my payments and adjust the existing rent if needed."), runtime(reverse))
             request = llm.client.chat.completions.create.call_args.kwargs
             self.assertEqual(request.get("temperature"), 0.0)
-            self.assertEqual(list(json.loads(request["messages"][1]["content"])["available_tools"]),
+            self.assertEqual(list(json.loads(request["messages"][1]["content"])["action_tools"]),
                              ["send_money", "update_payment"])
             self.assertEqual(contract.allowed_tools, frozenset({"update_payment"}))
             requests.append(request)
@@ -60,8 +60,8 @@ class AuthorizationDefaultsTests(unittest.TestCase):
         cases = [
             (model(content="bad JSON"), "AUTH_INVALID_JSON"),
             (model(content=None), "AUTH_INVALID_JSON"),
-            (model(content="{}"), "AUTH_INVALID_STEP_SCHEMA"),
-            (model(content='{"tools":["ghost"]}'), "AUTH_INVALID_STEP_TOOLS"),
+            (model(content="{}"), "AUTH_INVALID_PERMISSION_SCHEMA"),
+            (model(content='{"tools":["ghost"]}'), "AUTH_INVALID_TOOL_PERMISSIONS"),
             (model(refusal="refused"), "AUTH_REFUSED"),
             (model(finish="length"), "AUTH_INCOMPLETE"),
         ]

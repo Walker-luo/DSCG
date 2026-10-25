@@ -30,16 +30,16 @@ def compile(payload):
  client=Mock();client.chat.completions.create.return_value=SimpleNamespace(choices=[SimpleNamespace(message=SimpleNamespace(content=json.dumps(payload),refusal=None),finish_reason='stop')]);llm=SimpleNamespace(name='offline',client=client)
  return d.ToolAuthorizationCompiler(llm).compile(d.TrustedTaskRequest('Find the channel and reply there.'),runtime()),client
 
-def valid():return {'steps':[{'intent':'Reply to discovered channel','tools':['send_channel_message']}]}
+def valid():return {'tool_permissions':{'send_channel_message':True}}
 
 class StepAuthorizationTests(unittest.TestCase):
  def test_native_schema_full_catalogue_one_call_and_step_trace(self):
   grant,client=compile(valid());client.chat.completions.create.assert_called_once();packet=json.loads(client.chat.completions.create.call_args.kwargs['messages'][1]['content'])
-  self.assertEqual(set(packet['available_tools']),{'discover','send_channel_message'})
-  self.assertEqual(packet['available_tools']['send_channel_message']['parameters']['required'],['channel','body'])
-  self.assertEqual(packet['available_tools']['discover']['authorization'],'automatic_read')
+  self.assertEqual(set({**packet['automatic_read_tools'], **packet['action_tools']}),{'discover','send_channel_message'})
+  self.assertEqual({**packet['automatic_read_tools'], **packet['action_tools']}['send_channel_message']['parameters']['required'],['channel','body'])
+  self.assertEqual({**packet['automatic_read_tools'], **packet['action_tools']}['discover']['authorization'],'automatic_read')
   self.assertIn('send_channel_message',grant.allowed_tools)
-  self.assertEqual(grant.public_dict()['authorization_steps'],valid()['steps'])
+  self.assertEqual(grant.public_dict()['tool_permissions'],valid()['tool_permissions'])
  def test_bad_steps_unknown_tools_duplicates_and_extra_fields_fail_closed(self):
   bad=[['send_channel_message'],{'tools':['send_channel_message']},{'steps':[{'intent':'read','tools':['discover']}]},{**valid(),'tools':[]},{**valid(),'tools':['send_channel_message','send_channel_message']},
    {**valid(),'steps':[{'intent':'send','tools':['ghost']}]},{**valid(),'steps':[{'intent':'','tools':['send_channel_message']}]},
@@ -47,11 +47,11 @@ class StepAuthorizationTests(unittest.TestCase):
   for value in bad:
    with self.subTest(value=value),self.assertRaises(d.AuthorizationCompilationError):compile(value)
  def test_read_only_step_does_not_gain_action_and_no_host_semantic_pairing(self):
-  grant,_=compile({'steps':[]})
+  grant,_=compile({'tool_permissions':{'send_channel_message':False}})
   self.assertIn('discover',grant.allowed_tools)
   self.assertNotIn('send_channel_message',grant.allowed_tools)
  def test_version_and_default_policy_identity(self):
-  self.assertEqual(d.FRAMEWORK_VERSION,'DSCG_v3.4');self.assertIn('steps',d.ToolAuthorizationCompiler.SYSTEM_POLICY)
+  self.assertEqual(compile(valid())[0].authorization_protocol,'tool-permissions-v1')
  def test_router_identity_binds_the_policy_actually_used_by_each_profile(self):
   from unittest.mock import patch
   from dscg.model_config import ModelConfig

@@ -32,7 +32,7 @@ class AuditToolContextTests(unittest.TestCase):
             """
             self.executed.append(url)
             return "page"
-        set_tool_metadata(self.runtime, {"get_webpage": load_tool_metadata('config/tools.agentdojo-v1.2.toml')["get_webpage"]})
+        set_tool_metadata(self.runtime, {"get_webpage": {**load_tool_metadata('config/tools.agentdojo-v1.2.toml')["get_webpage"], "sensitivity":"personal"}})
         self.sandbox = PermissionSandbox(["get_webpage"])
         self.llm = SimpleNamespace(name="offline", client=Mock())
         self.llm.client.chat.completions.create.return_value = SimpleNamespace(choices=[SimpleNamespace(
@@ -56,7 +56,7 @@ class AuditToolContextTests(unittest.TestCase):
         self.assertEqual(context[0]["tool_name"], "get_channel_messages")
         self.assertEqual(context[0]["tool_call_id"], "read-1")
         self.assertNotIn("old private task", json.dumps(packet))
-        self.assertEqual(packet["current_actions"][0]["untrusted_argument_data"], {"url":"https://article.example"})
+        self.assertEqual(packet["current_actions"][0]["candidate_arguments"], {"url":"https://article.example"})
 
     def test_short_results_share_the_budget_without_artificial_four_result_loss(self):
         packet, _ = self.packet([user("Current"), *[result(str(i)) for i in range(5)], result("x"*3000)])

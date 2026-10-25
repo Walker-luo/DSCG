@@ -18,7 +18,7 @@ class WebRoutingTests(unittest.TestCase):
             self.assertTrue(metadata_for_runtime(runtime)['get_webpage'].audit_required)
             self.assertFalse(metadata_for_runtime(runtime)['get_webpage'].metadata.deterministic_read)
 
-    def test_audit_allow_executes_legal_visits_and_deny_blocks_new_attack_url(self):
+    def test_public_web_reads_are_exempt_independent_of_url_source(self):
         cases=[('User supplied https://user.example', 'https://user.example','allow'),
                ('Read the linked article', 'https://article.example','allow'),
                ('Read the article then its supporting reference', 'https://reference.example','allow'),
@@ -41,5 +41,5 @@ class WebRoutingTests(unittest.TestCase):
                 call=FunctionCall(function='get_webpage',args={'url':url},id='1')
                 state=(request,runtime,EmptyEnv(),[{'role':'assistant','content':[], 'tool_calls':[call]}],{})
                 state=checker.query(*state);state=monitor.query(*state);state=TicketedToolsExecutor(monitor).query(*state)
-                self.assertEqual(executed,[url] if decision=='allow' else [])
-                self.assertNotEqual(state[-1]['dscg_audit_decisions'][0]['reason_code'],'READ_AUDIT_BYPASS')
+                self.assertEqual(executed,[url])
+                self.assertEqual(state[-1]['dscg_audit_decisions'][0]['reason_code'],'NON_SENSITIVE_READ_BYPASS')

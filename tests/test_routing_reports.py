@@ -56,6 +56,19 @@ class RoutingReportTests(unittest.TestCase):
         for user, row in rows.items():
             self.put(f'attack/sample/{user}/attack/i0.json', row)
 
+    def test_fixed_read_shadow_bypass_is_valid_without_calibration_artifact(self):
+        from experiments.common.routing_reports import collect_routing_summary
+        row = trace([event(policy_version='non-sensitive-read-v3', actual_bypass=True,
+            artifact_sha256=None, semantic_audit_calls=0, semantic_audit_tokens=0,
+            raw_audit_decision=None, threshold_applied=False)])
+        row['dscg_framework'].update(audit_router_policy_version='non-sensitive-read-v3',
+            audit_router_artifact_sha256=None)
+        self.fixture({'u0':row})
+        report=collect_routing_summary(self.root)
+        self.assertEqual(report['totals']['invalid_event_records'],0)
+        self.assertEqual(report['totals']['actual_bypass_batches'],1)
+        self.assertEqual(report['configurations'][0]['calibration_status'],'rule_based_unvalidated')
+
     def test_rule_shadow_has_no_threshold_sweep_and_retains_disagreement_cost(self):
         from experiments.common.routing_reports import collect_routing_summary
         row=trace([event(policy_version='read-purpose-v2',eligible=True,would_bypass=True,

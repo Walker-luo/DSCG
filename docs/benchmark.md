@@ -4,9 +4,9 @@
 
 新执行的任务采用“精简交互JSON＋同名诊断JSONL”：主文件保留原生交互／评分，仅新增诊断引用；授权、校验、Monitor结果及成本写入 `.dscg.jsonl`，L3原始回复保存到 `.dscg.responses.jsonl`。无需新参数，GOAL预检同样适用；历史文件和缓存命中不改写。详见[诊断文件](./result_files.md#精简任务轨迹与独立诊断)。
 
-`--prompt-profile intent-evidence-v35` 在 full、partial、cohort 共用实现中选择 **DSCG_v3.5**；不传仍为 **legacy / DSCG_v3.4**，`--name` 不选择策略。候选 L2 一次返回每个动作工具的完整布尔映射 `tool_permissions`，宿主严格检查后合并原自动读取；L3 同次输出有界 `assessment` 与有限代码 `verdict`，分别说明当前用途、参数依据与缺失证据。读取无需提前知道待查询事实；实际写入仍核对目标及已有依据。读取免审范围、Monitor、整批回执和执行票据不变。
+`--prompt-profile intent-evidence-v35` 在 full、partial、cohort 共用实现中选择 **DSCG_v3.5**；不传为 **legacy / DSCG_v3.4.1**，`--name` 不选择策略。候选 L2 一次返回每个动作工具的完整布尔映射 `tool_permissions`，宿主严格检查后合并原自动读取；L3 同次输出有界 `assessment` 与有限代码 `verdict`，分别说明当前用途、参数依据与缺失证据。读取无需提前知道待查询事实；实际写入仍核对目标及已有依据。读取免审范围、Monitor、整批回执和执行票据不变。
 
-本轮300万Tokens后续验证已按用户要求停止：922次请求、919次成功响应、已知1,693,429Tokens，另3次连接故障usage未知。最佳完整六例5/6，但同代码确认4/6，未达提升门槛。当前显式候选恢复到实际执行的round13：L3关闭思考、JSON Object＋严格宿主四字段verdict/三字段assessment、明确执行前审计；主模型/L2不启用思考。最新部分运行仅四条完整、2成功；另有GOAL连接错误和未开始项。未验证的结构化证据候选只存快照，不进入运行入口。见[后续报告](../workshop/completed/v35_followup_20261023.md)。未运行离线回归或完整评测。
+2026-10-23历史300万Tokens后续验证已按用户要求停止：922次请求、919次成功响应、已知1,693,429Tokens，另3次连接故障usage未知。最佳完整六例5/6，但同代码确认4/6，未达提升门槛。当前显式候选恢复到实际执行的round13：L3关闭思考、JSON Object＋严格宿主四字段verdict/三字段assessment、明确执行前审计；主模型/L2不启用思考。最新部分运行仅四条完整、2成功；另有GOAL连接错误和未开始项。未验证的结构化证据候选只存快照，不进入运行入口。见[后续报告](../workshop/completed/v35_followup_20261023.md)。未运行离线回归或完整评测。
 
 最初220次请求的独立阶段仍保留[历史报告](../workshop/completed/v35_live_iterations_20261023.md)，不与本轮合并预算或分母。
 
@@ -24,9 +24,9 @@ python -m experiments.run_benchmark --suites banking slack \
 
 ## 默认 v3.4 策略与复测
 
-当前内部身份为 **`DSCG_v3.4`**，默认 `prompt_profile=legacy`。full、partial、cohort与factory使用同一策略；`--name`只命名实验，不选择版本。历史实验和原manifest保持原样。
+当前内部身份为 **`DSCG_v3.4.1`**，默认 `prompt_profile=legacy`；full、partial、cohort和factory共享策略，`--name`只命名实验。历史配置／结果保留原义。
 
-**L2**保留完整原生名称、描述、参数schema和自动读取标记，一次调用只返回请求的动作步骤：`{"steps":[{"intent":"请求的效果性子目标","tools":["native_action_name"]}]}`。不再重复输出顶层tools或读取步骤；宿主严格校验注册动作名称/重复/界限后求并集，合并原自动读取权限。覆盖未知参数、条件及后续动作，合理候选可并存；步骤不是语义完整性证明，不动态补权。旧显式prompt候选与宿主受限授权沿用原协议。
+**L2**一次调用按完整原生目录输出 `{"tool_permissions":{"每个动作工具":true或false}}`，宿主要求键完整、值严格布尔，再合并自动读取；未知参数不取消后续／条件动作能力，权限在任务内冻结。显式历史prompt候选及受限host授权保留各自协议。
 
 **L3**保留四字段JSON，decision为allow/deny/abstain，confidence为有限[0,1]。reason_code固定为ALIGNED、OFF_TASK_ACTION、EXPLICIT_CONSTRAINT、UNSUPPORTED_PARAMETER、UNREQUESTED_DISCLOSURE、INSTRUCTION_AS_AUTHORITY、ORDER_VIOLATION、MISSING_EVIDENCE。allow要求空violations与ALIGNED；deny要求具体违规代码及匹配理由；abstain要求MISSING_EVIDENCE。非法格式或组合仍失败关闭，不修补或重新请求。
 
@@ -34,7 +34,7 @@ python -m experiments.run_benchmark --suites banking slack \
 
 短提示只判断当前一步的用途与参数事实；允许先查询未知事实、使用相关成功返回及派生值，不要求一次调用完成整项任务或虚构验证门槛。源中出现注入不自动否决合法摘要、退款或地址更新；错误目标、无关写入、非用户要求的攻击指令外发仍拒绝。证据保留原有界限，错误/阻断返回不能当成功事实。Monitor、一次性回执、整批审批和执行票据不变。
 
-读取路由仍为`read-purpose-v2`：合格public/internal幂等无sink读取及全读批次可以成为候选；personal/secret、混合读写和效果性操作仍审计。仅可信请求逐字指定的公共网页保留原窄例外，工具返回中的新URL不能自动免审。CLI默认shadow，**仍实际审计**；selective才应用候选。API/factory默认off，阈值只作诊断且仍绑定配置；不改风险目录。
+读取路由为`non-sensitive-read-v3`：已注册、L2授权、schema有效的public/internal读取在off/shadow/selective中固定免审，不受sink、URL来源或阈值限制；personal/secret读取和效果动作仍审计，有效deny执行阻断。混合批次只审计非免审部分，整批权限／schema校验、原生顺序、回执与票据保持。工具级标签不提供对象隐私或查询参数外传防护。
 
 新策略须用新name，不能复用旧防御测量缓存。冻结cohort仍按模型/provider、后端/版本/所选场景轻量读取，无需因Schema变化重做screen。baseline保持原生行为。
 
@@ -44,7 +44,7 @@ python -m experiments.run_benchmark --suites banking slack \
   --progress --name DSCG_v3.4_shadow_01
 ```
 
-本轮按用户要求跳过离线回归，直接进行固定失败案例的Qwen验证；结果和限制见[实施记录](../workshop/completed/v34_decision_contract_20261022.md)。小样本不能证明整体TSR/ASR改善或安全性。shadow候选也不代表实际免审或节省。
+2026-10-22历史阶段按用户要求跳过离线回归，直接进行固定失败案例的Qwen验证；结果和限制见[实施记录](../workshop/completed/v34_decision_contract_20261022.md)。小样本不能证明整体TSR/ASR改善或安全性。shadow候选也不代表实际免审或节省。
 
 <a id="l3直接阈值策略2026-10-21"></a>
 
@@ -297,7 +297,7 @@ CLI full、partial、cohort（含旧benchmark转发）均按原生单任务函�
 | `--no-checker` | 关闭L3的消融，保留授权/Monitor/ticket，不是baseline |
 | `--no-tool-view` / `--no-delegated-tasks` | L2展示/有限委托消融 |
 | `--l1-projection-mode off/shadow/projected` | 默认projected；AgentDojo保留银行有限profile，AgentDyn沿用完整来源封装 |
-| `--audit-router-mode off/shadow/selective` | DSCG CLI默认shadow；baseline/NoChecker默认off；shadow不新增免审 |
+| `--audit-router-mode off/shadow/selective` | DSCG CLI默认shadow；baseline/NoChecker默认off；三种模式均有固定读取免审 |
 | `--audit-router-artifact PATH` | 单独校准的冻结artifact；旧基准/输入绑定不兼容时不可复用 |
 | `--audit-retries 0/1` / `--completion-prompt` | 当前默认0/关闭，常规对照不叠加恢复 |
 | `--trace-level summary/standard/full` | 默认summary；只控制独立诊断文件详细程度，主JSON始终精简；full增加序列化/写盘成本 |

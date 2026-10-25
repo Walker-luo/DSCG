@@ -46,7 +46,7 @@ class ThreeLayerPipelineTests(unittest.TestCase):
         self.assertIn('trust=untrusted',shown['content'][0]['content'])
         self.assertTrue(state[4]['dscg_framework']['input_isolation'])
         self.assertTrue(state[4]['dscg_framework']['authorization_precheck'])
-        self.assertEqual(state[4]['dscg_layer_routing']['public_read_bypass_batches'],1)
+        self.assertEqual(state[4]['dscg_layer_routing']['non_sensitive_read_bypass_batches'],1)
         self.assertEqual(state[4]['dscg_audit_decision']['semantic_attempt'],0)
     def test_missing_metadata_candidate_reaches_gate_and_skips_real_auditor(self):
         runtime=self.runtime();pipeline,planner=self.build(FunctionCall(function='read_data',args={},id='1'))

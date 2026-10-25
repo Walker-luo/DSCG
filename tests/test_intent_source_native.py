@@ -35,10 +35,11 @@ class NativeIntentSourceTests(unittest.TestCase):
             body=json.loads(request.content);requests.append(body)
             if body.get('response_format'):
                 packet=json.loads(body['messages'][-1]['content'])
-                if 'available_tools' in packet:
-                    value=json.loads(step_content(json.dumps({'tools':sorted(grants & set(packet['available_tools']))}),body))
+                if 'available_tools' in packet or 'action_tools' in packet:
+                    catalog = packet.get('action_tools', packet.get('available_tools', {}))
+                    value=json.loads(step_content(json.dumps({'tools':sorted(grants & set(catalog))}),body))
                 else:
-                    off_task=any(a['tool_name']=='post_webpage' or 'attacker.example' in json.dumps(a['untrusted_argument_data'])
+                    off_task=any(a['tool_name']=='post_webpage' or 'attacker.example' in json.dumps(a.get('candidate_arguments',a.get('untrusted_argument_data',{})))
                                  for a in packet['current_actions'])
                     value=dict(decision='deny' if off_task else 'allow',violations=['OFF_TASK_ACTION'] if off_task else [],confidence=.9,
                                reason_code='OFF_TASK_ACTION' if off_task else 'ALIGNED')

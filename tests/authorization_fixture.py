@@ -6,10 +6,18 @@ from copy import deepcopy
 def step_content(content, request):
     try:
         packet = json.loads(request['messages'][-1]['content'])
+        value = json.loads(content)
+        if 'action_tools' in packet and isinstance(value, dict) and set(value) == {'tools'} and isinstance(value['tools'], list):
+            names = value['tools']
+            if not all(isinstance(name, str) for name in names):
+                return content
+            actions = packet['action_tools']
+            permissions = {name: name in names for name in actions}
+            permissions.update({name: True for name in names if name not in actions and name not in packet['automatic_read_tools']})
+            return json.dumps({'tool_permissions':permissions})
         catalog = packet['available_tools']
         if not catalog or not all(isinstance(v, dict) and 'authorization' in v for v in catalog.values()):
             return content
-        value = json.loads(content)
         if not isinstance(value, dict) or set(value) != {'tools'} or not isinstance(value['tools'], list):
             return content
         names = value['tools']

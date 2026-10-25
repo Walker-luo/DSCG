@@ -58,15 +58,14 @@ class ThresholdRouterTests(unittest.TestCase):
         self.assertTrue(self.assess(a.LocalAuditRouter('selective', threshold=0))['would_bypass'])
         self.assertTrue(self.assess(a.LocalAuditRouter('selective', threshold=1))['would_bypass'])
 
-    def test_scope_and_incomplete_inputs_still_audit(self):
-        for field, value in (('sensitivity', 'secret'), ('sink', 'external_recipient'),
-                             ('effect', 'write'), ('idempotent', False)):
+    def test_sensitive_or_effectful_calls_audit_but_context_flags_do_not_gate_reads(self):
+        for field, value in (('sensitivity', 'secret'), ('sensitivity', 'personal'), ('effect', 'write')):
             with self.subTest(field=field):
                 set_tool_metadata(self.runtime, {'read_data': {**self.metadata, field: value}})
                 self.assertFalse(self.assess(a.LocalAuditRouter('selective'))['would_bypass'])
         set_tool_metadata(self.runtime, {'read_data': self.metadata})
         self.flags['arguments_truncated'] = True
-        self.assertFalse(self.assess(a.LocalAuditRouter('selective'))['would_bypass'])
+        self.assertTrue(self.assess(a.LocalAuditRouter('selective'))['would_bypass'])
 
     def test_unauthorized_missing_metadata_cannot_bypass_and_read_batch_can(self):
         router = a.LocalAuditRouter('selective')
@@ -77,8 +76,8 @@ class ThresholdRouterTests(unittest.TestCase):
         set_tool_metadata(self.runtime, {})
         self.assertFalse(self.assess(router)['would_bypass'])
 
-    def test_selective_skips_auditor_but_shadow_preserves_protocol_block(self):
-        for mode, requests, effects in (('selective', 0, ['read']), ('shadow', 1, [])):
+    def test_all_modes_skip_auditor_for_fixed_read_exemptions(self):
+        for mode, requests, effects in (('selective', 0, ['read']), ('shadow', 0, ['read'])):
             self.effects.clear()
             router = a.LocalAuditRouter(mode)
             sandbox = d.PermissionSandbox(['read_data'])
@@ -101,10 +100,10 @@ class ThresholdRouterTests(unittest.TestCase):
             self.assertEqual(checker.requests, requests)
             self.assertEqual(self.effects, effects)
             event = state[4]['dscg_router_events'][0]
-            self.assertEqual(event['actual_bypass'], mode == 'selective')
+            self.assertTrue(event['actual_bypass'])
             if mode == 'shadow':
                 self.assertTrue(event['would_bypass'])
-                self.assertEqual(event['audit_parser_status'], 'failure')
+                self.assertEqual(event['semantic_audit_calls'], 0)
 
 
 if __name__ == '__main__':

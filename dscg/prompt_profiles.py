@@ -146,5 +146,9 @@ def profile_binding(profile):
                  'planning_tool_order': 'native-registration-v1', 'main_task_policy': MAIN_TASK_POLICY, 'isolation_policy': ISOLATION_POLICY, 'review_rules': REVIEW_RULES, 'decision_guide': DECISION_GUIDE,
                  'envelope_schema': ENVELOPE_SCHEMA, 'permission_schema_template': permission_schema(['registered_action']),
                  'catalog_schema': 'native-tools-separated-v1', 'audit_input': 'dscg.audit-input.v5.10'}
+    # Shared host mediation changes must also invalidate opt-in/off-mode names.
+    if profile == V35_PROFILE:
+        from dscg.audit_router import POLICY_VERSION
+        value['host_read_policy'] = POLICY_VERSION
     digest = hashlib.sha256(json.dumps(value, sort_keys=True, ensure_ascii=False).encode()).hexdigest()
     return {'prompt_profile': profile, 'prompt_profile_sha256': digest}

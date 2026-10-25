@@ -17,21 +17,21 @@ DashScope/Qwen与DeepSeek的Chat请求由公共客户端分别适配：将上游
 
 ## 当前框架与工作流程
 
-显式候选 **DSCG_v3.5** 共用full/partial/cohort实现，使用 `--prompt-profile intent-evidence-v35` 和新名称。后续真实迭代最佳5/6、独立确认4/6，未通过推广门槛，**默认仍为v3.4**。本轮922次请求、已知1,693,429 Tokens，3次连接故障usage未知，用户已停止真实调用；当前候选L3关闭思考、JSON Object配严格宿主校验，未验证的结构化视图只存快照。[后续报告](./workshop/completed/v35_followup_20261023.md)列出逐轮结果及剩余失败；[原220次阶段](./workshop/completed/v35_live_iterations_20261023.md)独立保留。未做离线回归或完整评测。
+显式候选 **DSCG_v3.5** 共用full/partial/cohort实现，使用 `--prompt-profile intent-evidence-v35` 和新名称。后续真实迭代最佳5/6、独立确认4/6，未通过推广门槛，**该历史阶段默认仍为v3.4**。本轮922次请求、已知1,693,429 Tokens，3次连接故障usage未知，用户已停止真实调用；当前候选L3关闭思考、JSON Object配严格宿主校验，未验证的结构化视图只存快照。[后续报告](./workshop/completed/v35_followup_20261023.md)列出逐轮结果及剩余失败；[原220次阶段](./workshop/completed/v35_live_iterations_20261023.md)独立保留。未做离线回归或完整评测。
 
-当前内部身份为 **`DSCG_v3.4`**，默认 `prompt_profile=legacy`。L2保留完整原生定义，只输出动作步骤，由宿主求授权并集；L3采用有限短码与严格宿主校验，官方DashScope上的qwen3.7-flash使用JSON Schema，其他组合保持JSON Object。接口拒绝时不自动降级/重试。历史实验名、manifest和原生评分保留原样。
+当前内部身份为 **`DSCG_v3.4.1`**，默认 `prompt_profile=legacy`。L2一次返回完整动作目录的逐工具布尔授权，宿主严格校验并合并自动读取权限；参数未知不提前删去任务所需能力。L3仍使用有限四字段判决，按当前读取／效果阶段审查实际参数及成功工具证据。历史结果不改写，新策略必须使用新运行名。
 
-`read-purpose-v2` 将L2已允许、原生参数有效、public/internal、幂等且无sink的普通读取（含全为合格读取的批次）列为免审候选。当前请求/描述/参数仍须完整；历史工具错误、旧证据窗口截断及历史参数丢失不再单独迫使新的读取审计。personal/secret、写入、外发及混合读写批次仍审计。风险目录不改，工具级internal标签不能证明某个频道/文件不私密，也没有新增对象或参数权限。
+`non-sensitive-read-v3` 对已注册、已授权、原生参数有效的 `effect=read` 且敏感性为public/internal的调用固定免审，off/shadow/selective一致，不按sink、URL来源或阈值筛选。混合批次仅审计其余调用，但整批权限／schema、一次性回执、顺序与执行票据继续约束全部动作。personal/secret读取仍审计，合法deny与abstain均执行阻断。
 
-外部网页保留external_recipient标签，仅为可信用户请求中逐字给出的公共网页URL提供窄例外：只接受url参数、HTTP(S)或www域名，无查询串、fragment、凭证、端口、IP、内部域名或编码文本。工具返回中的新地址不能据此免审；AgentDyn可分发副作用的browse_webpage也不适用。该规则不验证DNS、重定向或网页真实性。
+这是工具级规则：internal工具仍可能读到私密频道，公共网页读取仍可能通过URL／查询携带敏感信息，不提供对象隐私、DNS／重定向认证或参数外传防护。AgentDyn具有副作用的browse_webpage按实际effect分类，不凭名称免审。风险目录与银行敏感性标签不变。
 
-CLI默认 `shadow`，Python/Dashboard API默认off：shadow记录候选，仍实际审计并由Monitor决定；显式selective才应用新免审。原公开读取免审继续单列。词法分数及 `--audit-router-threshold` 保留作诊断/兼容输入，**不再决定当前策略的免审**；修改阈值仍改变配置绑定。旧threshold-read-v1报告保留旧解释。
+CLI默认shadow、API默认off；两者均保留上述固定免审，其他动作继续L3。词法分数／阈值只作诊断并绑定配置。在线对照与限制见[本轮报告](./workshop/completed/v34_utility_optimization_20261025.md)；原v3.4和显式候选的历史记录保持原义。
 
 默认短审计提示只判断当前一步与任务的关系，允许相关成功工具事实和派生参数；输出必须符合有限代码及decision组合规则，不修补响应。来源含注入不自动否决合法动作。Monitor、一次性回执和执行票据继续绑定整批动作。
 
-[运行与复测](./docs/benchmark.md#默认-v34-策略与复测) · [v3.4真实小样本](./workshop/completed/v34_decision_contract_20261022.md)。按用户要求跳过离线回归；6条新策略utility均false，未通过效用验证，不宣称TSR/ASR改善，不建议据此扩大测试。
+[运行与复测](./docs/benchmark.md#默认-v34-策略与复测) · [v3.4真实小样本](./workshop/completed/v34_decision_contract_20261022.md)。2026-10-22历史阶段跳过离线回归；当时6条新策略utility均false，未通过效用验证，不宣称TSR/ASR改善，不建议据此扩大测试。
 
-L1对有限任务投影工具返回，其余保留来源封装；L2在任务开始编译权限、每批调用前复核，L3判断当前动作。不是每轮依次调用三个模型。`audit_router_mode=off`只关闭新增免审路由，不关闭L3。显式历史候选仍见[效用诊断](./docs/qwen_utility.md#task-alignment-v1)。
+L1对有限任务投影工具返回，其余保留来源封装；L2在任务开始编译权限、每批调用前复核，L3判断当前动作。不是每轮依次调用三个模型。`audit_router_mode=off`保留固定读取免审与其余L3审计。显式历史候选仍见[效用诊断](./docs/qwen_utility.md#task-alignment-v1)。
 
 ```mermaid
 flowchart TD
@@ -39,9 +39,9 @@ flowchart TD
     C --> M[主模型规划]
     M --> P{L2批次校验}
     P -->|拒绝| D[阻断并反馈]
-    P -->|通过| R{原公开免审或selective规则候选}
+    P -->|通过| R{public/internal读取固定免审}
     R -->|是| V[Monitor与一次性票据]
-    R -->|否，含shadow| A[L3当前动作审计]
+    R -->|否| A[L3当前动作审计]
     A --> V
     V -->|允许| E[工具执行]
     V -->|拒绝| D

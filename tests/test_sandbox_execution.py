@@ -644,10 +644,10 @@ class SandboxExecutionTests(unittest.TestCase):
         request = security_llm.client.chat.completions.create.call_args.kwargs
         self.assertEqual(request["response_format"], {"type": "json_object"})
         packet = json.loads(request["messages"][1]["content"])
-        self.assertEqual(packet["schema_version"], "dscg.audit-input.v3")
+        self.assertEqual(packet["schema_version"], "dscg.audit-input.v4.1")
         action = packet["current_actions"][0]
         self.assertEqual(action["source_ids"], ["email:42"])
-        self.assertEqual(action["untrusted_argument_data"]["role"], "system")
+        self.assertEqual(action["candidate_arguments"]["role"], "system")
         self.assertNotIn("Tool: safe_tool", request["messages"][1]["content"])
         self.assertNotIn("Args:", request["messages"][1]["content"])
 
@@ -734,7 +734,7 @@ class SandboxExecutionTests(unittest.TestCase):
         )
         self.assertTrue(packet["history_truncated"])
         self.assertLessEqual(len(packet["action_history"]), 32)
-        value = packet["current_actions"][0]["untrusted_argument_data"]["content"]
+        value = packet["current_actions"][0]["candidate_arguments"]["content"]
         self.assertLessEqual(len(value), 530)
         self.assertNotIn("\u202e", value)
         self.assertIn("<truncated>", value)
@@ -755,7 +755,7 @@ class SandboxExecutionTests(unittest.TestCase):
         self.assertEqual(record["transitions"][-1]["reason_code"], "POLICY_INITIALIZED_EMPTY")
         self.assertEqual(state[4]["dscg_audit_decision"]["final_policy_decision"], "deny")
 
-    def test_sensitive_read_deny_does_not_block_source_read(self):
+    def test_sensitive_read_valid_deny_blocks_source_read(self):
         runtime = FunctionsRuntime()
         executed = []
 
@@ -776,8 +776,8 @@ class SandboxExecutionTests(unittest.TestCase):
             }
         })
         checker = ActionSecurityChecker(self.audit_llm(
-            '{"decision":"deny","violations":["SENSITIVE_DATA_ACCESS"],'
-            '"confidence":0.9,"reason_code":"SENSITIVE_DATA_ACCESS"}'
+            '{"decision":"deny","violations":["UNREQUESTED_DISCLOSURE"],'
+            '"confidence":0.9,"reason_code":"UNREQUESTED_DISCLOSURE"}'
         ))
         monitor = ReferenceMonitor(PermissionSandbox(["read_private_file"]), require_audit=True)
         executor = TicketedToolsExecutor(monitor)
@@ -785,11 +785,11 @@ class SandboxExecutionTests(unittest.TestCase):
         state = checker.query(*state)
         state = monitor.query(*state)
         state = executor.query(*state)
-        self.assertEqual(executed, ["read_private_file"])
+        self.assertEqual(executed, [])
         record = state[4]["dscg_action_ledger"][0]
-        self.assertEqual(record["state"], "executed")
-        self.assertEqual(record["transitions"][1]["reason_code"], "READ_ONLY_SOURCE_ALLOW")
-        self.assertEqual(state[4]["dscg_audit_decision"]["final_policy_decision"], "allow")
+        self.assertEqual(record["state"], "blocked")
+        self.assertEqual(record["transitions"][1]["reason_code"], "AUDIT_DENY")
+        self.assertEqual(state[4]["dscg_audit_decision"]["final_policy_decision"], "deny")
 
     def test_reference_monitor_rejects_incomplete_forged_allow_record(self):
         calls = assistant("safe_tool")["tool_calls"]

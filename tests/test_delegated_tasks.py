@@ -50,9 +50,9 @@ class Auditor(d.ActionSecurityChecker):
     def _request_audit(self, q, extra, packet):
         self.packets.append(deepcopy(packet))
         decision = self.decision
-        if any(c['untrusted_argument_data'].get('recipient') == 'Bob' for c in packet['current_actions']):
+        if any(c.get('candidate_arguments',c.get('untrusted_argument_data',{})).get('recipient') == 'Bob' for c in packet['current_actions']):
             decision = 'deny'
-        return json.dumps({'decision': decision, 'violations': [], 'confidence': 0.8, 'reason_code': 'FIXTURE'})
+        return json.dumps({'decision': decision, 'violations': [] if decision=='allow' else ['MISSING_EVIDENCE'] if decision=='abstain' else ['OFF_TASK_ACTION'], 'confidence': 0.8, 'reason_code': 'ALIGNED' if decision=='allow' else 'MISSING_EVIDENCE' if decision=='abstain' else 'OFF_TASK_ACTION'})
 
 
 def fixture(body=ORDER, fail_read=False, summary=False, private=False, recipient='Alice', reader=None):
@@ -86,7 +86,7 @@ def fixture(body=ORDER, fail_read=False, summary=False, private=False, recipient
 
     set_tool_metadata(runtime, {
         'read_file': dict(effect='read', source='local', sink='none',
-                          sensitivity='internal' if private else 'public', idempotent=True, reversible=False),
+                          sensitivity='personal' if private else 'public', idempotent=True, reversible=False),
         'read_data': dict(effect='read', source='local', sink='none', sensitivity='public',
                           idempotent=True, reversible=False),
         'send_order': dict(effect='external_send', source='local', sink='external_recipient',
@@ -236,7 +236,7 @@ class DelegatedTaskTests(unittest.TestCase):
         state = pipeline.query(REQUEST, runtime, Env(cloud_drive=drive))
         self.assertIn(('send', 'Alice'), effects)
         self.assertIn(ORDER, planner.views[0][0])
-        self.assertIn('file-7', auditor.packets[0]['trusted_user_request'])
+        self.assertIn(ORDER, auditor.packets[0]['trusted_user_request'])
         self.assertEqual(state[3][1]['tool_calls'][0].args, {'file_id': 'file-7'})
 
     def test_unavailable_adapter_and_unknown_source_fail_without_business_compile(self):
@@ -326,6 +326,7 @@ class MessageDelegationTests(unittest.TestCase):
 
     def test_external_bootstrap_still_requires_audit_and_cannot_promote_a_blocked_return(self):
         pipeline, runtime, effects, planner, auditor = self.fixture('web')
+        register_tool_metadata(runtime, 'get_webpage', dict(effect='read', source='web', sink='external_recipient', sensitivity='personal', idempotent=True, reversible=True))
         auditor.decision = 'deny'
         state = pipeline.query(self.WEB, runtime, EmptyEnv())
         self.assertEqual(effects, [])

@@ -88,20 +88,20 @@ class SelectiveAuditTests(unittest.TestCase):
     def test_selective_skips_api_but_requires_monitor_and_ticket(self):
         chain=self.setup_chain();state=self.run_chain(chain)
         self.assertEqual(self.effects,['read']);self.assertEqual(chain[1].requests,0)
-        self.assertEqual(state[4]['dscg_audit_decision']['reason_code'],'SELECTIVE_READ_BYPASS')
+        self.assertEqual(state[4]['dscg_audit_decision']['reason_code'],'NON_SENSITIVE_READ_BYPASS')
         self.assertEqual(state[4]['dscg_audit_decision']['confidence'],0)
         event=state[4]['dscg_router_events'][0];self.assertTrue(event['actual_bypass']);self.assertEqual(event['semantic_audit_calls'],0)
         self.assertEqual(event['final_monitor_decision'],'allow');self.assertNotIn('_dscg_router_receipt',state[4])
 
-    def test_shadow_preserves_abstain_and_deny_read_override(self):
-        for response,effects in [('allow',['read']),('deny',['read']),('abstain',[]),('error',[])]:
+    def test_shadow_fixed_reads_do_not_request_any_model_verdict(self):
+        for response,effects in [('allow',['read']),('deny',['read']),('abstain',['read']),('error',['read'])]:
             self.effects.clear();chain=self.setup_chain('shadow',response=response);state=self.run_chain(chain)
-            self.assertEqual(self.effects,effects);self.assertEqual(chain[1].requests,1)
-            event=state[4]['dscg_router_events'][0];self.assertTrue(event['would_bypass']);self.assertFalse(event['actual_bypass'])
-            self.assertEqual(event['semantic_audit_calls'],1);self.assertIsNone(event['semantic_audit_tokens'])
+            self.assertEqual(self.effects,effects);self.assertEqual(chain[1].requests,0)
+            event=state[4]['dscg_router_events'][0];self.assertTrue(event['would_bypass']);self.assertTrue(event['actual_bypass'])
+            self.assertEqual(event['semantic_audit_calls'],0);self.assertEqual(event['semantic_audit_tokens'],0)
 
     def test_hard_scope_cannot_be_overridden_by_score(self):
-        for sensitivity,effect,sink in [('secret','read','none'),('internal','write','none'),('internal','read','external_recipient')]:
+        for sensitivity,effect,sink in [('secret','read','none'),('internal','write','none'),('personal','read','none')]:
             self.effects.clear();self.md.update(sensitivity=sensitivity,effect=effect,sink=sink);set_tool_metadata(self.runtime,{'read_data':self.md})
             chain=self.setup_chain();state=self.run_chain(chain)
             self.assertEqual(chain[1].requests,1);self.assertFalse(state[4]['dscg_router_events'][0]['actual_bypass'])

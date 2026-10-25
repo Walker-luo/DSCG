@@ -240,8 +240,8 @@ print("classified tools:", len(catalog))
 | planning_tool_view | true | factory/API、网页、partial --no-tool-view；关掉展示完整目录，执行授权仍检查 |
 | delegated_tasks | true | factory/API、网页、partial --no-delegated-tasks；有界明确执行文件/唯一邮件/指定网页任务，不把普通返回变成任务 |
 | use_security_checker | true | factory/API、网页、partial --no-checker；整个L3语义审计开关 |
-| audit_router_mode | API/factory off；DSCG CLI shadow | full/partial CLI未显式指定时，baseline/NoChecker为off，其余为shadow；显式不兼容组合报错。off仍运行原L3，shadow观察并审计，selective按读取规则免审 |
-| audit_router_threshold | 0.70 | CLI --audit-router-threshold、Python/Dashboard API；有限数值[0,1]，保留作诊断，不控制read-purpose-v2免审 |
+| audit_router_mode | API/factory off；DSCG CLI shadow | full/partial CLI未显式指定时，baseline/NoChecker为off，其余为shadow；显式不兼容组合报错。三种模式均保留固定非敏感读取免审，其余动作继续L3 |
+| audit_router_threshold | 0.70 | CLI --audit-router-threshold、Python/Dashboard API；有限数值[0,1]，保留作诊断，不控制固定读取免审 |
 | audit_router_artifact | 已停用 | 非空值直接报迁移错误，改用threshold；不读取旧artifact |
 | audit_retries | 0 | factory/API、partial --audit-retries 0/1；仅语义abstain有界重审，普通比较保持0，不是SDK传输重试设置 |
 | completion_prompt | false | factory/API、partial --completion-prompt；历史可选提示，当前普通比较保持关闭 |
@@ -253,9 +253,9 @@ print("classified tools:", len(catalog))
 
 ### L3读取路由
 
-DSCG_v3.3使用read-purpose-v2，不按词法分数或阈值决定免审。public/internal、幂等、无sink且L2允许/参数有效的普通读取及全读批次成为候选；personal/secret、混合/效果性操作仍审计。历史错误/证据截断不再阻止新读取，当前输入异常仍回退。可信用户原文URL仅有严格窄例外，不改变风险标签或提供对象权限。[完整规则](./benchmark.md#默认-v33-策略与复测)。
+当前默认DSCG_v3.4.1采用non-sensitive-read-v3：已注册、L2授权、schema有效的public/internal读取固定免审，包含工具返回中发现的网页链接；不按sink、URL语法／来源、幂等标签或词法阈值选择。personal/secret与效果动作继续审计，混合批次只审计非免审部分，整批前置校验及回执／票据不变。读取免审不证明对象隐私或URL参数无泄露风险。
 
-CLI默认shadow，API默认off；shadow仍审计，selective才应用候选。--audit-router-threshold及Python同名参数保留为有限[0,1]诊断输入，不控制新规则；旧artifact仍拒绝。策略/阈值/有效提示仍进入缓存身份，使用新name。
+CLI默认shadow、API默认off，固定免审在三种模式中一致。阈值仍校验为有限[0,1]且绑定配置，旧artifact拒绝；更新策略后使用新name。[验证报告](../workshop/completed/v34_utility_optimization_20261025.md)。
 
 ```bash
 python -m experiments.run_benchmark --suites banking slack --name DSCG_v3.3_shadow_01 \

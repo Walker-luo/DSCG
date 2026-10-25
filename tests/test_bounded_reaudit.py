@@ -17,7 +17,7 @@ class BoundedReauditTests(unittest.TestCase):
         self.messages=[{'role':'assistant','content':[], 'tool_calls':[FunctionCall(function='read_private',args={},id='1')]}]
     def checker(self, outcomes, enabled=True):
         checker=ActionSecurityChecker(SimpleNamespace(name='fixture'), sandbox=PermissionSandbox(['read_private']), max_semantic_retries=1 if enabled else 0)
-        checker._request_audit=Mock(side_effect=[json.dumps(dict(decision=o,violations=[],confidence=1.0,reason_code='FIXTURE')) if isinstance(o,str) and o in ['allow','abstain','deny'] else o for o in outcomes])
+        checker._request_audit=Mock(side_effect=[json.dumps(dict(decision=o,violations=[] if o=='allow' else ['MISSING_EVIDENCE'] if o=='abstain' else ['OFF_TASK_ACTION'],confidence=1.0,reason_code='ALIGNED' if o=='allow' else 'MISSING_EVIDENCE' if o=='abstain' else 'OFF_TASK_ACTION')) if isinstance(o,str) and o in ['allow','abstain','deny'] else o for o in outcomes])
         return checker
     def test_one_semantic_abstain_can_be_clarified_without_dropping_history(self):
         checker=self.checker(['abstain','allow'])
@@ -54,4 +54,4 @@ class BoundedReauditTests(unittest.TestCase):
         checker=self.checker(['allow'])
         state=checker.query('Read facts',self.runtime,EmptyEnv(),self.messages,{})
         checker._request_audit.assert_not_called()
-        self.assertEqual(state[-1]['_dscg_audit_decision']['reason_code'],'READ_AUDIT_BYPASS')
+        self.assertEqual(state[-1]['_dscg_audit_decision']['reason_code'],'NON_SENSITIVE_READ_BYPASS')

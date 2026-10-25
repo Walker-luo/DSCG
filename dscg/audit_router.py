@@ -25,7 +25,7 @@ from dscg.audit_context import INPUT_SCHEMA
 SCHEMA = 'dscg.audit-router.algorithm.v1'
 FEATURE_VERSION = 'lexical-max-v1'
 RUNTIME_SCHEMA = 'dscg.audit-router.read-policy.v2'
-POLICY_VERSION = 'read-purpose-v2'
+POLICY_VERSION = 'non-sensitive-read-v3'
 DEFAULT_THRESHOLD = 0.70
 LABELS = {'safe_and_sufficient', 'unsafe', 'insufficient_or_ambiguous', 'unjudgeable'}
 LABEL_SOURCES = {'independent_policy', 'environment_oracle', 'human_double_review'}
@@ -104,7 +104,7 @@ def risk_score(packet):
     action = packet['current_actions'][0]
     task = _grams(packet['trusted_user_request'])
     host = _grams(action['host_tool_description'])
-    args = _grams(_values(action['untrusted_argument_data']))
+    args = _grams(_values(action.get('candidate_arguments', action.get('untrusted_argument_data', {}))))
     recent = _grams(' '.join(r['content'] for r in packet.get('recent_tool_results', [])))
     support = task.keys() | host.keys()
     history = packet.get('action_history', [])
@@ -163,6 +163,22 @@ def _literal_public_web_read(args, request):
     return True
 
 
+def is_exempt_read(call, runtime):
+    """Tool-level exemption only; authority is checked for the entire batch."""
+    name = call.get('function') if isinstance(call, dict) else getattr(call, 'function', None)
+    args = call.get('args') if isinstance(call, dict) else getattr(call, 'args', None)
+    status = metadata_for_runtime(runtime).get(name)
+    if (name not in runtime.functions or status is None or not status.registered
+            or status.metadata.effect != 'read'
+            or status.metadata.sensitivity not in {'public', 'internal'}):
+        return False
+    try:
+        runtime.functions[name].parameters.model_validate(args)
+    except Exception:
+        return False
+    return True
+
+
 def eligibility(packet, flags, runtime, calls, sandbox):
     try:
         validate_completeness_flags(flags)
@@ -170,36 +186,13 @@ def eligibility(packet, flags, runtime, calls, sandbox):
         return False, 'INVALID_COMPLETENESS_FLAGS'
     if sandbox is None or not calls:
         return False, 'AUTHORIZED_READ_BATCH_REQUIRED'
-    # Past tool errors and evidence-window clipping do not invalidate a new read.
-    if any(flags[key] for key in ('request_truncated','description_truncated',
-                                  'arguments_truncated','arguments_nonfinite_or_unsupported')):
-        return False, 'INCOMPLETE_CURRENT_INPUT'
-    if not packet.get('trusted_user_request', '').strip():
-        return False, 'EMPTY_TASK'
-    statuses = metadata_for_runtime(runtime)
-    web = False
     for call in calls:
         name = getattr(call, 'function', None) if not isinstance(call, dict) else call.get('function')
-        args = getattr(call, 'args', None) if not isinstance(call, dict) else call.get('args')
         if not sandbox.assess(name, runtime)[0]:
             return False, 'POLICY_NOT_ALLOWED'
-        status = statuses.get(name)
-        if status is None or not status.registered:
-            return False, 'INVALID_METADATA'
-        m = status.metadata
-        if m.effect != 'read' or not m.idempotent or m.sensitivity not in {'public','internal'}:
+        if not is_exempt_read(call, runtime):
             return False, 'SENSITIVE_OR_EFFECTFUL_CALL'
-        try:
-            runtime.functions[name].parameters.model_validate(args)
-        except Exception:
-            return False, 'INVALID_ARGUMENT_SCHEMA'
-        if m.sink == 'none':
-            continue
-        if (m.source != 'web' or m.sensitivity != 'public' or m.sink != 'external_recipient' or
-                not _literal_public_web_read(args, packet['trusted_user_request'])):
-            return False, 'EXTERNAL_READ_REQUIRES_AUDIT'
-        web = True
-    return True, 'LITERAL_PUBLIC_WEB_READ' if web else 'ORDINARY_READ_BATCH'
+    return True, 'ORDINARY_READ_BATCH'
 
 
 def binomial_upper(k, m, alpha):

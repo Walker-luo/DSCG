@@ -18,7 +18,7 @@ import tempfile
 SCHEMA = 'dscg.l3-router-summary.v2'
 THRESHOLD_POLICY = 'threshold-read-v1'
 READ_POLICY = 'read-purpose-v2'
-DIRECT_POLICIES = {THRESHOLD_POLICY, READ_POLICY}
+DIRECT_POLICIES = {THRESHOLD_POLICY, READ_POLICY, 'non-sensitive-read-v3'}
 MARKER = '<!-- ' + SCHEMA + ' -->'
 OWNED_SCHEMAS = (SCHEMA, 'dscg.l3-router-summary.v1')
 JSON_NAME, MD_NAME = 'l3_router_summary.json', 'l3_router_summary.md'
@@ -392,7 +392,9 @@ def collect_routing_summary(run_dir):
                     for row in events:
                         if (not isinstance(row, dict) or row.get('mode') not in ('shadow','selective')
                                 or row.get('mode') != config['mode']
-                                or (row.get('actual_bypass') is True and row.get('mode') != 'selective')
+                                or (row.get('actual_bypass') is True and row.get('mode') != 'selective'
+                                    and not (config['policy_version'] == 'non-sensitive-read-v3'
+                                             and row.get('policy_version') == 'non-sensitive-read-v3'))
                                 or any(type(row.get(k)) is not bool for k in ('eligible','would_bypass','actual_bypass'))
                                 or (row.get('would_bypass') is True and row.get('eligible') is not True)
                                 or (row.get('actual_bypass') is True and row.get('would_bypass') is not True)
@@ -452,7 +454,7 @@ def collect_routing_summary(run_dir):
         conf, stat = selected['configuration'], selected['stats']
         calibration = ('disabled' if conf['mode'] in {'off','baseline'} else
                        'empirical_threshold_uncalibrated' if conf['policy_version'] == THRESHOLD_POLICY else
-                       'rule_based_unvalidated' if conf['policy_version'] == READ_POLICY else
+                       'rule_based_unvalidated' if conf['policy_version'] in {READ_POLICY, 'non-sensitive-read-v3'} else
                        'uncalibrated' if not conf['artifact_sha256'] or conf['load_error'] else
                        'calibrated' if stat.thresholds else 'threshold_unobserved_or_uncertified')
         configurations.append({'configuration': conf, 'calibration_status': calibration,

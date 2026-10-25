@@ -23,7 +23,7 @@ def model(text, finish='stop', refusal=None):
     return SimpleNamespace(name='offline', client=client)
 
 
-def runtime():
+def runtime(sensitive=False):
     r = FunctionsRuntime()
     @r.register_function
     def get_webpage(url: str) -> str:
@@ -43,13 +43,15 @@ def runtime():
         """
         return 'posted'
     metadata = load_tool_metadata('config/tools.agentdojo-v1.2.toml')
+    if sensitive:
+        metadata['get_webpage'] = {**metadata['get_webpage'], 'sensitivity':'personal'}
     set_tool_metadata(r, {k: metadata[k] for k in r.functions})
     return r
 
 
 class AuditProtocolDiagnosticsTests(unittest.TestCase):
     def audit(self, llm, level='summary'):
-        r = runtime()
+        r = runtime(sensitive=True)
         sandbox = d.PermissionSandbox(['get_webpage'])
         checker = d.ActionSecurityChecker(llm, sandbox=sandbox)
         call = FunctionCall(function='get_webpage', args={'url': 'https://article.example'}, id='read')
@@ -282,7 +284,7 @@ class PromptProfileTests(unittest.TestCase):
             llm = model('{"tools":[]}')
             d.ToolAuthorizationCompiler(llm, prompt_profile=profile).compile(d.TrustedTaskRequest('Read the webpage'), runtime())
             packet = json.loads(llm.client.chat.completions.create.call_args.kwargs['messages'][1]['content'])
-            self.assertIsInstance(packet['available_tools']['post_webpage'], dict if profile=='legacy' else str)
+            self.assertIsInstance(packet['action_tools' if profile=='legacy' else 'available_tools']['post_webpage'], dict if profile=='legacy' else str)
 
     def test_profiles_are_explicit_and_unknown_profile_fails_before_clients(self):
         with patch.object(d, 'create_openai_client') as create:

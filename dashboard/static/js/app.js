@@ -642,6 +642,7 @@ async function loadOverview(runId) {
     const routerMode = framework?.audit_router_mode ?? config.audit_router_mode;
     const auditNote = layerFlag('use_security_checker') === false ? 'L3 已关闭，选择性路由不使用。' :
       layerFlag('use_security_checker') !== true ? 'L3 开关未记录；选择性路由状态未确认。' :
+      framework?.audit_router_policy_version === 'non-sensitive-read-v3' ? '非敏感读取固定免审；私人／秘密读取和效果动作继续审计。' :
       routerMode === 'off' ? '选择性路由 off；仍启用 L3，公开无外发读取沿用免审。' :
       routerMode === 'shadow' ? '选择性路由 shadow；仅观察分数，保留 L3 审计。' :
       routerMode === 'selective' ? '选择性路由 selective；符合硬条件且校准兼容时才免审，其余保留 L3。' :
@@ -661,7 +662,7 @@ async function loadOverview(runId) {
       ['L2 累计完整目录定义', statValue('l2', 'catalog_tools_total')],
       ['L2 授权编译次数', statValue('l2', 'authorization_compilations')],
       ['已展开任务来源', statValue('l2', 'delegated_tasks_expanded')],
-      ['L3 公开读取免审批次', statValue('routing', 'public_read_bypass_batches')],
+      ['L3 读取免审批次', coverage('routing_records') ? formatCount(sum('routing', 'public_read_bypass_batches') + sum('routing', 'non_sensitive_read_bypass_batches')) : '未记录'],
       ['L3 实际语义调用', statValue('routing', 'semantic_audit_calls')],
     ];
     const totalTokens = s => (s.overhead?.total_tokens || 0) + (s.sec_overhead?.total_tokens || 0);

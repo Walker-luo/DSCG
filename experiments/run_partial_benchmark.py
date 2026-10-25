@@ -135,7 +135,7 @@ def _describe_pipeline(model_id, sec_model_id, *, origin, defense, **options):
                 audit_retries=options['audit_retries'], completion_prompt=options['completion_prompt'],
                 prompt_profile=prompt_profile, audit_router_threshold=options.get('audit_router_threshold', DEFAULT_THRESHOLD)
                 if options['audit_router_mode'] != 'off' else None, use_sandbox=sandbox)
-            if options['audit_router_mode'] != 'off':
+            if sandbox or options['audit_router_mode'] != 'off':
                 router = LocalAuditRouter(options['audit_router_mode'], model_config_sha256=config_hash,
                                           threshold=options.get('audit_router_threshold', DEFAULT_THRESHOLD))
         optimization = {'audit_router_config_sha256': config_hash,

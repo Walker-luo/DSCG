@@ -11,7 +11,7 @@ from dscg.l1_projection import MODES as L1_PROJECTION_MODES
 from dscg.prompt_profiles import validate_profile, profile_binding
 
 ROUTING_KEYS = ("candidate_batches", "precheck_allowed_batches", "precheck_rejected_batches",
-                "public_read_bypass_batches", "semantic_audit_calls")
+                "public_read_bypass_batches", "non_sensitive_read_bypass_batches", "semantic_audit_calls")
 ISOLATION_KEYS = ("model_requests", "tool_results_rendered", "escaped_results_rendered",
                   "added_characters_total")
 L2_KEYS = ('planning_requests', 'catalog_tools_total', 'visible_tools_total',
