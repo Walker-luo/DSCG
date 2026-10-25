@@ -106,9 +106,9 @@ class TaskDiagnosticsTests(unittest.TestCase):
         from dscg.intent_flow import IntentFlow, IntentFlowError
         value=dict(intent_id='intent_1', status='in_progress', completion_kind='facts',
             evidence_ids=[],next_intent_id='intent_1',skipped_intents=[],reason='not finished')
-        with self.assertRaises(IntentFlowError) as caught:IntentFlow(('Read',),'Read').apply(value,{})
+        with self.assertRaises(IntentFlowError) as caught:IntentFlow(('Read',),'Read',goal_kinds=('facts',)).apply(value,{})
         self.assertEqual(caught.exception.reason_code,'INTENT_INVALID_PROGRESS')
-        self.assertEqual(caught.exception.diagnostics['code'],'NONCOMPLETED_KIND')
+        self.assertEqual(caught.exception.diagnostics['code'],'FIELDS_MISMATCH')
 
     def test_native_pipeline_persists_replies_in_sidecar_without_new_requests(self):
         from agentdojo import logging
@@ -160,12 +160,12 @@ class TaskDiagnosticsTests(unittest.TestCase):
             message=SimpleNamespace(content=json.dumps(payload),refusal=None),finish_reason='stop')])
         with TemporaryDirectory() as tmp:
             with DiagnosticSession(self.logger(tmp),'one',{}):
-                with self.assertRaises(IntentFlowError):IntentFlow(('Read',),'Read').observe(
+                with self.assertRaises(IntentFlowError):IntentFlow(('Read',),'Read',goal_kinds=('facts',)).observe(
                     SimpleNamespace(name='offline',client=client),[],[])
             side=Path(tmp)/'engine/banking/injection_task_3/none/none.dscg.jsonl'
             rows=list(map(json.loads,side.read_text().splitlines()))
             self.assertEqual(self.responses(side)[0]['record']['content'],json.dumps(payload))
-            self.assertEqual(next(x for x in rows if x['event']=='validation')['record']['diagnostics']['code'],'NONCOMPLETED_KIND')
+            self.assertEqual(next(x for x in rows if x['event']=='validation')['record']['diagnostics']['code'],'FIELDS_MISMATCH')
 
     def test_routing_and_dashboard_aggregates_match_old_inline_and_missing_is_unknown(self):
         from test_routing_reports import RoutingReportTests,event,trace

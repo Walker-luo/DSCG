@@ -29,7 +29,7 @@ class IntentFlowPipelineTests(unittest.TestCase):
             if body.get('response_format'):
                 packet = json.loads(body['messages'][-1]['content'])
                 if policy.startswith('Decompose'):
-                    value = {'authorization_steps': [{'intent': intent} for intent in intents]}
+                    value = {'authorization_steps': [{'intent': intent, 'goal_kind': ('answer' if clarification else ('facts' if i == 0 else 'effect'))} for i,intent in enumerate(intents)]}
                 elif policy.startswith('Select global'):
                     value = {'tools': ['send_message']}
                 elif policy.startswith('Observe progress'):
@@ -47,8 +47,7 @@ class IntentFlowPipelineTests(unittest.TestCase):
                     else:
                         status = 'completed'; refs = [executed[-1]['evidence_id']]
                         kind, nxt = ('facts', 'intent_2') if current == 'intent_1' else ('effect', None)
-                    value = dict(intent_id=current, status=status, completion_kind=kind,
-                        evidence_ids=refs, next_intent_id=nxt, skipped_intents=[], reason='Offline observation')
+                    value = dict(satisfaction='ambiguous' if clarification else 'satisfied' if status == 'completed' else 'not_yet', evidence_ids=refs)
                 else:
                     audits.append(packet)
                     value = dict(decision='allow', violations=[], confidence=.9, reason_code='ALIGNED')
@@ -137,9 +136,9 @@ class IntentFlowPipelineTests(unittest.TestCase):
         result = self.exercise(premature=True)
         for packet in result['progresses']:
             schema = packet['output_contract']
-            self.assertIn('next_intent_id',schema['required'])
-            statuses = schema['properties']['status']['enum']
-            self.assertEqual('needs_user' in statuses, packet['final_response'])
+            self.assertEqual(set(schema['required']), {'satisfaction','evidence_ids'})
+            self.assertTrue(all(t['authorization'] == 'granted' for t in packet['available_tools'].values()))
+            self.assertIn('host_observation',packet)
 
     def test_explicit_no_l2_keeps_full_original_request_without_intent_calls(self):
         result = self.exercise(no_sandbox=True)
@@ -184,22 +183,22 @@ class IntentFlowActualSuiteTests(unittest.TestCase):
             if body.get('response_format'):
                 packet = json.loads(body['messages'][-1]['content']); policy = body['messages'][0]['content']
                 if policy.startswith('Decompose'):
-                    value = {'authorization_steps':[{'intent':text} for text in intents]}
+                    value = {'authorization_steps':[{'intent':text, 'goal_kind':'facts' if scene == 'slack' and i == 0 else 'effect'} for i,text in enumerate(intents)]}
                 elif policy.startswith('Select global'):
                     value = {'tools':[n for n,_ in actions if packet['available_tools'][n]['authorization'] != 'automatic_read']}
                 elif policy.startswith('Observe progress'):
                     last = state['generation']-1; current = packet['current_intent_id']
                     refs = ['call:native-'+str(last)]
-                    if bad and last == len(actions)-1:
+                    if bad and last >= len(actions)-1:
                         status, kind, nxt = 'unfulfillable', 'none', None
+                        refs = []
                     elif last in completed_at:
                         nxt = completed_at[last]
                         status = 'completed'; kind = 'facts' if actions[last][0] == 'get_webpage' else 'effect'
                         nxt = 'intent_'+str(nxt+1) if nxt is not None else None
                     else:
                         status, kind, nxt = 'in_progress', 'none', current
-                    value = dict(intent_id=current, status=status, completion_kind=kind,
-                        evidence_ids=refs, next_intent_id=nxt, skipped_intents=[], reason='Authored offline execution check')
+                    value = dict(satisfaction='satisfied' if status == 'completed' else 'not_yet',evidence_ids=refs)
                 else:
                     audit_packets.append(packet)
                     final_call = packet['current_actions'][-1]
@@ -223,7 +222,7 @@ class IntentFlowActualSuiteTests(unittest.TestCase):
                 http_client=httpx.Client(transport=httpx.MockTransport(handler)))
             clients.append(raw); return raw
         config = ModelConfig('qwen3.7-flash', 'offline', 'https://offline.invalid/v1', 'custom')
-        artifact = Path(__file__).resolve().parents[1]/'workshop/artifacts/20261025_compact_task_diagnostics/native_cases'
+        artifact = Path(__file__).resolve().parents[1]/'workshop/artifacts/20261025_intent_host_fsm/native_cases'
         artifact.mkdir(parents=True, exist_ok=True)
         try:
             with TemporaryDirectory(dir=artifact) as temp, patch.object(d, 'create_openai_client', side_effect=client):
@@ -245,7 +244,7 @@ class IntentFlowActualSuiteTests(unittest.TestCase):
                 trace = load_task_trace(path)
                 self.assertEqual(trace['dscg_audit_summary']['mediation_failure_counts'], {})
                 self.assertEqual(trace['dscg_audit_summary']['protocol_failure_counts'], {})
-                self.assertEqual(main.snapshot()['intent_progress']['api_calls'],len(actions))
+                self.assertEqual(main.snapshot()['intent_progress']['api_calls'],len(actions) + (2 if bad else 0))
                 if scene == 'slack':
                     self.assertFalse(any(a['tool_name'] == 'get_webpage' for p in audit_packets for a in p['current_actions']))
                 import shutil

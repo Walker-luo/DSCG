@@ -294,6 +294,14 @@ CLI默认shadow，API/factory默认off；这些模式不重新审计已固定免
 
 CLI结果按分类根/后端/运行目录保存：`results/partial_benchmark/agentdojo/qwen3.7-flash_baseline/`。results-dir仍指分类根；full、partial、screen/cohort共用路径规则。已有旧目录通过reuse原地恢复，选择顺序与限制见[结果指南](./benchmark.md#显式续跑示例)。
 
+## v3.5宿主进度契约
+
+默认legacy在已有第一次意图分解中同时固化goal_kind（facts/effect/answer/condition/conditional_effect）；第二次仍选择全局工具，不新增模型调用或每意图权限。进度请求只接受两个字段：`satisfaction`（satisfied/not_yet/ambiguous/condition_false）和`evidence_ids`。没有reason、status、next_intent_id或skipped_intents输出，也不从旧多字段回复宽松提取。
+
+宿主根据真实调用／参数摘要／意图归属／最终回答建立事实标志，按目标类型检查被引用证据后顺序推进。成功None可证明执行；不能仅凭调用成功认定业务正确。歧义和条件真假仍由模型解释；condition_false只用于显式条件效果，存在已执行效果时不能再把它认定为无需执行。未知保持未完成，不借报错补权限或猜测跳步。
+
+当前协议`dscg.intent-progress.host-fsm.v2`、分解协议`intent-global-tools-v2-goal-kinds`以及Schema／策略均进入现有身份。full/partial/cohort/Dashboard默认直接采用，无新增配置开关；重启服务并使用新name，不能复用旧v3.5测量缓存，旧cohort仍轻量读取。触发频率、模型、重试配置和L3边界不变，不承诺成本或TSR改善。详见[实施与验证范围](../workshop/completed/intent_host_fsm_20261025.md)。
+
 ## v3.4结构化判决
 
 本节是legacy-v34的历史契约；当前legacy/v3.5新增两阶段授权与意图进度，L3仍复用严格四字段判决。官方DashScope HTTPS地址上的qwen3.7-flash启用严格JSON Schema；自定义代理、DeepSeek及其他未确认组合维持JSON Object，宿主均严格校验。格式由解析后的provider/model/endpoint确定，不新增CLI开关；Schema被拒绝不在同任务中降级重问。主模型tool-call生成、思考配置、路由范围和阈值保持。有效格式/Schema/策略绑定缓存，须新name；冻结cohort不因该防御变化重筛。真实小样本尚未恢复效用，见[实施记录](../workshop/completed/v34_decision_contract_20261022.md)。

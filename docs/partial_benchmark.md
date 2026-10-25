@@ -4,7 +4,7 @@
 
 新执行任务的 `.json` 主要保留原生交互和评分，防御记录移至同名 `.dscg.jsonl`；其中保存L3／进度模型的完整返回文本及校验结果，L2只保存解析后的授权。GOAL预检也采用该结构，不增加参数／模型调用，缓存命中和旧文件不改写。`--trace-level`只控制独立诊断详细度；参见[文件说明](./result_files.md#精简任务轨迹与独立诊断)。
 
-full、partial、cohort 共用默认 `legacy / DSCG_v3.5` 意图流程：L2 先生成纯 intent 步骤，再选全局工具白名单；根据真实工具执行结果独立判断意图进度，L3 围绕当前 intent 和完整原请求约束审计。明确任务不会因未知可查询参数而直接要求用户补充；真正含糊的对象仍须澄清。每个意图提前结束最多一次继续反馈，不替模型补执行。
+full、partial、cohort 共用默认 `legacy / DSCG_v3.5` 意图流程：L2先生成intent及goal_kind，再选全局工具白名单。进度模型只返回satisfaction/evidence_ids，宿主根据真实执行、最终回答与冻结目标类型控制状态及顺序推进；不猜测依赖跳步。L3围绕当前intent和完整原请求约束审计。明确任务不应因未知可查询参数要求用户补充，真实歧义仍须语义判断；每个意图提前结束最多一次继续反馈，不替模型补执行。详见[宿主FSM报告](../workshop/completed/intent_host_fsm_20261025.md)。
 
 已注册、L2允许且参数有效的 public/internal 读取固定免审，包括来自工具结果的博客网址；personal/secret 读取、写入与外发仍审计。免审按工具标签判断，不检查URL或对象隐私；private频道若仍标为internal也免审。混合批次保留次序，分别处理免审读取与待审计动作。`off/shadow/selective` 均不重新审计固定免审读取。
 
@@ -18,7 +18,7 @@ python -m experiments.run_partial_benchmark \
   --progress --name DSCG_v34_control_partial_01
 ```
 
-命令会调用真实模型，本次实施未执行。两阶段授权与 `intent_progress` 独立计入主模型成本，不承诺耗时或Token减少。API／协议失败作为任务错误，排除计分分母。旧v3.4缓存不能跨策略reuse；冻结cohort仍按轻量规则读取，不需重筛。历史 `intent-evidence-v35` 候选保持旧含义，不是当前默认。[完整机制与边界](./benchmark.md#默认-v35-意图流程)；[实施记录](../workshop/completed/intent_flow_v35_20261024.md)。
+命令会调用真实模型。两阶段授权与`intent_progress`独立计入主模型成本，本次没有减少触发频率，不承诺耗时或Token减少。API／超时／内部异常是运行错误；已收到的非法决策、引用及有界无进展仍按原生终止计分，保留已经发生的效果和原生成功。新进度协议必须新name，旧v3.5／v3.4缓存不能跨策略reuse；冻结cohort仍按轻量规则读取，不需重筛。历史`intent-evidence-v35`候选保持旧含义，不是当前默认。[完整机制与边界](./benchmark.md#默认-v35-意图流程)。
 
 DashScope/Qwen与DeepSeek的Chat请求角色由DSCG公共客户端分别适配，不修改conda包；更新后使用新运行名。AgentDyn首次请求的400/422定位、受限诊断字段和小范围复测要求见[消息角色兼容排错](./model_tool_configuration.md#消息角色兼容与请求排错)。旧测量缓存与新增请求身份不一致时拒绝复用，旧数据保留；冻结cohort只比较主模型ID/provider及环境与所选任务，详见[名单校验](./injection_precheck.md#2-中断和错误后续跑)。
 

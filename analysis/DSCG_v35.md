@@ -1,6 +1,8 @@
-# DSCG_v3.5：v3.5.1 partial 复盘与当前问题
+# DSCG_v3.5：v3.5.1 partial 复盘与算法方向
 
-更新日期：2026-10-25。主要对象：[qwen3.7-flash_v3.5.1](../results/partial_benchmark/agentdojo/qwen3.7-flash_v3.5.1/summary.md)。本报告重构原有banking分析，以banking／Slack为重点，使用新版task诊断补齐具体原因。**本轮只读取已有记录、代码和原生标签，未调用模型、执行工具、重跑实验或修改框架。** 原报告保留在[修改前快照](../workshop/artifacts/20261025_v351_trace_analysis/report.before.md)。
+> v3.5.2的结果复盘、Token增长分析与对应优化方案已独立整理到[v352.md](v352.md)。本文件保留v3.5.1历史分析及第8节算法方向。
+
+更新日期：2026-10-25。主要对象：[qwen3.7-flash_v3.5.1](../results/partial_benchmark/agentdojo/qwen3.7-flash_v3.5.1/summary.md)。本报告重构原有banking分析，以banking／Slack为重点，使用新版task诊断补齐具体原因。**第1–7节的原始复盘只读取历史记录，未调用模型、执行工具或修改框架；后续§8.2已单独实施，其新在线证据和限制见[实施报告](../workshop/completed/intent_host_fsm_20261025.md)，不混入下述历史统计。** 原报告保留在[修改前快照](../workshop/artifacts/20261025_v351_trace_analysis/report.before.md)。
 
 ## 1. 结论：记录更完整了，进度控制仍是主要故障点
 
@@ -208,7 +210,7 @@
 
 ## 8. 进度更新的算法化方向：宿主管事实，模型判断剩余语义
 
-**建议先采用“宿主状态机＋事件触发的有限语义判断”，再考虑结构化完成条件和依赖图。** 当前宿主已经在`IntentFlow.apply`中校验状态、引用与转换，但状态提案仍由模型每次生成；算法化的重点是把可直接从执行记录确定的字段交给宿主，而非再增加一个校验器。以下均为候选设计，未修改运行实现，也未证明能恢复TSR。
+**建议先采用“宿主状态机＋事件触发的有限语义判断”，再考虑结构化完成条件和依赖图。** 原v3.5.1宿主已在`IntentFlow.apply`中校验状态、引用与转换，但状态提案仍由模型每次生成；算法化的重点是把可直接从执行记录确定的字段交给宿主，而非再增加一个校验器。2026-10-25已实施8.2，其余方向仍为候选，尚未证明能恢复TSR。
 
 ### 8.1 先划清哪些信息可以由算法确定
 
@@ -230,6 +232,8 @@ q_i^{t+1}=\delta(q_i^t,e_t,z_t)
 使用三值结果\(\{\mathrm{true},\mathrm{false},\mathrm{unknown}\}\)：未知不能当作条件为假，也不能当作完成。算法无法证明“所有可行路径均已耗尽”时，不应仅凭一次拒绝或无新事件就宣称业务不可完成。停止预算耗尽应单独记录。
 
 ### 8.2 方向一：宿主有限状态机，收回模型的控制字段（优先）
+
+**2026-10-25实施状态：** 本方向已接入默认legacy的共享factory，详见[交付与验证范围](../workshop/completed/intent_host_fsm_20261025.md)。首次意图分解固化goal_kind，不加请求；进度模型仅返回satisfaction/evidence_ids，宿主生成状态和下一个顺序ID。增加condition_false，仅适用于显式条件效果，未知不算false，已发生效果不能被该分支抹去。没有依赖图时不跳过后续意图；语义未满足且次数耗尽按有界停止记录，不推断业务无解。解释性reason退出输出契约，原始回复仍先留证。下述设计不是TSR改善结论，8.3–8.5仍为候选。
 
 **做法：把“观测发生了什么”和“目标是否满足”分开。** 为当前意图维护几个独立标志，例如`facts_observed`、`effect_observed`、`answer_emitted`及`semantic_satisfied`。一次执行可以更新多个标志，但不会因标志出现就自动完成整个目标。
 
@@ -322,4 +326,4 @@ L2房租调整工具漏选、L3合法准备读取／干净外发误拒，需要�
 - 主要代码：[IntentFlow.apply/observe](../dscg/intent_flow.py)、[权限目录含义](../dscg/authorization_steps.py)、[executor意图观察入口](../dscg/pipelines/defended.py)、[失败分类](../dscg/failure_policy.py)、[诊断读取器](../dscg/task_diagnostics.py)。源码仅用于解释记录；工作树有其他未提交改动，未认证与服务器执行源码逐字节一致。
 - 原运行489个文件的修改前摘要与最终复核见[before.json](../workshop/artifacts/20261025_v351_trace_analysis/before.json)和[validation.json](../workshop/artifacts/20261025_v351_trace_analysis/validation.json)。本轮只重写本分析文件及新增派生产物，不改原运行、框架、配置或历史评分。
 - 复现脚本、精确命令／退出码、代码基点／工作树状态及衍生文件哈希见[manifest.json](../workshop/artifacts/20261025_v351_trace_analysis/manifest.json)。统计从逐任务原生标签和绑定侧车重算，不平均场景比例，不混入旧attempt或GOAL分母。
-- **Online Evaluation：本轮0次新API调用。Offline Regression：未执行，文档工作只做读取、统计一致性、链接和diff检查。** 引用的108条是既有在线实验，不是本轮新测试；原生ASR=0不构成一般安全保证，E0／I3／I2研究状态不改变。
+- **原始复盘的Online Evaluation：0次新API调用；Offline Regression：未执行，仅做读取、统计一致性、链接和diff检查。** 此处108条是历史实验，§8.2后续新实验另见实施报告；原生ASR=0不构成一般安全保证，E0／I3／I2研究状态不改变。

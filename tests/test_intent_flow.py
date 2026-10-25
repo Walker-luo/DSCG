@@ -51,14 +51,14 @@ class IntentAuthorizationTests(unittest.TestCase):
     def test_default_compiles_intents_then_global_tools_without_step_mapping(self):
         runtime, _ = tools(); client = Mock()
         client.chat.completions.create.side_effect = [
-            reply({'authorization_steps': [{'intent': 'Read the article'}, {'intent': 'Send its summary'}]}),
+            reply({'authorization_steps': [{'intent': 'Read the article', 'goal_kind': 'facts'}, {'intent': 'Send its summary', 'goal_kind': 'effect'}]}),
             reply({'tools': ['send_message']})]
         llm = SimpleNamespace(name='offline', client=client)
         grant = d.ToolAuthorizationCompiler(llm).compile(d.TrustedTaskRequest(
             'Read the article Alice mentioned, then send its summary.'), runtime)
         self.assertEqual(client.chat.completions.create.call_count, 2)
         self.assertEqual(grant.public_dict()['authorization_steps'],
-            [{'intent': 'Read the article'}, {'intent': 'Send its summary'}])
+            [{'intent': 'Read the article', 'goal_kind': 'facts'}, {'intent': 'Send its summary', 'goal_kind': 'effect'}])
         self.assertEqual(grant.allowed_tools, frozenset(runtime.functions))
         second = json.loads(client.chat.completions.create.call_args.kwargs['messages'][1]['content'])
         self.assertEqual(len(second['authorization_steps']), 2)
@@ -85,7 +85,7 @@ class IntentAuthorizationTests(unittest.TestCase):
     def test_selector_failure_never_installs_partial_read_permissions(self):
         runtime, _ = tools(); client = Mock()
         client.chat.completions.create.side_effect = [
-            reply({'authorization_steps': [{'intent': 'Send a summary'}]}), reply({'tools': ['unknown']})]
+            reply({'authorization_steps': [{'intent': 'Send a summary', 'goal_kind': 'effect'}]}), reply({'tools': ['unknown']})]
         sandbox = d.PermissionSandbox(['send_message'])
         llm = SimpleNamespace(name='offline', client=client, query=Mock())
         from dscg.intent_flow import IntentFlowError
@@ -98,7 +98,7 @@ class IntentAuthorizationTests(unittest.TestCase):
     def test_read_only_request_still_has_intents_and_no_action_grant(self):
         runtime, _ = tools(); client = Mock()
         client.chat.completions.create.side_effect = [
-            reply({'authorization_steps': [{'intent': 'Read the article, do not send anything'}]}),
+            reply({'authorization_steps': [{'intent': 'Read the article, do not send anything', 'goal_kind': 'facts'}]}),
             reply({'tools': []})]
         grant = d.ToolAuthorizationCompiler(SimpleNamespace(name='offline', client=client)).compile(
             d.TrustedTaskRequest('Read the article, do not send anything'), runtime)
@@ -110,7 +110,7 @@ class IntentAuthorizationTests(unittest.TestCase):
         runtime, _ = tools(); client = Mock()
         def compliant_reply(**kwargs):
             policy = kwargs['messages'][0]['content']
-            return reply({'authorization_steps':[{'intent':'Send greeting'}]} if 'authorization_steps' in policy
+            return reply({'authorization_steps':[{'intent':'Send greeting','goal_kind':'effect'}]} if 'authorization_steps' in policy
                          else {'tools':['send_message']})
         client.chat.completions.create.side_effect = compliant_reply
         profile = ToolAuthorizationProfile('fixed', ('Only this request',), frozenset({'send_message'}))
@@ -139,74 +139,6 @@ class IntentAuthorizationTests(unittest.TestCase):
 
 
 class IntentStateTests(unittest.TestCase):
-    def flow(self):
-        from dscg.intent_flow import IntentFlow
-        return IntentFlow(('Update the address', 'Refund ten'), 'Update my address then refund ten')
-
-    def decision(self, **changes):
-        return dict(intent_id='intent_1', status='completed', completion_kind='effect',
-            evidence_ids=['call:one'], next_intent_id='intent_2', skipped_intents=[],
-            reason='Address update executed', **changes)
-
-    def test_module_is_present(self):
-        self.assertIsNotNone(importlib.util.find_spec('dscg.intent_flow'))
-
-    def test_successful_none_return_can_advance_but_error_cannot(self):
-        flow = self.flow(); before = flow.binding()
-        flow.apply(self.decision(), {'call:one': {'successful': True, 'effect': 'write'}})
-        self.assertEqual(flow.current['intent_id'], 'intent_2')
-        self.assertNotEqual(flow.binding(), before)
-        flow = self.flow()
-        with self.assertRaises(ValueError):
-            flow.apply(self.decision(), {'call:one': {'successful': False, 'effect': 'write'}})
-        self.assertEqual(flow.current['intent_id'], 'intent_1')
-
-    def test_no_unknown_evidence_jump_or_duplicate_transition(self):
-        from dscg.intent_flow import IntentFlowError
-        for patch in ({'evidence_ids': ['call:unknown']}, {'next_intent_id': 'intent_99'},
-                      {'intent_id': 'intent_2'}):
-            flow = self.flow(); value = self.decision(); value.update(patch)
-            with self.assertRaises(IntentFlowError):
-                flow.apply(value, {'call:one': {'successful': True, 'effect': 'write'}})
-            self.assertEqual(flow.current['intent_id'], 'intent_1')
-
-    def test_failure_is_not_completion_and_independent_next_can_run(self):
-        flow = self.flow(); value = self.decision(); value.update(status='unfulfillable',
-            completion_kind='none', reason='Only address update was denied')
-        flow.apply(value, {'call:one': {'successful': False, 'effect': 'write'}})
-        self.assertEqual(flow.snapshot()['steps'][0]['state'], 'unfulfilled')
-        self.assertEqual(flow.current['intent_id'], 'intent_2')
-
-    def test_prior_intent_effect_cannot_complete_a_later_effect(self):
-        flow = self.flow()
-        flow.apply(self.decision(), {'call:one': {'successful': True, 'effect': 'write', 'intent_id': 'intent_1'}})
-        value = self.decision(); value.update(intent_id='intent_2', next_intent_id=None)
-        with self.assertRaises(ValueError):
-            flow.apply(value, {'call:one': {'successful': True, 'effect': 'write', 'intent_id': 'intent_1'}})
-        self.assertEqual(flow.current['intent_id'], 'intent_2')
-
-    def test_dependent_skip_is_explicit_and_unknown_conditions_do_not_complete(self):
-        from dscg.intent_flow import IntentFlow
-        flow = IntentFlow(('Read necessary file', 'Publish file summary', 'Refund ten'), 'Original task')
-        value = self.decision(); value.update(status='unfulfillable', completion_kind='none',
-            next_intent_id='intent_3', skipped_intents=[dict(intent_id='intent_2',
-                depends_on=['intent_1'], reason='Summary needs the unavailable file')])
-        flow.apply(value, {'call:one': {'successful': False}})
-        self.assertEqual([s['state'] for s in flow.steps], ['unfulfilled','dependency_blocked','active'])
-        for patch in ({'completion_kind': 'condition'}, {'completion_kind': 'effect'}):
-            value = self.decision(); value.update(patch)
-            with self.assertRaises(ValueError): self.flow().apply(value, {'call:one': {'successful': False}})
-
-    def test_unjustified_jump_and_premature_user_wait_are_rejected_atomically(self):
-        from dscg.intent_flow import IntentFlow
-        flow = IntentFlow(('One', 'Two', 'Three'), 'Task')
-        value = self.decision(); value['next_intent_id'] = 'intent_3'
-        before = flow.binding()
-        with self.assertRaises(ValueError): flow.apply(value, {'call:one': {'successful': True, 'effect': 'write'}})
-        self.assertEqual(before, flow.binding())
-        value.update(status='needs_user', completion_kind='none', next_intent_id=None)
-        with self.assertRaises(ValueError): flow.apply(value, {'call:one': {}})
-
     def test_current_return_and_final_answer_survive_a_full_old_evidence_window(self):
         from dscg.intent_flow import IntentFlow
         messages = [dict(role='tool', content=[dict(type='text',content='x'*2048)],
@@ -215,15 +147,15 @@ class IntentStateTests(unittest.TestCase):
             tool_call_id='current',error=None),
             dict(role='assistant',content=[dict(type='text',content='The total spending is 1050.')],tool_calls=None)])
         client = Mock(); client.chat.completions.create.return_value = reply(dict(
-            intent_id='intent_1',status='in_progress',completion_kind='none',evidence_ids=[],
-            next_intent_id='intent_1',skipped_intents=[],reason='Need more validation'))
-        flow = IntentFlow(('Calculate total',), 'Calculate total')
+            satisfaction='not_yet',evidence_ids=[]))
+        flow = IntentFlow(('Calculate total',), 'Calculate total', goal_kinds=('answer',))
         flow.observe(SimpleNamespace(name='offline',client=client),messages,[],final=True)
         packet = json.loads(client.chat.completions.create.call_args.kwargs['messages'][1]['content'])
         self.assertEqual(packet['evidence'][-1]['content'],'The total spending is 1050.')
         self.assertEqual(packet['evidence'][-2]['content'],'Current fact: 1050')
         self.assertLessEqual(sum(len(r['content']) for r in packet['evidence']),16384)
         self.assertTrue(any(r['content_truncated'] for r in packet['evidence'][:-2]))
+        self.assertTrue(packet['host_observation']['answer_emitted'])
 
 
 class IntentReadBoundaryTests(unittest.TestCase):
@@ -275,7 +207,7 @@ class IntentReadBoundaryTests(unittest.TestCase):
         effects, _, _ = self.run_calls(calls, verdict='allow')
         self.assertEqual(effects, [('send','summary'),('read','www.eve-blog.com')])
         from dscg.intent_flow import IntentFlow
-        flow = IntentFlow(('Read blog', 'Send summary'), 'Read and send')
+        flow = IntentFlow(('Read blog', 'Send summary'), 'Read and send', goal_kinds=('facts','effect'))
         effects, _, _ = self.run_calls([calls[1]], active_flow=flow,
             mutate=lambda extra: setattr(flow, 'revision', flow.revision+1))
         self.assertEqual(effects, [])
@@ -296,7 +228,7 @@ class IntentReadBoundaryTests(unittest.TestCase):
     def test_execution_ticket_cannot_survive_an_intent_state_change(self):
         from dscg.intent_flow import IntentFlow
         runtime, effects = tools(); sandbox = d.PermissionSandbox(list(runtime.functions))
-        flow = IntentFlow(('Read the blog', 'Send its summary'), 'Read and send')
+        flow = IntentFlow(('Read the blog', 'Send its summary'), 'Read and send', goal_kinds=('facts','effect'))
         verifier = d.RouterReceiptVerifier()
         checker = d.ActionSecurityChecker(SimpleNamespace(name='offline'), sandbox=sandbox,
             router_verifier=verifier, intent_flow_getter=lambda: flow)

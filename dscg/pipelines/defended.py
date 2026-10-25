@@ -1035,6 +1035,7 @@ class ToolAuthorizationContract:
     authorization_protocol: str = ''
     authorization_permissions: tuple[tuple[str, bool], ...] = ()
     authorization_intents: tuple[str, ...] = ()
+    authorization_goal_kinds: tuple[str, ...] = ()
 
     def public_dict(self) -> dict:
         record = {
@@ -1059,7 +1060,8 @@ class ToolAuthorizationContract:
         if self.authorization_protocol:
             record['authorization_protocol'] = self.authorization_protocol
             if self.authorization_protocol == flow.AUTH_PROTOCOL:
-                record['authorization_steps'] = [{'intent': intent} for intent in self.authorization_intents]
+                record['authorization_steps'] = [{'intent': intent, 'goal_kind': kind}
+                    for intent, kind in zip(self.authorization_intents, self.authorization_goal_kinds)]
                 record['authorization_stages'] = ['authorization_intents', 'authorization_tools']
             elif self.authorization_protocol == V35_AUTH_PROTOCOL:
                 record['tool_permissions'] = dict(self.authorization_permissions)
@@ -1214,6 +1216,7 @@ class ToolAuthorizationCompiler:
                 permission_schema(action_tools), 'dscg_tool_permissions_v1')
         steps = ()
         intents = ()
+        goal_kinds = ()
         flow_mode = self.prompt_profile == 'legacy' and self.authorization_profile is None and not getattr(self, '_legacy_audit_input', False)
         base_policy = self.SYSTEM_POLICY if step_mode else self.CLASSIC_POLICY
         policy_profile = self.prompt_profile
@@ -1272,6 +1275,7 @@ class ToolAuthorizationCompiler:
                 )),
                 runtime_catalog_sha256=catalog_fingerprint(runtime),
                 authorization_steps=steps, authorization_permissions=permissions, authorization_intents=intents,
+                authorization_goal_kinds=goal_kinds,
                 authorization_protocol=flow.AUTH_PROTOCOL if flow_mode else V35_AUTH_PROTOCOL if permission_mode else (STEP_PROTOCOL if action_step_mode else LEGACY_STEP_PROTOCOL) if step_mode else '',
                 authorization_mode=authorization_mode, profile_status=profile_status,
                 profile_sha256=self.authorization_profile.identity() if self.authorization_profile else '',
@@ -1280,7 +1284,7 @@ class ToolAuthorizationCompiler:
 
         if flow_mode:
             try:
-                intents, selected = flow.compile_authorization(self.llm, request.text, catalog, set(catalog))
+                intents, goal_kinds, selected = flow.compile_authorization(self.llm, request.text, catalog, set(catalog))
             except flow.IntentFlowError as exc:
                 error = AuthorizationCompilationError(exc.reason_code)
                 error.stage = exc.stage
@@ -1448,7 +1452,8 @@ class OurFrameExecutor(agent_pipeline.BasePipelineElement):
 
     def _publish_grant(self, grant, extra_args):
         self.sandbox.install_contract(grant)
-        self.intent_flow = flow.IntentFlow(grant.authorization_intents, self._task_context.effective_request) if grant.authorization_intents else None
+        self.intent_flow = flow.IntentFlow(grant.authorization_intents, self._task_context.effective_request,
+            goal_kinds=grant.authorization_goal_kinds) if grant.authorization_intents else None
         record = grant.public_dict()
         record['policy_state'] = self.sandbox.policy_state.value
         extra_args['dscg_authorization'] = record
@@ -1597,7 +1602,8 @@ class OurFrameExecutor(agent_pipeline.BasePipelineElement):
                     self._authorization_cache_key = cache_key
                     self._authorization_cache_contract = grant
                 self.sandbox.install_contract(grant)
-                self.intent_flow = flow.IntentFlow(grant.authorization_intents, user_text) if grant.authorization_intents else None
+                self.intent_flow = flow.IntentFlow(grant.authorization_intents, user_text,
+                    goal_kinds=grant.authorization_goal_kinds) if grant.authorization_intents else None
                 record = grant.public_dict()
                 if authorization_reused:
                     record["authorization_reused"] = True
@@ -1693,8 +1699,10 @@ class OurFrameExecutor(agent_pipeline.BasePipelineElement):
 
     def _observe_intent(self, messages, extra_args, *, final=False, runtime=None):
         before = self.intent_flow.binding()
+        before_revision = self.intent_flow.revision
         catalog = native_catalog(runtime, metadata_for_runtime(runtime)) if runtime is not None else {}
-        catalog = {name: spec for name, spec in catalog.items() if name in self.sandbox.allowed_tools}
+        catalog = {name: {**spec, 'authorization': 'granted'} for name, spec in catalog.items()
+            if name in self.sandbox.allowed_tools}
         try:
             self.intent_flow.observe(self.llm, messages, _get_action_ledger(extra_args).snapshot(), final=final,
                 exhausted=bool(final and self.intent_flow.current and
@@ -1703,6 +1711,8 @@ class OurFrameExecutor(agent_pipeline.BasePipelineElement):
             exc.messages = list(messages)
             extra_args['dscg_intent_flow'] = {**self.intent_flow.snapshot(), 'error_code': exc.reason_code,
                 'error_diagnostics':exc.diagnostics}
+            if self.intent_flow.revision != before_revision:
+                _append_full_trace(extra_args, 'intent_progress', self.intent_flow.snapshot())
             _sync_trace_context(extra_args)
             raise
         if before != self.intent_flow.binding() and self.on_authority_replaced:

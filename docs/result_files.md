@@ -13,6 +13,8 @@ injection_task_3/none/
 
 计分任务同样使用 `<injection_task_id>.json` 和 `<injection_task_id>.dscg.jsonl`。
 
+宿主FSM进度协议`dscg.intent-progress.host-fsm.v2`起，L2的authorization_steps包含intent/goal_kind；进度原始回复只含satisfaction/evidence_ids。诊断observation中的intent_id/status/completion_kind/next_intent_id/skipped_intents/reason_code/host_facts由宿主派生，不是宽松修补的模型回复；skipped_intents固定为空，不猜测依赖跳过。host_facts的semantic_satisfied记录模型语义提案，与真实facts_observed/effect_observed/answer_emitted分开；不能单独当作完成真值。旧八字段进度记录保持原义，不重写。见[实施说明](../workshop/completed/intent_host_fsm_20261025.md)。
+
 - **主JSON**：完整原生messages／injections、任务ID、utility/security、error、duration及原生时间／版本；仅新增 `dscg_diagnostics` 引用，包含相对文件名、执行ID和起始字节位置，不内嵌框架配置、授权、路由、意图历史或Token统计。
 - **诊断JSONL v2**：保留L2授权／意图、每次审计的最终结果、每个动作的最终状态、进度、失败校验、L1统计和实际成本；审计与路由的重复更新合并，模块来源明确。task_end的status是执行收尾分类，任务是否成功仍以主JSON原生评分为准。
 - **原始回复附件**：L3／进度模型回复先保存至 `.dscg.responses.jsonl` 再解析。诊断通过相对路径、attempt／response ID及字节偏移引用；保留完整content／refusal、finish_reason、usage、耗时及调用／意图ID。格式错误、拒绝和截断同样留证；API没有响应时不伪造文本。L2只保存解析后的授权。

@@ -17,13 +17,15 @@ DashScope/Qwen与DeepSeek的Chat请求由公共客户端分别适配：将上游
 
 ## 当前框架与工作流程
 
-当前默认 **legacy / DSCG_v3.5**：L2先生成只有intent的步骤，再依据完整任务和全部步骤选取全局工具白名单；白名单在任务内冻结。主模型按当前意图执行，独立进度判定根据真实返回推进，提前结束每意图最多一次继续反馈。L3以当前意图为目标，同时保留完整原请求约束。显式 `--prompt-profile legacy-v34` 保留v3.4对照，历史候选保持原义，不因同名v3.5自动叠加。
+当前默认 **legacy / DSCG_v3.5**：L2先生成intent及冻结的目标类型，再依据完整任务和全部步骤选取全局工具白名单；白名单在任务内冻结。主模型按当前意图执行，**宿主状态机**依据真实执行／最终回复及有限语义判断推进，提前结束每意图最多一次继续反馈。L3以当前意图为目标，同时保留完整原请求约束。显式 `--prompt-profile legacy-v34` 保留v3.4对照，历史候选保持原义，不因同名v3.5自动叠加。
+
+进度模型现在只输出 `satisfaction` 与 `evidence_ids`，不生成状态、下一ID、跳步或reason。宿主维护资料取得、当前意图效果执行、最终回答发出等标志，再结合语义结果决定推进：查到答案不等于已回答，调用成功不等于业务目标完成。歧义只有引用实际最终澄清回复才能等待用户；未知条件不能按false处理。未建立依赖图时不猜测跳过后续目标，次数耗尽按原生有界停止记录。目标类型、事实充分性和真实歧义仍依赖模型，详见[宿主进度状态机](./workshop/completed/intent_host_fsm_20261025.md)。
 
 已授权、参数有效且已注册的public/internal读取固定免审，包括工具结果中的博客网址；personal/secret读取及效果性动作仍审计。该规则不按URL来源、查询串、内网地址或sink筛选，不提供对象级隐私判断；当前internal频道读取也包含private频道。混合批次只审计非免审子集，Monitor、整批回执和一次性票据仍校验原始批次及当前意图状态。
 
 CLI路由默认shadow、API/factory默认off保持；固定读取免审在off/shadow/selective均生效，阈值不控制它。`authorization_intents`、`authorization_tools`、`intent_progress`均计入实际成本，不能假定调用或Tokens减少。新策略使用新实验名；旧结果不改写，旧冻结cohort不重筛，测量缓存不跨策略复用。
 
-[完整测试指南](./docs/benchmark.md#默认-v35-意图流程) · [partial指南](./docs/partial_benchmark.md) · [本轮实施记录](./workshop/completed/intent_flow_v35_20261024.md)。本轮不调用真实模型，离线通过不证明TSR／ASR改善；旧v3.5候选成绩仍见[历史报告](./workshop/completed/v35_followup_20261023.md)。
+[完整测试指南](./docs/benchmark.md#默认-v35-意图流程) · [partial指南](./docs/partial_benchmark.md) · [初始意图流程记录](./workshop/completed/intent_flow_v35_20261024.md)。实现与验证范围见各阶段报告，离线通过不证明TSR／ASR改善；旧v3.5候选成绩仍见[历史报告](./workshop/completed/v35_followup_20261023.md)。
 
 ```mermaid
 flowchart TD
@@ -37,7 +39,7 @@ flowchart TD
     A --> V
     V --> E[按原顺序执行获准动作]
     E --> L[L1来源视图]
-    L --> G[独立意图进度判断]
+    L --> G[宿主状态机与有限语义判断]
     G -->|未完成或下一意图| M
     G -->|完成或需要用户澄清| F[最终汇报]
 ```
