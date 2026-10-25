@@ -2,6 +2,8 @@
 
 ## v3.5 显式候选（未提升默认）
 
+新执行的任务采用“精简交互JSON＋同名诊断JSONL”：主文件保留原生交互／评分，仅新增诊断引用；授权、校验、Monitor结果及成本写入 `.dscg.jsonl`，L3原始回复保存到 `.dscg.responses.jsonl`。无需新参数，GOAL预检同样适用；历史文件和缓存命中不改写。详见[诊断文件](./result_files.md#精简任务轨迹与独立诊断)。
+
 `--prompt-profile intent-evidence-v35` 在 full、partial、cohort 共用实现中选择 **DSCG_v3.5**；不传仍为 **legacy / DSCG_v3.4**，`--name` 不选择策略。候选 L2 一次返回每个动作工具的完整布尔映射 `tool_permissions`，宿主严格检查后合并原自动读取；L3 同次输出有界 `assessment` 与有限代码 `verdict`，分别说明当前用途、参数依据与缺失证据。读取无需提前知道待查询事实；实际写入仍核对目标及已有依据。读取免审范围、Monitor、整批回执和执行票据不变。
 
 本轮300万Tokens后续验证已按用户要求停止：922次请求、919次成功响应、已知1,693,429Tokens，另3次连接故障usage未知。最佳完整六例5/6，但同代码确认4/6，未达提升门槛。当前显式候选恢复到实际执行的round13：L3关闭思考、JSON Object＋严格宿主四字段verdict/三字段assessment、明确执行前审计；主模型/L2不启用思考。最新部分运行仅四条完整、2成功；另有GOAL连接错误和未开始项。未验证的结构化证据候选只存快照，不进入运行入口。见[后续报告](../workshop/completed/v35_followup_20261023.md)。未运行离线回归或完整评测。
@@ -298,7 +300,7 @@ CLI full、partial、cohort（含旧benchmark转发）均按原生单任务函�
 | `--audit-router-mode off/shadow/selective` | DSCG CLI默认shadow；baseline/NoChecker默认off；shadow不新增免审 |
 | `--audit-router-artifact PATH` | 单独校准的冻结artifact；旧基准/输入绑定不兼容时不可复用 |
 | `--audit-retries 0/1` / `--completion-prompt` | 当前默认0/关闭，常规对照不叠加恢复 |
-| `--trace-level summary/standard/full` | 默认summary；full增加序列化/压缩/写盘成本 |
+| `--trace-level summary/standard/full` | 默认summary；只控制独立诊断文件详细程度，主JSON始终精简；full增加序列化/写盘成本 |
 | `--task-manifest PATH` / `--write-task-manifest PATH` | 导入/离线导出任务ID；full不能缩小范围 |
 
 Python factory/API原有router默认off保持；网页以有效配置为准。不要把router off当作关闭L3。具体默认及字段见 [配置指南](./model_tool_configuration.md#5-运行控制默认值用途及设置入口)。

@@ -61,7 +61,7 @@
         <details class="config-section connection-section" id="advanced-config">
           <summary>高级设置 <span>日志、子集与连接</span></summary>
           <div class="advanced-fields">
-          <div class="field-group" id="trace-level-group"><label class="form-label" for="trace-level">轨迹级别</label><select id="trace-level" class="form-select form-select-sm"><option value="summary">Summary · 紧凑统计（默认）</option><option value="standard">Standard · 判决与动作记录</option><option value="full">Full · 完整诊断与压缩附录</option></select><small class="field-help">三层路由统计在各级别均保留；Full 会增加序列化和写入开销。</small></div>
+          <div class="field-group" id="trace-level-group"><label class="form-label" for="trace-level">诊断级别</label><select id="trace-level" class="form-select form-select-sm"><option value="summary">Summary · 必要诊断（默认）</option><option value="standard">Standard · 判决与动作记录</option><option value="full">Full · 详细诊断</option></select><small class="field-help">任务JSON始终精简；L3和进度原始回复保存在同名诊断文件，Full增加写入开销。</small></div>
           <div class="field-group"><label class="form-label" for="selection-seed">子集选择 seed</label><input id="selection-seed" type="number" min="0" step="1" value="20260927" class="form-control form-control-sm"><small class="field-help">网页按 seed 排序；partial CLI 使用注册顺序前缀。跨入口对比需核对任务 ID。</small></div>
           <div class="field-group metadata-path-group"><label class="form-label" for="tool-metadata-path">工具风险元数据 <span class="field-optional">可选</span></label><input type="text" id="tool-metadata-path" class="form-control form-control-sm" placeholder="留空使用本地 / 内置目录" spellcheck="false"><small class="field-help">未知或无效工具按 critical 处理。</small></div>
           <p class="section-help"><i class="bi bi-lock"></i>仅用于本次运行；留空则使用环境变量或 TOML 配置。</p>

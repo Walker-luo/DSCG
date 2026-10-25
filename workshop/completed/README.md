@@ -1,5 +1,9 @@
 # 已完成阶段的优化材料
 
+- 2026-10-25：[workshop 选择性提交迁移](./workshop_commit_transfer_20261025.md)：迁入 2d57bc7 单次筛选及 d457369 可独立诊断改动；保留当前 v3.4 运行路径，未迁入 intent-flow。AGENTS 与 769e11d 原文一致；在线 12 个有效计分案例、80 调用，工程记录未提交。
+
+- 2026-10-24：[Injection预检单次筛选与紧凑报告](./injection_screen_single_pass_20261024.md)：每目标一次，失败/错误不补测，续跑仅未开始目标；status只统计、summary按场景汇总，完整cohort/轨迹保留，旧冻结名单语义不变。无模型调用。
+
 - 2026-10-23：[v3.5后续真实迭代与停止交付](./v35_followup_20261023.md)：922请求、已知1,693,429Tokens，3次故障usage未知；最佳5/6但确认4/6，保留v3.4默认。有限思考反例危险allow已否决，prepared14未入生产；按用户要求不跑离线回归。
 
 - 2026-10-23：[DSCG_v3.5三轮真实迭代](./v35_live_iterations_20261023.md)：220次请求/384803Tokens；最终六例4成功、security全false，未达5/6双运行门槛；保留v3.4默认，v3.5仅显式候选。未跑离线回归。
@@ -105,6 +109,6 @@ L2原始工程报告和计划保留为当时v2的实施记录，当前v2.2状态
 
 仍待真实数据与收益验收的 [L3 Checker](../L3_checker_opt.md) 与 [授权对照校准（历史归档）](../archive/framework_docs_cleanup_20261010/originals/workshop/original_framework_direction_20261008.md) 留在 [顶层索引](../README.md)。正式E0/I3/I2状态以 [研究路线](../../../research/technical_route.md) 和 [I3交接记录](../../../research/Experiments/implementation_status.md) 为准。
 
-旧稿件与CFP：[投稿草案](../archive/legacy_submission/ALMML_sub.md)、[原附件](<../archive/legacy_submission/AIMLL WS.pdf>)；旧docs/图表见 [归档索引](../archive/project_structure_20261008/README.md)。旧证据位于 [workshop/results/](../results/framework_optimization/)，所有新输出放 `workshop/artifacts/`。
+旧稿件与CFP：[投稿草案](../archive/legacy_submission/ALMML_sub.md)、[原附件](<../AIMLL WS.pdf>)；旧docs/图表见 [归档索引](../archive/project_structure_20261008/README.md)。旧证据位于 [workshop/results/](../results/framework_optimization/)，所有新输出放 `workshop/artifacts/`。
 
 本次移动前的原始字节与哈希单独保留；历史报告的路径更新只改变当前阅读入口，不重写原样本或测量。完整存放规则见 [AGENTS.md](../../AGENTS.md)。

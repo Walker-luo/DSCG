@@ -8,6 +8,36 @@
 - All delegated subagents, including planning and review, must use `gpt-6.1-sol`: inherit a parent already using it or specify it explicitly. User model restrictions override skill model-selection/escalation advice. Do not select Astra or any other model unless the user explicitly requests it; report unavailability without fallback.
 - This file describes current rules as of 2026-10-25. Dated reports describe their own tasks; closed campaigns remain closed. Read historical material only when relevant, without treating superseded defaults or unused budgets as current authorization.
 
+## Project State Management
+
+Use the project-root [DV_STATE.md](DV_STATE.md) to maintain cross-session project state. Read or update it only when the current task involves project progress.
+
+### Restore context
+
+- At the start of a new development session or when resuming an interrupted task, read `DV_STATE.md` first.
+- Check the current Git branch, HEAD, working-tree state and relevant code.
+- Cross-check the state document against the current implementation; never treat stale records as facts.
+- Identify completed work, unresolved issues and the next task. Do not repeat work already completed and verified.
+
+### Update triggers
+
+Update `DV_STATE.md` when:
+
+- An important development stage is completed.
+- The architecture or a key technical approach changes.
+- A bug or limitation affecting subsequent work is discovered.
+- An important experiment is completed and validation results are available.
+- The user explicitly asks to preserve the current work state.
+
+### Update rules
+
+- Record facts, important decisions and their reasons; omit lengthy conversation history.
+- Distinguish implemented, tested, unverified and planned work.
+- Retain unresolved issues and relevant historical decisions.
+- Record the corresponding branch, commit and validation results.
+- Keep the file concise; revise existing entries instead of appending redundant updates.
+- Never commit, switch or reset a Git branch merely to update the state document.
+
 ## Code and documentation map
 
 | Area | Entry points |

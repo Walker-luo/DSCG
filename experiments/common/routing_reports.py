@@ -25,7 +25,7 @@ JSON_NAME, MD_NAME = 'l3_router_summary.json', 'l3_router_summary.md'
 MODES = {'off', 'shadow', 'selective', 'baseline', 'unknown'}
 COVERAGE = ('planned_traces', 'read_traces', 'event_traces', 'no_candidate_traces',
             'disabled_traces', 'unrecorded_traces', 'missing_traces', 'corrupt_traces',
-            'inconsistent_traces', 'outside_run_traces')
+            'inconsistent_traces', 'outside_run_traces', 'diagnostic_unavailable_traces')
 
 
 def _component(value):
@@ -41,7 +41,8 @@ def _safe(root, path):
 
 
 def _read(root, path):
-    value = json.loads(_safe(root, path).read_text(encoding='utf-8'))
+    from dscg.task_diagnostics import load_task_trace
+    value = load_task_trace(_safe(root, path))
     if not isinstance(value, dict):
         raise ValueError('expected JSON object')
     return value
@@ -355,6 +356,13 @@ def collect_routing_summary(run_dir):
                         acc.c['unknown_audit_call_records'] += 1; acc.c['unknown_audit_cost_traces'] += 1
                     continue
                 covered['read_traces'] += 1
+                if raw.get('dscg_diagnostics_status') in ('missing','corrupt','invalid_reference','incomplete'):
+                    covered['diagnostic_unavailable_traces'] += 1
+                    issue('diagnostic_'+raw['dscg_diagnostics_status'],path)
+                    for acc in (total,stats):
+                        acc.c['unknown_audit_call_records'] += 1
+                        acc.c['unknown_audit_cost_traces'] += 1
+                    continue
                 raw_injection = raw.get('injection_task_id') or 'none'
                 if (raw.get('suite_name') != suite or raw.get('user_task_id') != user
                         or raw_injection != injection or raw.get('attack_type') != attack

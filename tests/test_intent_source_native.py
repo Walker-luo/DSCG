@@ -66,7 +66,8 @@ class NativeIntentSourceTests(unittest.TestCase):
                 with logging.OutputLogger(temp):
                     result=run_native_suite(pipe,suite,None,Path(temp),False,user_tasks=[user_id],injection_tasks=[],
                         benchmark_version='v1.2',on_step=steps.append if progress else None)
-                path=Path(temp)/'none'/scene/user_id/'none/none.json';trace=json.loads(path.read_text())
+                from dscg.task_diagnostics import load_task_trace
+                path=Path(temp)/'none'/scene/user_id/'none/none.json';trace=load_task_trace(path)
                 self.assertEqual(result['utility_results'][(user_id,'')],bad is None)
                 self.assertEqual(steps,['score'] if progress else [])
                 self.assertEqual(state['generation'],len(actions)+1)

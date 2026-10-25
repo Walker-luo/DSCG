@@ -90,18 +90,23 @@ def _validate_prompt_profile(origin, use_sandbox, use_checker, profile):
 
 
 def _router_trace_summary(suite_dir, task_keys, attack_name, run_attack):
+    from dscg.task_diagnostics import load_task_trace
     events=[];recorded=0
+    unavailable=0
     for key in task_keys:
         injection=key[1] if len(key)>1 and run_attack else "none"
         path=suite_dir/str(key[0])/attack_name/f"{injection}.json"
         try:
             if not path.resolve().is_relative_to(suite_dir.resolve()):continue
-            trace=json.loads(path.read_text())
+            trace=load_task_trace(path)
+            if trace.get('dscg_diagnostics_status') in ('missing','corrupt','invalid_reference','incomplete'):
+                unavailable+=1;continue
             value=trace.get("dscg_router_events")
             if isinstance(value,list) and all(isinstance(e,dict) for e in value):
                 recorded+=1;events.extend(value)
         except (OSError,ValueError,AttributeError):continue
     return {**summarize_events(events),"expected_task_traces":len(task_keys),"recorded_task_traces":recorded,
+            "diagnostic_unavailable_traces":unavailable,
             "scope":"recorded scored traces only; missing routing traces are unknown"}
 
 
@@ -634,6 +639,8 @@ def _run_single_attack(
             "audit_router_mode": audit_router_mode,
             "audit_router_artifact_sha256": getattr(pipeline,"dscg_optimization_config",{}).get("audit_router_artifact_sha256"),
             "audit_router_config_sha256": getattr(pipeline,"dscg_optimization_config",{}).get("audit_router_config_sha256"),
+            **({'task_failure_policy': pipeline.dscg_optimization_config['task_failure_policy']}
+               if getattr(pipeline,'dscg_optimization_config',{}).get('task_failure_policy') else {}),
         }
         if audit_router_mode != 'off':
             run_binding.update(audit_router_threshold=audit_router_threshold,
@@ -762,6 +769,7 @@ def _run_single_attack(
                 "utility_passed": sum(valid_utility_results),
                 "utility_valid": len(valid_utility_results),
                 "execution_errors": sum(r["execution_error"] for r in outcomes.values()),
+                "framework_failures": sum(r.get('framework_termination',{}).get('kind') == 'framework_failure' for r in outcomes.values()),
                 "attacked_tasks": len(valid_security_results) if run_attack else 0,
                 "security_missing": sum(
                     not isinstance(r["attack_success"], bool) for r in outcomes.values()
@@ -861,12 +869,12 @@ def cli(argv: list[str] | None = None, *, task_scope: str = 'partial', entrypoin
         "--trace-level",
         choices=("summary", "standard", "full"),
         default=os.getenv("DSCG_TRACE_LEVEL", "summary"),
-        help="任务 JSON 中 DSCG 记录级别；默认 summary，full 会额外保存压缩审计侧车。",
+        help="独立 DSCG 诊断文件详细度；默认 summary，任务 JSON 始终精简。",
     )
     parser.add_argument(
         "--include-extra-info",
         action="store_true",
-        help="兼容快捷开关，等同于 --trace-level full，将完整审计/动作记录写入 JSON。",
+        help="兼容快捷开关，等同于 --trace-level full，将详细审计/动作记录写入独立诊断文件。",
     )
     parser.add_argument(
         "--tool-metadata",

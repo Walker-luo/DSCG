@@ -116,6 +116,7 @@ def aggregate(summaries):
         "avg_defense_success_rate": round(100 - asr, 2) if asr is not None else None,
         "total_tasks": total, "utility_passed": passed, "utility_valid": utility_valid,
         "execution_errors": sum(s.get("task_counts", {}).get("execution_errors", 0) for s in summaries),
+        "framework_failures": sum(s.get('task_counts',{}).get('framework_failures',0) for s in summaries),
         "security_denominator": denominator if security_known else None,
         "security_missing": (sum(s["task_counts"]["security_missing"] for s in summaries)
                              if all("security_missing" in s.get("task_counts", {}) for s in summaries) else None),
@@ -148,22 +149,25 @@ def display_metrics(run):
 
 def trace_stats(root, pipeline_name, suite, attack, task_keys):
     """Read only scored native task traces, excluding attack-generation preflights."""
+    from dscg.task_diagnostics import load_task_trace
     root = Path(root).resolve()
     stats = {"expected_records": len(task_keys), "trace_records": 0, "routing_records": 0,
              "isolation_records": 0, "routing": dict.fromkeys(ROUTING_KEYS, 0),
              "isolation": dict.fromkeys(ISOLATION_KEYS, 0), 'l2_records': 0,
-             'l2': dict.fromkeys(L2_KEYS, 0)}
+             'l2': dict.fromkeys(L2_KEYS, 0), 'diagnostic_errors':0}
     for task_key in task_keys:
         injection = task_key[1] if len(task_key) > 1 else None
         path = root / pipeline_name.replace("/", "_") / suite / task_key[0] / attack / f"{injection or 'none'}.json"
         try:
             path.resolve().relative_to(root)
-            trace = json.loads(path.read_text(encoding="utf-8"))
+            trace = load_task_trace(path)
             if not isinstance(trace, dict):
                 continue
         except (OSError, ValueError):
             continue
         stats["trace_records"] += 1
+        if trace.get('dscg_diagnostics_status') in ('missing','corrupt','invalid_reference','incomplete'):
+            stats['diagnostic_errors'] += 1
         for source, target, coverage in (("dscg_layer_routing", "routing", "routing_records"),
                                           ("dscg_input_isolation", "isolation", "isolation_records"),
                                           ('dscg_l2', 'l2', 'l2_records')):

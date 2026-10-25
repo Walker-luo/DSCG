@@ -187,7 +187,7 @@ python -m dscg.benchmark_catalog
 
 **全部任务的正式对照使用 `experiments.run_benchmark`**，当前框架与无防御 baseline 的命令、任务/攻击规模和续跑方法见 [全量测试指南](./docs/benchmark.md)。下面的 partial 命令仅用于小规模回归。
 
-需要先检查攻击目标是否可直接完成时，使用 [Injection 目标预检](./docs/injection_precheck.md) 的 `run_injection_precheck screen`：提供实时进度、同身份新预检复用、失败复测和冻结名单。后续测量统一使用 `run_benchmark`，加 `--cohort PATH` 时保留全部 user tasks 并记录为 screened 子集；不加时仍为完整 full。两类结果分别命名、分别报告。
+需要先检查攻击目标是否可直接完成时，使用 [Injection 目标预检](./docs/injection_precheck.md) 的 `run_injection_precheck screen`：每目标只尝试一次，成功保留，失败/错误跳过；续跑仅处理未开始目标。status仅统计、summary每场景一行，完整判定与证据保留在cohort和attempts。旧冻结名单不重筛。后续测量统一使用 `run_benchmark`，加 `--cohort PATH` 时保留全部 user tasks 并记录为 screened 子集；不加时仍为完整 full。两类结果分别命名、分别报告。
 
 以下命令在 `ipi` 或 `ipi-agentdyn` 均可执行，无需基准参数、额外任务清单或工具目录参数。使用新运行名称保存每次对照：
 
@@ -208,7 +208,7 @@ baseline使用当前基准的原生工具循环，不启用DSCG或安全模型�
 
 中断后在原命令中去掉force-rerun、加`--reuse`并保留原name。旧实验按模型、后端、任务、攻击、工具和有效防御配置核对，源码哈希或Python补丁版本变化不再阻止续跑；旧绑定保留并记录校验规则变化。冻结cohort测量只校验名单自身摘要与模型/环境/所选任务，screen续跑仍校验原预检证据。原生接受的错误缓存不会自动重试，见[续跑说明](./docs/benchmark.md#显式续跑示例)。
 
-默认 `summary` 足够用于对比。`--trace-level full` 保存详细诊断及压缩侧车，增加序列化和写入开销；按需排错时使用。正式对照还需匹配任务 ID、攻击、模型配置及预检口径，历史结果仅作参照。
+默认 `summary` 足够用于对比。新执行任务的主JSON保留交互和原生评分，防御配置／授权／成本移至同名 `.dscg.jsonl` 及公共配置，L3原始回复保存在 `.dscg.responses.jsonl`；`--trace-level`只控制诊断详细度，full增加序列化和写入开销。旧结果及缓存命中不改写，详见[文件说明](./docs/result_files.md#精简任务轨迹与独立诊断)。正式对照还需匹配任务 ID、攻击、模型配置及预检口径，历史结果仅作参照。
 
 用户运行的结果保存到：
 

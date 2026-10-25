@@ -171,10 +171,13 @@ class ReusePlan:
         aggregate_names = {'attack_manifest.json', 'summary.json', 'summary.md', 'failure_cases.jsonl',
                            'detailed_results.csv', 'report.txt', 'all_report.txt', 'preflight_report.json'}
         snapshots = []
+        saved = set()
         def snapshot(path):
+            if path in saved:return
             target = destination / 'snapshot' / path.relative_to(self.base)
             target.parent.mkdir(parents=True, exist_ok=True); shutil.copyfile(path, target)
             snapshots.append({'path': str(path.relative_to(self.base)), 'size_bytes': target.stat().st_size})
+            saved.add(path)
         for path in self.base.rglob('*'):
             if (not path.is_file() or path.is_relative_to(self.base / 'reuse')
                     or path.is_relative_to(self.base / 'validation')): continue
@@ -192,6 +195,8 @@ class ReusePlan:
                 snapshot(path)
                 sidecar = path.with_suffix('.dscg_trace.jsonl.gz')
                 if sidecar.is_file(): snapshot(sidecar)
+                from dscg.task_diagnostics import diagnostic_dependencies
+                for dependency in diagnostic_dependencies(path):snapshot(dependency)
             except (OSError, ValueError, KeyError, TypeError):
                 pass  # Preserve the native error path, including malformed JSON.
         record = {'scope': 'explicit native task-cache resume; errors are not automatically retried',

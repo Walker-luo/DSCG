@@ -11,7 +11,7 @@
 | [完整任务测试指南](./benchmark.md) | run_benchmark的baseline/DSCG、clean、场景/cohort、公共攻击与指标口径 |
 | [结果文件与L3汇总](./result_files.md) | 精简报告、完整失败索引、shadow/selective统计、旧目录离线补充与未知值口径 |
 | [小批量测试指南](./partial_benchmark.md) | run_partial_benchmark的3×3前缀、场景/cohort、shadow与续跑 |
-| [Injection 目标预检](./injection_precheck.md) | 实时进度、失败复测、同基准状态续跑与冻结名单；full/partial各自支持cohort |
+| [Injection 目标预检](./injection_precheck.md) | 每目标一次、失败/错误跳过、仅续跑未开始目标；紧凑汇总与冻结名单 |
 | [框架与平台交接](./framework_updates.md) | 当前L2默认/可选能力、L1/L3后续修订、网页已接线与待办 |
 | [Dashboard 指南](./dashboard.md) | 历史筛选、多版本对比及分析导出 |
 | [Workshop 索引](../workshop/README.md) | 优化计划、调研、当前报告和历史归档 |

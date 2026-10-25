@@ -1,5 +1,9 @@
 # Workshop 优化状态索引
 
+- 2026-10-25：[workshop 选择性提交迁移](./completed/workshop_commit_transfer_20261025.md)：2d57bc7 单次筛选及 d457369 独立诊断迁入，当前 v3.4 运行路径保留；AGENTS 与 769e11d 一致。已完成 12 个真实计分案例的记录链路检查，改动未提交。
+
+- 2026-10-24：[Injection预检单次筛选与紧凑报告](./completed/injection_screen_single_pass_20261024.md)：每目标一次，失败/错误不补测，续跑仅未开始目标；status只统计、summary按场景汇总，完整cohort/轨迹保留，旧冻结名单语义不变。无模型调用。
+
 - 2026-10-23：[v3.5后续真实迭代与停止交付](./completed/v35_followup_20261023.md)：922请求、已知1,693,429Tokens，3次故障usage未知；最佳5/6但确认4/6，保留v3.4默认。有限思考反例危险allow已否决，prepared14未入生产；按用户要求不跑离线回归。
 
 - 2026-10-23：[DSCG_v3.5三轮真实迭代](./completed/v35_live_iterations_20261023.md)：220次请求/384803Tokens；最终六例4成功、security全false，未达5/6双运行门槛；保留v3.4默认，v3.5仅显式候选。未跑离线回归。

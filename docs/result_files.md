@@ -1,8 +1,36 @@
 # 测试结果文件与L3路由汇总
 
+## 精简任务轨迹与独立诊断
+
+2026-10-25 分层诊断 v2 起，新执行的共享DSCG pipeline任务采用如下结构；full、partial、cohort、clean及GOAL预检一致：
+
+```text
+injection_task_3/none/
+├── none.json
+├── none.dscg.jsonl
+└── none.dscg.responses.jsonl
+```
+
+计分任务同样使用 `<injection_task_id>.json` 和 `<injection_task_id>.dscg.jsonl`。
+
+- **主JSON**：完整原生messages／injections、任务ID、utility/security、error、duration及原生时间／版本；仅新增 `dscg_diagnostics` 引用，包含相对文件名、执行ID和起始字节位置，不内嵌框架配置、授权、路由、意图历史或Token统计。
+- **诊断JSONL v2**：保留L2授权／意图、每次审计的最终结果、每个动作的最终状态、进度、失败校验、L1统计和实际成本；审计与路由的重复更新合并，模块来源明确。task_end的status是执行收尾分类，任务是否成功仍以主JSON原生评分为准。
+- **原始回复附件**：L3／进度模型回复先保存至 `.dscg.responses.jsonl` 再解析。诊断通过相对路径、attempt／response ID及字节偏移引用；保留完整content／refusal、finish_reason、usage、耗时及调用／意图ID。格式错误、拒绝和截断同样留证；API没有响应时不伪造文本。L2只保存解析后的授权。
+- **公共配置**：每个攻击／场景只保存一次不可覆盖、去重的 `dscg_config.<摘要>.json`。有run_manifest时引用已有模型／工具配置，仅补充缺少的框架字段；其他共享pipeline调用保存公开配置。无凭证、HTTP头或SDK对象。
+
+不额外保存完整请求提示、工具返回正文或隐藏推理。原始模型返回文本不截断；消息和工具数据仍以主JSON为准。新执行不额外生成旧full gzip文件。读取器同时支持历史inline、v1 sidecar和gzip；原文附件缺失／损坏单独标记，已知成本不补零。
+
+正常工具阻挡分别使用 `L2_BLOCKED`、`L3_BLOCKED`、`MONITOR_BLOCKED`，历史 `DSCG_BLOCKED` 继续可读。L3 API／超时失败单独记基础设施错误，不能算作成功防御。当前 workshop 分支保留原 v3.4 授权和评分流程；本次迁移没有引入 dev-v3.4 分支的独立 intent/progress 子系统及其框架失败终止策略。诊断格式仍支持读取该分支产生的意图／进度记录和规则子码。
+
+程序读取请用 `dscg.task_diagnostics.load_task_trace(path)`，它在内存中合并防御字段，不改文件；可继续读取旧内嵌结构。旧full gzip可由同模块的 `load_diagnostic_events` 读取。诊断缺失、损坏、未结束或引用无效会明确标记，路由／成本保持未知，不能解释成零次审计。Dashboard与汇总读取使用相同规则。
+
+只有新执行写新格式；cache命中不新建模型回复、不改旧JSON。再次执行以新执行ID追加诊断，旧事件保留；主引用只选择当前执行，避免历史错误混入。写入失败显式报告，不退回向主JSON塞入诊断。
+
+迁入的诊断和阻挡来源变更使用新运行名，不重新解释旧缓存／cohort。源分支的存储／评分策略及验证范围见[历史记录](../workshop/completed/compact_task_diagnostics_20261025.md)，其中 intent/progress 机制不代表本分支已经具备。历史记录中不存在的原始审计回复无法补回。
+
 ## v3.5 候选诊断
 
-显式 `intent-evidence-v35` 的授权记录保存完整 `tool_permissions`；L3 full附件保存有界assessment，公开记录用 `assessment_sha256` 及完整原回复摘要绑定判决。三个分析字段限256/384/256字符；allow/deny的missing_evidence必须是空字符串，abstain必须说明缺失依据。模型写“None.”仍是非空，不自动修补；协议失败、Monitor拒绝及最终原生utility分别查看。分析文字不授予权限。当前候选使用v3输出协议与JSON Object，不修补响应，格式和实际审计设置进入配置身份；旧v1/v2原记录保留。默认仍v3.4；[后续真实迭代](../workshop/completed/v35_followup_20261023.md)最佳5/6、确认4/6，未达推广门槛。
+显式 `intent-evidence-v35` 的授权记录保存完整 `tool_permissions`；L3 full附件保存有界assessment，公开记录用 `assessment_sha256` 及完整原回复摘要绑定判决。三个分析字段限256/384/256字符；allow/deny的missing_evidence必须是空字符串，abstain必须说明缺失依据。模型写“None.”仍是非空，不自动修补；协议失败、Monitor拒绝及最终原生utility分别查看。分析文字不授予权限。该候选使用v3输出协议与JSON Object，不修补响应，格式和实际审计设置进入配置身份；旧v1/v2原记录保留。[后续真实迭代](../workshop/completed/v35_followup_20261023.md)最佳5/6、确认4/6，未达推广门槛；本分支默认仍为 legacy / DSCG_v3.4。
 
 新运行以根目录作为查阅入口，不再生成场景report.txt、攻击级或根级all_report.txt、单独攻击错误TXT。旧报告保留，不自动清理。此改动只影响派生展示，不进入防御/缓存配置身份，不改变模型、路由策略、校准阈值或评分。
 

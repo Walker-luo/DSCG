@@ -235,7 +235,7 @@ class I3StateTransitionTests(unittest.TestCase):
                 try:
                     self.assertTrue(entered.wait(timeout=5))
                     duplicate = submit()
-                    self.assertEqual(duplicate[3][-1]["error"], "DSCG_BLOCKED:REPLAYED_EXECUTION_TICKET")
+                    self.assertEqual(duplicate[3][-1]["error"], "MONITOR_BLOCKED:REPLAYED_EXECUTION_TICKET")
                     self.assertEqual(ledger.state(pending.actions[0].action_id), ActionState.APPROVED)
                 finally:
                     release.set()

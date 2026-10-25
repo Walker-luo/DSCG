@@ -65,7 +65,8 @@ class PersistedCostTests(unittest.TestCase):
                              pipeline_name='p', attack_type='none', injection_task_id=None):
                 with self.assertRaisesRegex(RuntimeError, 'PRIVATE_RESPONSE'):
                     pipeline.query('A', FunctionsRuntime())
-            trace = json.loads((Path(directory) / 'p/s/u/none/none.json').read_text())
+            from dscg.task_diagnostics import load_task_trace
+            trace = load_task_trace(Path(directory) / 'p/s/u/none/none.json')
             phase = trace['dscg_cost']['models'][0]['authorization']
             self.assertEqual((phase['api_calls'], phase['failed_calls']), (1, 1))
             self.assertEqual(phase['last_api_error']['request_role_counts'], {'user': 1})
@@ -89,6 +90,7 @@ class PersistedCostTests(unittest.TestCase):
             pipeline=TaskIsolatedPipeline([Generate()],trackers=(tracker,))
             with TraceLogger(OutputLogger(directory),suite_name='s',user_task_id='u',pipeline_name='p',attack_type='none',injection_task_id=None):
                 pipeline.query('A',FunctionsRuntime());pipeline.query('B',FunctionsRuntime())
-            trace=json.loads((Path(directory)/'p/s/u/none/none.json').read_text())
+            from dscg.task_diagnostics import load_task_trace
+            trace=load_task_trace(Path(directory)/'p/s/u/none/none.json')
             self.assertEqual(trace['dscg_cost']['models'][0]['generation']['total_tokens'],5)
             self.assertEqual(tracker.get_total_tokens(),10)

@@ -5,6 +5,7 @@ from pathlib import Path
 from urllib.parse import quote
 
 from dscg.benchmark_catalog import benchmark_identity, get_backend, get_suites
+from dscg.task_diagnostics import load_task_trace
 
 
 MAX_EXCERPTS = 6
@@ -31,7 +32,7 @@ def _excerpt(kind: str, pointer: str, text: str, *, start: int = 0) -> dict:
 
 def _read_excerpts(path: Path) -> tuple[str, list[dict], bool]:
     try:
-        raw = json.loads(path.read_text(encoding="utf-8"))
+        raw = load_task_trace(path)
     except FileNotFoundError:
         return "trace_missing", [], False
     except (OSError, ValueError):
@@ -42,9 +43,19 @@ def _read_excerpts(path: Path) -> tuple[str, list[dict], bool]:
     messages = [(i, message) for i, message in enumerate(raw["messages"])
                 if isinstance(message, dict)]
     excerpts = []
+    if raw.get('dscg_diagnostics_status') in ('missing','corrupt','invalid_reference','incomplete'):
+        excerpts.append(_excerpt('diagnostic_error','/dscg_diagnostics',raw['dscg_diagnostics_status']))
     task_error = bool(raw.get("error"))
     if task_error:
         excerpts.append(_excerpt("task_error", "/error", str(raw["error"])))
+    if isinstance(raw.get('dscg_termination'),dict):
+        excerpts.append(_excerpt('framework_failure','/dscg_termination',
+            json.dumps(raw['dscg_termination'],ensure_ascii=False)))
+    for action in raw.get('dscg_action_ledger',[]):
+        if action.get('blocked_by'):
+            excerpts.append(_excerpt('module_block','/dscg_action_ledger',
+                json.dumps({k:action[k] for k in ('call_id','tool_name','blocked_by','block_reason') if k in action},ensure_ascii=False)))
+            break
 
     # Prefer actionable diagnostics. Selection is observational, not causal.
     errors = [(i, message) for i, message in messages
@@ -130,6 +141,8 @@ def collect_suite_report(base_dir: Path, suite_dir: Path, summary: dict, records
         failures = ["task_error"] if record.get("execution_error") else []
         if record["utility_success"] is False:
             failures.append("tsr_failure")
+        if record.get('framework_termination',{}).get('kind') == 'framework_failure':
+            failures.append('framework_failure')
         if record["attack_success"] is True:
             failures.append("asr_success")
         if attacked and record["attack_success"] is None:
@@ -162,6 +175,7 @@ def collect_suite_report(base_dir: Path, suite_dir: Path, summary: dict, records
         "metric_unavailable": unavailable + missing,
         "goal_preflight_errors": len(preflight_errors),
         "task_errors": sum("task_error" in case["failure_types"] for case in cases),
+        "framework_failures": sum('framework_failure' in case['failure_types'] for case in cases),
         "cases": cases,
     }
 
@@ -221,8 +235,8 @@ def write_run_overview(base_dir: Path, attack_names: list[str], suites: list[str
              "TSR 失败 = utility=false；防御失败 = 原生 ASR=true。缺失指标和运行错误单列，不当作攻击成功或防御成功。",
              "ASR 为当前基准原生 predicate；DoS 的 ASR=not utility，不能和 targeted ASR 合并。",
              "TSR/ASR 分母分别是已返回效用结果数/有效布尔安全结果数；预检不计入这些分母。Token 含主模型和审计模型，沿用各场景 cost_scope。", "",
-             "| Attack | 场景 | 状态 | 完成/计划 | TSR | ASR | 防御成功率 | Token 主/审计/合计 | TSR失败 | ASR成功 | 指标缺失 | 任务错误 | 场景数据 |",
-             "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |"]
+             "| Attack | 场景 | 状态 | 完成/计划 | TSR | ASR | 防御成功率 | Token 主/审计/合计 | TSR失败 | ASR成功 | 指标缺失 | 任务错误 | 框架失败 | 场景数据 |",
+             "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |"]
     for attack in attack_names:
         for suite in suites:
             report = reports.get((attack, suite))
@@ -234,7 +248,7 @@ def write_run_overview(base_dir: Path, attack_names: list[str], suites: list[str
                 else:
                     status = f"run_error ({run.get('error_type', 'unknown')})" if run.get("status") == "error" else "not_reported"
                     completed = "N/A"
-                row = [attack, suite, status, completed, "N/A", "N/A", "N/A", "N/A", "N/A", "N/A", "N/A", "N/A", "—"]
+                row = [attack, suite, status, completed, "N/A", "N/A", "N/A", "N/A", "N/A", "N/A", "N/A", "N/A", "N/A", "—"]
             else:
                 data = report["summary"]
                 counts = data["task_counts"]
@@ -252,7 +266,7 @@ def write_run_overview(base_dir: Path, attack_names: list[str], suites: list[str
                        _rate(valid - report["asr_successes"], valid, enabled=attacked),
                        f"{main_tokens}/{sec_tokens}/{main_tokens + sec_tokens}",
                        report["tsr_failures"], report["asr_successes"], report["metric_unavailable"],
-                       task_errors, _link(report["summary_path"])]
+                       task_errors, report.get('framework_failures',0), _link(report["summary_path"])]
             # Links are already Markdown-escaped.
             lines.append("| " + " | ".join(_cell(value) for value in row[:-1]) + " | " + row[-1] + " |")
     lines.extend(["", "各场景 Token 统计范围："])
@@ -272,7 +286,7 @@ def write_run_overview(base_dir: Path, attack_names: list[str], suites: list[str
                       "| --- | --- | --- | --- | --- | --- | --- |"])
         labels = {"tsr_failure": "TSR失败", "asr_success": "ASR成功（防御失败）",
                   "asr_unavailable": "ASR缺失/无效", "result_missing": "结果缺失",
-                  "task_error": "任务运行错误", "run_error": "运行中断",
+                  "task_error": "任务运行错误", "run_error": "运行中断", "framework_failure": "框架决策失败",
                   "goal_preflight_error": "GOAL预检错误（不计分）"}
         for case in cases[:10]:
             task = f"{case.get('user_task_id') or '—'} / {case.get('injection_task_id') or 'none'}"

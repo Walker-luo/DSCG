@@ -215,7 +215,8 @@ def _run_ticket_case(case: str, mode: str, evidence: dict) -> dict[str, Any]:
             finally:
                 release.set()
             results = [winner.result(timeout=5), duplicate]
-        blocked = sum(error.startswith("DSCG_BLOCKED:") for _, error in results)
+        from dscg.failure_policy import is_blocked_error
+        blocked = sum(is_blocked_error(error) for _, error in results)
         # Read from the shared ledger after joining; returned result messages
         # supply per-submission decisions rather than racing snapshot copies.
         args["dscg_action_ledger"] = args["_dscg_action_ledger"].snapshot()

@@ -22,7 +22,8 @@ from experiments.common.result_paths import resolve_run_path
 from experiments.common.benchmark_execution import PreparedBindings
 
 SCHEMA = 'dscg.injection-screen.v2'
-RULE = 'keep-any-valid-success; exclude-after-two-valid-failures; errors-unresolved'
+LEGACY_RULE = 'keep-any-valid-success; exclude-after-two-valid-failures; errors-unresolved'
+RULE = 'single-attempt; keep-valid-success; skip-failure-or-error; no-retests'
 COHORT_VALIDATION = {'mode': 'model_backend_suites_v1', 'cohort_digest_verified': True,
                      'screening_evidence_verified': False}
 LIMITATIONS = [
@@ -172,7 +173,13 @@ def _trace_status(path, suite_name, task, version):
     return ('pass' if value['utility'] else 'fail'), value['utility']
 
 
-def _decision(attempts):
+def _decision(attempts, rule=RULE):
+    if rule == RULE:
+        if not attempts:
+            return 'unresolved'
+        return {'pass': 'kept', 'fail': 'excluded', 'error': 'error'}[attempts[0]['status']]
+    if rule != LEGACY_RULE:
+        raise ValueError('unknown screening selection rule')
     if any(a['status'] == 'pass' for a in attempts):
         return 'kept'
     if sum(a['status'] == 'fail' for a in attempts) >= 2:
@@ -226,11 +233,13 @@ def _validate_cohort_data(cohort, config, suites=None):
 def _validate_screen_cohort_data(cohort, config):
     """Screen creation/resumption still verifies its native evidence."""
     content = {k: v for k, v in cohort.items() if k != 'cohort_sha256'}
+    rule = cohort.get('selection_rule')
     if (not same_backend(cohort.get('benchmark'), benchmark_identity()) or cohort.get('schema_version') != SCHEMA or cohort.get('cohort_sha256') != _digest(content)
-            or cohort.get('selection_rule') != RULE):
+            or rule not in (RULE, LEGACY_RULE) or cohort['binding'].get('rule') != rule):
         raise ValueError('invalid or changed frozen cohort')
     binding = cohort['binding']
     current = _binding(config, list(binding['catalog']))
+    current['rule'] = rule  # Frozen historical cohorts retain their original decision semantics.
     if not _bindings_compatible(binding, current):
         raise ValueError(_binding_error(binding, current))
     for name, entry in binding['catalog'].items():
@@ -239,19 +248,19 @@ def _validate_screen_cohort_data(cohort, config):
             raise ValueError('incomplete screening decisions')
         for task_id, decision in decisions.items():
             attempts = decision['attempts']
-            if _decision(attempts) == 'unresolved' or _decision(attempts) != decision['status']:
+            if _decision(attempts, rule) == 'unresolved' or _decision(attempts, rule) != decision['status']:
                 raise ValueError('unresolved or inconsistent screening decisions')
             task = get_suite('v1.2', name).get_injection_task_by_id(task_id)
             for attempt in attempts:
+                for prefix in ('trace', 'manifest'):
+                    path = attempt.get(prefix + '_path')
+                    if path and _file_hash(path) != attempt.get(prefix + '_sha256'):
+                        raise ValueError('screening evidence changed')
                 if attempt.get('status') not in {'pass', 'fail'}:
                     continue
                 trace = attempt['trace_path']
-                if _file_hash(trace) != attempt['trace_sha256']:
-                    raise ValueError('screening evidence changed')
                 if _trace_status(trace, name, task, binding['source']['agentdojo'])[0] != attempt['status']:
                     raise ValueError('screening outcome changed')
-                if attempt.get('manifest_path') and _file_hash(attempt['manifest_path']) != attempt['manifest_sha256']:
-                    raise ValueError('historical source manifest changed')
         expected = {'user_task_ids': entry['user_task_ids'],
                     'injection_task_ids': [i for i, d in decisions.items() if d['status'] == 'kept']}
         if cohort['suites'].get(name) != expected:
