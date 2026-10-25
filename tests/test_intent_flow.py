@@ -309,7 +309,7 @@ class IntentReadBoundaryTests(unittest.TestCase):
         flow.revision += 1
         state = d.TicketedToolsExecutor(monitor).query(*state)
         self.assertEqual(effects, [])
-        self.assertEqual(state[3][-1]['error'], 'DSCG_BLOCKED:INVALID_EXECUTION_TICKET')
+        self.assertEqual(state[3][-1]['error'], 'MONITOR_BLOCKED:INVALID_EXECUTION_TICKET')
 
 
 class IntentTaskErrorTests(unittest.TestCase):

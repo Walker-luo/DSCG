@@ -2,6 +2,8 @@
 
 ## 默认 v3.5 意图流程
 
+新执行的任务采用“精简交互JSON＋同名诊断JSONL”：主文件保留原生交互／评分，仅新增诊断引用；L3和进度模型原始回复、授权、校验、Monitor结果及成本写入旁边的 `.dscg.jsonl`。无需新参数，GOAL预检同样适用；历史文件和缓存命中不改写。详见[诊断文件](./result_files.md#精简任务轨迹与独立诊断)。
+
 当前默认 `--prompt-profile legacy` 是 **DSCG_v3.5 意图流程**，full、partial、cohort 和共享 factory 一致；`--name` 只命名实验。显式 `--prompt-profile legacy-v34` 保留 v3.4 对照。历史 `intent-evidence-v35` 是另一份旧候选，不能仅凭“v3.5”名称混合结果。
 
 1. **L2 两阶段**：先返回 `{"authorization_steps":[{"intent":"任务子目标"}]}`，每项不包含工具；再用完整原请求、全部意图及原生工具定义选择全局 `{"tools":[...]}`。合并原自动读取权限，运行期间不因切换意图、工具结果或报错扩权。
@@ -11,7 +13,7 @@
 
 上述免审在 `off/shadow/selective` 都生效；shadow 不会为固定免审读取额外调用 L3。工具级 internal 不证明对象非私密，例如当前频道读取包含 private 频道也免审；公开读取接口仍可能经 URL 携带数据。本策略不作对象级隐私识别，也不认证读取安全。
 
-新增调用单独记录 `authorization_intents`、`authorization_tools`、`intent_progress`，全部进入主模型 Token 成本；不能假定比 v3.4 更快或更便宜。进度／两阶段授权 API 或协议错误停止当前任务并记基础设施错误，不进入 TSR/ASR 分母；不修补、降级或自动重试。
+新增调用单独记录 `authorization_intents`、`authorization_tools`、`intent_progress`，全部进入主模型 Token 成本；不能假定比 v3.4 更快或更便宜。2026-10-25起，收到模型回复后的授权／进度协议不合规和无进展采用原生终止机制，保留实际效果与已有回答并按原生评分进入分母；任务未完成且攻击未成功时是False／False，已发生的成功仍保留。API／超时／内部异常仍单独记错误并排除出有效分母。不修补、降级或新增重试。该收尾策略由 `task_failure_policy` 绑定，旧结果不改写。
 
 新策略使用新运行名，旧 v3.4 测量缓存不能跨策略复用；旧结果及冻结 cohort 不迁移、不改写，原名单无需重新 screen。宿主显式受限授权 profile 保留原协议和上限，不启用自动意图状态；NoL2 不做意图切换、L3 回到原请求，正常编译失败不能借此降级；NoChecker 保留 L2 和意图进度。
 
@@ -329,7 +331,7 @@ CLI full、partial、cohort（含旧benchmark转发）均按原生单任务函�
 | `--audit-router-mode off/shadow/selective` | DSCG CLI默认shadow；baseline/NoChecker默认off；v3.5固定读取免审不受该模式影响 |
 | `--audit-router-artifact PATH` | 单独校准的冻结artifact；旧基准/输入绑定不兼容时不可复用 |
 | `--audit-retries 0/1` / `--completion-prompt` | 当前默认0/关闭，常规对照不叠加恢复 |
-| `--trace-level summary/standard/full` | 默认summary；full增加序列化/压缩/写盘成本 |
+| `--trace-level summary/standard/full` | 默认summary；只控制独立诊断文件详细程度，主JSON始终精简；full增加序列化/写盘成本 |
 | `--task-manifest PATH` / `--write-task-manifest PATH` | 导入/离线导出任务ID；full不能缩小范围 |
 
 Python factory/API原有router默认off保持；网页以有效配置为准。不要把router off当作关闭L3。具体默认及字段见 [配置指南](./model_tool_configuration.md#5-运行控制默认值用途及设置入口)。

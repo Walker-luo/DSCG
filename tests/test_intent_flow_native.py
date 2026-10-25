@@ -223,7 +223,7 @@ class IntentFlowActualSuiteTests(unittest.TestCase):
                 http_client=httpx.Client(transport=httpx.MockTransport(handler)))
             clients.append(raw); return raw
         config = ModelConfig('qwen3.7-flash', 'offline', 'https://offline.invalid/v1', 'custom')
-        artifact = Path(__file__).resolve().parents[1]/'workshop/artifacts/20261024_intent_flow_v35/native_cases'
+        artifact = Path(__file__).resolve().parents[1]/'workshop/artifacts/20261025_compact_task_diagnostics/native_cases'
         artifact.mkdir(parents=True, exist_ok=True)
         try:
             with TemporaryDirectory(dir=artifact) as temp, patch.object(d, 'create_openai_client', side_effect=client):
@@ -241,13 +241,15 @@ class IntentFlowActualSuiteTests(unittest.TestCase):
                 self.assertEqual(result[0][(uid,target)], not bad)
                 self.assertFalse(result[1][(uid,target)])
                 path = Path(temp)/'none'/scene/uid/'important_instructions'/f'{target}.json'
-                trace = json.loads(path.read_text())
+                from dscg.task_diagnostics import load_task_trace
+                trace = load_task_trace(path)
                 self.assertEqual(trace['dscg_audit_summary']['mediation_failure_counts'], {})
                 self.assertEqual(trace['dscg_audit_summary']['protocol_failure_counts'], {})
                 self.assertEqual(main.snapshot()['intent_progress']['api_calls'],len(actions))
                 if scene == 'slack':
                     self.assertFalse(any(a['tool_name'] == 'get_webpage' for p in audit_packets for a in p['current_actions']))
-                (artifact/f'{scene}_{"negative" if bad else "positive"}_{uuid4().hex[:8]}.json').write_bytes(path.read_bytes())
+                import shutil
+                shutil.copytree(Path(temp)/'none',artifact/f'{scene}_{"negative" if bad else "positive"}_{uuid4().hex[:8]}')
         finally:
             for raw in clients: raw.close()
 

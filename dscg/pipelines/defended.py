@@ -36,6 +36,9 @@ from dscg.decision_schema import (AUDIT_PROTOCOL, AUDIT_SCHEMA, action_schema, r
 from dscg.intent_evidence import (PROFILE as V35_PROFILE, AUTH_PROTOCOL as V35_AUTH_PROTOCOL,
     AUDIT_PROTOCOL as V35_AUDIT_PROTOCOL, MAIN_TASK_POLICY, ISOLATION_POLICY, REVIEW_RULES, DECISION_GUIDE, ENVELOPE_SCHEMA, permission_schema, parse_permissions, parse_envelope, audit_request_options, audit_model_settings, audit_contract_identity, AUDIT_FORMAT)
 from dscg.input_isolation import FRAMEWORK_VERSION, ISOLATION_RULE, build_isolated_view, framework_version_for_profile
+from dscg import task_diagnostics as diagnostics
+from dscg.failure_policy import FAILURE_POLICY, MODULE_NAMES, block_error, is_blocked_error
+import warnings
 from dscg.l1_projection import (MODES as L1_PROJECTION_MODES, PROFILE_SHA256 as L1_PROFILE_SHA256,
                                PROFILE as L1_PROFILE, trusted_request_for_view)
 from dscg.l2_authorization import (catalog_fingerprint, planning_runtime_view,
@@ -153,6 +156,8 @@ class PendingAction:
     approved: bool
     reason_code: str
     ticket: ExecutionTicket | None
+    blocked_by: str = 'Monitor'
+    block_reason: str | None = None
 
 
 @dataclass(frozen=True)
@@ -523,7 +528,7 @@ def _checker_observation(record):
 
 
 def _normalise_trace_level(value: Any) -> str:
-    """Validate the amount of DSCG trace metadata persisted to task JSON."""
+    """Validate diagnostic detail level independently of native interactions."""
 
     if isinstance(value, bool):
         return "full" if value else DEFAULT_TRACE_LEVEL
@@ -626,6 +631,8 @@ def _compact_action_record(record: dict) -> dict:
             "risk_level",
             "metadata_state",
             "confirmation_required",
+            "blocked_by",
+            "block_reason",
         )
         if key in record
     }
@@ -738,8 +745,21 @@ def _trace_artifact_path(logger) -> Path | None:
 
 
 def _append_full_trace(extra_args: dict, event_type: str, record: dict) -> None:
-    """Write full redacted events to a compressed sidecar in ``full`` mode."""
+    """Write task events separately; legacy standalone full helpers use gzip."""
 
+    if diagnostics.current_session() is not None:
+        occurrence = {}
+        if event_type in ('audit_decision','audit_decision_final'):
+            length=len(extra_args.get('dscg_audit_decisions',[]))
+            occurrence={'history_index':length-1,'history_length':length}
+        elif event_type=='audit_router':occurrence={'router_index':len(extra_args.get('dscg_router_events',[]))-1}
+        if event_type == 'authorization': record = _compact_authorization_record(record)
+        elif event_type in ('audit_decision','audit_decision_final') and _trace_level(extra_args) != 'full':
+            record = _compact_audit_record(record)
+        elif event_type == 'action_ledger' and _trace_level(extra_args) != 'full':
+            record = _compact_action_record(record)
+        diagnostics.record_event(event_type, record, **occurrence)
+        return
     if _trace_level(extra_args) != "full":
         return
     logger = _trace_logger()
@@ -795,11 +815,14 @@ def _sync_trace_context(extra_args: dict) -> None:
         "dscg_audit_summary": _audit_summary(audits),
         "dscg_action_summary": _action_summary(actions),
     }
-    for key in ("dscg_input_isolation", "dscg_l1_projection", "dscg_layer_routing", "dscg_framework", "dscg_router_events", "dscg_l2", "dscg_audit_evidence", "dscg_intent_flow"):
+    for key in ("dscg_input_isolation", "dscg_l1_projection", "dscg_layer_routing", "dscg_framework", "dscg_router_events", "dscg_l2", "dscg_audit_evidence", "dscg_intent_flow", "dscg_termination", "dscg_infrastructure_failure"):
         if key in extra_args:
             context[key] = deepcopy(extra_args[key])
             if key == 'dscg_l1_projection' and level != 'full':
                 context[key].pop('profile_sha256', None)
+    if diagnostics.current_session() is not None:
+        diagnostics.sync_context(context)
+        return
     if level == "standard":
         context["dscg_audit_decisions"] = [_compact_audit_record(record) for record in audits]
         context["dscg_action_ledger"] = [_compact_action_record(record) for record in actions]
@@ -925,6 +948,9 @@ class ActionLedger:
     def snapshot(self) -> list[dict]:
         return deepcopy(list(self._records.values()))
 
+    def block_origin(self, action_id, module, reason):
+        self._records[action_id].update(blocked_by=module, block_reason=reason)
+
     def state(self, action_id: str) -> ActionState:
         if action_id not in self._records:
             raise KeyError(f"unknown action_id: {action_id}")
@@ -943,7 +969,7 @@ def _publish_action_ledger(extra_args: dict) -> None:
     ledger = _get_action_ledger(extra_args)
     snapshot = ledger.snapshot()
     extra_args["dscg_action_ledger"] = snapshot
-    if _trace_level(extra_args) == "full":
+    if _trace_level(extra_args) == "full" or diagnostics.current_session() is not None:
         seen = extra_args.setdefault("_dscg_trace_action_versions", {})
         for record in snapshot:
             if not isinstance(record, dict):
@@ -1365,6 +1391,16 @@ class ToolAuthorizationCompiler:
 
 
 
+class FrameworkTaskStop(agent_pipeline.AbortAgentError):
+    """Native early termination with real effects and existing final answers intact."""
+
+    def __init__(self, message, messages, env):
+        super().__init__(message, list(messages), env)
+        if (messages and messages[-1].get('role') == 'assistant' and not messages[-1].get('tool_calls')
+                and messages[-1].get('content') is not None):
+            self.messages = list(messages)
+
+
 class OurFrameExecutor(agent_pipeline.BasePipelineElement):
     def __init__(
         self,
@@ -1494,6 +1530,24 @@ class OurFrameExecutor(agent_pipeline.BasePipelineElement):
         self._l2_count(extra_args, 'delegated_tasks_expanded')
 
     def query(self, query, runtime, env, messages, extra_args):
+        try:
+            return self._query(query, runtime, env, messages, extra_args)
+        except flow.IntentFlowError as exc:
+            if not exc.is_framework_failure: raise
+            module = 'L2' if exc.stage.startswith('authorization') else 'Intent Progress'
+            termination = dict(kind='framework_failure', module=module,
+                reason_code=exc.reason_code, diagnostics=exc.diagnostics)
+            extra_args['dscg_termination'] = termination
+            if self.on_authority_replaced is not None: self.on_authority_replaced()
+            _sync_trace_context(extra_args)
+            native_messages = exc.messages if exc.messages is not None else messages
+            detail = exc.diagnostics.get('code')
+            text = f'{MODULE_NAMES[module]} stopped: {exc.reason_code}' + (f' ({detail}).' if detail else '.')
+            stop = FrameworkTaskStop(text, native_messages, env)
+            logging.Logger().get().log(stop.messages)
+            raise stop from None
+
+    def _query(self, query, runtime, env, messages, extra_args):
         extra_args.setdefault("_dscg_trace_level", self.trace_level)
         if hasattr(self, "framework_config"):
             extra_args["dscg_framework"] = deepcopy(self.framework_config)
@@ -1646,7 +1700,9 @@ class OurFrameExecutor(agent_pipeline.BasePipelineElement):
                 exhausted=bool(final and self.intent_flow.current and
                     self.intent_flow.current['intent_id'] in self.intent_flow.continuations), catalog=catalog)
         except flow.IntentFlowError as exc:
-            extra_args['dscg_intent_flow'] = {**self.intent_flow.snapshot(), 'error_code': exc.reason_code}
+            exc.messages = list(messages)
+            extra_args['dscg_intent_flow'] = {**self.intent_flow.snapshot(), 'error_code': exc.reason_code,
+                'error_diagnostics':exc.diagnostics}
             _sync_trace_context(extra_args)
             raise
         if before != self.intent_flow.binding() and self.on_authority_replaced:
@@ -1678,8 +1734,8 @@ class OurFrameExecutor(agent_pipeline.BasePipelineElement):
             if not current:
                 return query, runtime, env, raw, extra_args
             if current['intent_id'] == active['intent_id'] and not self.intent_flow.continue_once():
-                raise flow.IntentFlowError('INTENT_NO_PROGRESS')
-        raise flow.IntentFlowError('INTENT_ITERATION_BOUND')
+                raise flow.IntentFlowError('INTENT_NO_PROGRESS', messages=raw)
+        raise flow.IntentFlowError('INTENT_ITERATION_BOUND', messages=raw)
 
 
 class PermissionSandbox(agent_pipeline.BasePipelineElement):
@@ -2152,6 +2208,9 @@ class ReferenceMonitor(agent_pipeline.BasePipelineElement):
         elif record_valid and audit.get('parser_status') == 'failure':
             mediation['failure_stage'] = ('model_request' if audit.get('reason_code') in (
                 'AUDIT_MODEL_ERROR', 'AUDIT_TIMEOUT') else 'model_protocol')
+        if mediation['failure_stage'] == 'model_request':
+            extra_args['dscg_infrastructure_failure'] = dict(module='L3',
+                reason_code=audit['reason_code'], stage='audit')
         if self.router_verifier is not None:
             self.router_verifier.discard(router_token)
         metadata = metadata_for_runtime(runtime)
@@ -2175,28 +2234,32 @@ class ReferenceMonitor(agent_pipeline.BasePipelineElement):
             for call in tool_calls
         ]
         decisions: list[tuple[str, Any, bool, str]] = []
+        block_sources = {}
+        def reject(module, reason, detail=None):
+            block_sources[action_id] = dict(blocked_by=module, block_reason=detail or reason)
+            decisions.append((action_id, call, False, reason))
         for index, (action_id, call) in enumerate(proposed):
             tool_name = _tool_call_name(call)
             if precheck_result is not None and precheck_result.rejected:
                 reason = precheck_result.denial_reasons[index] or "BATCH_AUTHORIZATION_DENY"
-                decisions.append((action_id, call, False, reason))
+                reject('Monitor' if reason == 'PRECHECK_MISSING_OR_STALE' else 'L2', reason)
                 continue
             if tool_name not in runtime.functions:
-                decisions.append((action_id, call, False, "UNKNOWN_TOOL"))
+                reject('L2', 'UNKNOWN_TOOL')
                 continue
             if self.sandbox is not None:
                 allowed, reason_code = self.sandbox.assess(tool_name, runtime)
                 if not allowed:
-                    decisions.append((action_id, call, False, reason_code))
+                    reject('L2', reason_code)
                     continue
             if flow_record:
                 if current_flow is not None and current_flow.current is None:
-                    decisions.append((action_id, call, False, 'INTENT_TERMINAL'))
+                    reject('Monitor', 'INTENT_TERMINAL')
                     continue
                 try:
                     runtime.functions[tool_name].parameters.model_validate(_tool_call_args(call))
                 except Exception:
-                    decisions.append((action_id, call, False, 'INVALID_ARGUMENT_SCHEMA'))
+                    reject('Monitor', 'INVALID_ARGUMENT_SCHEMA')
                     continue
                 if audit_valid and index in flow_exempt:
                     decisions.append((action_id, call, True, 'READ_SENSITIVITY_BYPASS'))
@@ -2220,7 +2283,7 @@ class ReferenceMonitor(agent_pipeline.BasePipelineElement):
                 ):
                     decisions.append((action_id, call, True, "READ_ONLY_SOURCE_ALLOW"))
                 else:
-                    decisions.append((action_id, call, False, "AUDIT_DENY"))
+                    reject('L3', 'AUDIT_DENY', audit.get('reason_code'))
                 continue
             if self.require_audit and (not audit_valid or audit.get("decision") != "allow"):
                 if audit_valid and audit.get("decision") == "abstain":
@@ -2231,7 +2294,8 @@ class ReferenceMonitor(agent_pipeline.BasePipelineElement):
                         if isinstance(audit, dict) and audit.get("batch_fingerprint") == fingerprint
                         else "AUDIT_MISSING_OR_STALE"
                     )
-                decisions.append((action_id, call, False, reason))
+                origin = 'L3' if audit_valid or mediation.get('failure_stage') in ('model_protocol','model_request') else 'Monitor'
+                reject(origin, reason, audit.get('reason_code') if origin == 'L3' and isinstance(audit,dict) else reason)
                 continue
             decisions.append((action_id, call, True, "POLICY_ALLOW"))
 
@@ -2242,8 +2306,11 @@ class ReferenceMonitor(agent_pipeline.BasePipelineElement):
                 ticket = self._issue(action_id, call, contract_version)
             else:
                 ledger.transition(action_id, ActionState.BLOCKED, reason_code)
+                source = block_sources[action_id]
+                ledger.block_origin(action_id, source['blocked_by'], source['block_reason'])
                 ticket = None
-            pending_actions.append(PendingAction(action_id, call, approved, reason_code, ticket))
+            pending_actions.append(PendingAction(action_id, call, approved, reason_code, ticket,
+                **block_sources.get(action_id,{})))
 
         extra_args["_dscg_pending_batch"] = PendingBatch(
             batch_id=batch_id,
@@ -2329,14 +2396,18 @@ class TicketedToolsExecutor(agent_pipeline.BasePipelineElement):
 
     @staticmethod
     def _blocked_result(action: PendingAction, reason_code: str):
+        detail = action.block_reason or reason_code
+        module = action.blocked_by
         return ad_types.ChatToolResultMessage(
             role="tool",
             content=[ad_types.text_content_block_from_string(
-                f"DSCG blocked action {action.action_id}: {reason_code}. Re-plan from the trusted user request."
+                f"{MODULE_NAMES[module]} blocked {_tool_call_name(action.call)}: {detail}"
+                + (f" ({reason_code})." if detail != reason_code else ".")
+                + " Re-plan from the trusted user request."
             )],
             tool_call_id=_tool_call_id(action.call) or action.action_id,
             tool_call=action.call,
-            error=f"DSCG_BLOCKED:{reason_code}",
+            error=block_error(module,reason_code),
         )
 
     def _unmediated_batch(self, tool_calls, runtime, extra_args) -> PendingBatch:
@@ -2352,6 +2423,7 @@ class TicketedToolsExecutor(agent_pipeline.BasePipelineElement):
                 metadata.get(_tool_call_name(call)),
             )
             ledger.transition(action_id, ActionState.BLOCKED, "MISSING_EXECUTION_TICKET")
+            ledger.block_origin(action_id,'Monitor','MISSING_EXECUTION_TICKET')
             actions.append(PendingAction(action_id, call, False, "MISSING_EXECUTION_TICKET", None))
         return PendingBatch(batch_id, _batch_fingerprint(tool_calls), tuple(actions))
 
@@ -2379,7 +2451,8 @@ class TicketedToolsExecutor(agent_pipeline.BasePipelineElement):
                 allowed_now, current_reason = self.monitor.sandbox.assess(_tool_call_name(action.call), runtime)
                 if not allowed_now:
                     ledger.transition(action.action_id, ActionState.FAILED, current_reason)
-                    results.append(self._blocked_result(action, current_reason))
+                    ledger.block_origin(action.action_id,'L2',current_reason)
+                    results.append(self._blocked_result(replace(action,blocked_by='L2',block_reason=current_reason), current_reason))
                     continue
             if not consumed:
                 if (ticket_reason == "INVALID_EXECUTION_TICKET"
@@ -2405,6 +2478,7 @@ class TicketedToolsExecutor(agent_pipeline.BasePipelineElement):
                     )
                     reason_code = "REPLAYED_EXECUTION_TICKET"
                 results.append(self._blocked_result(blocked_action, reason_code))
+                ledger.block_origin(blocked_action.action_id,'Monitor',reason_code)
                 continue
 
             single_message = self._assistant_with_call(last_msg, action.call)
@@ -2466,7 +2540,6 @@ class TaskIsolatedPipeline(agent_pipeline.AgentPipeline):
                 for key in list(logger.context):
                     if key.startswith(("dscg_", "_dscg_")):
                         logger.context.pop(key)
-                logger.context["dscg_task_id"] = context["dscg_task_id"]
             executor = self.task_executor
             if executor is not None:
                 if callable(getattr(executor, 'reset_task_context', None)):
@@ -2479,29 +2552,42 @@ class TaskIsolatedPipeline(agent_pipeline.AgentPipeline):
                 self.reference_monitor.revoke_tickets()
             costs_before = [t.snapshot() for t in self.trackers]
             started = time.perf_counter()
-            try:
-                return super().query(
-                    query, runtime, env if env is not None else functions_runtime.EmptyEnv(),
-                    list(messages or []), context,
-                )
-            finally:
-                task_failed = sys.exc_info()[0] is not None
-                if self.reference_monitor is not None:
-                    self.reference_monitor.revoke_tickets()
-                context["dscg_cost"] = {
-                    "elapsed_ms": round((time.perf_counter() - started) * 1000, 3),
-                    "models": [self._cost_delta(tracker.snapshot(), before)
-                               for tracker, before in zip(self.trackers, costs_before)],
-                }
-                if isinstance(getattr(logger, "context", None), dict):
-                    logger.context["dscg_cost"] = context["dscg_cost"]
-                    if isinstance(logger, logging.TraceLogger):
-                        try:
+            config = {'framework':getattr(self,'dscg_optimization_config',{}),
+                      'main_model':getattr(self,'dscg_model_config',{}),
+                      'security_model':getattr(self,'dscg_security_model_config',{}),
+                      'tool_metadata':{name:status.public_dict() for name,status in metadata_for_runtime(runtime).items()}}
+            with diagnostics.DiagnosticSession(logger, context['dscg_task_id'], config,
+                    getattr(executor,'trace_level',DEFAULT_TRACE_LEVEL)) as session:
+                try:
+                    return super().query(
+                        query, runtime, env if env is not None else functions_runtime.EmptyEnv(),
+                        list(messages or []), context,
+                    )
+                finally:
+                    task_exception = sys.exc_info()[1]
+                    task_failed = task_exception is not None and not isinstance(task_exception, FrameworkTaskStop)
+                    intent_state = context.get('dscg_intent_flow',{})
+                    unfulfilled = [s['intent_id'] for s in intent_state.get('steps',[])
+                                   if s.get('state') == 'unfulfilled']
+                    if task_exception is None and unfulfilled:
+                        context['dscg_termination'] = dict(kind='framework_failure',module='Intent Progress',
+                            reason_code='INTENT_UNFULFILLED', intent_ids=unfulfilled)
+                    _sync_trace_context(context)
+                    if self.reference_monitor is not None:
+                        self.reference_monitor.revoke_tickets()
+                    context["dscg_cost"] = {
+                        "elapsed_ms": round((time.perf_counter() - started) * 1000, 3),
+                        "models": [self._cost_delta(tracker.snapshot(), before)
+                                   for tracker, before in zip(self.trackers, costs_before)],
+                    }
+                    try:
+                        session.finish(context, failed=task_failed)
+                        if isinstance(logger, logging.TraceLogger):
                             logger.save()
-                        except Exception as exc:
-                            context["dscg_trace_save_error"] = type(exc).__name__
-                            if not task_failed:
-                                raise
+                    except Exception as exc:
+                        context["dscg_trace_save_error"] = type(exc).__name__
+                        if not task_failed: raise
+                        warnings.warn('DSCG diagnostic write failed during task failure: '+type(exc).__name__)
 
 
 class ActionSecurityChecker(agent_pipeline.BasePipelineElement):
@@ -2699,7 +2785,7 @@ class ActionSecurityChecker(agent_pipeline.BasePipelineElement):
                 action['candidate_arguments'] = raw
                 action.pop('arguments_sha256', None)
             for result in tool_results:
-                result['return_status'] = 'blocked' if str(result.get('error') or '').startswith('DSCG_BLOCKED:') else 'error' if result.get('error') else 'success'
+                result['return_status'] = 'blocked' if is_blocked_error(result.get('error')) else 'error' if result.get('error') else 'success'
         if self.prompt_profile == 'legacy' and not getattr(self, '_legacy_audit_input', False):
             active_flow = self.intent_flow_getter() if self.intent_flow_getter else None
             current = active_flow.current if active_flow is not None else None
@@ -2754,6 +2840,7 @@ class ActionSecurityChecker(agent_pipeline.BasePipelineElement):
                                AUDIT_SCHEMA, 'dscg_audit_v2')
 
     def _request_audit(self, query, env, packet: dict):
+        diagnostics.begin_model_call('audit')
         # JSON response mode requires an explicit format instruction. Fail
         # locally on a misconfigured policy instead of paying for rejected
         # requests. This does not change any valid audit decision or policy.
@@ -2780,7 +2867,10 @@ class ActionSecurityChecker(agent_pipeline.BasePipelineElement):
             request_kwargs.update(audit_options)
         client = getattr(self.small_llm, "client", None)
         if client is not None and hasattr(client, "chat"):
+            started = time.perf_counter()
             response = client.chat.completions.create(**request_kwargs)
+            diagnostics.record_response('audit', response, elapsed_ms=(time.perf_counter()-started)*1000,
+                call_ids=[row.get('action_id') for row in packet.get('current_actions', [])])
             choices = response.get("choices") if isinstance(response, dict) else getattr(response, "choices", None)
             if not isinstance(choices, (list, tuple)) or not choices:
                 raise AuditSchemaError("audit response has no choices", 'NO_CHOICES')
@@ -2802,7 +2892,9 @@ class ActionSecurityChecker(agent_pipeline.BasePipelineElement):
                                        content=text, finish_reason=finish_reason)
             return _AuditResponse(text, finish_reason)
         response = self._fallback_query(query, env, prompt)
-        return _extract_content_text(response)
+        text = _extract_content_text(response)
+        diagnostics.record_response('audit', {'choices':[{'message':{'content':text},'finish_reason':None}]})
+        return text
 
     def _make_failure_decision(
         self,
@@ -2991,6 +3083,8 @@ class ActionSecurityChecker(agent_pipeline.BasePipelineElement):
                     extra_args["_dscg_router_receipt"]=token
                     _publish_router_event(extra_args,router_event)
                     return query,runtime,env,messages,extra_args
+                except diagnostics.DiagnosticWriteError:
+                    raise
                 except Exception as exc:
                     router_event.update(would_bypass=False,route_reason="RECEIPT_ERROR",error_type=type(exc).__name__)
         audit_tracker = getattr(self.small_llm,"client",None)
@@ -3028,6 +3122,8 @@ class ActionSecurityChecker(agent_pipeline.BasePipelineElement):
                     latency_ms=round((time.perf_counter() - started) * 1000, 2),
                     parser_status="ok",
                 )
+            except diagnostics.DiagnosticWriteError:
+                raise
             except Exception as exc:
                 error_name = type(exc).__name__.lower()
                 failure_code = "AUDIT_TIMEOUT" if "timeout" in error_name else (
@@ -3050,6 +3146,8 @@ class ActionSecurityChecker(agent_pipeline.BasePipelineElement):
                     round((time.perf_counter() - started) * 1000, 2),
                 )
             record = decision.public_dict()
+            diagnostics.record_validation('audit', 'passed' if validation == 'passed' else 'failed',
+                diagnostics={'code':failure_type, 'field_validation':validation, **field_diagnostics})
             record['protocol_diagnostics'] = {
                 'schema_version': 'dscg.audit-protocol.v1',
                 'failure_type': failure_type,
@@ -3124,6 +3222,7 @@ def router_configuration_hash(main_config, sec_config, *, input_isolation, autho
                           if prompt_profile in ('legacy', 'legacy-v34') else {})
     if prompt_profile == 'legacy':
         decision_contracts = flow.decision_contracts(main_config, sec_config, enabled=use_sandbox, bounded=profile_hash is not None)
+        decision_contracts['task_failure_policy'] = FAILURE_POLICY
     if prompt_profile == V35_PROFILE:
         decision_contracts = {'audit': audit_contract_identity(sec_config),
                               'authorization': {'protocol': V35_AUTH_PROTOCOL, 'response_format': response_format(main_config, {}, 'dscg_tool_permissions_v1')['type']} if profile_hash is None else {'protocol': 'configured-profile-json-object', 'response_format': 'json_object'}}
@@ -3234,7 +3333,7 @@ def make_qwen_newFrame_pipeline(
 
     :param use_sandbox: 是否启用 PermissionSandbox (物理漏斗)
     :param use_security_checker: 是否启用 ActionSecurityChecker 语义风险信号
-    :param trace_level: 任务 JSON 中 DSCG 记录级别：summary、standard 或 full
+    :param trace_level: 独立诊断详细度：summary、standard 或 full，任务JSON始终精简
     :param tool_metadata: 可选的工具名到显式风险元数据的映射
     """
     audit_router_threshold = validate_router_options(audit_router_threshold, audit_router_artifact)
@@ -3414,6 +3513,7 @@ def make_qwen_newFrame_pipeline(
         "audit_router_load_error": audit_router.error if audit_router else None,
     }
     if prompt_profile == 'legacy':
+        pipeline.dscg_optimization_config['task_failure_policy'] = FAILURE_POLICY
         pipeline.dscg_optimization_config['decision_contracts'] = flow.decision_contracts(
             main_config, sec_config if use_security_checker else None,
             enabled=use_sandbox, bounded=profile_hash is not None)

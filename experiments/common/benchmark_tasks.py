@@ -118,6 +118,7 @@ class _TaskPipelineProbe:
                 return self.pipeline.query(*args, **kwargs)
         except IntentFlowError as exc:
             self.error = {'reason_code': exc.reason_code, 'intent_stage': exc.stage,
+                          'intent_diagnostics':exc.diagnostics,
                           'execution_error': execution_error_diagnostics(exc)}
             raise _TaskToolJSONAbort(exc.reason_code) from None
         except json.JSONDecodeError as exc:

@@ -245,7 +245,7 @@ print("classified tools:", len(catalog))
 | audit_router_artifact | 已停用 | 非空值直接报迁移错误，改用threshold；不读取旧artifact |
 | audit_retries | 0 | factory/API、partial --audit-retries 0/1；仅语义abstain有界重审，普通比较保持0，不是SDK传输重试设置 |
 | completion_prompt | false | factory/API、partial --completion-prompt；历史可选提示，当前普通比较保持关闭 |
-| trace_level | summary | factory/API、网页、partial --trace-level；standard逐条紧凑记录，full压缩诊断增加序列化/写盘成本 |
+| trace_level | summary | factory/API、网页、CLI --trace-level；只控制独立诊断JSONL详细度，主JSON始终精简；full增加序列化/写盘成本 |
 
 这些控制不会从模型连接TOML读取。NoL2同时关闭前置检查、授权工具视图与委托展开；L2/L3均关时L1也关闭。shadow/selective要求L2和L3同时开启，baseline使用原生循环。L3运行时不再要求独立标签或artifact；0.70仅保留为诊断参数，当前规则没有独立安全保证。authorization_profile/delegated_task_reader是受信host API对象，不是普通测试必填项或TOML新增段，详见 [L2方案](../workshop/L2_opt.md)。
 

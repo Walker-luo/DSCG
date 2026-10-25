@@ -3,9 +3,12 @@ from contextlib import nullcontext
 from copy import deepcopy
 from hashlib import sha256
 import json
+import time
+from dscg import task_diagnostics as diagnostics
 
 from dscg.decision_schema import load_decision_json, response_format, contract_identity, AUDIT_SCHEMA
 from dscg.token_tracking import TokenTrackerClient
+from dscg.failure_policy import FRAMEWORK_FAILURE_CODES, FAILURE_POLICY
 
 AUTH_PROTOCOL = 'intent-global-tools-v1'
 PROGRESS_PROTOCOL = 'dscg.intent-progress.v1'
@@ -106,9 +109,15 @@ def tools_schema(names):
 
 
 class IntentFlowError(ValueError):
-    def __init__(self, code, stage='intent_progress'):
+    def __init__(self, code, stage='intent_progress', diagnostics=None, messages=None):
         super().__init__(code)
         self.reason_code, self.stage = code, stage
+        self.diagnostics = diagnostics or {}
+        self.messages = messages
+
+    @property
+    def is_framework_failure(self):
+        return self.reason_code in FRAMEWORK_FAILURE_CODES
 
 
 def digest(value):
@@ -118,6 +127,7 @@ def digest(value):
 
 def identity():
     return dict(authorization_protocol=AUTH_PROTOCOL, progress_protocol=PROGRESS_PROTOCOL,
+        task_failure_policy=FAILURE_POLICY,
         read_policy=READ_POLICY, intents=INTENT_POLICY, tools=TOOLS_POLICY, main=MAIN_POLICY,
         audit=AUDIT_POLICY, progress=PROGRESS_POLICY, intent_schema=INTENT_SCHEMA,
         progress_schema=PROGRESS_SCHEMA, progress_intermediate_schema=progress_schema(False),
@@ -150,21 +160,29 @@ def request_json(llm, phase, policy, packet, schema):
     reasoning = getattr(llm, 'reasoning_effort', None)
     if reasoning is not None:
         kwargs['reasoning_effort'] = reasoning
+    diagnostics.begin_model_call(phase)
+    started = time.perf_counter()
     try:
         with (tracker.phase(phase) if isinstance(tracker, TokenTrackerClient) else nullcontext()):
             with (tracker.without_retries() if isinstance(tracker, TokenTrackerClient) else nullcontext()):
                 response = tracker.chat.completions.create(**kwargs)
     except Exception as exc:
+        diagnostics.record_validation(phase,'failed',diagnostics={'code':'INTENT_API_ERROR','error_type':type(exc).__name__})
         raise IntentFlowError('INTENT_API_ERROR', phase) from exc
+    diagnostics.record_response(phase,response,elapsed_ms=(time.perf_counter()-started)*1000,
+        intent_id=packet.get('current_intent_id'), final_response=packet.get('final_response'))
     choices = getattr(response, 'choices', None)
     if not isinstance(choices, (list, tuple)) or not choices:
+        diagnostics.record_validation(phase,'failed',diagnostics={'code':'INTENT_NO_CHOICE'})
         raise IntentFlowError('INTENT_NO_CHOICE', phase)
     choice = choices[0]
     if getattr(choice.message, 'refusal', None) or choice.finish_reason != 'stop':
+        diagnostics.record_validation(phase,'failed',diagnostics={'code':'INTENT_INCOMPLETE'})
         raise IntentFlowError('INTENT_INCOMPLETE', phase)
     try:
         return load_decision_json(choice.message.content)
     except (ValueError, TypeError) as exc:
+        diagnostics.record_validation(phase,'failed',diagnostics={'code':'INTENT_INVALID_JSON'})
         raise IntentFlowError('INTENT_INVALID_JSON', phase) from exc
 
 
@@ -238,48 +256,53 @@ class IntentFlow:
         return digest({'request': self.request, **self.snapshot()})
 
     def apply(self, payload, evidence, *, final=False):
-        def invalid():
-            raise IntentFlowError('INTENT_INVALID_PROGRESS')
-        if (not self.current or not isinstance(payload, dict) or
-                set(payload) != set(PROGRESS_SCHEMA['required']) or
-                payload['intent_id'] != self.current['intent_id'] or
-                payload['status'] not in ('in_progress', 'completed', 'unfulfillable', 'needs_user') or
-                payload['completion_kind'] not in ('none', 'effect', 'facts', 'answer', 'condition') or
-                not isinstance(payload['reason'], str) or not 1 <= len(payload['reason']) <= 256):
-            invalid()
+        def invalid(code, field='$', **details):
+            detail={'code':code,'field':field, **details}
+            diagnostics.record_validation('intent_progress','failed',diagnostics=detail)
+            raise IntentFlowError('INTENT_INVALID_PROGRESS', diagnostics=detail)
+        if not self.current: invalid('NO_ACTIVE_INTENT')
+        if not isinstance(payload,dict) or set(payload) != set(PROGRESS_SCHEMA['required']):
+            invalid('FIELDS_MISMATCH')
+        if payload['intent_id'] != self.current['intent_id']: invalid('INTENT_ID_MISMATCH','intent_id')
+        if payload['status'] not in ('in_progress','completed','unfulfillable','needs_user'):invalid('INVALID_STATUS','status')
+        if payload['completion_kind'] not in ('none','effect','facts','answer','condition'):invalid('INVALID_COMPLETION_KIND','completion_kind')
+        if not isinstance(payload['reason'],str) or not 1 <= len(payload['reason']) <= 256:
+            invalid('INVALID_REASON','reason', actual_type=type(payload['reason']).__name__,
+                actual_length=len(payload['reason']) if isinstance(payload['reason'],str) else None,
+                min_length=1, max_length=256)
         refs = payload['evidence_ids']
         if (not isinstance(refs, list) or len(refs) > 64 or
                 any(not isinstance(x, str) or x not in evidence for x in refs) or len(set(refs)) != len(refs)):
-            invalid()
+            invalid('INVALID_EVIDENCE','evidence_ids')
         status, kind = payload['status'], payload['completion_kind']
         if status == 'completed':
             successful = [evidence[x] for x in refs if evidence[x].get('successful')]
             if kind == 'effect':
                 if not any(x.get('effect') not in (None, 'read', 'unknown') and
                         x.get('intent_id', self.current['intent_id']) == self.current['intent_id']
-                        for x in successful): invalid()
+                        for x in successful): invalid('NO_CURRENT_EFFECT_EVIDENCE','evidence_ids')
             elif kind in ('facts', 'condition'):
-                if not successful: invalid()
+                if not successful: invalid('NO_SUCCESSFUL_FACT_EVIDENCE','evidence_ids')
             elif kind == 'answer':
-                if not final or not any(evidence[x].get('final_answer') for x in refs): invalid()
+                if not final or not any(evidence[x].get('final_answer') for x in refs): invalid('NO_FINAL_ANSWER_EVIDENCE','evidence_ids')
             else:
-                invalid()
+                invalid('COMPLETED_KIND_NONE','completion_kind')
         elif kind != 'none':
-            invalid()
+            invalid('NONCOMPLETED_KIND','completion_kind')
         next_id, skips = payload['next_intent_id'], payload['skipped_intents']
         ids = [s['intent_id'] for s in self.steps]
-        if not isinstance(skips, list) or len(skips) > MAX_STEPS: invalid()
+        if not isinstance(skips, list) or len(skips) > MAX_STEPS: invalid('INVALID_SKIPS','skipped_intents')
         if status == 'in_progress':
-            if next_id != ids[self.index] or skips: invalid()
+            if next_id != ids[self.index] or skips: invalid('IN_PROGRESS_TRANSITION','next_intent_id')
             destination = self.index
         elif status == 'needs_user':
-            if not final or next_id is not None or skips: invalid()
+            if not final or next_id is not None or skips: invalid('NEEDS_USER_TRANSITION','next_intent_id')
             destination = None
         else:
-            if next_id is not None and (not isinstance(next_id, str) or next_id not in ids[self.index+1:]): invalid()
+            if next_id is not None and (not isinstance(next_id, str) or next_id not in ids[self.index+1:]): invalid('INVALID_NEXT_INTENT','next_intent_id')
             destination = ids.index(next_id) if next_id is not None else len(ids)
             expected = ids[self.index+1:destination]
-            if len(skips) != len(expected): invalid()
+            if len(skips) != len(expected): invalid('UNEXPLAINED_SKIP','skipped_intents')
             failed = {s['intent_id'] for s in self.steps if s['state'] in ('unfulfilled', 'dependency_blocked')}
             if status == 'unfulfillable': failed.add(ids[self.index])
             for entry, target in zip(skips, expected):
@@ -287,7 +310,7 @@ class IntentFlow:
                         entry['intent_id'] != target or not isinstance(entry['reason'], str) or
                         not 1 <= len(entry['reason']) <= 256 or not isinstance(entry['depends_on'], list) or
                         not entry['depends_on'] or any(not isinstance(x, str) or x not in failed for x in entry['depends_on'])):
-                    invalid()
+                    invalid('INVALID_SKIP_DEPENDENCY','skipped_intents')
                 failed.add(target)
         # No mutation before all references and transitions have been validated.
         self.steps[self.index]['state'] = {'in_progress': 'active', 'completed': 'completed',
@@ -298,6 +321,7 @@ class IntentFlow:
         if self.current: self.steps[self.index]['state'] = 'active'
         self.revision += 1
         self.observations.append(deepcopy(payload))
+        diagnostics.record_validation('intent_progress','passed')
 
     def observe(self, llm, messages, ledger, *, final=False, exhausted=False, catalog=None):
         if not self.current: return

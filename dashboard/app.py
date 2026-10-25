@@ -425,6 +425,7 @@ def run_test_thread(run_id: str, config: dict):
                         "utility_passed": sum(valid_utility_results),
                         "utility_valid": len(valid_utility_results),
                         "execution_errors": sum(r["execution_error"] for r in outcomes.values()),
+                        "framework_failures": sum(r.get('framework_termination',{}).get('kind') == 'framework_failure' for r in outcomes.values()),
                         "attacked_tasks": len(security_results),
                         "security_valid": len(valid_security_results) if run_attack else 0,
                         "attack_successes": sum(valid_security_results) if run_attack else 0,

@@ -16,6 +16,7 @@ from dscg.pipelines import defended as d
 from dscg.tool_metadata import load_tool_metadata, set_tool_metadata, metadata_for_runtime
 from experiments.diagnostics.utility_packets import build_packets
 from dscg.prompt_profiles import audit_policy
+from dscg.task_diagnostics import load_task_trace
 
 ROOT = Path(__file__).resolve().parents[2]
 FIXTURES = ROOT / 'tests/fixtures'
@@ -365,6 +366,7 @@ def compare_stage(bundle, responses=None):
 def trace_signals(trace):
     """Overlapping observations only; never infer a unique root cause or rescore."""
     valid = not trace.get('error') and all(isinstance(trace.get(k),bool) for k in ('utility','security'))
+    diagnostic_available=trace.get('dscg_diagnostics_status') not in ('missing','corrupt','invalid_reference','incomplete')
     messages = trace.get('messages')
     complete_messages = (isinstance(messages,list) and bool(messages)
                          and all(isinstance(m,dict) for m in messages))
@@ -380,9 +382,10 @@ def trace_signals(trace):
                 native_utility=trace.get('utility') if valid else None,
                 native_security=trace.get('security') if valid else None,
                 protocol_failure_seen=('AUDIT_SCHEMA_INVALID' in reasons
-                                       if 'dscg_audit_summary' in trace or 'dscg_audit_decisions' in trace else None),
-                audit_deny_seen=('AUDIT_DENY' in final if 'dscg_action_summary' in trace or 'dscg_action_ledger' in trace else None),
-                audit_abstain_seen=('AUDIT_ABSTAIN' in final if 'dscg_action_summary' in trace or 'dscg_action_ledger' in trace else None),
+                                       if diagnostic_available and ('dscg_audit_summary' in trace or 'dscg_audit_decisions' in trace) else None),
+                audit_deny_seen=('AUDIT_DENY' in final if diagnostic_available and ('dscg_action_summary' in trace or 'dscg_action_ledger' in trace) else None),
+                audit_abstain_seen=('AUDIT_ABSTAIN' in final if diagnostic_available and ('dscg_action_summary' in trace or 'dscg_action_ledger' in trace) else None),
+                diagnostic_status=trace.get('dscg_diagnostics_status','legacy_inline'),
                 no_proposed_calls=(not any(m.get('tool_calls') for m in messages if isinstance(m,dict))
                                    if valid and complete_messages else None),
                 attribution='overlapping_observations_not_causal_labels')
@@ -438,7 +441,7 @@ def main(argv=None):
             raise FileExistsError('diagnostic output already exists')
         value = (build_stage(args.stage) if args.command == 'export' else
                  dict(scope='explicit input files only; not a run denominator',
-                      traces=[dict(path=str(p),**trace_signals(json.loads(p.read_text()))) for p in args.trace]))
+                      traces=[dict(path=str(p),**trace_signals(load_task_trace(p))) for p in args.trace]))
         target.parent.mkdir(parents=True,exist_ok=True)
         with target.open('x',encoding='utf-8') as stream:
             json.dump(value,stream,ensure_ascii=False,indent=2,allow_nan=False); stream.write('\n')

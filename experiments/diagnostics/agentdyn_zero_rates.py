@@ -11,6 +11,7 @@ from collections import Counter
 from pathlib import Path
 
 from dscg.benchmark_catalog import get_suite
+from dscg.task_diagnostics import load_task_trace
 
 
 def _read(path):
@@ -56,13 +57,14 @@ def inspect_trace(trace, reference_tools):
     payloads = [value for value in (trace.get('injections') or {}).values() if isinstance(value, str) and value]
     visible = any(payload in text for message in tool_messages
                   for text in _strings(message.get('content')) for payload in payloads)
-    blocked = sum('DSCG_BLOCKED' in str(message.get('error') or '') or
+    from dscg.failure_policy import is_blocked_error
+    blocked = sum(is_blocked_error(message.get('error')) or
                   any('DSCG_BLOCKED' in text for text in _strings(message.get('content')))
                   for message in tool_messages)
     audit_blocked = sum('AUDIT_' in str(message.get('error') or '')
                         for message in tool_messages)
     native_tool_errors = sum(bool(message.get('error')) and
-                             'DSCG_BLOCKED' not in str(message.get('error'))
+                             not is_blocked_error(message.get('error'))
                              for message in tool_messages)
     return {
         'status': 'valid' if valid else 'error',
@@ -123,7 +125,7 @@ def analyze_run(run_dir):
                        'trace_path': str(path)}
                 if path.exists():
                     try:
-                        trace = _read(path)
+                        trace = load_task_trace(path)
                         row.update(status='valid' if trace.get('error') is None and
                                    isinstance(trace.get('utility'), bool) else 'error',
                                    utility=trace.get('utility'), security=trace.get('security'),
@@ -152,7 +154,7 @@ def analyze_run(run_dir):
                         row['status'] = 'missing'
                     else:
                         try:
-                            trace = _read(path)
+                            trace = load_task_trace(path)
                             row.update(inspect_trace(trace, reference[user] or []))
                             if reference[user] is None:
                                 row['reference_tools_missing'] = None

@@ -1,0 +1,19 @@
+{
+  "purpose": "Byte-preserved AGENTS.md instructions before user-requested compaction; historical snapshots are not active instructions.",
+  "files": [
+    {
+      "source": "/Users/luo/Desktop/AgentDefence/DSCG/AGENTS.md",
+      "snapshot": "project.AGENTS.original.md",
+      "bytes": 151913,
+      "lines": 642,
+      "sha256": "15eb62ad85e88f5d6efc1349f6be30d13ee5d75972474b65caee2b0d58c27b19"
+    },
+    {
+      "source": "/Users/luo/.codex/AGENTS.md",
+      "snapshot": "global.AGENTS.original.md",
+      "bytes": 527,
+      "lines": 7,
+      "sha256": "aeed608fbf7ce5529b29f1a855d1556bc6743a1ffc824cd2e6bfbd126ef3afc2"
+    }
+  ]
+}
