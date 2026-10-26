@@ -1,11 +1,12 @@
 """Versioned, opt-in utility candidates. No permissions or runtime bypasses."""
 import hashlib
 import json
+from dscg.task_view import PROFILE as TASK_VIEW_PROFILE, POLICY as TASK_VIEW_POLICY, GUIDANCE as TASK_VIEW_GUIDANCE, SCHEMA as TASK_VIEW_SCHEMA
 
 from dscg.intent_evidence import (PROFILE as V35_PROFILE, AUTH_POLICY as V35_AUTH_POLICY,
     AUDIT_POLICY as V35_AUDIT_POLICY, MAIN_TASK_POLICY, ISOLATION_POLICY, REVIEW_RULES, DECISION_GUIDE, AUDIT_THINKING, AUDIT_FORMAT, AUDIT_PROTOCOL as V35_OUTPUT_PROTOCOL, ENVELOPE_SCHEMA, permission_schema)
 
-PROFILES = ('legacy', 'protocol-v1', 'tool-semantics-v1', 'source-context-v1', 'task-alignment-v1', V35_PROFILE)
+PROFILES = ('legacy', 'protocol-v1', 'tool-semantics-v1', 'source-context-v1', 'task-alignment-v1', V35_PROFILE, TASK_VIEW_PROFILE)
 CATALOG_SCHEMA = 'dscg.authorization-tool-semantics.v1'
 
 TASK_ALIGNMENT_RULE = (
@@ -109,6 +110,8 @@ def semantic_catalog(profile):
 
 def audit_policy(legacy, profile):
     validate_profile(profile)
+    if profile == TASK_VIEW_PROFILE:
+        return legacy + '\n' + TASK_VIEW_GUIDANCE
     if profile == V35_PROFILE:
         return V35_AUDIT_POLICY
     if profile == 'task-alignment-v1':
@@ -119,6 +122,8 @@ def audit_policy(legacy, profile):
 
 def authorization_policy(legacy, profile, *, bounded=False):
     validate_profile(profile)
+    if profile == TASK_VIEW_PROFILE:
+        return legacy if bounded else legacy + '\n' + TASK_VIEW_GUIDANCE
     if profile == V35_PROFILE:
         return legacy if bounded else V35_AUTH_POLICY
     if profile == 'task-alignment-v1':
@@ -131,6 +136,13 @@ def profile_binding(profile):
     validate_profile(profile)
     if profile == 'legacy':
         return {}
+    if profile == TASK_VIEW_PROFILE:
+        value = {'profile':profile, 'task_view_policy':TASK_VIEW_POLICY,
+                 'task_view_schema':TASK_VIEW_SCHEMA, 'guidance':TASK_VIEW_GUIDANCE,
+                 'original_request_max_characters':2048,
+                 'global_tool_permissions':'tool-permissions-v1', 'progress_state':False}
+        return {'prompt_profile':profile, 'prompt_profile_sha256':hashlib.sha256(
+            json.dumps(value, sort_keys=True, ensure_ascii=False).encode()).hexdigest()}
     value = {'profile': profile, 'protocol': PROTOCOL_RULE,
              'authorization': AUTHORIZATION_RULE if semantic_catalog(profile) else None,
              'catalog_schema': CATALOG_SCHEMA if semantic_catalog(profile) else None,

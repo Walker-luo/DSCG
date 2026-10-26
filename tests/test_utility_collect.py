@@ -8,7 +8,7 @@ import unittest
 from unittest.mock import Mock
 
 from dscg.model_config import ModelConfig
-from experiments.diagnostics.utility_stages import build_stage, compare_stage
+from experiments.diagnostics.utility_stages import build_stage, compare_stage, RESPONSE_SCHEMA
 from experiments.diagnostics import utility_collect as c
 
 
@@ -19,6 +19,15 @@ def reply(text='{"decision":"allow","violations":[],"confidence":1,"reason_code"
 
 
 class UtilityCollectorTests(unittest.TestCase):
+    def test_public_retry_setting_is_typed_and_cannot_hide_private_fields(self):
+        bundle=build_stage('audit')
+        response=dict(schema_version=RESPONSE_SCHEMA,bundle_sha256=bundle['bundle_sha256'],
+            records=[],model_config=dict(provider='dashscope',model_id='qwen3.7-flash',sdk_max_retries=0))
+        self.assertEqual(compare_stage(bundle,response)['status'],'not_measured')
+        for value in (True,False,1,-1,'0',{'private':'KEY'}):
+            invalid=copy.deepcopy(response);invalid['model_config']['sdk_max_retries']=value
+            with self.assertRaises(ValueError):compare_stage(bundle,invalid)
+
     def config(self):
         return ModelConfig('qwen3.7-flash','not-a-real-key','https://example.invalid/v1','dashscope')
 

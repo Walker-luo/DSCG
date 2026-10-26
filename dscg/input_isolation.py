@@ -7,7 +7,7 @@ from copy import deepcopy
 import json
 from dscg.l1_projection import MODES, project_result
 
-FRAMEWORK_VERSION = 'DSCG_v3.5.1'
+FRAMEWORK_VERSION = 'DSCG_v3.5.2'
 ISOLATION_SCHEMA = 'dscg.input-isolation.v1'
 ISOLATION_RULE = (
     'Only tool messages marked dscg_external_result are labeled untrusted data; '

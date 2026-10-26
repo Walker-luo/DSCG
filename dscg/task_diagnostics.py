@@ -4,11 +4,13 @@ from copy import deepcopy
 import gzip
 import hashlib
 import json
+import math
 from pathlib import Path
 from uuid import uuid4
 
 SCHEMA = 'dscg.task-diagnostics.v2'
 LEGACY_SCHEMA = 'dscg.task-diagnostics.v1'
+REQUEST_REFERENCE_SCHEMA = 'dscg.request-reference.v1'
 _current = ContextVar('dscg_task_diagnostics', default=None)
 
 
@@ -105,7 +107,7 @@ class DiagnosticSession:
 
     def emit(self, event, record, **metadata):
         record = deepcopy(record)
-        module = {'authorization':'L2', 'audit_decision':'L3', 'audit_decision_final':'L3',
+        module = {'authorization':'L2', 'authorization_task_view':'L2', 'audit_request':'L3', 'audit_decision':'L3', 'audit_decision_final':'L3',
                   'audit_router':'L3', 'intent_progress':'Intent Progress'}.get(event)
         if module: metadata['module'] = module
         phase = 'audit' if event in ('audit_decision','audit_decision_final') else 'intent_progress' if event == 'intent_progress' else None
@@ -128,7 +130,7 @@ class DiagnosticSession:
         if event == 'authorization':
             keys = ('authorization_steps','allowed_tools','tool_permissions','implicit_read_tools',
                     'policy_state','contract_version','authorization_source','authorization_protocol',
-                    'task_phase','error_code','error_type','error_stage')
+                    'task_phase','error_code','error_type','error_stage','static_task_view','static_task_view_protocol')
             record = {k:v for k,v in record.items() if k in keys}
         self._write(event, record, **metadata)
 
@@ -242,6 +244,29 @@ def begin_model_call(phase):
         session.response_refs.pop(phase, None)
 
 
+def record_model_request(phase, options, call_index):
+    """Record only settings actually supplied to the shared transport."""
+    session = current_session()
+    if session is None:
+        return
+    sampling = {}
+    for key in ('temperature', 'top_p', 'max_tokens', 'max_completion_tokens',
+                'seed', 'presence_penalty', 'frequency_penalty', 'reasoning_effort'):
+        value = options.get(key)
+        if ((type(value) in (int, float) and math.isfinite(value)) or
+                (key == 'reasoning_effort' and value in ('none','minimal','low','medium','high','xhigh'))):
+            sampling[key] = value
+    tools = options.get('tools')
+    record = dict(phase=phase, call_index=call_index, sampling=sampling,
+                  tools_count=len(tools) if isinstance(tools, list) else None,
+                  tools_sha256=hashlib.sha256(_json(tools).encode()).hexdigest()
+                      if isinstance(tools, list) else None)
+    body = options.get('extra_body')
+    if isinstance(body, dict) and type(body.get('enable_thinking')) is bool:
+        record['enable_thinking'] = body['enable_thinking']
+    session.emit('model_request', record)
+
+
 def record_validation(phase, status, *, diagnostics=None):
     session = current_session()
     if session is not None and status != 'passed':
@@ -277,6 +302,7 @@ def merge_task_diagnostics(path, raw):
     audits, actions, observations = [], {}, {}
     authorizations, routers, config = [], {}, None
     response_refs, validations = {}, []
+    model_requests, audit_requests, task_views = [], [], []
     new_schema = False
     start, end = False, False
     try:
@@ -321,6 +347,9 @@ def merge_task_diagnostics(path, raw):
             elif event=='intent_progress':observations[record['revision']]=record['observation']
             elif event=='audit_router':routers[row.get('router_index',len(routers))]=record
             elif event=='validation':validations.append(record)
+            elif event=='model_request':model_requests.append(record)
+            elif event=='audit_request':audit_requests.append(record)
+            elif event=='authorization_task_view':task_views.append(record)
             elif event=='l1_summary':result.update(record)
             elif event=='task_end':result.update(record['summary']);end=True;break
         if not start:raise ValueError('missing diagnostic attempt')
@@ -334,6 +363,9 @@ def merge_task_diagnostics(path, raw):
     result.update(dscg_task_id=ref['attempt_id'], dscg_authorizations=authorizations,
         dscg_audit_decisions=audits, dscg_action_ledger=list(actions.values()),
         dscg_router_events=[routers[k] for k in sorted(routers)], dscg_diagnostics_status='complete' if end else 'incomplete')
+    if model_requests: result['dscg_model_requests'] = model_requests
+    if audit_requests: result['dscg_audit_requests'] = audit_requests
+    if task_views: result['dscg_static_task_views'] = task_views
     if isinstance(result.get('dscg_intent_flow'),dict):
         state=result['dscg_intent_flow']
         state['observations']=[x for rev in sorted(observations) for x in observations[rev]]

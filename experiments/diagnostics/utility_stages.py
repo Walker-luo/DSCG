@@ -281,8 +281,10 @@ def compare_stage(bundle, responses=None):
     if responses.get('schema_version') != RESPONSE_SCHEMA or responses.get('bundle_sha256') != bundle['bundle_sha256']:
         raise ValueError('response bundle identity mismatch')
     model = responses.get('model_config')
-    allowed = {'provider','model_id','base_url','api_key_env','reasoning_effort','chat_request_adapter'}
-    if not isinstance(model,dict) or set(model)-allowed or any(v is not None and not isinstance(v,str) for v in model.values()):
+    allowed = {'provider','model_id','base_url','api_key_env','reasoning_effort','chat_request_adapter','sdk_max_retries'}
+    if (not isinstance(model,dict) or set(model)-allowed or any(
+            not (type(v) is int and v == 0) if k == 'sdk_max_retries'
+            else v is not None and not isinstance(v,str) for k,v in model.items())):
         raise ValueError('model_config must contain public model settings only')
     records = responses.get('records')
     if not isinstance(records,list) or records and not all(model.get(k) for k in ('provider','model_id')):

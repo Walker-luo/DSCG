@@ -52,15 +52,15 @@ class ModelConfig:
     provider: str
     api_key_env: str | None = None
 
-    def client_kwargs(self) -> dict[str, str]:
+    def client_kwargs(self) -> dict[str, str | int]:
         """Return arguments accepted by ``openai.OpenAI``."""
 
-        kwargs = {"api_key": self.api_key}
+        kwargs = {"api_key": self.api_key, "max_retries": 0}
         if self.base_url:
             kwargs["base_url"] = self.base_url
         return kwargs
 
-    def public_dict(self) -> dict[str, str | None]:
+    def public_dict(self) -> dict[str, str | int | None]:
         """Return safe metadata suitable for experiment results and logs."""
 
         adapter = {'dashscope': DASHSCOPE_ADAPTER, 'deepseek': DEEPSEEK_ADAPTER}.get(self.provider)
@@ -70,6 +70,7 @@ class ModelConfig:
             "base_url": self.base_url,
             "api_key_env": self.api_key_env,
             "reasoning_effort": reasoning_effort_for_config(self),
+            "sdk_max_retries": 0,
             **({'chat_request_adapter': adapter} if adapter else {}),
         }
 

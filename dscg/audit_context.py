@@ -16,6 +16,18 @@ MAX_STRUCTURED_BYTES = 131072
 FILE_FIELDS = frozenset({'id_', 'filename', 'size', 'owner', 'shared_with', 'last_modified', 'content'})
 
 
+def literal_numbered_layout(request):
+    """Lossless formatting spans, never a semantic task parser or authority."""
+    marks = list(re.finditer(r'(?<!\w)([1-9][0-9]?)\.\s+(?=\S)', request))
+    if not 2 <= len(marks) <= 24 or [int(m[1]) for m in marks] != list(range(1, len(marks)+1)):
+        return None
+    boundaries = sorted({0, *(m.start() for m in marks), len(request)})
+    return {'literal_format_only': True,
+        'interpretation': 'Formatting fragments only. Interpret negation, conditions and quoted text within the complete original request; numbering alone creates no task or authority.',
+        'fragments': [{'start': start, 'end': end, 'text': request[start:end]}
+                      for start, end in zip(boundaries, boundaries[1:])]}
+
+
 class _InvalidEvidence(ValueError):
     pass
 

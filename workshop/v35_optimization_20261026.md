@@ -2,7 +2,7 @@
 
 > Execute inline with executing-plans and targeted RED→GREEN regressions. Preserve current dirty docs; no staging or commits.
 
-**Goal:** implement [analysis §4](../analysis/v3-5.md#4-对应完善方案与实施状态), then judge with fresh native Qwen trajectories.
+**Goal:** implement [analysis §4](archive/v35_analysis_20261026.md#4-对应完善方案与实施状态), then judge with fresh native Qwen trajectories.
 
 **Architecture:** retain frozen single-call boolean L2 grants, shared effective task and whole-batch mediation. Improve authorization input guidance and bounded audit evidence; route external-sink reads through existing L3. Completion guidance remains a separately measured option.
 

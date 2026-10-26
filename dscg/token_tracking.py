@@ -5,6 +5,7 @@ from contextvars import ContextVar
 from copy import deepcopy
 from time import perf_counter
 from dscg.request_compatibility import attach_api_error
+from dscg.task_diagnostics import record_model_request
 
 class _CompletionsProxy:
     def __init__(self, completions, tracker):
@@ -13,6 +14,7 @@ class _CompletionsProxy:
     def create(self, *args, **kwargs):
         tracker = self._tracker
         record = tracker._phases[tracker._phase.get()]
+        record_model_request(tracker._phase.get(), kwargs, record['api_calls'] + 1)
         record['api_calls'] += 1
         started = perf_counter()
         try:
