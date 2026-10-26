@@ -203,7 +203,7 @@ reversible = false
 
 例子：get_unread_emails会标记邮件已读，所以内置effect=write；send_email和真实发送参会人通知的日历修改是external_send。单effect字段不能枚举动态handler的所有行为；同名工具采用跨场景保守主风险分类，配合sink/敏感度保留审计要求，不表示付款以外的行为已被约束。
 
-公开免审来自有效read+public+sink=none的既有规则；idempotent不是这个旧规则的独立硬条件。L2允许且当前输入/参数有效的public/internal幂等无sink读取及全读批次，在selective时按规则免审；personal/secret仍审计。风险级别也不是最终allow/deny：Monitor保留已授权sink-free读取的deny例外，详见 [框架边界](../README.md#读取例外开销与当前边界)。
+当前免审要求已授权、参数有效的read、public/internal、sink=none；idempotent不单独决定免审。personal/secret及外部接收方读取仍审计，有效deny/abstain均阻断，Monitor不覆盖审计拒绝。详见 [当前流程](../README.md#当前框架与工作流程)。
 
 ### 4.3 生成、检查与新增工具
 
@@ -240,7 +240,7 @@ print("classified tools:", len(catalog))
 | planning_tool_view | true | factory/API、网页、partial --no-tool-view；关掉展示完整目录，执行授权仍检查 |
 | delegated_tasks | true | factory/API、网页、partial --no-delegated-tasks；有界明确执行文件/唯一邮件/指定网页任务，不把普通返回变成任务 |
 | use_security_checker | true | factory/API、网页、partial --no-checker；整个L3语义审计开关 |
-| audit_router_mode | API/factory off；DSCG CLI shadow | full/partial CLI未显式指定时，baseline/NoChecker为off，其余为shadow；显式不兼容组合报错。三种模式均保留固定非敏感读取免审，其余动作继续L3 |
+| audit_router_mode | API/factory off；DSCG CLI shadow | full/partial CLI未显式指定时，baseline/NoChecker为off，其余为shadow；显式不兼容组合报错。三种模式均保留固定无sink非敏感读取免审，其余动作继续L3 |
 | audit_router_threshold | 0.70 | CLI --audit-router-threshold、Python/Dashboard API；有限数值[0,1]，保留作诊断，不控制固定读取免审 |
 | audit_router_artifact | 已停用 | 非空值直接报迁移错误，改用threshold；不读取旧artifact |
 | audit_retries | 0 | factory/API、partial --audit-retries 0/1；仅语义abstain有界重审，普通比较保持0，不是SDK传输重试设置 |
@@ -253,7 +253,7 @@ print("classified tools:", len(catalog))
 
 ### L3读取路由
 
-当前默认DSCG_v3.4.1采用non-sensitive-read-v3：已注册、L2授权、schema有效的public/internal读取固定免审，包含工具返回中发现的网页链接；不按sink、URL语法／来源、幂等标签或词法阈值选择。personal/secret与效果动作继续审计，混合批次只审计非免审部分，整批前置校验及回执／票据不变。读取免审不证明对象隐私或URL参数无泄露风险。
+当前默认DSCG_v3.5.1采用sink-free-read-v4：已注册、L2授权、schema有效的public/internal读取仅在sink=none时固定免审；get_webpage等外部接收方读取恢复现有L3审计，合法的发现链接仍可放行。不按URL语法／来源、幂等标签或词法阈值选取免审。personal/secret与效果动作继续审计，混合批次只审计非免审部分，整批前置校验及回执／票据不变。工具级分流不保证对象隐私或URL参数安全。
 
 CLI默认shadow、API默认off，固定免审在三种模式中一致。阈值仍校验为有限[0,1]且绑定配置，旧artifact拒绝；更新策略后使用新name。[验证报告](../workshop/completed/v34_utility_optimization_20261025.md)。
 

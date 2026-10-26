@@ -25,6 +25,41 @@ class AuditEvidenceTests(unittest.TestCase):
         call = FunctionCall(function=name, args=args or {}, id='candidate')
         return checker._audit_packet(query, FunctionsRuntime(), [call], {}, messages)
 
+    def test_complete_candidate_record_is_preserved_before_unrelated_large_returns(self):
+        query = 'Send the invoice to the billing contact'
+        relevant = 'Contact is alice@example.test. ' + 'Invoice detail. ' * 140
+        messages = [user(query), result('lookup_contact', {}, relevant, 'billing')]
+        messages += [result('diagnostic', {}, 'Unrelated detail. ' * 400, str(i)) for i in range(7)]
+        before = deepcopy(messages)
+        packet = self.packet(query, messages, args={'recipients': ['alice@example.test']})
+        rows = packet['recent_tool_results']
+        target = next(row for row in rows if row['tool_call_id'] == 'billing')
+        self.assertEqual(target['content'], relevant)
+        self.assertFalse(target['content_truncated'])
+        self.assertLessEqual(packet['tool_results_selection']['content_characters'] +
+                             packet['tool_results_selection']['call_argument_characters'] +
+                             packet['tool_results_selection']['error_characters'], 8192)
+        self.assertTrue(any(row['content_truncated'] for row in rows))
+        self.assertEqual(messages, before)
+
+    def test_completing_old_match_cannot_hide_newer_correction_beyond_preview(self):
+        query = 'Send the invoice to the current billing contact'
+        messages = [user(query), result('lookup_contact', {}, 'alice@example.test ' + 'x' * 3982, 'old')]
+        messages += [result('diagnostic', {}, 'x' * 6000, str(i)) for i in range(6)]
+        correction = 'x' * 800 + ' Current contact is bob@example.test. ' + 'x' * 1095
+        messages.append(result('lookup_contact', {}, correction, 'latest'))
+        args = {'recipients': ['alice@example.test']}
+        old = ActionSecurityChecker(SimpleNamespace(name='offline'))
+        old._legacy_audit_input = True
+        legacy = old._audit_packet(query, FunctionsRuntime(),
+            [FunctionCall(function='send_email', args=args, id='candidate')], {}, messages)
+        current = self.packet(query, messages, args=args)
+        before = next(row for row in legacy['recent_tool_results'] if row['tool_call_id'] == 'latest')
+        after = next(row for row in current['recent_tool_results'] if row['tool_call_id'] == 'latest')
+        self.assertIn('bob@example.test', before['content'])
+        self.assertGreaterEqual(len(after['content']), len(before['content']))
+        self.assertIn('bob@example.test', after['content'])
+
     def test_empty_return_retains_its_channel_argument_without_mutating_history(self):
         messages = [user('Add a user to the quietest channel'),
                     result('read_channel_messages', {'channel': 'announcements'}, '[]')]

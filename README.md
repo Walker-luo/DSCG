@@ -19,13 +19,13 @@ DashScope/Qwen与DeepSeek的Chat请求由公共客户端分别适配：将上游
 
 显式候选 **DSCG_v3.5** 共用full/partial/cohort实现，使用 `--prompt-profile intent-evidence-v35` 和新名称。后续真实迭代最佳5/6、独立确认4/6，未通过推广门槛，**该历史阶段默认仍为v3.4**。本轮922次请求、已知1,693,429 Tokens，3次连接故障usage未知，用户已停止真实调用；当前候选L3关闭思考、JSON Object配严格宿主校验，未验证的结构化视图只存快照。[后续报告](./workshop/completed/v35_followup_20261023.md)列出逐轮结果及剩余失败；[原220次阶段](./workshop/completed/v35_live_iterations_20261023.md)独立保留。未做离线回归或完整评测。
 
-当前内部身份为 **`DSCG_v3.4.1`**，默认 `prompt_profile=legacy`。L2一次返回完整动作目录的逐工具布尔授权，宿主严格校验并合并自动读取权限；参数未知不提前删去任务所需能力。L3仍使用有限四字段判决，按当前读取／效果阶段审查实际参数及成功工具证据。历史结果不改写，新策略必须使用新运行名。
+当前内部身份为 **`DSCG_v3.5.1`**，默认 `prompt_profile=legacy`。L2一次返回完整动作目录的逐工具布尔授权，按完整任务的条件、后续步骤及交付对象检查覆盖，并提供原生效果类型；宿主严格校验并冻结授权。L3仍使用有限四字段判决，按当前阶段审查实际参数及成功工具证据；有界证据优先补全相关记录，同时保留近期更正原有的展示额度。历史结果不改写，新策略必须使用新运行名。
 
-`non-sensitive-read-v3` 对已注册、已授权、原生参数有效的 `effect=read` 且敏感性为public/internal的调用固定免审，off/shadow/selective一致，不按sink、URL来源或阈值筛选。混合批次仅审计其余调用，但整批权限／schema、一次性回执、顺序与执行票据继续约束全部动作。personal/secret读取仍审计，合法deny与abstain均执行阻断。
+`sink-free-read-v4` 对已注册、已授权、原生参数有效、`effect=read`、敏感性为public/internal且 **sink=none** 的调用固定免审，off/shadow/selective一致。`get_webpage` 等外部接收方读取交给现有L3判断任务相关性，不按URL来源或阈值放行。混合批次仅审计其余调用，但整批权限／schema、一次性回执、顺序与执行票据继续约束全部动作。personal/secret读取仍审计，合法deny与abstain均执行阻断。
 
 这是工具级规则：internal工具仍可能读到私密频道，公共网页读取仍可能通过URL／查询携带敏感信息，不提供对象隐私、DNS／重定向认证或参数外传防护。AgentDyn具有副作用的browse_webpage按实际effect分类，不凭名称免审。风险目录与银行敏感性标签不变。
 
-CLI默认shadow、API默认off；两者均保留上述固定免审，其他动作继续L3。词法分数／阈值只作诊断并绑定配置。在线对照与限制见[本轮报告](./workshop/completed/v34_utility_optimization_20261025.md)；原v3.4和显式候选的历史记录保持原义。
+CLI默认shadow、API默认off；两者均保留上述固定免审，其他动作继续L3。词法分数／阈值只作诊断并绑定配置。最新专项见[v3.5.1报告](./workshop/completed/v35_optimization_20261026.md)；此前在线对照见[v3.4.1报告](./workshop/completed/v34_utility_optimization_20261025.md)；下文旧阈值与Monitor例外说明属于历史设计，当前规则以上述流程为准。
 
 默认短审计提示只判断当前一步与任务的关系，允许相关成功工具事实和派生参数；输出必须符合有限代码及decision组合规则，不修补响应。来源含注入不自动否决合法动作。Monitor、一次性回执和执行票据继续绑定整批动作。
 

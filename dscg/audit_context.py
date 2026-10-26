@@ -6,7 +6,7 @@ import unicodedata
 import yaml
 
 INPUT_SCHEMA = 'dscg.audit-input.v2'
-EVIDENCE_VERSION = 'task-evidence-v1'
+EVIDENCE_VERSION = 'task-evidence-v2'
 MAX_RESULTS = 8
 RECENT_RESULTS = 4
 FACT_BUDGET = 8192
@@ -108,7 +108,20 @@ def _anchors(value, key='', depth=0):
     return set()
 
 
-def select_tool_evidence(messages, query, calls, normalize_text, normalize_value, argument_flags):
+def _share_budget(lengths, budget):
+    sizes = [0] * len(lengths)
+    active = list(range(len(lengths)))
+    while active and budget:
+        share = max(1, budget // len(active))
+        for i in active:
+            amount = min(lengths[i] - sizes[i], share, budget)
+            sizes[i] += amount
+            budget -= amount
+        active = [i for i in active if sizes[i] < lengths[i]]
+    return sizes
+
+
+def select_tool_evidence(messages, query, calls, normalize_text, normalize_value, argument_flags, *, preserve_complete=True):
     current = []
     found_user = False
     for message in messages or []:
@@ -165,15 +178,20 @@ def select_tool_evidence(messages, query, calls, normalize_text, normalize_value
     )[:MAX_RESULTS - min(RECENT_RESULTS, len(prepared))]
     selected.sort(key=lambda r: r[1])
     remaining = max(0, FACT_BUDGET - sum(row[3] + row[4] for row in selected))
-    sizes = [0] * len(selected)
-    active = list(range(len(selected)))
-    while active and remaining:
-        share = max(1, remaining // len(active))
-        for i in active:
-            amount = min(len(selected[i][2]['content']) - sizes[i], share, remaining)
-            sizes[i] += amount
-            remaining -= amount
-        active = [i for i in active if sizes[i] < len(selected[i][2]['content'])]
+    lengths = [len(row[2]['content']) for row in selected]
+    sizes = _share_budget(lengths, remaining)
+    if preserve_complete:
+        # Candidate matches must not shrink the former coverage of recent corrections.
+        recent_start = len(selected) - min(RECENT_RESULTS, len(prepared))
+        sizes = [size if i >= recent_start else min(512, size) for i, size in enumerate(sizes)]
+        remaining -= sum(sizes)
+        for i in sorted(range(len(selected)), key=lambda i: (selected[i][0], selected[i][1]), reverse=True):
+            needed = lengths[i] - sizes[i]
+            if needed <= remaining:
+                sizes[i] += needed
+                remaining -= needed
+        extra = _share_budget([length - size for length, size in zip(lengths, sizes)], remaining)
+        sizes = [size + addition for size, addition in zip(sizes, extra)]
     results = []
     for row, limit in zip(selected, sizes):
         item = row[2]
@@ -182,7 +200,7 @@ def select_tool_evidence(messages, query, calls, normalize_text, normalize_value
         results.append(item)
     omitted = len(current) - len(results)
     return results, bool(omitted), {
-        'version': EVIDENCE_VERSION, 'available_results': len(current),
+        'version': EVIDENCE_VERSION if preserve_complete else 'task-evidence-v1', 'available_results': len(current),
         'selected_results': len(results), 'omitted_results': omitted,
         'content_characters': sum(len(r['content']) for r in results),
         'call_argument_characters': sum(row[3] for row in selected),

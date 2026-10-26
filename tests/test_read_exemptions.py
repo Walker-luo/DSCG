@@ -11,12 +11,12 @@ from dscg.tool_metadata import set_tool_metadata
 
 
 class ReadExemptionTests(unittest.TestCase):
-    def chain(self, mode='off', sensitivity='public', decision='deny', authorized=True):
+    def chain(self, mode='off', sensitivity='public', decision='deny', authorized=True, external=False):
         runtime = FunctionsRuntime()
         effects, packets = [], []
         @runtime.register_function
         def fetch(url: str) -> str:
-            """Read a webpage.
+            """Read reference data.
 
             :param url: Source URL.
             """
@@ -28,7 +28,7 @@ class ReadExemptionTests(unittest.TestCase):
             effects.append('send')
             return 'sent'
         set_tool_metadata(runtime, {
-            'fetch': dict(effect='read', source='web', sink='none' if sensitivity in {'personal','secret'} else 'external_recipient',
+            'fetch': dict(effect='read', source='local', sink='external_recipient' if external else 'none',
                           sensitivity=sensitivity, idempotent=True, reversible=True),
             'send': dict(effect='external_send', source='local', sink='external_recipient',
                          sensitivity='internal', idempotent=False, reversible=False)})
@@ -64,7 +64,7 @@ class ReadExemptionTests(unittest.TestCase):
             state = component.query(*state)
         return effects, packets, state
 
-    def test_public_web_read_bypasses_in_every_mode_without_literal_url(self):
+    def test_sink_free_read_bypasses_in_every_mode_without_literal_locator(self):
         for mode in ['off','shadow','selective']:
             effects, packets, _ = self.run_case(mode)
             self.assertEqual(effects, ['read'], mode)

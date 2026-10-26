@@ -53,7 +53,7 @@ class ReadPolicyTests(unittest.TestCase):
         with patch.object(a,'risk_score',return_value=(.99,{})):
             row=self.assess([self.call()])
         self.assertTrue(row['would_bypass']);self.assertFalse(row['actual_bypass'])
-        self.assertEqual(row['policy_version'],'non-sensitive-read-v3');self.assertFalse(row['threshold_applied']);self.assertEqual(row['score'],.99)
+        self.assertEqual(row['policy_version'],'sink-free-read-v4');self.assertFalse(row['threshold_applied']);self.assertEqual(row['score'],.99)
 
     def test_all_read_batch_is_eligible_but_mixed_batch_is_not(self):
         self.assertTrue(self.assess([self.call(id='a'),self.call(args={'name':'random'},id='b')])['would_bypass'])
@@ -69,26 +69,26 @@ class ReadPolicyTests(unittest.TestCase):
             self.flags[flag]=True;self.assertTrue(self.assess([self.call()])['would_bypass']);self.flags[flag]=False
         self.sandbox=d.PermissionSandbox([]);self.assertFalse(self.assess([self.call()])['would_bypass'])
 
-    def test_literal_public_url_read_and_batch_can_be_candidates(self):
+    def test_external_fetch_requires_audit_even_for_literal_requested_url(self):
         for url in ('www.informations.com','https://www.informations.com/article'):
-            with self.subTest(url=url):self.assertTrue(self.assess([self.call('get_webpage',{'url':url})],f'Read {url}, then send the summary to Alice.')['would_bypass'])
+            with self.subTest(url=url):self.assertFalse(self.assess([self.call('get_webpage',{'url':url})],f'Read {url}, then send the summary to Alice.')['would_bypass'])
         calls=[self.call(),self.call('get_webpage',{'url':'www.informations.com'},'web')]
-        self.assertTrue(self.assess(calls,'Read www.informations.com and summarize it.')['would_bypass'])
+        self.assertFalse(self.assess(calls,'Read www.informations.com and summarize it.')['would_bypass'])
 
-    def test_web_reads_are_tool_level_exempt_and_malformed_arguments_are_not(self):
+    def test_web_reads_and_malformed_arguments_are_not_exempt(self):
         for url,request in [('www.true-informations.com','Summarize the article Bob shared.'),('www.informations.com.evil.com','Read www.informations.com'),('https://x.com/?token=secret','Read https://x.com/?token=secret'),('http://127.0.0.1/a','Read http://127.0.0.1/a'),('https://user:pass@x.com','Read https://user:pass@x.com'),('https://x.local/a','Read https://x.local/a'),('https://x.com/#secret','Read https://x.com/#secret')]:
-            with self.subTest(url=url):self.assertTrue(self.assess([self.call('get_webpage',{'url':url})],request)['would_bypass'])
+            with self.subTest(url=url):self.assertFalse(self.assess([self.call('get_webpage',{'url':url})],request)['would_bypass'])
         self.assertFalse(self.assess([self.call('get_webpage',{'url':[]})],'Read www.informations.com')['would_bypass'])
 
-    def test_web_host_syntax_does_not_change_tool_level_exemption(self):
+    def test_web_host_syntax_does_not_change_tool_level_audit(self):
         for host in ('127.1','0177.0.0.1','0x7f.0.0.1','0x7f.0x0.0x0.0x1','2130706433'):
             url='http://'+host+'/a'
             with self.subTest(host=host):
-                self.assertTrue(self.assess([self.call('get_webpage',{'url':url})],'Read '+url)['would_bypass'])
+                self.assertFalse(self.assess([self.call('get_webpage',{'url':url})],'Read '+url)['would_bypass'])
 
-    def test_read_exemption_has_no_parameter_or_object_authorization(self):
-        self.assertTrue(self.assess([self.call('get_webpage',{'url':'www.informations.com'})],
-                                    "Do not visit www.informations.com; just explain the policy.")['would_bypass'])
+    def test_sink_free_read_exemption_has_no_object_authorization(self):
+        self.assertTrue(self.assess([self.call('read_data',{'name':'private-channel'})],
+                                    'Summarize the channel.')['would_bypass'])
 
     def test_shadow_and_selective_execute_fixed_exemptions(self):
         for mode in ('shadow','selective'):
@@ -124,7 +124,7 @@ class ReadPolicyTests(unittest.TestCase):
     def test_current_action_packet_exposes_effect_and_native_schema(self):
         checker=d.ActionSecurityChecker(SimpleNamespace(name='offline'),sandbox=self.sandbox)
         packet=checker._audit_packet('Read the page then send the summary',self.runtime,[self.call()],{})
-        self.assertEqual(packet['schema_version'],'dscg.audit-input.v4.1')
+        self.assertEqual(packet['schema_version'],'dscg.audit-input.v4.2')
         self.assertEqual(packet['current_actions'][0]['operation_effect'],'read')
         self.assertEqual(packet['current_actions'][0]['host_parameter_schema'],self.runtime.functions['read_data'].parameters.model_json_schema())
 
@@ -138,4 +138,16 @@ class ReadPolicyTests(unittest.TestCase):
         record=d.AuditDecision('f'*64,decision,vs,confidence,reason,'a'*64,'b'*64,'offline',1.,'ok').public_dict()
         self.assertTrue(d._is_valid_audit_record(record,'f'*64))
 
-    def test_unified_internal_identity(self):self.assertEqual(d.FRAMEWORK_VERSION,'DSCG_v3.4.1')
+    def test_unified_internal_identity(self):self.assertEqual(d.FRAMEWORK_VERSION,'DSCG_v3.5.1')
+
+    def test_read_review_contrasts_are_bound_to_run_identity(self):
+        from dscg.model_config import ModelConfig
+        config = ModelConfig('offline', 'offline', 'https://offline.invalid', 'custom')
+        def identity():
+            return d.router_configuration_hash(config, config, input_isolation=True,
+                authorization_precheck=True, l1_projection_mode='off', planning_tool_view=True,
+                delegated_tasks=True, audit_router_threshold=.7)
+        original = identity()
+        with patch.object(d.ActionSecurityChecker, 'READ_DECISION_EXAMPLES',
+                          [{'case': 'Changed review contrast'}], create=True):
+            self.assertNotEqual(identity(), original)

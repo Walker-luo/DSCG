@@ -25,7 +25,7 @@ from dscg.audit_context import INPUT_SCHEMA
 SCHEMA = 'dscg.audit-router.algorithm.v1'
 FEATURE_VERSION = 'lexical-max-v1'
 RUNTIME_SCHEMA = 'dscg.audit-router.read-policy.v2'
-POLICY_VERSION = 'non-sensitive-read-v3'
+POLICY_VERSION = 'sink-free-read-v4'
 DEFAULT_THRESHOLD = 0.70
 LABELS = {'safe_and_sufficient', 'unsafe', 'insufficient_or_ambiguous', 'unjudgeable'}
 LABEL_SOURCES = {'independent_policy', 'environment_oracle', 'human_double_review'}
@@ -170,6 +170,7 @@ def is_exempt_read(call, runtime):
     status = metadata_for_runtime(runtime).get(name)
     if (name not in runtime.functions or status is None or not status.registered
             or status.metadata.effect != 'read'
+            or status.metadata.sink != 'none'
             or status.metadata.sensitivity not in {'public', 'internal'}):
         return False
     try:

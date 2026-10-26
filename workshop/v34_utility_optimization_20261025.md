@@ -6,7 +6,7 @@
 
 **Architecture:** Reuse the existing exhaustive Boolean permission protocol for a single L2 call, avoiding omitted tools hidden by step generation. A shared host predicate exempts registered, schema-valid public/internal reads in every router mode; mixed-batch audit reviews only other calls while whole-batch authorization, receipt binding and execution order remain intact. Private reads and effects receive a staged four-field audit; private deny is enforced.
 
-**Spec:** [analysis/v3-4.md](../analysis/v3-4.md#4-优化方案与验证顺序已实施). Candidate identity DSCG_v3.4.1; historical outputs remain untouched.
+**Spec:** [归档v3.4分析](archive/v34_analysis_20261025.md#4-优化方案与验证顺序已实施). Candidate identity DSCG_v3.4.1; historical outputs remain untouched.
 
 **Constraints:** Current checkout, preserve dirty documents and plan.md deletion; no model/provider change, no retries, grants frozen, no task-ID rules, parameter repair, obligation ledger or new recovery. Original HEAD source archived under fresh artifacts for online control. Model replies only in existing diagnostics.
 

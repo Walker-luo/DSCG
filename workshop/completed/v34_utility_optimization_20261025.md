@@ -1,6 +1,6 @@
 # v3.4.1 效用优化与 Qwen 在线对照
 
-2026-10-25（Asia/Shanghai）；分支 `workshop`，基于 HEAD `340a8b35409ebb52ef67af781113802fccea3e0d` 的未提交工作树。按用户批准的 [analysis 第4节](../../analysis/v3-4.md#4-优化方案与验证顺序已实施)实现；保留原有 `analysis/plan.md`、`plan.md` 删除及历史结果，没有暂存／提交。
+2026-10-25（Asia/Shanghai）；分支 `workshop`，基于 HEAD `340a8b35409ebb52ef67af781113802fccea3e0d` 的未提交工作树。按用户批准的 [analysis 第4节](../archive/v34_analysis_20261025.md#4-优化方案与验证顺序已实施)实现；保留原有 `analysis/plan.md`、`plan.md` 删除及历史结果，没有暂存／提交。
 
 **结果：相同18个典型案例，原版v3.4完成5例，组合v3.4.1完成15例，恢复10例、无新增失败。** 完成提示也是15例且成本更高，保持默认关闭。结论限于本轮挑选的失败案例，不能替代完整benchmark或E0审计。
 

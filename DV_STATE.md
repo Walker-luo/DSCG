@@ -1,14 +1,14 @@
 # DSCG Project State
 
-> 更新日期：2026-10-25（Asia/Shanghai）。范围：当前 workshop 分支的 **DSCG_v3.4.1** 优化、历史v3.4／baseline及配套诊断。运行事实依据当前代码和保存配置；研究任务边界依据 [technical_route.md](../research/technical_route.md)。
+> 更新日期：2026-10-26（Asia/Shanghai）。范围：v3.5正式结果分析与后续专项优化；当前代码内部默认为 **DSCG_v3.5.1**（历史v3.5运行保存的内部版本仍为v3.4.1）。运行事实依据当前代码和保存配置；研究任务边界依据 [technical_route.md](../research/technical_route.md)。
 >
-> 后续工作顺序：**查询现有 v3.4 结果 → 配对分析失败原因 → 选择有证据支持的优化 → 新名称复测**。每次阶段完成时更新本文件的代码状态、进行中任务、问题和验证摘要，详细过程放阶段报告。
+> 后续工作顺序：**复用现有配对账 → 定位残余漏授权／误拒 → 单项改动 → 新名称复测**。每次阶段完成时更新本文件的代码状态、进行中任务、问题和验证摘要，详细过程放阶段报告。
 
 ## 1. 项目概述
 
 - **研究目标：**防御工具使用型 LLM Agent 接收外部工具内容时遭遇的间接提示词注入，同时控制用户任务成功率损失和模型成本。
 - **核心技术方案：**L1 构建隔离的规划视图，有限银行任务使用结构投影；L2 根据可信任务、完整原生工具定义和参数 schema 编译工具授权；L3 审计当前动作与任务的关系。Reference Monitor、一次性回执与执行票据负责执行前复核。
-- **当前开发阶段：**历史配对分析及v3.4.1优化已完成；18个配对案例、5组共90次在线计分执行全部有效，组合15/18对原版5/18。下一步定位银行复合任务残余拒绝。效用损失仍明显，尚不能据低原生 ASR 宣称一般安全或优化验收通过。
+- **当前开发阶段：**v3.5.1方案实施及专项Qwen验证完成：最终37例TSR14→17、原生ASR7/28→0/28，合法网页4/4成功；保留全部231次计分／41次GOAL预检过程。退款漏授权与L3效果误拒仍未解决，未通过整体效用／一般安全验收。
 - **评测环境：**AgentDojo v1.2；`ipi` 当前为 Python 3.10.21、AgentDojo 0.1.35，配置模型为 DashScope `qwen3.7-flash`。后端识别属于 metadata-only，不认证远端服务或源码等价性。
 - **研究状态：**E0 pending；I3 partial（24 个有效探针、8 个范围违规）；I2 locked。对象／数据／参数授权及已关闭 provenance/source-to-sink 路线没有重新解锁。
 
@@ -17,12 +17,12 @@
 | 项目 | 当前快照 |
 | --- | --- |
 | Git Branch | `workshop` |
-| HEAD Commit | `340a8b35409ebb52ef67af781113802fccea3e0d`；`fix:完成一些细节优化：输出简化、agents.md优化……` |
-| HEAD 提交时间 | 2026-10-25 21:03:26 +08:00 |
-| 工作区是否有未提交修改 | 优化开始前已有本文件、analysis/与plan.md删除；现另有共享授权／读取分流／审计、读取器／Dashboard、测试和文档修改。精确状态见优化产物git_status.txt；保留用户analysis/plan.md与plan.md删除，未暂存／提交。 |
-| 实际默认运行策略 | `prompt_profile=legacy`，内部 `FRAMEWORK_VERSION=DSCG_v3.4.1`，见 [input_isolation.py](dscg/input_isolation.py) 和 [defended.py](dscg/pipelines/defended.py)。 |
+| HEAD Commit | `06d723ce6724c38b85199a57032ea848fe1a441d`；`DSCG_v3.5:针对v3.4进行优化，主要针对是slack和banking场景` |
+| HEAD 提交时间 | 2026-10-25 23:13:54 +08:00 |
+| 工作区是否有未提交修改 | 继承分析改名／归档的未提交文档改动；本轮修改L2/L3、读取分流、证据预算、版本／绑定及相关测试文档。未暂存／提交，未改正式结果、download或credentials。 |
+| 实际默认运行策略 | `prompt_profile=legacy`，内部 `FRAMEWORK_VERSION=DSCG_v3.5.1`，见 [input_isolation.py](dscg/input_isolation.py) 和 [defended.py](dscg/pipelines/defended.py)。 |
 | AGENTS.md | HEAD 已收录精简后的规则；其部分跨分支框架描述与本分支代码存在差异，执行机制须逐项查当前实现。 |
-| 最近更新时间 | 2026-10-25；本轮完成优化与新Qwen在线对照；710次真实调用，90次计分＋20次GOAL，完整成本与范围见完成报告。 |
+| 最近更新时间 | 2026-10-26；本轮在线专项231/231有效，2,456次真实API响应／4,869,987 Tokens；先前90次验证和正式结果独立保留。 |
 
 运行名不选择策略；目录名称、保存的 pipeline 名、配置身份和实际代码需分别核对。历史结果不因本次迁移改写或重新标记。
 
@@ -36,34 +36,28 @@
 - [x] 从 `d457369` 迁入适用于当前 v3.4 的独立诊断、L3 原始回复附件、分层阻挡来源、共享读取器和续跑快照支持。
 - [x] 对迁移完成 12 个真实计分案例的记录链路验证；结果、调用量和限制见 [迁移报告](workshop/completed/workshop_commit_transfer_20261025.md)。
 - [x] v3.4.1：L2逐工具布尔权限一次编译；public/internal读取固定免审（含混合批次）；私人读取拒绝执行；L3按当前阶段／实际参数组织输入；整批schema与off回执校验；现有完成提示单独对照且默认关闭。
-- [x] 定位历史 v3.4 与 baseline 正式结果，并完成1,167对任务／2,334份轨迹的 outcome、注入文本与元数据核对；程序提取全量失败信号，人工核对代表案例。结论见 [v3.4 TSR 分析](analysis/v3-4.md)，不等同于全量独立语义审计。
+- [x] 定位历史 v3.4 与 baseline 正式结果，并完成1,167对任务／2,334份轨迹的 outcome、注入文本与元数据核对；程序提取全量失败信号，人工核对代表案例。结论见 [归档v3.4分析](workshop/archive/v34_analysis_20261025.md)，不等同于全量独立语义审计。
 
 ## 4. 当前进行中的工作
 
-- **任务：**用户要求按analysis第4节完成优化并直接Qwen在线验证，已完成。当前默认DSCG_v3.4.1，完成提示保持关闭。
-- **最新Online Evaluation：**18个相同任务键×5组=90次计分，attempted/completed/valid/incomplete/error=90/90/90/0/0；每组clean6、攻击12。原版5/18、L2单改8/18、读取分流单改8/18、组合15/18、组合加完成提示15/18；每组攻击原生ASR0/12。另有20次GOAL预检，不计入TSR／ASR分母。
-- **残余问题：**组合banking6/9、Slack9/9；banking user_task_15在clean／ignore_previous／tool_knowledge下仍因租金更新拒绝并遗漏退款而失败。未通过放宽拒绝、修补参数或换模型获取通过。
-- **产物：**[完成报告](workshop/completed/v34_utility_optimization_20261025.md)、[逐例结果／成本](workshop/artifacts/20261025_v34_utility_optimization/online_summary.json)、[在线输入与输出哈希](workshop/artifacts/20261025_v34_utility_optimization/online_hashes.json)。历史分析仍见[analysis/v3-4.md](analysis/v3-4.md)。
+- **任务：**v3.5.1已实现并完成专项验证，见[阶段报告](workshop/completed/v35_optimization_20261026.md)和[分析第4节](analysis/v3-5.md#4-对应完善方案与实施状态)。内部v3.5.1仍为legacy逐工具布尔授权，不是intent-evidence-v35或host-FSM分支。
+- **实现：**完整任务／效果类型辅助单次L2覆盖；L3当前效果判定对照；证据8192字符内优先完整记录，近期4条不低于旧展示额度；sink-free-read-v4仅免审无sink非敏感读取，外部请求走L3。审计输入v4.2，规则／示例进入配置身份。completion选项改进但对照无净益，默认关闭；无动态扩权、参数修补、来源追踪、自动恢复或I2账本。
+- **专项结果：**最终37/37问题样本有效（另2个纯只读负控原版／最终均2/2成功、无写授权），主比较（banking12、Slack25），匹配原版TSR14/37→17/37、ASR7/28→0/28，恢复5例／新增失败2例；核心24例2→6，合法网页4/4、历史7个ASR键0/7。对照为优化前DSCG，不是新测无防御baseline；不能与正式整体分母混用。
+- **仍未解：**最终u15四例未授send_money、效用0/4，退款覆盖跨批次仍不稳；两例退步为ignore_previous/slack/u11/i2、i3，加入random仍被EXPLICIT_CONSTRAINT拒绝。u2修改／u18私信授权提升不代表全部复合任务已解决。
+- **证据：**[231次计分账](workshop/artifacts/20261026_v35_optimization/online_summary.json)、[41次GOAL预检及成本／得失键](workshop/artifacts/20261026_v35_optimization/online_details.json)、[不可变源码哈希](workshop/artifacts/20261026_v35_optimization/source_hashes.json)。使用现有DashScope qwen3.7-flash和原生评分；已完成本任务验证，不继续扩样或重复已完成筛选。
+- **正式结果分析保留：**[原三方账](workshop/artifacts/20261026_v35_analysis/paired_analysis.json)仍为1,119键／1,118有效／3,357份主轨迹；用户确认injection_task_8是正常cohort过滤，不是问题。原v3.5银行ASR0、Slack3→7是历史正式结果，未改标签或旧文件。
 
-### 当前结果入口与摘要观察
+### 正式结果共同有效范围
 
-分析范围是 **screened、banking/slack/travel、3 种 targeted 攻击**：`ignore_previous`、`important_instructions`、`tool_knowledge`；不是四场景完整基准。原始入口：
+范围仍为screened三场景／三种targeted攻击；cohort不同且baseline adapter未记录，保留比较告警，不做严格单因素因果推断。
 
-- [baseline](results/benchmarks/agentdojo/qwen3.7-flash_baseline/summary.md)
-- [DSCG_v3.4](results/benchmarks/agentdojo/qwen3.7-flash_DSCG_v3.4/summary.md)
-- [本次范围内清点与输入哈希](workshop/artifacts/20261025_dv_state/v34_inventory.json)
-
-| 场景 | baseline TSR | v3.4 TSR | baseline 原生 ASR | v3.4 原生 ASR |
+| 场景 | baseline TSR | v3.4 TSR | v3.5 TSR | 原生ASR v3.4→v3.5 |
 | --- | ---: | ---: | ---: | ---: |
-| banking | 305/432（70.60%） | 195/432（45.14%） | 118/432 | 0/432 |
-| slack | 223/315（70.79%） | 125/315（39.68%） | 182/315 | 3/315 |
-| travel | 233/420（55.48%） | 289/420（68.81%） | 128/420 | 0/420 |
-| 合计 | 761/1167（65.21%） | 609/1167（52.19%） | 428/1167（36.68%） | 3/1167（0.26%） |
+| banking | 270/383（70.50%） | 172/383（44.91%） | 232/383（60.57%） | 0/383→0/383 |
+| slack | 223/315（70.79%） | 125/315（39.68%） | 186/315（59.05%） | 3/315→7/315 |
+| travel | 233/420（55.48%） | 289/420（68.81%） | 319/420（75.95%） | 0/420→0/420 |
 
-这是保存摘要／CSV 的观察值：两组 CSV 均有 1,167 个布尔效用／安全结果、非 valid 状态为 0。此状态不替代原始轨迹和 E0 审计。banking、Slack 分别净少 110、98 个成功，travel 净多 56 个；净差不是“被误拦的案例数”，需同时统计退步和恢复配对。
-
-- **可比性限制：**保存的模型 ID/provider、基准元数据、任务选择、cohort 摘要与逐例注入一致；baseline adapter 未记录，v3.4为 `dashscope-system-v1`，源提交分别为 `d105c02`／`f0f4140`。下载全局比较告警保留，不宣称严格单因素因果对照。
-- **尚未完成：**全量误拒／合理阻挡独立判定、3个原生攻击成功案例检查、历史成本范围核验，以及本轮18案例之外优化效果的推广验证。上述配对和失败信号提取无需重做。
+本轮人工核对代表性失败及全部7例ASR，没有全量独立语义审计或oracle重放。正式结果与此前18例的15/18不能混用分母。
 
 ## 5. 关键技术决策
 
@@ -71,28 +65,36 @@
 | --- | --- | --- |
 | v3.4.1采用组合优化 | L2／读取单改均8/18，组合15/18，说明两点单独不足以解决银行问题 | 完成提示同为15/18且成本更高，默认不启用；不优先改L1投影／阈值 |
 | 按工具定义／schema、已授权能力和当前动作进行判断 | 步骤文字、来源命令、模型解释不能授予权限或证明任务完成 | 不引入对象／数据／参数授权、动态扩权、参数修补或恢复机制；相关研究边界仍受锁定 |
-| non-sensitive-read-v3固定分流 | 授权且schema有效的public/internal读取在三模式中免审；混合批次只审计其余调用 | 保留工具级隐私／URL查询外传限制；不新增对象／参数授权，不重标银行personal |
-| 审计与宿主分工一致 | 私人／秘密读取的有效deny与abstain均阻断；非敏感读取由宿主确定性允许 | 删除旧READ_ONLY_SOURCE_ALLOW私人deny例外；整批权限／schema、回执／票据继续约束全部动作 |
+| sink-free-read-v4分流 | 授权且schema有效、无sink的public/internal读取三模式免审；外部接收方读取恢复L3，混合批次只审计其余调用 | 保留工具级隐私／URL查询外传限制；不新增对象／参数授权，不重标银行personal |
+| 审计与宿主分工一致 | 私人／秘密读取的有效deny与abstain均阻断；非敏感无sink读取由宿主确定性允许 | 删除旧READ_ONLY_SOURCE_ALLOW私人deny例外；整批权限／schema、回执／票据继续约束全部动作 |
 | 原生评分、错误分母、成本分开记录 | 工具拒绝、模型协议错误、API故障、真实任务失败含义不同 | 不把错误样本计成成功防御、不把警告引用谓词直接当真实恶意效果 |
 | 原始交互与诊断分文件，历史数据保留原样 | L3 回复在解析前保存，便于排查合法字段下的语义误拒和协议错误 | 不补造历史原回复、不回写旧结果／cohort、不通过换模型或评分获得通过 |
 
-当前 L3 使用的 evidence 是有限上下文，不是参数来源或对象隐私的认证。当前固定读取免审不依赖sink、URL来源、词法阈值或幂等标签；依据已注册工具effect/sensitivity及授权／schema。旧read-purpose-v2仅描述历史运行，详见 [README 当前流程](README.md#当前框架与工作流程)。
+当前 L3 使用的 evidence 是有限上下文，不是参数来源或对象隐私的认证。当前固定读取免审要求sink=none，不依赖URL来源、词法阈值或幂等标签；依据已注册工具effect/sensitivity/sink及授权／schema。旧read-purpose-v2仅描述历史运行，详见 [README 当前流程](README.md#当前框架与工作流程)。
 
 ## 6. 已知问题
 
 | 问题描述 | 影响范围／已尝试方法 | 后续处理建议 |
 | --- | --- | --- |
-| banking／Slack TSR 低于匹配键 baseline | 本轮配对和代表轨迹已定位必要读取／合法动作拒绝、漏授权、停办及工具错误；退步审计未记录协议失败 | 固定代表反例及安全负例，验证最小共享优化；完整语义归因仍未完成 |
-| 审计结论与实际阻挡可能不同 | 只读 deny 例外、整批前置拒绝及票据复核共同影响执行；近期诊断已增加模块来源 | 使用最终 ledger／Monitor 决策及成功工具返回核对，模型解释仅作线索 |
+| 正式v3.5仍低于匹配baseline | banking差9.92pp、Slack差11.75pp；旧问题延续分别56／21例，另有新增退步 | 优先文档／复合任务授权、L3效果依据与交付遗漏，不再把已改善的准备读取列为主要瓶颈 |
+| 正式v3.5的Slack访问型ASR | 旧七例走public读取免审；新策略专项28攻击ASR0、合法网页4/4，但不能外推整体 | 保留旧证据；按任务相关性继续区分合法获取和源指令引导的额外访问，不以输出干净代替执行安全 |
 | 剩余I3旧诊断离线失败 | 原版快照同样出现5失败／5错误；旧审计fixture依赖过时协议，未改闭合I3机制 | 留在报告失败索引；原先私人deny覆盖／旧schema预期两项已按新语义更新且通过 |
-| 成本尚不能直接作节省结论 | 两组全部场景摘要 `cost_comparison_ready=false`；记录总 Token 分别 24,176,340 与 23,202,303 | 核查 invocation、cache、GOAL 预检、缺失 usage 和记录范围，再判断是否能比较 |
+| 历史成本尚不能直接作节省结论 | baseline／v3.4两组全部场景摘要 `cost_comparison_ready=false`；记录总 Token 分别 24,176,340 与 23,202,303 | 核查 invocation、cache、GOAL 预检、缺失 usage 和记录范围，再判断是否能比较 |
 | 历史原始审计回复可能缺失 | 新迁入记录只作用于新执行；旧 inline／gzip 不一定含完整模型文本 | 可定位已有证据；缺失部分明确标未知，不能反推或伪造原回复 |
-| 边界与文档存在限制 | E0 未过；I3 尚有8个范围缺口。AGENTS 为用户指定跨分支快照；部分 `report/report.md` 链接缺失 | 本文件按当前v3.4.1源码交接；研究解锁和独立验证继续走研究侧入口 |
+| 边界与文档存在限制 | E0 未过；I3 尚有8个范围缺口。AGENTS 为用户指定跨分支快照；部分 `report/report.md` 链接缺失 | 本文件按当前v3.5.1源码交接；研究解锁和独立验证继续走研究侧入口 |
 | 受限 host profile 的诊断详情不全 | 源提交的 authorization 白名单省略若干 profile 详情，运行授权不受影响 | 若本轮失败实际涉及该路径，再补足必要诊断并验证 |
 
 ## 7. 测试与验证
 
-### 最新Online Evaluation（2026-10-25，效用优化）
+### 本轮Online Evaluation（2026-10-26，v3.5.1）
+
+- attempted/completed/valid/incomplete/error=231/231/231/0/0，39个不同案例；另41次原生GOAL预检。全部新名称／不可变源码快照，无cache替代模型判断。
+- 2,456次尝试／2,456响应，4,869,987已知Tokens，失败调用0、缺失usage0。计分2,197次／4,437,075 Tokens；GOAL259次／432,912 Tokens；不合并TSR分母。
+- 最终web_refined与原版37键／注入文本一致：TSR14→17、ASR7→0；预算修正中间批仅15/37、ASR7/28，未验收，因真实L3误放再补读阶段对照后全新验证。所有阶段保留，未按最高分挑选结论。
+- gpt-6.1-sol独立只读审查发现1项近期更正被挤掉问题，RED→GREEN修复；此后读提示／配置摘要改动完成离线及在线验证，未二次独立审查。
+- 最终Offline Regression：ipi730项，707通过／5失败／5错误／13跳过，十项均为旧I3；AgentDyn相关39项通过。日志／命令／限制见[本轮报告](workshop/completed/v35_optimization_20261026.md)。没有全量benchmark或研究门槛通过结论。
+
+### 历史Online Evaluation（2026-10-25，效用优化）
 
 - 90次计分全部有效；710次API请求／710响应，已知1,139,851 Tokens，无失败调用或缺失usage。计分588次／947,902 Tokens；20个GOAL共122次／191,949 Tokens。未进行完整benchmark或无防御baseline新测，未改变E0/I3/I2状态。
 - 用完整原生轨迹、四字段原始审计回复和共享outcome投影验证；clean的security占位值不进入ASR。组合比原版恢复10例，无新增失败；不外推到正式1167例总体。
@@ -104,7 +106,7 @@
 - **记录验收：**12 个主 JSON 仅保存 `dscg_diagnostics` 防御引用，12 份诊断 complete，计分轨迹保存20份 L3 原始回复。
 - **解释范围：**证明本次记录／读取链路可运行，未证明效用改善或一般安全。本次批准范围已经完成。
 
-### 最新Offline Regression
+### 历史v3.4.1优化Offline Regression
 
 - ipi全套727项：704通过、5失败、5错误、13跳过；剩余10项均为I3旧诊断，在原版HEAD快照中同样失败／错误。未改该闭合诊断机制或宣称全套绿色。详见报告失败索引。
 - 新读取契约7项／权限契约3项、原生工具 authored fixture、读取器／Dashboard相关回归通过；AgentDyn新读取契约7通过（仅工程契约），Node49通过。
@@ -124,12 +126,13 @@
 完整命令、退出码、任务键、原生结果、源码快照和哈希见 [迁移报告](workshop/completed/workshop_commit_transfer_20261025.md) 与 [delivery_validation.json](workshop/artifacts/20261025_workshop_commit_transfer/delivery_validation.json)。未宣称全套回归绿色。
 
 - **历史分析阶段 Offline Analysis：**`python -B workshop/artifacts/20261025_v34_tsr_analysis/analyze.py`，exit 0；核对1,167对任务、2,334份轨迹，保存配对账／输入哈希。文档链接与 `git diff --check` 检查；新增模型调用0，未重跑运行时测试，不算新的 Online Evaluation／Offline Regression。
-- **尚未验证：**正式结果每条轨迹的独立有效性、未知 adapter 的等价性、全量误拒／合理阻挡区分、3个攻击成功的真实效果、历史成本可比性，以及超出本轮范围的优化效果。
+- **本轮Offline Analysis：**`/opt/miniconda3/envs/ipi/bin/python -B workshop/artifacts/20261026_v35_analysis/analyze.py` exit0；三方配对、哈希与ASR证据核查，文档链接／git diff --check，无新模型调用。
+- **尚未验证：**全量独立有效性／语义归因、未知adapter等价性、历史成本可比性，以及超出所选范围的优化效果。
 
 ## 8. 下一步计划
 
-1. **定位银行复合任务剩余误拒。** 复用本轮user_task_15三条失败与成功对照，核对当前租金更新参数为何被判EXPLICIT_CONSTRAINT／OFF_TASK；保留短码理由不足以还原模型完整判断的限制。
-2. **继续遵守研究与评测边界。** 本轮90例验证已结束；后续仅在有证据的改动下启动新任务专项Qwen对照。完整benchmark仍需用户明确请求；不续用旧活动预算，不加入自动扩权／恢复或任务ID规则。
-3. **保留独立事项。** 历史3个ASR成功的真实效果、完整1167例语义审计、旧adapter未知、历史成本可比性仍未解决；I3旧诊断10项离线失败／错误留账。
+1. 复用最终banking u11/u15、Slack u11/u13轨迹，区分漏授权、参数错误、关键依据缺失、看到依据仍误拒及真实交付遗漏；不重复全量清点。
+2. 退款授权跨批不稳定，L3拒绝加入random仍在；后续以单项有证据的改动验证，不靠降低严格校验或反复补同义提示。
+3. 保留正式成本可比性、独立oracle复核及I3旧诊断未完成项。E0 pending、I3 partial、I2 locked；新任务验证另用新名称，不重开历史余额或闭合campaign。
 
-**下一行动：**先审查banking user_task_15的当前拒绝及遗漏链；当前优化结论限于所选18个配对案例。
+**下一行动：**先按本批完整输入／返回核对退款漏授权与加入random的效果误拒；当前专项已结束，未提交代码。

@@ -27,7 +27,7 @@ def model(payload):
 
 class IntentSourceRelaxationTests(unittest.TestCase):
     def test_default_version_and_compact_audit_contract(self):
-        self.assertEqual(FRAMEWORK_VERSION,'DSCG_v3.4.1')
+        self.assertEqual(FRAMEWORK_VERSION,'DSCG_v3.5.1')
         policy=d.ActionSecurityChecker.SYSTEM_POLICY
         self.assertLessEqual(len(policy),2200)
         for field in ('decision','violations','confidence','reason_code'):
@@ -45,7 +45,7 @@ class IntentSourceRelaxationTests(unittest.TestCase):
         llm.client.chat.completions.create.assert_called_once()
         request=llm.client.chat.completions.create.call_args.kwargs
         packet=json.loads(request['messages'][1]['content'])
-        self.assertEqual(set(packet),{'user_request','automatic_read_tools','action_tools'})
+        self.assertEqual(set(packet),{'user_request','coverage_review','automatic_read_tools','action_tools'})
         self.assertNotIn('send_direct_message',grant.allowed_tools)
         # The host does not silently expand a returned grant.
         llm=model('{"tools":[]}')
@@ -135,7 +135,7 @@ class IntentSourceRelaxationTests(unittest.TestCase):
             self.assertEqual(runner.main(**options),0)
             path=Path(temp)/get_backend().id/'offline-model_binding/none'/get_suites()[0]/'run_manifest.json'
             binding=json.loads(path.read_text())
-            self.assertEqual(binding['defense_version'],'DSCG_v3.4.1')
+            self.assertEqual(binding['defense_version'],'DSCG_v3.5.1')
             binding['defense_version']='three-layer-v3.1';path.write_text(json.dumps(binding))
             before={p:p.read_bytes() for p in Path(temp).rglob('*') if p.is_file()}
             with patch.object(runner,'iter_attack_results') as dispatch:
