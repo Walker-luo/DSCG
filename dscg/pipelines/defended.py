@@ -572,6 +572,7 @@ def _compact_authorization_record(record: dict) -> dict:
         "allowed_tools",
         "authorization_protocol",
         "authorization_steps",
+        "step_tool_expectations",
         "authorization_stages",
         "error_stage",
         "tool_permissions",
@@ -630,6 +631,7 @@ def _compact_action_record(record: dict) -> dict:
             "sensitivity",
             "risk_level",
             "metadata_state",
+            "audit_verified",
             "confirmation_required",
             "blocked_by",
             "block_reason",
@@ -935,6 +937,9 @@ class ActionLedger:
             })
         return action_id
 
+    def record_audit_verification(self, action_id: str, verified: bool) -> None:
+        self._records[action_id]["audit_verified"] = verified
+
     def transition(self, action_id: str, state: ActionState, reason_code: str) -> None:
         if action_id not in self._records:
             raise KeyError(f"unknown action_id: {action_id}")
@@ -1036,6 +1041,7 @@ class ToolAuthorizationContract:
     authorization_permissions: tuple[tuple[str, bool], ...] = ()
     authorization_intents: tuple[str, ...] = ()
     authorization_goal_kinds: tuple[str, ...] = ()
+    progress_tool_expectations: tuple = ()
 
     def public_dict(self) -> dict:
         record = {
@@ -1063,6 +1069,8 @@ class ToolAuthorizationContract:
                 record['authorization_steps'] = [{'intent': intent, 'goal_kind': kind}
                     for intent, kind in zip(self.authorization_intents, self.authorization_goal_kinds)]
                 record['authorization_stages'] = ['authorization_intents', 'authorization_tools']
+                record['step_tool_expectations'] = [dict(step_id=sid, prepare_tools=list(prep),
+                    completion_groups=[list(g) for g in groups]) for sid,prep,groups in self.progress_tool_expectations]
             elif self.authorization_protocol == V35_AUTH_PROTOCOL:
                 record['tool_permissions'] = dict(self.authorization_permissions)
             else:
@@ -1217,6 +1225,7 @@ class ToolAuthorizationCompiler:
         steps = ()
         intents = ()
         goal_kinds = ()
+        associations = ()
         flow_mode = self.prompt_profile == 'legacy' and self.authorization_profile is None and not getattr(self, '_legacy_audit_input', False)
         base_policy = self.SYSTEM_POLICY if step_mode else self.CLASSIC_POLICY
         policy_profile = self.prompt_profile
@@ -1275,7 +1284,7 @@ class ToolAuthorizationCompiler:
                 )),
                 runtime_catalog_sha256=catalog_fingerprint(runtime),
                 authorization_steps=steps, authorization_permissions=permissions, authorization_intents=intents,
-                authorization_goal_kinds=goal_kinds,
+                authorization_goal_kinds=goal_kinds, progress_tool_expectations=associations,
                 authorization_protocol=flow.AUTH_PROTOCOL if flow_mode else V35_AUTH_PROTOCOL if permission_mode else (STEP_PROTOCOL if action_step_mode else LEGACY_STEP_PROTOCOL) if step_mode else '',
                 authorization_mode=authorization_mode, profile_status=profile_status,
                 profile_sha256=self.authorization_profile.identity() if self.authorization_profile else '',
@@ -1284,7 +1293,7 @@ class ToolAuthorizationCompiler:
 
         if flow_mode:
             try:
-                intents, goal_kinds, selected = flow.compile_authorization(self.llm, request.text, catalog, set(catalog))
+                intents, goal_kinds, selected, associations = flow.compile_authorization(self.llm, request.text, catalog, set(catalog))
             except flow.IntentFlowError as exc:
                 error = AuthorizationCompilationError(exc.reason_code)
                 error.stage = exc.stage
@@ -1453,7 +1462,8 @@ class OurFrameExecutor(agent_pipeline.BasePipelineElement):
     def _publish_grant(self, grant, extra_args):
         self.sandbox.install_contract(grant)
         self.intent_flow = flow.IntentFlow(grant.authorization_intents, self._task_context.effective_request,
-            goal_kinds=grant.authorization_goal_kinds) if grant.authorization_intents else None
+            goal_kinds=grant.authorization_goal_kinds,
+            tool_expectations=grant.progress_tool_expectations) if grant.authorization_intents else None
         record = grant.public_dict()
         record['policy_state'] = self.sandbox.policy_state.value
         extra_args['dscg_authorization'] = record
@@ -1603,7 +1613,8 @@ class OurFrameExecutor(agent_pipeline.BasePipelineElement):
                     self._authorization_cache_contract = grant
                 self.sandbox.install_contract(grant)
                 self.intent_flow = flow.IntentFlow(grant.authorization_intents, user_text,
-                    goal_kinds=grant.authorization_goal_kinds) if grant.authorization_intents else None
+                    goal_kinds=grant.authorization_goal_kinds,
+                    tool_expectations=grant.progress_tool_expectations) if grant.authorization_intents else None
                 record = grant.public_dict()
                 if authorization_reused:
                     record["authorization_reused"] = True
@@ -1706,7 +1717,7 @@ class OurFrameExecutor(agent_pipeline.BasePipelineElement):
         try:
             self.intent_flow.observe(self.llm, messages, _get_action_ledger(extra_args).snapshot(), final=final,
                 exhausted=bool(final and self.intent_flow.current and
-                    self.intent_flow.current['intent_id'] in self.intent_flow.continuations), catalog=catalog)
+                    self.intent_flow.current['intent_id'] in self.intent_flow.continuations), catalog=catalog, runtime=runtime)
         except flow.IntentFlowError as exc:
             exc.messages = list(messages)
             extra_args['dscg_intent_flow'] = {**self.intent_flow.snapshot(), 'error_code': exc.reason_code,
@@ -2312,6 +2323,8 @@ class ReferenceMonitor(agent_pipeline.BasePipelineElement):
         pending_actions = []
         for action_id, call, approved, reason_code in decisions:
             if approved:
+                ledger.record_audit_verification(action_id, bool(self.require_audit and audit_valid
+                    and audit.get("decision") == "allow" and audit.get("parser_status") == "ok"))
                 ledger.transition(action_id, ActionState.APPROVED, reason_code)
                 ticket = self._issue(action_id, call, contract_version)
             else:
@@ -2799,7 +2812,8 @@ class ActionSecurityChecker(agent_pipeline.BasePipelineElement):
         if self.prompt_profile == 'legacy' and not getattr(self, '_legacy_audit_input', False):
             active_flow = self.intent_flow_getter() if self.intent_flow_getter else None
             current = active_flow.current if active_flow is not None else None
-            packet['schema_version'] = 'dscg.audit-input.intent-flow.v1'
+            packet['schema_version'] = 'dscg.audit-input.intent-flow.v2'
+            packet['current_goal_kind'] = current['goal_kind'] if current else None
             packet['original_user_request'] = query
             packet['current_intent'] = current['intent'] if current else None
             packet['intent_state_sha256'] = active_flow.binding() if active_flow is not None else None

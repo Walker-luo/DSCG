@@ -1,5 +1,8 @@
 # 模型、工具与运行参数详解
 
+2026-10-26：默认legacy接入[v352 §4.7事件路由](../workshop/completed/intent_tool_events_20261026.md)。L2第二次请求以宿主固定step-ID键对象增加进度工具关联，不新增调用或权限；授权协议 `intent-global-tools-v4-keyed-event-links`，进度协议 `dscg.intent-progress.host-events.v3`。准备读取可由宿主记录；复杂目标仍需语义判断。`progress_source=host`没有新的response_id，不能沿用上一条模型原文。严格单次直接邀请完成模式不覆盖网站查邮箱／多人／条件／附加交付。新运行名和新配置绑定必需；Dashboard重启后随共享factory采用，无新增控件。
+
+
 本文供首次运行或更换模型/工具的测试者使用，对应当前DSCG_v3.5意图流程。所有命令从DSCG/执行；激活`ipi`使用AgentDojo，激活`ipi-agentdyn`使用AgentDyn，相同运行入口自动识别实际安装。模型配置和工具风险目录是宿主输入；模型返回、网页正文或工具错误不能改写它们。
 
 两个独立环境的安装入口是 [environment.yml](../environment.yml) 与 [environment-agentdyn.yml](../environment-agentdyn.yml)。保留已有环境和本地模型配置；运行前可离线自检：
@@ -300,7 +303,7 @@ CLI结果按分类根/后端/运行目录保存：`results/partial_benchmark/age
 
 宿主根据真实调用／参数摘要／意图归属／最终回答建立事实标志，按目标类型检查被引用证据后顺序推进。成功None可证明执行；不能仅凭调用成功认定业务正确。歧义和条件真假仍由模型解释；condition_false只用于显式条件效果，存在已执行效果时不能再把它认定为无需执行。未知保持未完成，不借报错补权限或猜测跳步。
 
-当前协议`dscg.intent-progress.host-fsm.v2`、分解协议`intent-global-tools-v2-goal-kinds`以及Schema／策略均进入现有身份。full/partial/cohort/Dashboard默认直接采用，无新增配置开关；重启服务并使用新name，不能复用旧v3.5测量缓存，旧cohort仍轻量读取。触发频率、模型、重试配置和L3边界不变，不承诺成本或TSR改善。详见[实施与验证范围](../workshop/completed/intent_host_fsm_20261025.md)。
+当前协议`dscg.intent-progress.host-events.v3`、授权协议`intent-global-tools-v4-keyed-event-links`以及Schema／策略均进入现有身份。full/partial/cohort/Dashboard默认直接采用，无新增配置开关；重启服务并使用新name，不能复用旧v3.5测量缓存，旧cohort仍轻量读取。准备读取改由宿主记录，剩余语义调用按事件触发；模型、重试配置和L3边界不变，不承诺成本或TSR改善。详见[实施与验证范围](../workshop/completed/intent_host_fsm_20261025.md)。
 
 ## v3.4结构化判决
 

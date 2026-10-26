@@ -109,7 +109,9 @@ class DiagnosticSession:
                   'audit_router':'L3', 'intent_progress':'Intent Progress'}.get(event)
         if module: metadata['module'] = module
         phase = 'audit' if event in ('audit_decision','audit_decision_final') else 'intent_progress' if event == 'intent_progress' else None
-        if phase and (phase != 'audit' or (record.get('parser_status') != 'deterministic_bypass'
+        host_progress = event == 'intent_progress' and any(
+            item.get('progress_source') == 'host' for item in record.get('observation', []))
+        if phase and not host_progress and (phase != 'audit' or (record.get('parser_status') != 'deterministic_bypass'
                 and record.get('semantic_attempt') != 0
                 and not str(record.get('model_version','')).startswith(('host','local-router:')))):
             metadata['response_id'] = self.responses.get(phase)
@@ -126,7 +128,7 @@ class DiagnosticSession:
             self.action_updates[record['action_id']] = record
             return
         if event == 'authorization':
-            keys = ('authorization_steps','allowed_tools','tool_permissions','implicit_read_tools',
+            keys = ('authorization_steps','step_tool_expectations','allowed_tools','tool_permissions','implicit_read_tools',
                     'policy_state','contract_version','authorization_source','authorization_protocol',
                     'task_phase','error_code','error_type','error_stage')
             record = {k:v for k,v in record.items() if k in keys}

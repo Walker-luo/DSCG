@@ -1,5 +1,8 @@
 # 小批量测试：run_partial_benchmark
 
+2026-10-26：默认legacy接入[v352 §4.7事件路由](../workshop/completed/intent_tool_events_20261026.md)。L2第二次请求以宿主固定step-ID键对象增加进度工具关联，不新增调用或权限；授权协议 `intent-global-tools-v4-keyed-event-links`，进度协议 `dscg.intent-progress.host-events.v3`。准备读取可由宿主记录；复杂目标仍需语义判断。`progress_source=host`没有新的response_id，不能沿用上一条模型原文。严格单次直接邀请完成模式不覆盖网站查邮箱／多人／条件／附加交付。新运行名和新配置绑定必需；Dashboard重启后随共享factory采用，无新增控件。
+
+
 ## 默认 DSCG_v3.5
 
 新执行任务的 `.json` 主要保留原生交互和评分，防御记录移至同名 `.dscg.jsonl`；其中保存L3／进度模型的完整返回文本及校验结果，L2只保存解析后的授权。GOAL预检也采用该结构，不增加参数／模型调用，缓存命中和旧文件不改写。`--trace-level`只控制独立诊断详细度；参见[文件说明](./result_files.md#精简任务轨迹与独立诊断)。

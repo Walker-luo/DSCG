@@ -1,5 +1,8 @@
 # 当前框架与平台展示交接
 
+2026-10-26：默认legacy接入[v352 §4.7事件路由](../workshop/completed/intent_tool_events_20261026.md)。L2第二次请求以宿主固定step-ID键对象增加进度工具关联，不新增调用或权限；授权协议 `intent-global-tools-v4-keyed-event-links`，进度协议 `dscg.intent-progress.host-events.v3`。准备读取可由宿主记录；复杂目标仍需语义判断。`progress_source=host`没有新的response_id，不能沿用上一条模型原文。严格单次直接邀请完成模式不覆盖网站查邮箱／多人／条件／附加交付。新运行名和新配置绑定必需；Dashboard重启后随共享factory采用，无新增控件。
+
+
 2026-10-25：当前默认仍为 **legacy / DSCG_v3.5**，新增宿主进度状态机。首次分解固化goal_kind，进度模型只返回satisfaction/evidence_ids；宿主产生状态、完成类型、下一个顺序ID及事实标志，不猜测依赖跳步。Dashboard与CLI共享factory，无新控件／参数；重启Dashboard并用新name即可采用，旧测量缓存不能跨新协议复用。历史原生评分、响应附件和cohort保留。展示进度诊断时，observation中的status/next_intent_id/reason_code/host_facts是宿主派生信息，不应标成模型原始输出；原文附件保存两字段回复。有效／错误分母与成本仍按现有规则。见[测试指南](./benchmark.md#默认-v35-意图流程)及[本轮报告](../workshop/completed/intent_host_fsm_20261025.md)。以下日期条目为历史阶段。
 
 2026-10-22当时内部身份为 **DSCG_v3.4**：L2动作步骤与宿主并集、L3有限代码Schema及当前一步审计，共用full/partial/cohort factory；读取范围、评分和执行边界不变。服务需重启，新name测量；真实6案例utility仍全false，Schema协议通过不等于效用改善。见[指南](./benchmark.md#默认-v34-策略与复测)及[实施记录](../workshop/completed/v34_decision_contract_20261022.md)。

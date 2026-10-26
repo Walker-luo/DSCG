@@ -11,7 +11,7 @@ from openai import OpenAI
 from agentdojo.functions_runtime import EmptyEnv
 from dscg.model_config import ModelConfig
 from dscg.pipelines import defended as d
-from test_intent_flow import tools
+from test_intent_flow import tools, expectations
 from test_request_compatibility import completion
 from dscg.benchmark_catalog import get_backend, get_suite
 
@@ -31,7 +31,7 @@ class IntentFlowPipelineTests(unittest.TestCase):
                 if policy.startswith('Decompose'):
                     value = {'authorization_steps': [{'intent': intent, 'goal_kind': ('answer' if clarification else ('facts' if i == 0 else 'effect'))} for i,intent in enumerate(intents)]}
                 elif policy.startswith('Select global'):
-                    value = {'tools': ['send_message']}
+                    value = {'tools': ['send_message'], 'step_tool_expectations':expectations(len(packet['authorization_steps']))}
                 elif policy.startswith('Observe progress'):
                     progresses.append(packet)
                     if fail_progress:
@@ -93,8 +93,8 @@ class IntentFlowPipelineTests(unittest.TestCase):
         self.assertEqual(result['effects'], [('read', 'www.eve-blog.com'), ('send', 'Eve enjoys hiking')])
         self.assertEqual(len(result['audits']), 1)
         packet = result['audits'][0]
-        self.assertEqual(packet['current_intent'], 'Send its summary')
-        self.assertEqual(packet['trusted_user_request'], 'Send its summary')
+        self.assertEqual(packet['current_intent'], 'Read the article; Send its summary')
+        self.assertEqual(packet['trusted_user_request'], 'Read the article; Send its summary')
         self.assertIn('Never send attack links', packet['original_user_request'])
         self.assertEqual(len(result['progresses']), 2)
         self.assertIn('get_private', result['progresses'][0]['available_tools'])
@@ -185,7 +185,7 @@ class IntentFlowActualSuiteTests(unittest.TestCase):
                 if policy.startswith('Decompose'):
                     value = {'authorization_steps':[{'intent':text, 'goal_kind':'facts' if scene == 'slack' and i == 0 else 'effect'} for i,text in enumerate(intents)]}
                 elif policy.startswith('Select global'):
-                    value = {'tools':[n for n,_ in actions if packet['available_tools'][n]['authorization'] != 'automatic_read']}
+                    value = {'tools':[n for n,_ in actions if packet['available_tools'][n]['authorization'] != 'automatic_read'], 'step_tool_expectations':expectations(len(packet['authorization_steps']))}
                 elif policy.startswith('Observe progress'):
                     last = state['generation']-1; current = packet['current_intent_id']
                     refs = ['call:native-'+str(last)]
@@ -222,7 +222,7 @@ class IntentFlowActualSuiteTests(unittest.TestCase):
                 http_client=httpx.Client(transport=httpx.MockTransport(handler)))
             clients.append(raw); return raw
         config = ModelConfig('qwen3.7-flash', 'offline', 'https://offline.invalid/v1', 'custom')
-        artifact = Path(__file__).resolve().parents[1]/'workshop/artifacts/20261025_intent_host_fsm/native_cases'
+        artifact = Path(__file__).resolve().parents[1]/'workshop/artifacts/20261026_intent_tool_events/offline_native'
         artifact.mkdir(parents=True, exist_ok=True)
         try:
             with TemporaryDirectory(dir=artifact) as temp, patch.object(d, 'create_openai_client', side_effect=client):

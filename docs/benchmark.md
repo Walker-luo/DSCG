@@ -6,8 +6,8 @@
 
 当前默认 `--prompt-profile legacy` 是 **DSCG_v3.5 意图流程**，full、partial、cohort 和共享 factory 一致；`--name` 只命名实验。显式 `--prompt-profile legacy-v34` 保留 v3.4 对照。历史 `intent-evidence-v35` 是另一份旧候选，不能仅凭“v3.5”名称混合结果。
 
-1. **L2 两阶段**：先返回 `{"authorization_steps":[{"intent":"任务子目标","goal_kind":"answer"}]}`，每项不包含工具；goal_kind为facts/effect/answer/condition/conditional_effect，由首次分解固化，仅描述交付类型，不证明目标正确。再用完整原请求、全部意图及原生工具定义选择全局 `{"tools":[...]}`。合并原自动读取权限，运行期间不因切换意图、工具结果或报错扩权。
-2. **宿主意图进度**：每批工具执行后仍进行一次有限语义判断，只返回 `{"satisfaction":"satisfied","evidence_ids":["call:..."]}`；另有not_yet/ambiguous/condition_false。宿主维护facts_observed/effect_observed/answer_emitted/semantic_satisfied，按冻结类型和真实引用决定完成及下一个顺序ID。成功None可证明执行，不证明业务正确；回答目标须有真实最终回答，效果目标须有本意图成功效果。ambiguous只有引用实际最终澄清才能等待用户；condition_false仅用于显式条件效果并须有成功读取，未知不是false。没有依赖图时不猜测跳步；未完成保留pending，每意图仍最多一次最终续行，耗尽按有界停止计分，不宣称业务不可能完成。
+1. **L2 两阶段**：先返回 `{"authorization_steps":[{"intent":"任务子目标","goal_kind":"answer"}]}`，每项不包含工具；goal_kind为facts/effect/answer/condition/conditional_effect，由首次分解固化，仅描述交付类型，不证明目标正确。再用完整原请求、全部意图及原生工具定义选择全局 `tools`，并为每个宿主step_id输出 `step_tool_expectations`（prepare_tools、completion_groups）。关联在全局授权合并后校验，不增加权限。合并原自动读取权限，运行期间不因切换意图、工具结果或报错扩权。
+2. **宿主意图进度**：先按事件路由：已关联准备读取只记录事实，answer等待最终交付，失败／阻挡及复杂执行保留语义检查；严格单次直接邀请格式且满足原生成功约定／实际审计／本意图执行时可由宿主推进。语义分支只返回 `{"satisfaction":"satisfied","evidence_ids":["call:..."]}`；另有not_yet/ambiguous/condition_false。宿主维护facts_observed/effect_observed/answer_emitted/semantic_satisfied，按冻结类型和真实引用决定完成及下一个顺序ID。成功None可证明执行，不证明业务正确；回答目标须有真实最终回答，效果目标须有本意图成功效果。ambiguous只有引用实际最终澄清才能等待用户；condition_false仅用于显式条件效果并须有成功读取，未知不是false。没有依赖图时不猜测跳步；未完成保留pending，每意图仍最多一次最终续行，耗尽按有界停止计分，不宣称业务不可能完成。
 3. **L3 当前意图**：以当前 intent 为主要目标，同时保留完整原用户请求作为金额、对象、禁止事项及顺序的约束。保留四字段有限判决、Monitor 和一次性执行票据；进度响应不是权限或语义正确性的证明。
 4. **固定读取免审**：L2 允许、原生参数有效、已注册 `effect=read` 且敏感度 `public/internal` 的调用，不请求 L3；包含博客发现网址及带查询参数、内网形式的网址，不检查 URL 来源／形式或 sink。`personal/secret` 和无效元数据仍审计；写入、付款、发送仍审计。混合批次只审计其非免审子集，保留原调用顺序，回执绑定完整批次、子集和意图状态。
 
@@ -27,7 +27,7 @@ python -m experiments.run_benchmark --suites banking slack \
   --progress --name DSCG_v34_control_01
 ```
 
-上方命令会发起真实模型调用。宿主FSM直接用于默认benchmark，无需新增参数；必须用新name，旧v3.5测量缓存也不能跨进度协议复用。当前进度协议为`dscg.intent-progress.host-fsm.v2`，授权分解为`intent-global-tools-v2-goal-kinds`，纳入已有配置绑定。完整回复仍先保存到响应附件；诊断observation中的status、completion_kind、next_intent_id、reason_code和host_facts来自宿主，不是模型的原始控制输出。旧记录按其原协议读取。详细验收与在线限制见[宿主FSM报告](../workshop/completed/intent_host_fsm_20261025.md)，初始设计见[历史记录](../workshop/completed/intent_flow_v35_20261024.md)。
+上方命令会发起真实模型调用。宿主FSM直接用于默认benchmark，无需新增参数；必须用新name，旧v3.5测量缓存也不能跨进度协议复用。当前进度协议为`dscg.intent-progress.host-events.v3`，授权协议为`intent-global-tools-v4-keyed-event-links`，纳入已有配置绑定。完整回复仍先保存到响应附件；诊断observation中的status、completion_kind、next_intent_id、reason_code和host_facts来自宿主，不是模型的原始控制输出。旧记录按其原协议读取。详细验收与在线限制见[宿主FSM报告](../workshop/completed/intent_host_fsm_20261025.md)，初始设计见[历史记录](../workshop/completed/intent_flow_v35_20261024.md)。
 
 ## 历史 v3.5 显式候选（保持原义）
 

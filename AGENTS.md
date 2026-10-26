@@ -2,11 +2,42 @@
 
 ## Scope and working rules
 
-- Work in `DSCG/`, the engineering repository for indirect prompt-injection defense. Keep the sibling `../research/` repository separate; do not copy paper plans here or create a nested research checkout.
+- Work in `DSCG_BaseIntent/`, this engineering worktree for indirect prompt-injection defense and intent-progress optimization. Keep its state separate from the sibling `../DSCG/` checkout. Keep the sibling `../research/` repository separate; do not copy paper plans here or create a nested research checkout.
 - Before research-driven changes, read `../research/technical_route.md` and follow its current implementation-status link. E0 remains pending, I3 partial (24 valid probes, 8 scope violations), and I2 locked. Do not reopen the closed provenance/source-to-sink route or add object/data/parameter authorization, recovery, or other locked mechanisms without a new research-side decision.
 - Preserve existing dirty work, user moves/deletions, unrelated conflict markers, credentials, historical results and evidence. Do not stage or commit unless explicitly requested. Keep the filename `AGENTS.md`; do not create lowercase `agents.md`.
 - All delegated subagents, including planning and review, must use `gpt-6.1-sol`: inherit a parent already using it or specify it explicitly. User model restrictions override skill model-selection/escalation advice. Do not select Astra or any other model unless the user explicitly requests it; report unavailability without fallback.
 - This file describes current rules as of 2026-10-25. Dated reports describe their own tasks; closed campaigns remain closed. Read historical material only when relevant, without treating superseded defaults or unused budgets as current authorization.
+
+## Project State Management
+
+Use the project-root [DV_STATE.md](DV_STATE.md) to maintain cross-session project state. Read or update it only when the current task involves project progress. Keep this checkout's state separate from sibling repositories and worktrees; verify their branch and evidence before using their records.
+
+### Restore context
+
+- At the start of a new development session or when resuming an interrupted task, read `DV_STATE.md` first.
+- Check the current Git branch, HEAD, working-tree state and relevant code.
+- Cross-check the state document against the current implementation; never treat stale records as facts.
+- Identify completed work, unresolved issues and the next task. Do not repeat work already completed and verified.
+
+### Update triggers
+
+Update `DV_STATE.md` when:
+
+- An important development stage is completed.
+- The architecture or a key technical approach changes.
+- A bug or limitation affecting subsequent work is discovered.
+- An important experiment is completed and validation results are available.
+- The user explicitly asks to preserve the current work state.
+
+### Update rules
+
+- Record facts, important decisions and their reasons; omit lengthy conversation history.
+- Distinguish implemented, tested, unverified and planned work.
+- Retain unresolved issues and relevant historical decisions.
+- Record the corresponding branch, commit and validation results.
+- Keep the file concise; revise existing entries instead of appending redundant updates.
+- Never commit, switch or reset a Git branch merely to update the state document.
+
 
 ## Code and documentation map
 
@@ -26,9 +57,9 @@ Use [README.md](README.md) for the framework, [model/tool configuration](docs/mo
 
 - Full, partial, cohort and Dashboard share the production factory. Default `legacy` resolves to DSCG_v3.5; explicit `legacy-v34` retains v3.4. Other historical profiles keep their meanings. Experiment names do not select strategies.
 - **L1:** rebuild an isolated planning view from raw history, preserving original returns for audit/native traces. The existing banking monthly-spending projection preserves every row/order and six structural fields, omitting subject only under its bounded profile. Unsupported, ambiguous or invalid inputs fall back to source wrapping. AgentDyn has no additional projection profile. No extra model call, fact authentication or provenance enforcement.
-- **L2:** two main-client calls first produce `authorization_steps` with intent and frozen goal_kind (facts/effect/answer/condition/conditional_effect), then select global tools from the complete trusted request, all intents and native definitions/schemas. Types describe progress, not authority or verified business predicates. Merge automatic reads and freeze grants/catalogue within the task. Show authorized definitions without mutating the execution catalogue. No per-intent tool map, dynamic grants, missing-tool repair or task-ID rules; invalid/unauthorized candidates reject the whole batch before L3.
+- **L2:** two main-client calls first produce `authorization_steps` with intent and frozen goal_kind (facts/effect/answer/condition/conditional_effect), host losslessly folds adjacent facts/condition prefixes into the following outcome before assigning IDs, then selects global tools and fixed-ID-key progress associations from the complete trusted request and native definitions/schemas. Independent effects and trailing preparations remain distinct. Types describe progress, not authority or verified business predicates. Merge automatic reads and freeze grants/catalogue within the task. Show authorized definitions without mutating the execution catalogue. Progress-only step_tool_expectations are frozen with global grants, never per-intent permissions. No dynamic grants, missing-tool repair or task-ID rules; invalid/unauthorized candidates reject the whole batch before L3.
 - **Delegated tasks:** explicitly delegated bounded txt/md task sources use existing mediated preparation reads, then compile the complete effective task shared by planner/L2/L3. Preserve raw roles; ordinary tool results cannot create task authority or recursive delegation. Retain existing size/grammar limits and fail-closed behavior. User-confirmed contaminated task files remain outside the approved scope. Trusted bounded host profiles retain their original protocols/ceilings and disable automatic intent state.
-- **Intent progress:** `dscg.intent-progress.host-fsm.v2` accepts only satisfaction/evidence_ids; the host owns state/type/next ID and facts_observed/effect_observed/answer_emitted, while semantic_satisfied records a model judgment. Require exact successful ledger/message matching; current effects need explicit current-intent ownership, successful None is execution evidence, blocks/errors/assistant claims are not. Answer completion needs an actual final reply. Ambiguous needs its final clarification reference to await_user; condition_false only applies to conditional_effect, needs successful read evidence and cannot erase current or previously observed effects. Unknown stays incomplete. Advance only one serial ID on verified completion; no guessed dependency skips. Keep one final continuation and native bounded-stop scoring, never infer business impossibility from exhaustion. No new calls, retries, authorization, argument repair or post-run execution; see the [FSM report](workshop/completed/intent_host_fsm_20261025.md).
+- **Intent progress:** `dscg.intent-progress.host-events.v3` routes mapped preparatory reads locally and answer goals at actual final delivery. Only a host-recognized bounded direct single-invite request, one effect goal and audited successful native None contract may auto-complete; source-dependent/free-form/multiple/conditional/delivery goals remain semantic. Host events have no model response ID. The semantic branch accepts only satisfaction/evidence_ids; the host owns state/type/next ID and facts_observed/effect_observed/answer_emitted, while semantic_satisfied records a model judgment. Require exact successful ledger/message matching; current effects need explicit current-intent ownership, successful None is execution evidence, blocks/errors/assistant claims are not. Answer completion needs an actual final reply. Ambiguous needs its final clarification reference to await_user; condition_false only applies to conditional_effect, needs successful read evidence and cannot erase current or previously observed effects. Unknown stays incomplete. Advance only one serial ID on verified completion; no guessed dependency skips. Keep one final continuation and native bounded-stop scoring, never infer business impossibility from exhaustion. No new calls, retries, authorization, argument repair or post-run execution; see the [FSM report](workshop/completed/intent_host_fsm_20261025.md).
 - **L3:** audit the current intent against the complete original constraints, actual native schema/effects and bounded evidence, using the strict finite four-field verdict. Source injection alone is not a violation; task-linked discovery and derived parameters are allowed, while off-task effects, wrong targets and unrequested forwarding are denied. Outbound body and destination both matter. Final text has no separate action-audit gate.
 - Registered, authorized, schema-valid `effect=read` tools with public/internal sensitivity bypass L3 in off/shadow/selective. This is not filtered by sink, URL source/query/internal host or object privacy; internal tools can access private channels. Personal/secret reads and effects remain audited, with valid deny enforced. Keep these tool-level privacy/exfiltration limitations explicit.
 - **Monitor:** preserve native batch order, one-use whole-batch receipts bound to intent/catalogue/authorization/context, and execution tickets bound to intent state. Audit only the nonexempt subset of a mixed batch without weakening whole-batch mediation. NoL2 disables intent flow; NoChecker retains L2/progress.

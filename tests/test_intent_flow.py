@@ -10,6 +10,10 @@ from dscg.pipelines import defended as d
 from dscg.tool_metadata import set_tool_metadata
 
 
+def expectations(count):
+    return {f"intent_{i+1}":dict(prepare_tools=[],completion_groups=[]) for i in range(count)}
+
+
 def reply(payload):
     return SimpleNamespace(choices=[SimpleNamespace(message=SimpleNamespace(
         content=json.dumps(payload), refusal=None), finish_reason='stop')])
@@ -48,20 +52,20 @@ def tools():
 
 
 class IntentAuthorizationTests(unittest.TestCase):
-    def test_default_compiles_intents_then_global_tools_without_step_mapping(self):
+    def test_default_compiles_intents_then_global_tools_with_progress_only_mapping(self):
         runtime, _ = tools(); client = Mock()
         client.chat.completions.create.side_effect = [
             reply({'authorization_steps': [{'intent': 'Read the article', 'goal_kind': 'facts'}, {'intent': 'Send its summary', 'goal_kind': 'effect'}]}),
-            reply({'tools': ['send_message']})]
+            reply({'tools': ['send_message'], 'step_tool_expectations':expectations(1)})]
         llm = SimpleNamespace(name='offline', client=client)
         grant = d.ToolAuthorizationCompiler(llm).compile(d.TrustedTaskRequest(
             'Read the article Alice mentioned, then send its summary.'), runtime)
         self.assertEqual(client.chat.completions.create.call_count, 2)
         self.assertEqual(grant.public_dict()['authorization_steps'],
-            [{'intent': 'Read the article', 'goal_kind': 'facts'}, {'intent': 'Send its summary', 'goal_kind': 'effect'}])
+            [{'intent': 'Read the article; Send its summary', 'goal_kind': 'effect'}])
         self.assertEqual(grant.allowed_tools, frozenset(runtime.functions))
         second = json.loads(client.chat.completions.create.call_args.kwargs['messages'][1]['content'])
-        self.assertEqual(len(second['authorization_steps']), 2)
+        self.assertEqual(len(second['authorization_steps']), 1)
         self.assertIn('send_message', second['available_tools'])
 
     def test_invalid_intent_does_not_call_tool_selector_or_grant(self):
@@ -99,7 +103,7 @@ class IntentAuthorizationTests(unittest.TestCase):
         runtime, _ = tools(); client = Mock()
         client.chat.completions.create.side_effect = [
             reply({'authorization_steps': [{'intent': 'Read the article, do not send anything', 'goal_kind': 'facts'}]}),
-            reply({'tools': []})]
+            reply({'tools': [], 'step_tool_expectations':expectations(1)})]
         grant = d.ToolAuthorizationCompiler(SimpleNamespace(name='offline', client=client)).compile(
             d.TrustedTaskRequest('Read the article, do not send anything'), runtime)
         self.assertNotIn('send_message', grant.allowed_tools)

@@ -14,3 +14,8 @@ DSCG 维护实现、测试、使用说明和 workshop 优化材料；正式论�
 所有优化计划与报告在 [workshop/](./workshop/README.md)，新 agent 测试产物固定在 `workshop/artifacts/<YYYYMMDD>_<task>/`；用户正式原始实验仍在 `results/`。详见 [AGENTS.md](./AGENTS.md)。
 
 根目录冗余 Paper_TODO 指针已归档；正式计划入口是 [research/paper/Paper_TODO.md](../research/paper/Paper_TODO.md)。本仓库不复制论文计划或自行修改 Go/No-Go 判断。
+
+
+## 2026-10-26 BaseIntent事件路由交付
+
+仅BaseIntent工作区，基线769e11d、未提交。工具级进度关联和宿主事件路由已实现；Qwen最终12例TSR8→7、ASR均0/8，计分Token减少14.8%，质量partial。独立控制、全部失败／连接错误、成本和源码冻结见[阶段报告](workshop/completed/intent_tool_events_20261026.md)。不构成I2覆盖oracle、参数授权或新论文贡献；E0 pending、I3 partial、I2 locked不变。未修改兄弟研究仓库。

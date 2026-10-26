@@ -1,5 +1,8 @@
 # 测试结果文件与L3路由汇总
 
+2026-10-26：默认legacy接入[v352 §4.7事件路由](../workshop/completed/intent_tool_events_20261026.md)。L2第二次请求以宿主固定step-ID键对象增加进度工具关联，不新增调用或权限；授权协议 `intent-global-tools-v4-keyed-event-links`，进度协议 `dscg.intent-progress.host-events.v3`。准备读取可由宿主记录；复杂目标仍需语义判断。`progress_source=host`没有新的response_id，不能沿用上一条模型原文。严格单次直接邀请完成模式不覆盖网站查邮箱／多人／条件／附加交付。新运行名和新配置绑定必需；Dashboard重启后随共享factory采用，无新增控件。
+
+
 ## 精简任务轨迹与独立诊断
 
 2026-10-25 分层诊断 v2 起，新执行的共享DSCG pipeline任务采用如下结构；full、partial、cohort、clean及GOAL预检一致：

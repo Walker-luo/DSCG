@@ -172,8 +172,8 @@ class GoalContractTests(unittest.TestCase):
                 content=json.dumps(payload),refusal=None),finish_reason='stop')])
         client=Mock();client.chat.completions.create.side_effect=[
             reply({'authorization_steps':[{'intent':'Tell me the balance','goal_kind':'answer'}]}),
-            reply({'tools':[]})]
-        intents,kinds,grants=f.compile_authorization(SimpleNamespace(name='offline',client=client),
+            reply({'tools':[], 'step_tool_expectations':{'intent_1':dict(prepare_tools=[],completion_groups=[])}})]
+        intents,kinds,grants,links=f.compile_authorization(SimpleNamespace(name='offline',client=client),
             'Tell me the balance',{},set())
         self.assertEqual(intents,('Tell me the balance',))
         self.assertEqual(kinds,('answer',));self.assertEqual(grants,frozenset())
@@ -204,7 +204,7 @@ class ExhaustionDiagnosticsTests(unittest.TestCase):
         executor.intent_flow=f.IntentFlow(('Answer','Send'),'Answer then send',goal_kinds=('answer','effect'))
         executor.intent_flow.continue_once()
         messages=[dict(role='assistant',content=[dict(type='text',content='I have not answered yet.')],tool_calls=None)]
-        root=Path(__file__).resolve().parents[1]/'workshop/artifacts/20261025_intent_host_fsm'
+        root=Path(__file__).resolve().parents[1]/'workshop/artifacts/20261026_intent_tool_events'
         with TemporaryDirectory(dir=root) as tmp:
             logger=SimpleNamespace(dirpath=tmp,context=dict(pipeline_name='engine',suite_name='sample',
                 user_task_id='user_task_1',attack_type='attack',injection_task_id='injection_task_1'))
