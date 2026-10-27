@@ -212,7 +212,9 @@ class PromptProfileTests(unittest.TestCase):
                                    'prompt_profile_sha256': 'client-forged'})
         self.assertNotEqual(active['prompt_profile_sha256'], 'client-forged')
         active = normalize_config({'suites': list(get_suites()), 'prompt_profile_sha256': 'client-forged'})
-        self.assertNotIn('prompt_profile_sha256', active)
+        self.assertEqual(active['prompt_profile'], 'static-task-v352')
+        self.assertNotEqual(active['prompt_profile_sha256'], 'client-forged')
+        self.assertNotIn('prompt_profile_sha256', normalize_config({'suites': list(get_suites()), 'prompt_profile':'legacy'}))
 
     def test_full_partial_and_cohort_cli_forward_profile_without_model_requests(self):
         from experiments import run_benchmark as full, run_partial_benchmark as partial

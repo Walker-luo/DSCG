@@ -138,7 +138,7 @@ class ReadPolicyTests(unittest.TestCase):
         record=d.AuditDecision('f'*64,decision,vs,confidence,reason,'a'*64,'b'*64,'offline',1.,'ok').public_dict()
         self.assertTrue(d._is_valid_audit_record(record,'f'*64))
 
-    def test_unified_internal_identity(self):self.assertEqual(d.FRAMEWORK_VERSION,'DSCG_v3.5.1')
+    def test_unified_internal_identity(self):self.assertEqual(d.FRAMEWORK_VERSION,'DSCG_v3.5.3')
 
     def test_read_review_contrasts_are_bound_to_run_identity(self):
         from dscg.model_config import ModelConfig
@@ -148,6 +148,6 @@ class ReadPolicyTests(unittest.TestCase):
                 authorization_precheck=True, l1_projection_mode='off', planning_tool_view=True,
                 delegated_tasks=True, audit_router_threshold=.7)
         original = identity()
-        with patch.object(d.ActionSecurityChecker, 'READ_DECISION_EXAMPLES',
+        with patch.object(d.ActionSecurityChecker, 'TASK_READ_DECISION_EXAMPLES',
                           [{'case': 'Changed review contrast'}], create=True):
             self.assertNotEqual(identity(), original)

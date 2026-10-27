@@ -108,7 +108,7 @@ class FullCliTests(unittest.TestCase):
             self.assertEqual(full.cli(['--attack', 'all']), 0)
             self.assertEqual(run.call_args.kwargs['attack'], ['all'])
             self.assertEqual(run.call_args.kwargs['results_dir'], BENCHMARK_RESULTS_DIR)
-            self.assertEqual(run.call_args.kwargs['l1_projection_mode'], 'projected')
+            self.assertEqual(run.call_args.kwargs['l1_projection_mode'], 'off')
             self.assertTrue(run.call_args.kwargs['planning_tool_view'])
             self.assertTrue(run.call_args.kwargs['delegated_tasks'])
             self.assertEqual(run.call_args.kwargs['audit_router_mode'], 'shadow')

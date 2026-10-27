@@ -35,7 +35,10 @@ class NativeIntentSourceTests(unittest.TestCase):
             body=json.loads(request.content);requests.append(body)
             if body.get('response_format'):
                 packet=json.loads(body['messages'][-1]['content'])
-                if 'available_tools' in packet or 'action_tools' in packet:
+                if set(packet) == {'user_request'}:
+                    value={'tasks':[{'intent':'Complete the requested task','quote':packet['user_request'],
+                                     'relation':'independent','condition':''}]}
+                elif 'available_tools' in packet or 'action_tools' in packet:
                     catalog = packet.get('action_tools', packet.get('available_tools', {}))
                     value=json.loads(step_content(json.dumps({'tools':sorted(grants & set(catalog))}),body))
                 else:

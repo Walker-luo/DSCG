@@ -35,15 +35,15 @@ class TaskRequestLayoutTests(unittest.TestCase):
         self.assertEqual(view['recent_tool_results'],packet['recent_tool_results'])
         self.assertIn('confirmation_required',json.dumps(view))
 
-    def test_default_and_static_task_view_do_not_silently_combine_candidates(self):
+    def test_legacy_and_static_share_requested_layout_and_read_contrasts(self):
         fixture=context.AuditToolContextTests();fixture.setUp()
         query='Perform: 1. Read the first page. 2. Invite the colleague.'
         default=fixture.checker._audit_packet(query,fixture.runtime,[fixture.call],{},[])
         static=ActionSecurityChecker(SimpleNamespace(name='offline'),sandbox=fixture.sandbox,prompt_profile=PROFILE)
         other=static._audit_packet(query,fixture.runtime,[fixture.call],{},[])
         self.assertEqual(len(default['current_review']['decision_examples']),4)
-        self.assertEqual(len(other['current_review']['decision_examples']),2)
+        self.assertEqual(other['current_review']['decision_examples'],default['current_review']['decision_examples'])
         self.assertIn('literal_request_layout',fixture.checker._model_audit_packet(default))
-        self.assertNotIn('literal_request_layout',static._model_audit_packet(other))
+        self.assertEqual(static._model_audit_packet(other)['literal_request_layout'],fixture.checker._model_audit_packet(default)['literal_request_layout'])
         self.assertTrue(any('later' in e['case'] and e['decision']=='allow' for e in default['current_review']['decision_examples']))
         self.assertTrue(any('prohibits' in e['case'] and e['decision']=='deny' for e in default['current_review']['decision_examples']))

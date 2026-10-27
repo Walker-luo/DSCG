@@ -1,12 +1,15 @@
 """Versioned, opt-in utility candidates. No permissions or runtime bypasses."""
 import hashlib
 import json
-from dscg.task_view import PROFILE as TASK_VIEW_PROFILE, POLICY as TASK_VIEW_POLICY, GUIDANCE as TASK_VIEW_GUIDANCE, SCHEMA as TASK_VIEW_SCHEMA
+from dscg.task_view import (PROFILE as TASK_VIEW_PROFILE, POLICY as TASK_VIEW_POLICY,
+    GUIDANCE as TASK_VIEW_GUIDANCE, SCHEMA as TASK_VIEW_SCHEMA,
+    PLANNING_POLICY as TASK_PLANNING_POLICY, AUDIT_GUIDANCE as TASK_AUDIT_GUIDANCE)
 
 from dscg.intent_evidence import (PROFILE as V35_PROFILE, AUTH_POLICY as V35_AUTH_POLICY,
     AUDIT_POLICY as V35_AUDIT_POLICY, MAIN_TASK_POLICY, ISOLATION_POLICY, REVIEW_RULES, DECISION_GUIDE, AUDIT_THINKING, AUDIT_FORMAT, AUDIT_PROTOCOL as V35_OUTPUT_PROTOCOL, ENVELOPE_SCHEMA, permission_schema)
 
 PROFILES = ('legacy', 'protocol-v1', 'tool-semantics-v1', 'source-context-v1', 'task-alignment-v1', V35_PROFILE, TASK_VIEW_PROFILE)
+DEFAULT_PROFILE = TASK_VIEW_PROFILE
 CATALOG_SCHEMA = 'dscg.authorization-tool-semantics.v1'
 
 TASK_ALIGNMENT_RULE = (
@@ -104,6 +107,10 @@ def validate_profile(profile):
     return profile
 
 
+def resolve_profile(profile=None, *, origin=False):
+    return validate_profile(('legacy' if origin else DEFAULT_PROFILE) if profile is None else profile)
+
+
 def semantic_catalog(profile):
     return validate_profile(profile) in ('tool-semantics-v1', 'source-context-v1')
 
@@ -111,7 +118,7 @@ def semantic_catalog(profile):
 def audit_policy(legacy, profile):
     validate_profile(profile)
     if profile == TASK_VIEW_PROFILE:
-        return legacy + '\n' + TASK_VIEW_GUIDANCE
+        return legacy + '\n' + TASK_VIEW_GUIDANCE + '\n' + TASK_AUDIT_GUIDANCE
     if profile == V35_PROFILE:
         return V35_AUDIT_POLICY
     if profile == 'task-alignment-v1':
@@ -139,6 +146,7 @@ def profile_binding(profile):
     if profile == TASK_VIEW_PROFILE:
         value = {'profile':profile, 'task_view_policy':TASK_VIEW_POLICY,
                  'task_view_schema':TASK_VIEW_SCHEMA, 'guidance':TASK_VIEW_GUIDANCE,
+                 'planning_policy':TASK_PLANNING_POLICY, 'audit_guidance':TASK_AUDIT_GUIDANCE,
                  'original_request_max_characters':2048,
                  'global_tool_permissions':'tool-permissions-v1', 'progress_state':False}
         return {'prompt_profile':profile, 'prompt_profile_sha256':hashlib.sha256(

@@ -337,7 +337,7 @@ def run_screened(cohort_path, *, config_path=None, run_name=None, results_dir=No
     use_checker = controls.get('use_security_checker', True)
     use_sandbox = controls.get('use_sandbox', True)
     shared._validate_router_controls(origin, use_checker, audit_router_mode, use_sandbox)
-    shared._validate_prompt_profile(origin, use_sandbox, use_checker, controls.get('prompt_profile', 'legacy'))
+    controls['prompt_profile'] = shared._validate_prompt_profile(origin, use_sandbox, use_checker, controls.get('prompt_profile'))
     validate_controls(origin=origin, use_security_checker=use_checker,
                       audit_retries=controls.get('audit_retries', 0), completion_prompt=controls.get('completion_prompt', False))
     security_model = None

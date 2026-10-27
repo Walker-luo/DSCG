@@ -21,7 +21,7 @@ from dscg.input_isolation import FRAMEWORK_VERSION, framework_version_for_profil
 from dscg.l1_projection import MODES as L1_PROJECTION_MODES, PROFILE_SHA256 as L1_PROFILE_SHA256
 from dscg.pipelines.baseline import make_openai_compatible_pipeline
 from dscg.pipelines.defended import make_defended_pipeline, router_configuration_hash, defended_pipeline_name
-from dscg.prompt_profiles import PROFILES as PROMPT_PROFILES, validate_profile, profile_binding
+from dscg.prompt_profiles import PROFILES as PROMPT_PROFILES, resolve_profile, validate_profile, profile_binding
 from dscg.intent_evidence import audit_model_settings
 from dscg.tool_metadata import ToolMetadataError, load_tool_metadata, validate_benchmark_tool_metadata, resolve_tool_metadata
 from experiments.common.benchmark_outcomes import project_outcomes
@@ -84,9 +84,10 @@ def _validate_router_controls(origin, use_security_checker, mode, use_sandbox=Tr
 
 
 def _validate_prompt_profile(origin, use_sandbox, use_checker, profile):
-    validate_profile(profile)
-    if profile != 'legacy' and (origin or not use_sandbox or not use_checker):
+    profile = resolve_profile(profile, origin=origin)
+    if (origin and profile != 'legacy') or (profile not in ('legacy', 'static-task-v352') and (not use_sandbox or not use_checker)):
         raise ValueError('candidate prompt profiles require the defended pipeline with L2 and checker')
+    return profile
 
 
 def _router_trace_summary(suite_dir, task_keys, attack_name, run_attack):
@@ -112,8 +113,7 @@ def _router_trace_summary(suite_dir, task_keys, attack_name, run_attack):
 
 def _describe_pipeline(model_id, sec_model_id, *, origin, defense, **options):
     """Resolve public identity without clients, pipelines, attacks or model requests."""
-    prompt_profile = options.get('prompt_profile', 'legacy')
-    _validate_prompt_profile(origin, options['use_sandbox'], options['use_security_checker'], prompt_profile)
+    prompt_profile = _validate_prompt_profile(origin, options['use_sandbox'], options['use_security_checker'], options.get('prompt_profile'))
     main = resolve_model_config(model_id, prefix='DSCG_MAIN', **{
         k: options.get(k) for k in ('api_key', 'base_url', 'provider', 'api_key_env', 'config_path')})
     name = f'{main.model_id}_{defense}' if origin and defense else main.model_id
@@ -186,7 +186,7 @@ def main(
     planning_tool_view: bool = True,
     delegated_tasks: bool = True,
     l1_projection_mode: str = 'projected',
-    prompt_profile: str = 'legacy',
+    prompt_profile: str | None = None,
     task_scope: str = 'partial',
     use_sandbox: bool = True,
     cohort_sha256: str | None = None,
@@ -237,7 +237,7 @@ def main(
         raise ValueError(f'suites must be a nonempty, unique selection of {", ".join(backend.suites)}')
     if not isinstance(l1_projection_mode, str) or l1_projection_mode not in L1_PROJECTION_MODES:
         raise ValueError('invalid L1 projection mode')
-    _validate_prompt_profile(origin, use_sandbox, use_security_checker, prompt_profile)
+    prompt_profile = _validate_prompt_profile(origin, use_sandbox, use_security_checker, prompt_profile)
     audit_router_threshold = validate_router_options(audit_router_threshold, audit_router_artifact)
     _validate_router_controls(origin,use_security_checker,audit_router_mode,use_sandbox)
     validate_controls(origin=origin, use_security_checker=use_security_checker,
@@ -455,7 +455,7 @@ def _run_single_attack(
     planning_tool_view: bool = True,
     delegated_tasks: bool = True,
     l1_projection_mode: str = 'projected',
-    prompt_profile: str = 'legacy',
+    prompt_profile: str | None = None,
     task_scope: str = 'partial',
     use_sandbox: bool = True,
     cohort_sha256: str | None = None,
@@ -481,7 +481,7 @@ def _run_single_attack(
     suites = list(backend.suites if suites is None else suites)
     if not suites or len(set(suites)) != len(suites) or not set(suites) <= set(backend.suites):
         raise ValueError('invalid suite selection for current backend')
-    _validate_prompt_profile(origin, use_sandbox, use_security_checker, prompt_profile)
+    prompt_profile = _validate_prompt_profile(origin, use_sandbox, use_security_checker, prompt_profile)
     audit_router_threshold = validate_router_options(audit_router_threshold, audit_router_artifact)
     _validate_router_controls(origin,use_security_checker,audit_router_mode,use_sandbox)
     validate_controls(origin=origin, use_security_checker=use_security_checker,
@@ -897,10 +897,10 @@ def cli(argv: list[str] | None = None, *, task_scope: str = 'partial', entrypoin
     parser.add_argument("--no-checker", action="store_true", help="P0 消融：保留授权/monitor/ticket，关闭语义审计。")
     parser.add_argument('--no-tool-view', action='store_true', help='L2 对照：规划器展示完整工具目录，保留执行权限检查。')
     parser.add_argument('--no-delegated-tasks', action='store_true', help='关闭显式任务文件展开，用于原任务编译对照。')
-    parser.add_argument('--prompt-profile', choices=PROMPT_PROFILES, default='legacy',
-                        help='Explicit staged utility candidate; legacy keeps the current default policy')
-    parser.add_argument('--l1-projection-mode', choices=('off','shadow','projected'), default='projected',
-                        help='L1有限交易投影，默认projected；off保留旧来源封装，shadow只观察。')
+    parser.add_argument('--prompt-profile', choices=PROMPT_PROFILES, default=None,
+                        help='默认static-task-v352；baseline默认legacy；显式legacy保留单次授权对照')
+    parser.add_argument('--l1-projection-mode', choices=('off','shadow','projected'), default='off',
+                        help='L1有限交易投影，CLI默认off保留来源封装；shadow只观察，projected启用有限投影。')
     # None selects the profile default below: DSCG shadow, baseline/NoChecker off.
     parser.add_argument("--audit-router-mode", choices=("off", "shadow", "selective"), default=None,
                         help="L3纯算法路由；DSCG CLI默认shadow，baseline/NoChecker默认off；可显式选择。")
@@ -944,7 +944,7 @@ def cli(argv: list[str] | None = None, *, task_scope: str = 'partial', entrypoin
     try:
         validate_controls(origin=args.baseline, use_security_checker=not args.no_checker,
                           audit_retries=args.audit_retries, completion_prompt=args.completion_prompt)
-        _validate_prompt_profile(args.baseline, True, not args.no_checker, args.prompt_profile)
+        args.prompt_profile = _validate_prompt_profile(args.baseline, True, not args.no_checker, args.prompt_profile)
         _validate_router_controls(args.baseline,not args.no_checker,args.audit_router_mode)
         if args.write_task_manifest:
             path = Path(args.write_task_manifest)

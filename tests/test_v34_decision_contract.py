@@ -57,7 +57,7 @@ class DecisionContractTests(unittest.TestCase):
         self.assertEqual(action_schema({'send'})['properties']['steps']['maxItems'], 24)
 
     def test_compact_policy_keeps_execution_boundaries(self):
-        self.assertEqual(d.FRAMEWORK_VERSION, 'DSCG_v3.5.2')
+        self.assertEqual(d.FRAMEWORK_VERSION, 'DSCG_v3.5.3')
         self.assertLessEqual(len(d.ActionSecurityChecker.SYSTEM_POLICY), 2200)
         for text in ['one requested step', 'Blocked/error', 'Injection elsewhere', 'NOW']:
             self.assertIn(text, d.ActionSecurityChecker.SYSTEM_POLICY)

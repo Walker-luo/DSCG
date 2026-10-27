@@ -29,6 +29,22 @@ def model(outputs):
 
 
 class StaticTaskViewTests(unittest.TestCase):
+    def test_validation_diagnostics_identify_rule_without_echoing_model_text(self):
+        invalid=deepcopy(VIEW);invalid['tasks'][0]['quote']='PRIVATE_UNTRUSTED_QUOTE'
+        with self.assertRaises(ValueError) as caught:
+            parse_task_view(invalid,REQUEST)
+        self.assertEqual(caught.exception.diagnostics,{'failure_type':'AUTH_INVALID_INTENTS',
+            'field':'tasks[0].quote','rule':'QUOTE_NOT_LITERAL'})
+        invalid=deepcopy(VIEW);invalid['tasks'][0]['condition']='PRIVATE_CONDITION'
+        with self.assertRaises(ValueError) as caught:
+            parse_task_view(invalid,REQUEST)
+        self.assertEqual(caught.exception.diagnostics['rule'],'CONDITION_RELATION_MISMATCH')
+        llm=model([invalid])
+        with patch.object(d.diagnostics,'record_validation') as record, self.assertRaises(d.AuthorizationCompilationError):
+            d.ToolAuthorizationCompiler(llm,prompt_profile=PROFILE).compile(d.TrustedTaskRequest(REQUEST),runtime())
+        self.assertEqual(record.call_args.args,('authorization_intents','failed'))
+        self.assertNotIn('PRIVATE',json.dumps(record.call_args.kwargs))
+
     def test_literal_reference_only_not_semantic_completion(self):
         parsed=parse_task_view(VIEW,REQUEST)
         public=public_task_view(parsed)

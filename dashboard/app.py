@@ -315,7 +315,7 @@ def run_test_thread(run_id: str, config: dict):
                         use_security_checker=use_security_checker,
                         input_isolation=config.get("input_isolation", True),
                         l1_projection_mode=config.get('l1_projection_mode', 'projected'),
-                        prompt_profile=config.get('prompt_profile', 'legacy'),
+                        prompt_profile=config.get('prompt_profile'),
                         audit_router_mode=config.get('audit_router_mode', 'off'),
                         audit_router_threshold=config.get('audit_router_threshold', DEFAULT_THRESHOLD),
                         authorization_precheck=config.get("authorization_precheck", True),
