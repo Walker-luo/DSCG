@@ -127,6 +127,8 @@ CLI full／partial／cohort中，主模型工具参数JSON语法错误终止当�
 
 ## 可选控制与日志
 
+L2授权编译失败的控制台消息包含 `suite`、`stage`、`user_task_id`、`injection_task_id` 和安全错误码。正式计分阶段为 `scored_task`，可直接定位用户／注入任务对。GOAL预检将注入目标单独当作用户请求执行，此时显示 `stage=goal_preflight user_task_id=none injection_task_id=...`；预检失败／错误警告逐个列出目标，不对应某个普通用户任务。clean显示 `injection_task_id=none`。直接pipeline调用若缺少任务上下文，明确显示 `unknown`。
+
 | 参数 | 用途 |
 | --- | --- |
 | `--model-config PATH`／`--tool-metadata PATH` | 模型连接／审核风险目录 |

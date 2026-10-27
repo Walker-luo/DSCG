@@ -1,5 +1,6 @@
 """Append-only task diagnostics, separate from native interactions and scoring."""
 from contextvars import ContextVar
+from contextlib import contextmanager
 from copy import deepcopy
 import gzip
 import hashlib
@@ -12,6 +13,26 @@ SCHEMA = 'dscg.task-diagnostics.v2'
 LEGACY_SCHEMA = 'dscg.task-diagnostics.v1'
 REQUEST_REFERENCE_SCHEMA = 'dscg.request-reference.v1'
 _current = ContextVar('dscg_task_diagnostics', default=None)
+_task_log_context = ContextVar('dscg_task_log_context', default=None)
+
+
+@contextmanager
+def task_log_context(*, suite, stage, user_task_id, injection_task_id):
+    """Console identity only; never alter native task IDs or persisted evidence."""
+    token = _task_log_context.set(dict(suite_name=suite, stage=stage,
+        user_task_id=user_task_id, injection_task_id=injection_task_id))
+    try:
+        yield
+    finally:
+        _task_log_context.reset(token)
+
+
+def task_log_label(fallback=None):
+    context = _task_log_context.get()
+    if context is None: context = fallback or {}
+    values = {'suite': context.get('suite_name', 'unknown'),
+              **{key: context.get(key, 'unknown') for key in ('stage','user_task_id','injection_task_id')}}
+    return ' '.join(f'{key}={"none" if value is None else value}' for key, value in values.items())
 
 
 class DiagnosticWriteError(OSError):

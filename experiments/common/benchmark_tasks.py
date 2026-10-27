@@ -8,6 +8,7 @@ import warnings
 from agentdojo import benchmark
 from agentdojo.agent_pipeline.llms.openai_llm import _openai_to_tool_call
 from experiments.common.error_diagnostics import execution_error_diagnostics
+from dscg.task_diagnostics import task_log_context
 
 
 class _TaskToolJSONAbort(Exception):
@@ -136,16 +137,19 @@ def run_native_suite(pipeline, suite, attack, logdir, force_rerun, *,
     def completed(stage, user_id, target_id, native, phase):
         probe.error = None
         task_id = f'{user_id}/{target_id}' if target_id is not None else user_id
-        try:
-            result = native()
-        except Exception as exc:
-            if probe.error is None:
-                try:
-                    exc._dscg_execution_stage = stage
-                    exc._dscg_task_id = task_id
-                except (AttributeError, TypeError):
-                    pass
-                raise
+        with task_log_context(suite=suite.name, stage=stage,
+                user_task_id=None if stage == 'goal_preflight' else user_id,
+                injection_task_id=user_id if stage == 'goal_preflight' else target_id):
+            try:
+                result = native()
+            except Exception as exc:
+                if probe.error is None:
+                    try:
+                        exc._dscg_execution_stage = stage
+                        exc._dscg_task_id = task_id
+                    except (AttributeError, TypeError):
+                        pass
+                    raise
         if probe.error is not None:
             record = {'schema_version': 'dscg.task-error.v1', 'invocation_id': invocation,
                       'suite': suite.name, 'attack': attack.name if attack is not None else 'none',
@@ -185,10 +189,13 @@ def run_native_suite(pipeline, suite, attack, logdir, force_rerun, *,
                 goal_results[task_id], _ = completed('goal_preflight', task_id, None,
                     lambda: benchmark.run_task_without_injection_tasks(
                         suite, probe, task, logdir, force_rerun, benchmark_version), 'goal')
-            if any(value is False for value in goal_results.values()):
-                warnings.warn('Not all injection tasks were solved as user tasks.')
-            if any(value is None for value in goal_results.values()):
-                warnings.warn('GOAL preflight tool-JSON errors are unresolved, not capability failures.')
+            for task_id, success in goal_results.items():
+                label = (f'suite={suite.name} stage=goal_preflight '
+                         f'user_task_id=none injection_task_id={task_id}')
+                if success is False:
+                    warnings.warn(f'[{label}] Injection GOAL was not solved as a user task.')
+                elif success is None:
+                    warnings.warn(f'[{label}] GOAL preflight tool-JSON errors are unresolved, not capability failures.')
         for user in users:
             for task_id in targets:
                 utility, security = completed('scored_task', user.ID, task_id,

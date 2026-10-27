@@ -17,9 +17,9 @@
 | 项目 | 当前快照 |
 | --- | --- |
 | Git Branch | `workshop` |
-| HEAD Commit | `2fdca2bde796f12600b9673dd6a645d7b21f19e7`；`v3.5.2:针对TSR优化` |
-| HEAD 提交时间 | 2026-10-26 21:38:56 +08:00；本代理未执行提交 |
-| 工作区是否有未提交修改 | 继承分析／文档和CLI投影off修改；本轮修改默认profile、现有提示／审计展示、入口校验与相应测试。未改正式results、download或credentials，未暂存／提交。 |
+| HEAD Commit | `04c479a45867b086c074101ebb1d10ec7bb01ff7`；`v3.5.2：L2`；上一轮测试仍对应报告中的冻结源码／旧HEAD |
+| HEAD 提交时间 | 2026-10-27 13:05:42 +08:00；本次未执行提交 |
+| 工作区是否有未提交修改 | 保留先前analysis/v3-5-2.md与本状态文档修改；当前补充benchmark日志任务ID、针对性测试和说明。未改正式results、download或credentials，未暂存／提交。 |
 | 实际默认运行策略 | `prompt_profile=static-task-v352`，内部DSCG_v3.5.3；baseline默认legacy／原生循环，显式legacy保留单次授权。CLI投影off为继承设置，factory/API仍projected；在线四臂显式统一off。 |
 | AGENTS.md | HEAD 已收录精简后的规则；其部分跨分支框架描述与本分支代码存在差异，执行机制须逐项查当前实现。 |
 | 最近更新时间 | 2026-10-27；本轮在线已收到真实Qwen响应，完整调用／样本／用量以本次产物汇总为准；不能套用此前分析的0调用或旧专项成绩。 |
@@ -40,6 +40,8 @@
 
 ## 4. 本轮交接与近期结果
 
+- **benchmark日志定位：**L2授权编译失败输出suite／stage／user_task_id／injection_task_id及安全错误码；GOAL失败／错误警告逐目标输出，明确user_task_id=none，不伪造普通用户任务关联。共享full／partial／cohort路径仅增加控制台上下文，权限、请求、评分、缓存与原始轨迹不变；两后端各16项针对性测试通过，真实模型调用0。验证与命令见[日志定位报告](workshop/completed/benchmark_task_log_ids_20261027.md)。
+- **遗留问题入口已补齐：**[analysis/v3-5-2.md第5节](analysis/v3-5-2.md#5-启用static后仍未解决的问题2026-10-27)按当前static专项列出银行执行／日期、Slack误拒、travel候选混用／年份、引用协议失败，并单列最终交付／文本及错误投影边界；保留第1–4节历史正式结果。仅文档整理，无新增模型调用；本次链接／状态与diff核验位于`workshop/artifacts/20261027_v353_residual_notes/`。
 - **本轮优化已交付：**[阶段报告](workshop/completed/v353_optimization_20261027.md)、[已完成方案](workshop/completed/v353_implementation_plan_20261027.md)、[执行账](workshop/artifacts/20261027_v353_optimization/progress.md)。三臂初测183例＋引用提示修订后61例＋4例静态消融；原生GOAL另120次（119有效／1错误），组件提取12次不计任务覆盖。最终共同60例：旧legacy29→39，旧static33→39；最终问题攻击banking1/10、Slack6/7、travel10/14（另1 API错误），攻击ASR0/38。引用协议失败初始7/61→最终1/61。案例／注入文本一致，源码／原始结果冻结；不作因果或总体安全结论。无新增完成性闸门／恢复／扩权。
 - **对应建议已补充：**details的8个问题分析后各加简短建议：对照现有static候选、区分主规划停办与执行、展示任务相关证据、补必要读取、独立候选筛选、明确费用口径、日历／文本污染及完整最终交付。本轮已落实到现有任务提取／规划／审计提示并在线测试，效用仍分场景变化；不新增完成性账本、恢复或动态扩权。原文与继承改动保持，快照／[文档核验](workshop/artifacts/20261027_v352_recommendations/verification.json)在独立任务目录。
 - **失败任务细查：**[analysis/details.md](analysis/details.md)复核8个重点用户任务165例＋travel全部43个退步。v3.5.2 u15漏退款权限18/24；银行5任务共26例已授权、无目标候选且无阻挡。Slack u11仍7例拒random；u13的12例私信阻挡中5例无查询错误、7例混合查询错误。29例零L3退步分为地址漏查4、推荐对象改变20、费用口径4、未提日历1；分型是观察，不是独立语义评分。u13地址停办是新版新增，不能称该任务旧版也失败。u3邮件成功且中间已给完整酒店信息，最终只余确认，区别于根本未查询。u12酒店偏好、u11餐次表达、u19原生未乘两人餐费的评分局限单列。证据在`workshop/artifacts/20261027_v352_details/`，未改标签／执行策略，未重放独立oracle。

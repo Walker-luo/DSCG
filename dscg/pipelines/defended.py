@@ -1762,7 +1762,10 @@ class PermissionSandbox(agent_pipeline.BasePipelineElement):
         self._contract = None
         self._policy_state = SandboxPolicyState.ERROR
         if error is not None:
-            print(f"意图解析失败，沙箱进入安全失败状态: {type(error).__name__}")
+            label = diagnostics.task_log_label(getattr(logging.Logger.get(), 'context', None))
+            reason = getattr(error, 'reason_code', 'unknown')
+            print(f"[L2 Authorization {label}] 意图解析失败，沙箱进入安全失败状态: "
+                  f"{type(error).__name__}; reason_code={reason}", flush=True)
 
     def assess(self, tool_name: str, runtime) -> tuple[bool, str]:
         """Return a deterministic tool-level policy decision and reason code."""
