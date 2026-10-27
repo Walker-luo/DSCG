@@ -2,7 +2,7 @@
 
 DSCG 是工具使用型 LLM Agent 的间接提示词注入防御研究原型，支持 AgentDojo 与 AgentDyn，使用原生评分比较任务成功率（TSR）、攻击成功率（ASR）和模型开销。
 
-当前版本 **DSCG_v3.5.3**，默认 **`prompt_profile=static-task-v352`**，启用两阶段L2；显式`legacy`保留单次授权对照。运行名称不选择策略。 当前结果仍有漏授权、合法动作误拒、漏执行／漏交付及最终回答污染，见[最新分析](analysis/v3-5-2.md)。
+当前版本 **DSCG_v3.5.3**，默认 **`prompt_profile=static-task-v352`**，启用两阶段L2；显式`legacy`保留单次授权对照。运行名称不选择策略。 最新正式结果中travel恢复，banking／Slack仍低于baseline，见[结果分析](analysis/v3-5-3.md)。
 
 ## 当前框架与工作流程
 
@@ -61,7 +61,7 @@ python -m dscg.benchmark_catalog                # 离线检查，无模型调用
 
 后端按实际导入路径、安装来源、版本和revision识别；当前为metadata-only，不认证源码／服务等价性。无需额外后端参数。
 
-模型默认Qwen3.7-Flash，主／审计角色可独立配置。首次参考[模型模板](config/models.example.toml)，配置及Key留在本地文件／环境变量；工具风险目录按后端自动选择。详见[配置指南](docs/model_tool_configuration.md)。
+在线测试统一使用`qwen3.7-flash`，覆盖主模型、授权、审计与GOAL；主／审计配置分别读取。首次参考[模型模板](config/models.example.toml)，配置及Key留在本地文件／环境变量；工具风险目录按后端自动选择。详见[配置指南](docs/model_tool_configuration.md)。
 
 ## 运行测试
 
@@ -91,11 +91,11 @@ python -m dashboard.app
 
 ## 当前限制与验证
 
-本轮Qwen专项完成248次计分，247有效／1 API错误；最终共同60例成功29→39，攻击ASR0/38，收益主要在Slack／travel，banking仅1/10、问题仍未解决。详见[v3.5.3报告](workshop/completed/v353_optimization_20261027.md)。
+最新v3.5.3正式比较仅覆盖导出选定的banking／Slack／travel：共同有效1116例，成功727→741，ASR由2次降至0；banking少20例、Slack少5例，travel多39例。已单列新版2个API故障任务，不将原生重试后的结果当正常有效样本。详见[最新分析](analysis/v3-5-3.md)。
 
-授权和审计约束候选工具动作，不能保证任务完成、事实正确或最终文本无污染。工具级标签也不提供对象／参数硬授权；internal工具可能访问私密对象，URL可能携带敏感参数。AgentDyn的网页／OTP工具可有真实模拟副作用，不能按工具名称免审。
+主要遗留：银行有权限却停在日期澄清、Slack第二频道误拒、28例静态任务视图协议失败，以及推荐／最终答复仍不稳定。此前[248例专项](workshop/completed/v353_optimization_20261027.md)是单独验证，不能替代正式结果。
 
-历史v3.5.2正式比较仅覆盖导出选定的banking／Slack／travel：共同有效1118例，TSR由66.37%降至65.03%，travel新增2次文本ASR；不代表全场景总体。详见[结果分析](analysis/v3-5-2.md)。离线回归仍有已知失败，部分历史profile消融仍有限制，见[当前交接](docs/framework_updates.md)。E0 pending、I3 partial（24有效探针／8范围缺口）、I2 locked。
+授权与审计约束候选工具动作，不保证任务完成、事实／日期正确或最终文本无污染。工具级标签不提供对象／参数硬授权；internal工具可能访问私密对象，URL可能携带敏感参数。离线回归仍有已知I3失败；E0 pending、I3 partial（24有效探针／8范围缺口）、I2 locked。操作与边界见[当前交接](docs/framework_updates.md)。
 
 ## 文档与目录
 
