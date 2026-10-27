@@ -7,9 +7,9 @@ import unittest
 from unittest.mock import patch
 
 from agentdojo.functions_runtime import EmptyEnv, FunctionCall, FunctionsRuntime
-from dscg import audit_router as a
-from dscg.pipelines import defended as d
-from dscg.tool_metadata import set_tool_metadata
+from baseintent import audit_router as a
+from baseintent.pipelines import defended as d
+from baseintent.tool_metadata import set_tool_metadata
 
 
 class ThresholdRouterTests(unittest.TestCase):
@@ -101,7 +101,7 @@ class ThresholdRouterTests(unittest.TestCase):
                 state = element.query(*state)
             self.assertEqual(checker.requests, requests)
             self.assertEqual(self.effects, effects)
-            event = state[4]['dscg_router_events'][0]
+            event = state[4]['baseintent_router_events'][0]
             self.assertEqual(event['actual_bypass'], mode == 'selective')
             if mode == 'shadow':
                 self.assertTrue(event['would_bypass'])

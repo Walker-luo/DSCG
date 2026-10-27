@@ -9,7 +9,7 @@ import serial_fixture
 class PartialRouterTests(unittest.TestCase):
     def test_modes_reach_every_attack_and_baseline_rejects(self):
         self.assertIn('audit_router_mode',inspect.signature(p.main).parameters,'runner routing controls missing')
-        with tempfile.TemporaryDirectory() as out, serial_fixture.patched(), \
+        with tempfile.TemporaryDirectory() as out, serial_fixture.patched(),\
              patch.object(p,'make_defended_pipeline',side_effect=serial_fixture.defended) as run:
             self.assertEqual(p.main(run_attack=False,results_dir=out,audit_router_mode='shadow',audit_router_threshold=.65),0)
             self.assertEqual(run.call_args.kwargs['audit_router_mode'],'shadow')
@@ -29,7 +29,7 @@ class PartialRouterTests(unittest.TestCase):
             p.main(audit_router_artifact='/tmp/old.json', results_dir=out)
 
     def test_summary_separates_potential_from_actual_savings(self):
-        from dscg import audit_router as a
+        from baseintent import audit_router as a
         self.assertTrue(hasattr(a,'summarize_events'),'router cost summary missing')
         events=[dict(route_reason='READ_AUDIT_BYPASS',original_public_bypass=True,actual_bypass=False,eligible=False),
                 dict(mode='shadow',route_reason='BELOW_CALIBRATED_THRESHOLD',original_public_bypass=False,eligible=True,

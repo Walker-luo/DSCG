@@ -5,7 +5,7 @@ import unicodedata
 
 import yaml
 
-INPUT_SCHEMA = 'dscg.audit-input.v2'
+INPUT_SCHEMA = 'baseintent.audit-input.v2'
 EVIDENCE_VERSION = 'task-evidence-v1'
 MAX_RESULTS = 8
 RECENT_RESULTS = 4

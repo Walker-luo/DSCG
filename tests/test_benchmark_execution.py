@@ -1,4 +1,7 @@
 """Read-only preparation and sequential run locking."""
+
+from artifact_support import ensure_artifacts
+ensure_artifacts('test_benchmark_execution')
 from pathlib import Path
 from tempfile import TemporaryDirectory
 import unittest
@@ -10,7 +13,7 @@ class BenchmarkExecutionTests(unittest.TestCase):
         return benchmark_execution
 
     def temporary(self):
-        root = Path(__file__).resolve().parents[1] / 'workshop/artifacts/20261018_serial_lightweight/test_runs'
+        root = Path(__file__).resolve().parents[1] / 'artifacts/tests/test_benchmark_execution'
         root.mkdir(parents=True, exist_ok=True)
         temp = TemporaryDirectory(dir=root); self.addCleanup(temp.cleanup)
         return Path(temp.name)

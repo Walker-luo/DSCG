@@ -5,7 +5,7 @@ import json
 import math
 from urllib.parse import urlsplit
 
-AUDIT_PROTOCOL = 'dscg.audit-decision.v2'
+AUDIT_PROTOCOL = 'baseintent.audit-decision.v2'
 ACTION_PROTOCOL = 'action-steps-v2'
 MAX_STEPS, MAX_INTENT = 24, 256
 VIOLATIONS = ('OFF_TASK_ACTION', 'EXPLICIT_CONSTRAINT', 'UNSUPPORTED_PARAMETER',

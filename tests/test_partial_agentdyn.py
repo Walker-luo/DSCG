@@ -1,4 +1,7 @@
 """AgentDyn namespace/provenance boundaries; no model or fork dependency."""
+
+from artifact_support import ensure_artifacts
+ensure_artifacts('test_partial_agentdyn')
 import json
 from pathlib import Path
 from tempfile import TemporaryDirectory as _TemporaryDirectory
@@ -17,7 +20,7 @@ IDENTITY = {'id': 'agentdyn', 'repository': 'https://github.com/SaFo-Lab/AgentDy
 
 def TemporaryDirectory(*args, **kwargs):
     """Keep generated offline fixtures within this task's artifact root."""
-    root = Path(__file__).resolve().parents[1] / 'workshop/artifacts/20261018_dual_benchmark/runner/test_runs'
+    root = Path(__file__).resolve().parents[1] / 'artifacts/tests/test_partial_agentdyn'
     root.mkdir(parents=True, exist_ok=True)
     kwargs.setdefault('dir', root)
     return _TemporaryDirectory(*args, **kwargs)
@@ -46,8 +49,8 @@ class DualBackendRunnerContracts(unittest.TestCase):
     def test_exports_resolve_runtime_catalog_without_reimport(self):
         suite = SimpleNamespace(user_tasks=dict.fromkeys(['u0', 'u1', 'u2', 'u3']), injection_tasks=dict.fromkeys(['i0', 'i1', 'i2', 'i3']))
         for identity in (DOJO_IDENTITY, IDENTITY):
-            with self.subTest(backend=identity['id']), patch.object(controls, 'get_backend', create=True, return_value=profile(identity)), \
-                    patch.object(controls, 'get_suites', create=True, return_value=profile(identity).suites), \
+            with self.subTest(backend=identity['id']), patch.object(controls, 'get_backend', create=True, return_value=profile(identity)),\
+                    patch.object(controls, 'get_suites', create=True, return_value=profile(identity).suites),\
                     patch.object(controls, 'benchmark_identity', return_value=identity), patch.object(controls, 'get_suite', return_value=suite):
                 for scope, size in (('full', 4), ('partial', 3)):
                     manifest = controls.make_task_manifest(scope)
@@ -78,7 +81,7 @@ class InstalledBackendRunnerTests(unittest.TestCase):
     def test_actual_cli_exports_current_backend_scope_without_models(self):
         from contextlib import redirect_stdout
         from io import StringIO
-        from dscg.benchmark_catalog import get_backend, benchmark_identity, get_suite
+        from baseintent.benchmark_catalog import get_backend, benchmark_identity, get_suite
         from experiments import run_benchmark as full
         backend = get_backend()
         expected = {'agentdojo': ('workspace', 'travel', 'banking', 'slack'),
@@ -113,7 +116,7 @@ class AgentDynRunnerContracts(unittest.TestCase):
         self.assertEqual(runner._apply_run_name(pipeline, 'model/id', None), 'native-model')
 
     def test_backend_rejected_before_model_or_output_creation(self):
-        with patch.object(runner, 'get_backend', create=True, side_effect=ValueError('wrong fork')), \
+        with patch.object(runner, 'get_backend', create=True, side_effect=ValueError('wrong fork')),\
                 patch.object(runner, 'make_openai_compatible_pipeline') as factory, TemporaryDirectory() as root:
             with self.assertRaisesRegex(ValueError, 'wrong fork'):
                 runner.main(origin=True, results_dir=root, run_name='blocked')
@@ -137,8 +140,8 @@ class AgentDynRunnerContracts(unittest.TestCase):
     def test_export_and_plan_have_required_identity(self):
         suite = SimpleNamespace(user_tasks={'u0': None, 'u1': None, 'u2': None, 'u3': None},
                                 injection_tasks={'i0': None, 'i1': None, 'i2': None, 'i3': None})
-        with patch.object(controls, 'benchmark_identity', create=True, return_value=IDENTITY), \
-                patch.object(reuse, 'benchmark_identity', create=True, return_value=IDENTITY), \
+        with patch.object(controls, 'benchmark_identity', create=True, return_value=IDENTITY),\
+                patch.object(reuse, 'benchmark_identity', create=True, return_value=IDENTITY),\
                 patch.object(controls, 'get_suite', return_value=suite):
             for scope in ('partial', 'full'):
                 manifest = controls.make_task_manifest(scope)
@@ -149,7 +152,7 @@ class AgentDynRunnerContracts(unittest.TestCase):
     def test_foreign_task_manifest_rejected_without_modification(self):
         with TemporaryDirectory() as root, patch.object(controls, 'benchmark_identity', create=True, return_value=IDENTITY):
             path = Path(root) / 'manifest.json'
-            raw = json.dumps({'schema_version': 'dscg.partial-tasks.v1', 'suite_version': 'v1.2', 'suites': {}})
+            raw = json.dumps({'schema_version': 'baseintent.partial-tasks.v1', 'suite_version': 'v1.2', 'suites': {}})
             path.write_text(raw)
             with self.assertRaises(ValueError): controls.load_task_manifest(path)
             self.assertEqual(path.read_text(), raw)
@@ -159,8 +162,8 @@ class AgentDynOfflineExecution(unittest.TestCase):
     def setUp(self):
         stack = fixture_backend(IDENTITY)
         self.addCleanup(stack.close)
-        description = SimpleNamespace(name='provider/model', dscg_model_config={'model_id': 'provider/model'},
-                                      dscg_security_model_config={}, dscg_optimization_config={})
+        description = SimpleNamespace(name='provider/model', baseintent_model_config={'model_id': 'provider/model'},
+                                      baseintent_security_model_config={}, baseintent_optimization_config={})
         patcher = patch.object(runner, '_describe_pipeline', return_value=description)
         patcher.start(); self.addCleanup(patcher.stop)
         self.suite = SimpleNamespace(user_tasks={f'user_task_{i}': None for i in range(4)},
@@ -171,7 +174,7 @@ class AgentDynOfflineExecution(unittest.TestCase):
         patcher.start(); self.addCleanup(patcher.stop)
 
     def test_defended_metadata_preflight_rejects_before_model_creation(self):
-        from dscg.tool_metadata import ToolMetadataError
+        from baseintent.tool_metadata import ToolMetadataError
         with TemporaryDirectory() as root, patch.object(runner, 'validate_benchmark_tool_metadata', create=True,
                 side_effect=ToolMetadataError('missing classification')), patch.object(runner, 'make_defended_pipeline') as factory:
             with self.assertRaisesRegex(ToolMetadataError, 'missing classification'):
@@ -187,9 +190,9 @@ class AgentDynOfflineExecution(unittest.TestCase):
         selection = SimpleNamespace(path=Path(record['path']), public_dict=lambda: record)
         def results(*args, **kwargs):
             return {'utility_results': {(u, None): True for u in kwargs['user_tasks']}}
-        with TemporaryDirectory() as root, redirect_stdout(StringIO()) as output, patch.object(runner, 'resolve_tool_metadata', create=True, return_value=selection), \
-                patch.object(runner, 'load_tool_metadata', return_value={}), \
-                patch.object(runner, 'make_defended_pipeline', side_effect=lambda *a, **k: (*self.factory(), None)), \
+        with TemporaryDirectory() as root, redirect_stdout(StringIO()) as output, patch.object(runner, 'resolve_tool_metadata', create=True, return_value=selection),\
+                patch.object(runner, 'load_tool_metadata', return_value={}),\
+                patch.object(runner, 'make_defended_pipeline', side_effect=lambda *a, **k: (*self.factory(), None)),\
                 patch.object(runner.benchmark, 'benchmark_suite_without_injections', side_effect=results):
             self.assertEqual(runner.main(run_attack=False, results_dir=root, run_name='metadata', suites=['shopping']), 0)
             summary = json.loads((Path(root) / 'agentdyn/provider-model_metadata/none/shopping/summary.json').read_text())
@@ -199,23 +202,23 @@ class AgentDynOfflineExecution(unittest.TestCase):
             self.assertIn(record['warning'], output.getvalue())
 
     def factory(self, *args, **kwargs):
-        return SimpleNamespace(name='provider/model', dscg_model_config={'model_id': 'provider/model'}), SimpleNamespace(
+        return SimpleNamespace(name='provider/model', baseintent_model_config={'model_id': 'provider/model'}), SimpleNamespace(
             total_prompt_tokens=0, total_completion_tokens=0, get_total_tokens=lambda: 0)
 
     def test_full_partial_clean_and_typical_keep_native_results_and_identity(self):
         from contextlib import redirect_stdout
         from io import StringIO
         from experiments import run_benchmark as full
-        root = Path(__file__).resolve().parents[1] / 'workshop/artifacts/20261018_dual_benchmark/runner/test_runs'
+        root = Path(__file__).resolve().parents[1] / 'artifacts/tests/test_partial_agentdyn'
         root.mkdir(parents=True, exist_ok=True)
         def results(pipeline, suite, *args, **kwargs):
             keys = [(u, i) for u in kwargs['user_tasks'] for i in kwargs.get('injection_tasks', [None])]
             return {'utility_results': {k: n != 0 for n, k in enumerate(keys)},
                     'security_results': {k: n == 0 for n, k in enumerate(keys)}}
-        with TemporaryDirectory(dir=root) as directory, redirect_stdout(StringIO()), \
-                patch.object(runner, 'make_openai_compatible_pipeline', side_effect=self.factory), \
-                patch.object(runner.attacks, 'load_attack', side_effect=lambda name, *a: SimpleNamespace(name=name, is_dos_attack=False)), \
-                patch.object(runner.benchmark, 'benchmark_suite_with_injections', side_effect=results), \
+        with TemporaryDirectory(dir=root) as directory, redirect_stdout(StringIO()),\
+                patch.object(runner, 'make_openai_compatible_pipeline', side_effect=self.factory),\
+                patch.object(runner.attacks, 'load_attack', side_effect=lambda name, *a: SimpleNamespace(name=name, is_dos_attack=False)),\
+                patch.object(runner.benchmark, 'benchmark_suite_with_injections', side_effect=results),\
                 patch.object(runner.benchmark, 'benchmark_suite_without_injections', side_effect=results):
             for identity in (DOJO_IDENTITY, IDENTITY):
                 with fixture_backend(identity):
@@ -238,7 +241,7 @@ class AgentDynOfflineExecution(unittest.TestCase):
                                 self.assertEqual(summary['metrics']['attack_success_rate'], 1 / (size * size) if attacked else None)
                             plan = json.loads((base / 'benchmark_plan.json').read_text())
                             self.assertEqual(plan['benchmark'], identity)
-                            self.assertEqual(plan['schema_version'], 'dscg.benchmark-plan.v2')
+                            self.assertEqual(plan['schema_version'], 'baseintent.benchmark-plan.v2')
 
 
 def legacy_suite_dispatch(pipeline, suite, attack, logdir, force_rerun, *,
@@ -294,6 +297,6 @@ def legacy_fixture_backend(namespace, model="offline-model"):
     stack = fixture_backend(DOJO_IDENTITY, native_legacy=True)
     if 'serial_fixture' not in namespace:
         stack.enter_context(patch.object(runner, '_describe_pipeline', side_effect=lambda *a, **k:
-            SimpleNamespace(name=a[0] or model, dscg_model_config={'model_id': a[0] or model},
-                            dscg_security_model_config={}, dscg_optimization_config={})))
+            SimpleNamespace(name=a[0] or model, baseintent_model_config={'model_id': a[0] or model},
+                            baseintent_security_model_config={}, baseintent_optimization_config={})))
     return stack

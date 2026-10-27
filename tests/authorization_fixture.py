@@ -13,7 +13,7 @@ def step_content(content, request):
         if not isinstance(value, dict) or set(value) != {'tools'} or not isinstance(value['tools'], list):
             return content
         names = value['tools']
-        if request.get('response_format', {}).get('json_schema', {}).get('name') == 'dscg_action_steps_v2' or 'do not output read-only steps' in request['messages'][0]['content']:
+        if request.get('response_format', {}).get('json_schema', {}).get('name') == 'baseintent_action_steps_v2' or 'do not output read-only steps' in request['messages'][0]['content']:
             names = [n for n in names if n not in catalog or catalog[n].get('authorization') != 'automatic_read']
             return json.dumps({'steps': [{'intent': 'Authored fixture task', 'tools': names}] if names else []})
         return json.dumps({'steps':[{'intent':'Authored fixture task','tools':names}], 'tools':names})

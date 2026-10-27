@@ -3,8 +3,8 @@
 import unittest
 from types import SimpleNamespace
 from agentdojo.functions_runtime import EmptyEnv, FunctionCall, FunctionsRuntime
-from dscg.pipelines import defended as d
-from dscg.tool_metadata import set_tool_metadata
+from baseintent.pipelines import defended as d
+from baseintent.tool_metadata import set_tool_metadata
 
 
 class RecordingAuditor(d.ActionSecurityChecker):
@@ -46,42 +46,42 @@ class AuthorizationPrecheckTests(unittest.TestCase):
     def test_denied_batch_never_calls_auditor_or_tool(self):
         _,p,c,m,e=self.components();state=self.run_chain(self.state('write_data'),p,c,m,e)
         self.assertEqual(c.requests,[]);self.assertEqual(self.executed,[])
-        self.assertEqual(state[4]['dscg_action_ledger'][0]['state'],'blocked')
-        self.assertEqual(state[4]['dscg_audit_decision']['semantic_attempt'],0)
+        self.assertEqual(state[4]['baseintent_action_ledger'][0]['state'],'blocked')
+        self.assertEqual(state[4]['baseintent_audit_decision']['semantic_attempt'],0)
     def test_mixed_batch_is_atomic_in_either_order(self):
         for names in [('read_data','write_data'),('write_data','read_data')]:
             with self.subTest(names=names):
                 _,p,c,m,e=self.components();state=self.run_chain(self.state(*names),p,c,m,e)
                 self.assertEqual(self.executed,[]);self.assertEqual(c.requests,[])
-                self.assertEqual(len(state[4]['dscg_action_ledger']),2)
-                self.assertTrue(all(x['state']=='blocked' for x in state[4]['dscg_action_ledger']))
+                self.assertEqual(len(state[4]['baseintent_action_ledger']),2)
+                self.assertTrue(all(x['state']=='blocked' for x in state[4]['baseintent_action_ledger']))
     def test_unknown_or_missing_metadata_cannot_be_fixed_by_auditor(self):
         for name in ['ghost_tool','write_data']:
             with self.subTest(name=name):
-                if name=='write_data':self.runtime._dscg_tool_metadata.pop(name)
+                if name=='write_data':self.runtime._baseintent_tool_metadata.pop(name)
                 _,p,c,m,e=self.components(('read_data','write_data'))
                 state=self.run_chain(self.state(name),p,c,m,e)
                 self.assertEqual(self.executed,[]);self.assertEqual(c.requests,[])
-                self.assertEqual(state[4]['dscg_action_ledger'][0]['state'],'blocked')
+                self.assertEqual(state[4]['baseintent_action_ledger'][0]['state'],'blocked')
     def test_public_read_keeps_existing_bypass(self):
         _,p,c,m,e=self.components();state=self.run_chain(self.state('read_data'),p,c,m,e)
         self.assertEqual(self.executed,['read']);self.assertEqual(c.requests,[])
-        self.assertEqual(state[4]['dscg_audit_decision']['reason_code'],'READ_AUDIT_BYPASS')
+        self.assertEqual(state[4]['baseintent_audit_decision']['reason_code'],'READ_AUDIT_BYPASS')
     def test_private_read_is_still_audited_once(self):
         self.metadata['read_data']['sensitivity']='personal';set_tool_metadata(self.runtime,self.metadata)
         _,p,c,m,e=self.components();state=self.run_chain(self.state('read_data'),p,c,m,e)
         self.assertEqual(self.executed,['read']);self.assertEqual(len(c.requests),1)
-        self.assertEqual(state[4]['dscg_audit_decision']['semantic_attempt'],1)
+        self.assertEqual(state[4]['baseintent_audit_decision']['semantic_attempt'],1)
     def test_revoked_permission_after_precheck_cannot_execute(self):
         sandbox,p,c,m,e=self.components();state=c.query(*p.query(*self.state('read_data')))
         sandbox.allowed_tools=[];state=e.query(*m.query(*state))
         self.assertEqual(self.executed,[])
-        self.assertEqual(state[4]['dscg_action_ledger'][0]['state'],'blocked')
+        self.assertEqual(state[4]['baseintent_action_ledger'][0]['state'],'blocked')
     def test_changed_metadata_after_public_bypass_requires_new_boundary(self):
         _,p,c,m,e=self.components();state=c.query(*p.query(*self.state('read_data')))
         self.metadata['read_data']['sensitivity']='secret';set_tool_metadata(self.runtime,self.metadata)
         state=e.query(*m.query(*state));self.assertEqual(self.executed,[])
-        self.assertEqual(state[4]['dscg_action_ledger'][0]['state'],'blocked')
+        self.assertEqual(state[4]['baseintent_action_ledger'][0]['state'],'blocked')
     def test_rejected_read_cannot_use_read_deny_override(self):
         _,p,c,m,e=self.components(('write_data',))
         state=self.run_chain(self.state('read_data'),p,c,m,e)
@@ -104,7 +104,7 @@ class AuthorizationPrecheckTests(unittest.TestCase):
                     spec.name='changed-name'
                 state=e.query(*m.query(*state))
                 self.assertEqual(self.executed,[])
-                self.assertEqual(state[4]['dscg_action_ledger'][0]['state'],'blocked')
+                self.assertEqual(state[4]['baseintent_action_ledger'][0]['state'],'blocked')
     def test_missing_precheck_receipt_never_executes(self):
         _,p,c,m,e=self.components();state=c.query(*self.state('read_data'))
         state=e.query(*m.query(*state));self.assertEqual(self.executed,[])
@@ -116,4 +116,4 @@ class AuthorizationPrecheckTests(unittest.TestCase):
     def test_final_answer_creates_no_audit_or_rejection(self):
         _,p,c,m,e=self.components();state=self.state()
         state=self.run_chain(state,p,c,m,e)
-        self.assertEqual(c.requests,[]);self.assertNotIn('dscg_action_ledger',state[4])
+        self.assertEqual(c.requests,[]);self.assertNotIn('baseintent_action_ledger',state[4])

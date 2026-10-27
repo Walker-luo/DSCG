@@ -9,10 +9,10 @@ import threading
 import time
 
 from agentdojo import benchmark, logging
-from dscg.benchmark_catalog import get_suite, benchmark_identity, validate_backend, get_backend, get_suites, same_backend
-from dscg.model_config import resolve_model_config
-from dscg.paths import RESULTS_DIR
-from dscg.pipelines.baseline import make_openai_compatible_pipeline
+from baseintent.benchmark_catalog import get_suite, benchmark_identity, validate_backend, get_backend, get_suites, same_backend
+from baseintent.model_config import resolve_model_config
+from baseintent.paths import RESULTS_DIR
+from baseintent.pipelines.baseline import make_openai_compatible_pipeline
 from experiments import run_partial_benchmark as shared
 from experiments.common.partial_controls import source_revision, guard_run
 from experiments.common.result_paths import resolve_run_path
@@ -108,7 +108,7 @@ def _native_attempt(directory, suite, task, config, binding):
     except Exception as exc:
         # Preserve native traces; provider exception text can contain private input.
         record['error_type'] = type(exc).__name__
-        from dscg.request_compatibility import api_error_diagnostics
+        from baseintent.request_compatibility import api_error_diagnostics
         diagnostic = api_error_diagnostics(exc)
         if diagnostic is not None:
             record['api_error'] = diagnostic

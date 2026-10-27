@@ -4,7 +4,7 @@ import unittest
 
 from agentdojo.functions_runtime import FunctionCall
 
-from dscg.pipelines.defended import (
+from baseintent.pipelines.defended import (
     OurFrameExecutor,
     PermissionSandbox,
     SandboxPolicyState,

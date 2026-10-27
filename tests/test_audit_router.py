@@ -5,8 +5,8 @@ import unittest
 
 class AlgorithmRouterTests(unittest.TestCase):
     def api(self):
-        self.assertIsNotNone(importlib.util.find_spec('dscg.audit_router'), 'local algorithm is missing')
-        from dscg import audit_router
+        self.assertIsNotNone(importlib.util.find_spec('baseintent.audit_router'), 'local algorithm is missing')
+        from baseintent import audit_router
         return audit_router
 
     def test_fixed_score_has_no_training_and_ignores_identity_fields(self):

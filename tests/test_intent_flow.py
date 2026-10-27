@@ -6,8 +6,8 @@ import unittest
 from unittest.mock import Mock
 
 from agentdojo.functions_runtime import FunctionsRuntime, FunctionCall, EmptyEnv
-from dscg.pipelines import defended as d
-from dscg.tool_metadata import set_tool_metadata
+from baseintent.pipelines import defended as d
+from baseintent.tool_metadata import set_tool_metadata
 
 
 def expectations(count):
@@ -92,7 +92,7 @@ class IntentAuthorizationTests(unittest.TestCase):
             reply({'authorization_steps': [{'intent': 'Send a summary', 'goal_kind': 'effect'}]}), reply({'tools': ['unknown']})]
         sandbox = d.PermissionSandbox(['send_message'])
         llm = SimpleNamespace(name='offline', client=client, query=Mock())
-        from dscg.intent_flow import IntentFlowError
+        from baseintent.intent_flow import IntentFlowError
         with self.assertRaises(IntentFlowError):
             d.OurFrameExecutor(llm, sandbox=sandbox).query('Send a summary', runtime, EmptyEnv(),
                 [dict(role='user', content=[dict(type='text', content='Send a summary')])], {})
@@ -110,7 +110,7 @@ class IntentAuthorizationTests(unittest.TestCase):
         self.assertEqual(len(grant.authorization_intents), 1)
 
     def test_unmatched_host_profile_preserves_compliant_single_tools_fallback(self):
-        from dscg.l2_authorization import ToolAuthorizationProfile
+        from baseintent.l2_authorization import ToolAuthorizationProfile
         runtime, _ = tools(); client = Mock()
         def compliant_reply(**kwargs):
             policy = kwargs['messages'][0]['content']
@@ -130,7 +130,7 @@ class IntentAuthorizationTests(unittest.TestCase):
                 self.assertEqual(grant.authorization_intents, ())
 
     def test_bounded_fallback_identity_binds_its_actual_tools_policy(self):
-        from dscg.model_config import ModelConfig
+        from baseintent.model_config import ModelConfig
         from unittest.mock import patch
         config = ModelConfig('offline','offline','https://offline.invalid','custom')
         def binding():
@@ -144,7 +144,7 @@ class IntentAuthorizationTests(unittest.TestCase):
 
 class IntentStateTests(unittest.TestCase):
     def test_current_return_and_final_answer_survive_a_full_old_evidence_window(self):
-        from dscg.intent_flow import IntentFlow
+        from baseintent.intent_flow import IntentFlow
         messages = [dict(role='tool', content=[dict(type='text',content='x'*2048)],
             tool_call_id='old-'+str(i), error=None) for i in range(8)]
         messages.extend([dict(role='tool',content=[dict(type='text',content='Current fact: 1050')],
@@ -210,7 +210,7 @@ class IntentReadBoundaryTests(unittest.TestCase):
                  FunctionCall(function='get_webpage', args={'url':'www.eve-blog.com'}, id='read')]
         effects, _, _ = self.run_calls(calls, verdict='allow')
         self.assertEqual(effects, [('send','summary'),('read','www.eve-blog.com')])
-        from dscg.intent_flow import IntentFlow
+        from baseintent.intent_flow import IntentFlow
         flow = IntentFlow(('Read blog', 'Send summary'), 'Read and send', goal_kinds=('facts','effect'))
         effects, _, _ = self.run_calls([calls[1]], active_flow=flow,
             mutate=lambda extra: setattr(flow, 'revision', flow.revision+1))
@@ -218,19 +218,19 @@ class IntentReadBoundaryTests(unittest.TestCase):
 
     def test_internal_private_channel_classification_is_tool_level(self):
         runtime, _ = tools()
-        from dscg.intent_flow import exempt_read
+        from baseintent.intent_flow import exempt_read
         set_tool_metadata(runtime, {'get_webpage': dict(effect='read', source='web',
             sink='external_recipient', sensitivity='internal', idempotent=False, reversible=True)})
         self.assertTrue(exempt_read(runtime, FunctionCall(function='get_webpage',
             args={'url':'http://internal/private?token=example'}, id='private-name')))
-        runtime._dscg_tool_metadata.pop('get_webpage')
+        runtime._baseintent_tool_metadata.pop('get_webpage')
         self.assertFalse(exempt_read(runtime, FunctionCall(function='get_webpage', args={'url':'x'}, id='x')))
         effects, _, _ = self.run_calls([FunctionCall(function='get_webpage', args={'url': 'x'}, id='read')],
-            mutate=lambda extra: extra['_dscg_audit_decision'].update(decision='deny'))
+            mutate=lambda extra: extra['_baseintent_audit_decision'].update(decision='deny'))
         self.assertEqual(effects, [])
 
     def test_execution_ticket_cannot_survive_an_intent_state_change(self):
-        from dscg.intent_flow import IntentFlow
+        from baseintent.intent_flow import IntentFlow
         runtime, effects = tools(); sandbox = d.PermissionSandbox(list(runtime.functions))
         flow = IntentFlow(('Read the blog', 'Send its summary'), 'Read and send', goal_kinds=('facts','effect'))
         verifier = d.RouterReceiptVerifier()
@@ -241,7 +241,7 @@ class IntentReadBoundaryTests(unittest.TestCase):
         state = ('Read and send', runtime, EmptyEnv(), [dict(role='assistant',content=[],tool_calls=[
             FunctionCall(function='get_webpage',args={'url':'www.eve-blog.com'},id='read')])], {})
         state = monitor.query(*checker.query(*state))
-        self.assertTrue(state[-1]['_dscg_pending_batch'].actions[0].approved)
+        self.assertTrue(state[-1]['_baseintent_pending_batch'].actions[0].approved)
         flow.revision += 1
         state = d.TicketedToolsExecutor(monitor).query(*state)
         self.assertEqual(effects, [])
@@ -250,7 +250,7 @@ class IntentReadBoundaryTests(unittest.TestCase):
 
 class IntentTaskErrorTests(unittest.TestCase):
     def test_progress_failure_has_null_labels_and_next_task_runs(self):
-        from dscg.intent_flow import IntentFlowError
+        from baseintent.intent_flow import IntentFlowError
         from experiments.common import benchmark_tasks as adapter
         class Pipeline:
             name = 'offline'

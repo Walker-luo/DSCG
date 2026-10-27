@@ -1,4 +1,7 @@
 """Relocated offline commands keep working from the project root."""
+
+from artifact_support import ensure_artifacts
+ensure_artifacts('test_experiments_layout')
 import json
 from pathlib import Path
 import subprocess
@@ -10,7 +13,7 @@ import unittest
 class ExperimentsLayoutTests(unittest.TestCase):
     def test_grouped_harness_cli_preserves_sample_error_denominators(self):
         root = Path(__file__).resolve().parents[1]
-        artifacts = root / 'workshop/artifacts/20261017_experiments_layout/test_runs'
+        artifacts = root / 'artifacts/tests/test_experiments_layout'
         artifacts.mkdir(parents=True, exist_ok=True)
         with TemporaryDirectory(dir=artifacts) as directory:
             output = Path(directory) / 'e0.json'

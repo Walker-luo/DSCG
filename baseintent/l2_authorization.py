@@ -12,7 +12,7 @@ import unicodedata
 
 from agentdojo.functions_runtime import FunctionsRuntime
 from pydantic import create_model
-from dscg.tool_metadata import metadata_catalog_hash, metadata_for_runtime
+from baseintent.tool_metadata import metadata_catalog_hash, metadata_for_runtime
 
 
 def catalog_fingerprint(runtime):
@@ -291,7 +291,7 @@ class DelegatedTaskSpec:
         text = serialized
         if self.output_format in {'yaml_file', 'yaml_email'}:
             import yaml
-            from dscg.audit_context import parse_structured
+            from baseintent.audit_context import parse_structured
             try:
                 item = parse_structured(serialized, MAX_SERIALIZED_TASK_SOURCE)
             except (ValueError, yaml.YAMLError) as exc:

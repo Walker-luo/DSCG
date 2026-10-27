@@ -1,21 +1,9 @@
-# DSCG 与 research 的交互入口
+# BaseIntent 研究状态
 
-DSCG 维护实现、测试、使用说明和 workshop 优化材料；正式论文问题、创新判断、实验协议与投稿计划留在兄弟仓库 [research/](../research/)。
+BaseIntent 是单独维护的研究方向；当前技术说明在 [docs/framework.md](docs/framework.md)，工程状态在 [DV_STATE.md](DV_STATE.md)，配置／验证在 [docs/README.md](docs/README.md)。当前代码与运行不依赖兄弟仓库或历史工程报告。
 
-工程任务唯一入口是 [technical_route.md](../research/technical_route.md)，当前 route-2026-09-30。完成后向 [implementation_status.md](../research/paper/implementation_status.md) 追加 commit、工作树、完整命令/退出码、产物哈希、样本分母、限制和下一步。
+实现研究对象是：可信任务的意图分解、冻结工具能力、执行事件与语义完成判断的分工，以及有状态执行中介。当前仍只提供工具级控制；未实现一般参数／对象授权、事实认证、完整任务覆盖oracle或自动恢复。本次整理不增加算法或论文创新声明。
 
-| 范围 | 当前状态 |
-| --- | --- |
-| P0 | 工具级底座已实现；当前 V2 保留两层防御 |
-| E0 | 真实 harness 审计待完成，合成自检不代表过闸 |
-| I3 | partial：24 条有效样例中 8 条范围缺口，待研究侧复核 |
-| I2 / 三层候选 | 尚未解锁或实现；旧 provenance/source-to-sink 路线保持关闭 |
+前一阶段小样本仍存在效用损失，不能把模型调用减少当成研究质量通过。后续研究设计、独立对照与有效性检查需在本项目明确记录，保留所有失败和实际分母。
 
-所有优化计划与报告在 [workshop/](./workshop/README.md)，新 agent 测试产物固定在 `workshop/artifacts/<YYYYMMDD>_<task>/`；用户正式原始实验仍在 `results/`。详见 [AGENTS.md](./AGENTS.md)。
-
-根目录冗余 Paper_TODO 指针已归档；正式计划入口是 [research/paper/Paper_TODO.md](../research/paper/Paper_TODO.md)。本仓库不复制论文计划或自行修改 Go/No-Go 判断。
-
-
-## 2026-10-26 BaseIntent事件路由交付
-
-仅BaseIntent工作区，基线769e11d、未提交。工具级进度关联和宿主事件路由已实现；Qwen最终12例TSR8→7、ASR均0/8，计分Token减少14.8%，质量partial。独立控制、全部失败／连接错误、成本和源码冻结见[阶段报告](workshop/completed/intent_tool_events_20261026.md)。不构成I2覆盖oracle、参数授权或新论文贡献；E0 pending、I3 partial、I2 locked不变。未修改兄弟研究仓库。
+用户选择保留原Git linked-worktree／历史／remote；代码和研究方向独立不等于Git仓库已拆分。重命名验证的实际范围与限制见 [维护记录](docs/maintenance.md)。

@@ -1,4 +1,4 @@
-"""Explicit risk metadata for tools crossing the DSCG execution boundary.
+"""Explicit risk metadata for tools crossing the BASEINTENT execution boundary.
 
 The registry is attached to a trusted ``FunctionsRuntime`` by the host.  Tool
 names and docstrings are never used to infer effects.  Missing metadata is
@@ -15,9 +15,10 @@ from typing import Any, Iterable, Mapping
 from pathlib import Path
 import os
 import warnings
+from baseintent.compat import environment_aliases
 
 
-TOOL_METADATA_SCHEMA_VERSION = "dscg.tool-risk.v1"
+TOOL_METADATA_SCHEMA_VERSION = "baseintent.tool-risk.v1"
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_TOOL_METADATA_PATH = PROJECT_ROOT / "config" / "tools.local.toml"
 EFFECTS = frozenset({"read", "write", "delete", "financial", "external_send"})
@@ -109,8 +110,11 @@ def resolve_tool_metadata(
     Explicit paths also support isolated custom runtimes and need no benchmark
     identity field. Implicit generic files must be known reviewed catalog copies.
     """
-    environ = os.environ if env is None else env
-    configured = config_path or environ.get("DSCG_TOOL_METADATA")
+    try:
+        environ = environment_aliases(os.environ if env is None else env)
+    except ValueError as exc:
+        raise ToolMetadataError(str(exc)) from None
+    configured = config_path or environ.get("BASEINTENT_TOOL_METADATA")
     if configured:
         path = _absolute_metadata_path(configured)
         if not path.exists():
@@ -118,7 +122,7 @@ def resolve_tool_metadata(
         return ToolMetadataSelection(path, "explicit" if config_path else "environment",
             getattr(backend, "id", None), _catalog_backend_id(path))
     if backend is None:
-        from dscg.benchmark_catalog import get_backend
+        from baseintent.benchmark_catalog import get_backend
 
         backend = get_backend()
     backend_id = backend.id
@@ -323,7 +327,7 @@ def validate_benchmark_tool_metadata(
     Extra override entries are allowed; every selected benchmark tool is checked.
     """
     if required_tools is None:
-        from dscg.benchmark_catalog import get_backend, get_suite
+        from baseintent.benchmark_catalog import get_backend, get_suite
 
         backend = get_backend()
         required_tools = {
@@ -354,13 +358,13 @@ def set_tool_metadata(runtime: Any, metadata: Mapping[str, ToolRiskMetadata | Ma
         if tool_name not in functions:
             raise ToolMetadataError(f"metadata references unregistered tool: {tool_name}")
         catalog[str(tool_name)] = _coerce_metadata(value)
-    runtime._dscg_tool_metadata = catalog
+    runtime._baseintent_tool_metadata = catalog
 
 
 def register_tool_metadata(runtime: Any, tool_name: str, metadata: ToolRiskMetadata | Mapping[str, Any]) -> None:
     """Register one tool after the runtime function has been installed."""
 
-    existing = dict(getattr(runtime, "_dscg_tool_metadata", {}))
+    existing = dict(getattr(runtime, "_baseintent_tool_metadata", {}))
     existing[tool_name] = _coerce_metadata(metadata)
     set_tool_metadata(runtime, existing)
 
@@ -369,7 +373,7 @@ def metadata_for_runtime(runtime: Any) -> dict[str, ToolMetadataStatus]:
     """Validate a complete runtime catalog; omissions become critical entries."""
 
     functions = getattr(runtime, "functions", {})
-    raw_catalog = getattr(runtime, "_dscg_tool_metadata", {})
+    raw_catalog = getattr(runtime, "_baseintent_tool_metadata", {})
     if not isinstance(raw_catalog, Mapping):
         raw_catalog = {}
     statuses: dict[str, ToolMetadataStatus] = {}

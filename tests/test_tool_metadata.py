@@ -4,12 +4,12 @@ from types import SimpleNamespace
 import unittest
 from pathlib import Path
 from unittest.mock import patch
-import dscg.tool_metadata as tool_metadata
+import baseintent.tool_metadata as tool_metadata
 import experiments.tools.generate_tool_metadata as metadata_generator
 
 from agentdojo.functions_runtime import FunctionsRuntime
 
-from dscg.tool_metadata import (
+from baseintent.tool_metadata import (
     ToolMetadataError,
     ToolRiskMetadata,
     load_tool_metadata,
@@ -109,8 +109,8 @@ class ToolMetadataTests(unittest.TestCase):
             validate_catalog(suites=suites)
 
     def test_generator_rejects_unpinned_backend_as_metadata_configuration_error(self):
-        from dscg.benchmark_catalog import BenchmarkConfigurationError
-        with patch("dscg.benchmark_catalog.get_backend", side_effect=BenchmarkConfigurationError("wrong revision")):
+        from baseintent.benchmark_catalog import BenchmarkConfigurationError
+        with patch("baseintent.benchmark_catalog.get_backend", side_effect=BenchmarkConfigurationError("wrong revision")):
             with self.assertRaisesRegex(ToolMetadataError, "wrong revision"):
                 registered_tools()
 
@@ -190,7 +190,7 @@ class DualBackendMetadataTests(unittest.TestCase):
                 target.write_bytes(source.read_bytes())
                 profiles[name] = SimpleNamespace(id=name, label=name, tool_metadata_path=target,
                     suites=("workspace", "travel", "banking", "slack") if name=="agentdojo" else ("shopping", "github", "dailylife"), suite_version="v1.2")
-            with patch.object(tool_metadata, "PROJECT_ROOT", root), patch.object(tool_metadata, "DEFAULT_TOOL_METADATA_PATH", root/"config/tools.local.toml"), patch("dscg.benchmark_catalog.get_backend", return_value=profiles[active]):
+            with patch.object(tool_metadata, "PROJECT_ROOT", root), patch.object(tool_metadata, "DEFAULT_TOOL_METADATA_PATH", root/"config/tools.local.toml"), patch("baseintent.benchmark_catalog.get_backend", return_value=profiles[active]):
                 yield root, profiles
 
     def test_copy_of_other_backend_generic_is_skipped_with_visible_reason(self):
@@ -259,7 +259,7 @@ class DualBackendMetadataTests(unittest.TestCase):
             override=root/"override.toml"
             override.write_text('[tools.override]\neffect="delete"\n')
             self.assertEqual(set(load_tool_metadata(env={})), {"local"})
-            env={"DSCG_TOOL_METADATA":str(override)}
+            env={"BASEINTENT_TOOL_METADATA":str(override)}
             self.assertEqual(set(load_tool_metadata(env=env)), {"override"})
             self.assertEqual(set(load_tool_metadata(local,env=env)), {"local"})
 

@@ -1,4 +1,7 @@
 """Deterministic state/evidence contracts; these do not test model judgment quality."""
+
+from artifact_support import ensure_artifacts
+ensure_artifacts('test_intent_host_fsm')
 import json
 from hashlib import sha256
 from pathlib import Path
@@ -7,7 +10,7 @@ import unittest
 from types import SimpleNamespace
 from unittest.mock import Mock
 
-from dscg import intent_flow as f
+from baseintent import intent_flow as f
 
 
 def read(owner='intent_1', **changes):
@@ -192,8 +195,8 @@ class GoalContractTests(unittest.TestCase):
 
 class ExhaustionDiagnosticsTests(unittest.TestCase):
     def test_last_host_observation_is_emitted_before_bounded_stop(self):
-        from dscg.pipelines import defended as d
-        from dscg.task_diagnostics import DiagnosticSession
+        from baseintent.pipelines import defended as d
+        from baseintent.task_diagnostics import DiagnosticSession
         from test_intent_flow import tools
         runtime,_=tools();client=Mock()
         client.chat.completions.create.return_value=SimpleNamespace(choices=[SimpleNamespace(
@@ -204,14 +207,14 @@ class ExhaustionDiagnosticsTests(unittest.TestCase):
         executor.intent_flow=f.IntentFlow(('Answer','Send'),'Answer then send',goal_kinds=('answer','effect'))
         executor.intent_flow.continue_once()
         messages=[dict(role='assistant',content=[dict(type='text',content='I have not answered yet.')],tool_calls=None)]
-        root=Path(__file__).resolve().parents[1]/'workshop/artifacts/20261026_intent_tool_events'
+        root=Path(__file__).resolve().parents[1]/'artifacts/tests/test_intent_host_fsm'
         with TemporaryDirectory(dir=root) as tmp:
             logger=SimpleNamespace(dirpath=tmp,context=dict(pipeline_name='engine',suite_name='sample',
                 user_task_id='user_task_1',attack_type='attack',injection_task_id='injection_task_1'))
             with DiagnosticSession(logger,'one',{}):
                 with self.assertRaises(f.IntentFlowError) as caught:
                     executor._observe_intent(messages,{},final=True,runtime=runtime)
-            side=Path(tmp)/'engine/sample/user_task_1/attack/injection_task_1.dscg.jsonl'
+            side=Path(tmp)/'engine/sample/user_task_1/attack/injection_task_1.baseintent.jsonl'
             observations=[row['record']['observation'][0] for row in map(json.loads,side.read_text().splitlines())
                           if row['event']=='intent_progress']
         self.assertEqual(caught.exception.reason_code,'INTENT_NO_PROGRESS')

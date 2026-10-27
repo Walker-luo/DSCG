@@ -13,7 +13,7 @@ from hashlib import sha256
 from pathlib import Path
 from typing import Any, Iterable, Mapping
 
-from dscg.harness_records import RunRecord, SampleRecord, SampleStatus
+from baseintent.harness_records import RunRecord, SampleRecord, SampleStatus
 
 
 def _canonical(value: Any) -> str:
@@ -187,7 +187,7 @@ def audit_cases(cases: Iterable[Mapping[str, Any]], seed: int | str = 20260927) 
         )
     run_record = RunRecord(run_id=str(case_list[0].get("run_id", "audit-run")) if case_list else "audit-run", records=records, seed=seed)
     return {
-        "schema_version": "dscg.harness-audit.v1",
+        "schema_version": "baseintent.harness-audit.v1",
         "seed": seed,
         "manifest_hash": manifest_hash(manifest),
         "sample_counts": run_record.compact_dict()["sample_counts"],

@@ -9,7 +9,7 @@ from dashboard import evaluation
 from dashboard.app import app, runs_store, run_test_thread
 
 
-ARTIFACT_ROOT = Path(__file__).resolve().parents[1] / "workshop/artifacts/20261018_dual_benchmark/dashboard"
+ARTIFACT_ROOT = Path(__file__).resolve().parents[1] / "artifacts/20261027_project_cleanup/dashboard"
 
 
 class DashboardEvaluationTests(unittest.TestCase):
@@ -38,7 +38,7 @@ class DashboardEvaluationTests(unittest.TestCase):
         self.assertFalse(disabled["input_isolation"])
         self.assertFalse(disabled["authorization_precheck"])
 
-    def test_baseline_has_no_dscg_layers_or_security_connection(self):
+    def test_baseline_has_no_baseintent_layers_or_security_connection(self):
         config = evaluation.normalize_config({"suites": ["shopping"], "origin": True,
                                               "sec_api_key": "unused", "sec_model_id": "unused"})
         for key in ("input_isolation", "authorization_precheck", "use_sandbox", "use_security_checker"):
@@ -160,7 +160,7 @@ class DashboardEvaluationTests(unittest.TestCase):
             self.assertEqual(kwargs["trace_level"], "standard")
             self.assertEqual(kwargs["audit_router_mode"], "shadow")
             self.assertEqual(kwargs["audit_router_threshold"], .65)
-            pipeline = SimpleNamespace(name="test-pipeline", dscg_optimization_config={
+            pipeline = SimpleNamespace(name="test-pipeline", baseintent_optimization_config={
                 "framework_version": "three-layer-v1", "input_isolation": False,
                 "authorization_precheck": False, "use_security_checker": True})
             main = SimpleNamespace(total_prompt_tokens=80, total_completion_tokens=20, get_total_tokens=lambda:100)

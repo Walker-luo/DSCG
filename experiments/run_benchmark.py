@@ -5,9 +5,9 @@ Explicit --cohort retains all users in selected suites and frozen kept targets.
 """
 from pathlib import Path
 
-from dscg.paths import BENCHMARK_RESULTS_DIR
+from baseintent.paths import BENCHMARK_RESULTS_DIR
 from experiments import run_partial_benchmark as runner
-from dscg.benchmark_catalog import get_suites
+from baseintent.benchmark_catalog import get_suites
 
 # Preserve helpers imported by older local callers.
 _safe_result_component = runner._safe_result_component

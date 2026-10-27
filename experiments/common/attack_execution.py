@@ -24,7 +24,7 @@ def group_result(job, execute=None):
     except KeyboardInterrupt:
         raise
     except Exception as exc:
-        from dscg.request_compatibility import api_error_diagnostics
+        from baseintent.request_compatibility import api_error_diagnostics
         result = {'status': 'error', 'error_type': type(exc).__name__,
                   'execution_error': execution_error_diagnostics(exc)}
         diagnostic = api_error_diagnostics(exc)
@@ -114,7 +114,7 @@ def iter_attack_results(jobs, *, on_event, execute=None):
             indexed = [(i, {**j, 'resources': {k: v for k, v in j.get('resources', {}).items()
                                              if k in {'task_manifest', 'metadata'}}}) for i, j in indexed]
             receiver, sender = context.Pipe(duplex=False)
-            process = context.Process(target=_attack_worker, args=(sender, indexed, execute), name=f'dscg-{attack}')
+            process = context.Process(target=_attack_worker, args=(sender, indexed, execute), name=f'baseintent-{attack}')
             try:
                 process.start()
                 workers[receiver] = (process, indexed)

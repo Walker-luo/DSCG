@@ -9,7 +9,7 @@ import re
 import yaml
 from agentdojo.functions_runtime import FunctionsRuntime
 from agentdojo.default_suites.v1.tools.banking_client import get_most_recent_transactions, Transaction
-from dscg.tool_metadata import metadata_for_runtime
+from baseintent.tool_metadata import metadata_for_runtime
 
 PROFILE = 'banking-monthly-spending-v1'
 MODES = frozenset({'off','shadow','projected'})

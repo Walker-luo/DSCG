@@ -5,9 +5,9 @@ import unittest
 from pathlib import Path
 from types import SimpleNamespace
 from agentdojo.functions_runtime import EmptyEnv, FunctionCall, FunctionsRuntime
-from dscg import audit_router as a
-from dscg.pipelines import defended as d
-from dscg.tool_metadata import set_tool_metadata
+from baseintent import audit_router as a
+from baseintent.pipelines import defended as d
+from baseintent.tool_metadata import set_tool_metadata
 
 
 class SelectiveAuditTests(unittest.TestCase):
@@ -89,34 +89,34 @@ class SelectiveAuditTests(unittest.TestCase):
     def test_selective_skips_api_but_requires_monitor_and_ticket(self):
         chain=self.setup_chain();state=self.run_chain(chain)
         self.assertEqual(self.effects,['read']);self.assertEqual(chain[1].requests,0)
-        self.assertEqual(state[4]['dscg_audit_decision']['reason_code'],'SELECTIVE_READ_BYPASS')
-        self.assertEqual(state[4]['dscg_audit_decision']['confidence'],0)
-        event=state[4]['dscg_router_events'][0];self.assertTrue(event['actual_bypass']);self.assertEqual(event['semantic_audit_calls'],0)
-        self.assertEqual(event['final_monitor_decision'],'allow');self.assertNotIn('_dscg_router_receipt',state[4])
+        self.assertEqual(state[4]['baseintent_audit_decision']['reason_code'],'SELECTIVE_READ_BYPASS')
+        self.assertEqual(state[4]['baseintent_audit_decision']['confidence'],0)
+        event=state[4]['baseintent_router_events'][0];self.assertTrue(event['actual_bypass']);self.assertEqual(event['semantic_audit_calls'],0)
+        self.assertEqual(event['final_monitor_decision'],'allow');self.assertNotIn('_baseintent_router_receipt',state[4])
 
     def test_shadow_preserves_abstain_and_deny_read_override(self):
         for response,effects in [('allow',['read']),('deny',['read']),('abstain',[]),('error',[])]:
             self.effects.clear();chain=self.setup_chain('shadow',response=response);state=self.run_chain(chain)
             self.assertEqual(self.effects,effects);self.assertEqual(chain[1].requests,1)
-            event=state[4]['dscg_router_events'][0];self.assertTrue(event['would_bypass']);self.assertFalse(event['actual_bypass'])
+            event=state[4]['baseintent_router_events'][0];self.assertTrue(event['would_bypass']);self.assertFalse(event['actual_bypass'])
             self.assertEqual(event['semantic_audit_calls'],1);self.assertIsNone(event['semantic_audit_tokens'])
 
     def test_hard_scope_cannot_be_overridden_by_score(self):
         for sensitivity,effect,sink in [('secret','read','none'),('internal','write','none'),('internal','read','external_recipient')]:
             self.effects.clear();self.md.update(sensitivity=sensitivity,effect=effect,sink=sink);set_tool_metadata(self.runtime,{'read_data':self.md})
             chain=self.setup_chain();state=self.run_chain(chain)
-            self.assertEqual(chain[1].requests,1);self.assertFalse(state[4]['dscg_router_events'][0]['actual_bypass'])
+            self.assertEqual(chain[1].requests,1);self.assertFalse(state[4]['baseintent_router_events'][0]['actual_bypass'])
 
     def test_zero_threshold_is_diagnostic_for_rule_based_candidates(self):
         chain=self.setup_chain(threshold=0);state=self.run_chain(chain)
         self.assertEqual(chain[1].requests,0)
-        self.assertTrue(state[4]['dscg_router_events'][0]['would_bypass'])
+        self.assertTrue(state[4]['baseintent_router_events'][0]['would_bypass'])
 
     def test_forged_or_stale_receipt_cannot_execute(self):
         for mutation in ('token','task','args','catalog','schema','run','artifact','threshold','policy','decision','mode','config'):
             self.effects.clear();chain=self.setup_chain();state=chain[1].query(*chain[0].query(*self.state()))
             q,r,e,m,x=state
-            if mutation=='token':x['_dscg_router_receipt']={'decision':'allow'}
+            if mutation=='token':x['_baseintent_router_receipt']={'decision':'allow'}
             elif mutation=='task':q='Different task'
             elif mutation=='args':m[-1]['tool_calls'][0].args['new']='x'
             elif mutation=='catalog':self.md['sensitivity']='secret';set_tool_metadata(r,{'read_data':self.md})
@@ -125,7 +125,7 @@ class SelectiveAuditTests(unittest.TestCase):
             elif mutation=='artifact':chain[1].audit_router.artifact_sha256='3'*64
             elif mutation=='threshold':chain[1].audit_router.threshold=.9
             elif mutation=='policy':chain[1].audit_router.policy_version='other'
-            elif mutation=='decision':x['_dscg_audit_decision']['confidence']=0.9
+            elif mutation=='decision':x['_baseintent_audit_decision']['confidence']=0.9
             elif mutation=='mode':chain[1].audit_router.mode='shadow'
             elif mutation=='config':chain[1].audit_router.model_config_sha256='4'*64
             state=chain[3].query(*chain[2].query(q,r,e,m,x));self.assertEqual(self.effects,[],mutation)
@@ -137,25 +137,25 @@ class SelectiveAuditTests(unittest.TestCase):
         tools=[{'role':'tool','content':[{'type':'text','content':'<max-depth>'}],'error':None} for _ in range(9)]
         messages=[{'role':'user','content':[]},*tools,m[-1]]
         state=self.run_chain(chain,(q,r,e,messages,x));self.assertEqual(chain[1].requests,0)
-        self.assertTrue(state[4]['dscg_router_events'][0]['completeness_flags']['tool_results_window_truncated'])
+        self.assertTrue(state[4]['baseintent_router_events'][0]['completeness_flags']['tool_results_window_truncated'])
 
     def test_route_marker_removal_and_changed_history_cannot_downgrade_handoff(self):
         for mutation in ('downgrade','history'):
             self.effects.clear();chain=self.setup_chain();q,r,e,m,x=chain[1].query(*chain[0].query(*self.state()))
             if mutation=='downgrade':
-                x.pop('_dscg_router_receipt');x['_dscg_audit_decision'].pop('route_source')
-                x['_dscg_audit_decision']['reason_code']='TEST_ALLOW';q='Different task'
-            else:x['dscg_action_ledger']=[{'state':'blocked'}]
+                x.pop('_baseintent_router_receipt');x['_baseintent_audit_decision'].pop('route_source')
+                x['_baseintent_audit_decision']['reason_code']='TEST_ALLOW';q='Different task'
+            else:x['baseintent_action_ledger']=[{'state':'blocked'}]
             self.run_chain(chain[2:],(q,r,e,m,x));self.assertEqual(self.effects,[],mutation)
 
     def test_shadow_also_authenticates_ordinary_audit_handoff(self):
         chain=self.setup_chain('shadow');q,r,e,m,x=chain[1].query(*chain[0].query(*self.state()))
-        x['_dscg_audit_decision']['reason_code']='FORGED'
+        x['_baseintent_audit_decision']['reason_code']='FORGED'
         self.run_chain(chain[2:],(q,r,e,m,x));self.assertEqual(self.effects,[])
 
     def test_changed_action_history_revokes_selective_receipt(self):
         chain=self.setup_chain();q,r,e,m,x=chain[1].query(*chain[0].query(*self.state()))
-        x['dscg_action_ledger']=[{'state':'blocked'}]
+        x['baseintent_action_ledger']=[{'state':'blocked'}]
         self.run_chain(chain[2:],(q,r,e,m,x));self.assertEqual(self.effects,[])
 
     def test_artifact_denominator_inconsistency_is_not_loadable(self):

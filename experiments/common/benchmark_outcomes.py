@@ -2,7 +2,7 @@
 from pathlib import Path
 
 from experiments.diagnostics.harness_audit import security_result_fields
-from dscg.task_diagnostics import load_task_trace
+from baseintent.task_diagnostics import load_task_trace
 
 
 def project_outcomes(utility_results, security_results, suite_dir, attack, *, run_attack, task_errors=()):
@@ -21,9 +21,9 @@ def project_outcomes(utility_results, security_results, suite_dir, attack, *, ru
             try:
                 raw = load_task_trace(trace)
                 error = (not isinstance(raw, dict) or bool(raw.get('error'))
-                         or bool(raw.get('dscg_infrastructure_failure'))
-                         or ('dscg_diagnostics' in raw and raw.get('dscg_diagnostics_status') != 'complete'))
-                termination = raw.get('dscg_termination') if isinstance(raw,dict) else None
+                         or bool(raw.get('baseintent_infrastructure_failure'))
+                         or ('baseintent_diagnostics' in raw and raw.get('baseintent_diagnostics_status') != 'complete'))
+                termination = raw.get('baseintent_termination') if isinstance(raw,dict) else None
             except (OSError, ValueError):
                 error = True
         attack_success, defense_success, status = security_result_fields(security_results, key, run_attack=run_attack)

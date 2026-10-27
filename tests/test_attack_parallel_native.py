@@ -1,4 +1,7 @@
 """Real spawn + real AgentDojo/AgentDyn cache/loop; no paid model requests."""
+
+from artifact_support import ensure_artifacts
+ensure_artifacts('test_attack_parallel_native')
 from contextlib import redirect_stdout
 from io import StringIO
 import json
@@ -9,7 +12,7 @@ from unittest.mock import patch
 
 import attack_parallel_fixture
 import serial_fixture
-from dscg.benchmark_catalog import get_backend, get_suites, get_suite
+from baseintent.benchmark_catalog import get_backend, get_suites, get_suite
 from experiments import run_partial_benchmark as runner, run_benchmark as full
 from experiments.common.attack_execution import iter_attack_results, iter_serial_results
 
@@ -24,7 +27,7 @@ def inline(jobs, *, on_event):
 
 class NativeAttackParallelTests(unittest.TestCase):
     def setUp(self):
-        root=Path(__file__).resolve().parents[1]/'workshop/artifacts/20261021_attack_parallel/native'
+        root=Path(__file__).resolve().parents[1]/'artifacts/tests/test_attack_parallel_native'
         root.mkdir(parents=True,exist_ok=True)
         temp=TemporaryDirectory(dir=root);self.addCleanup(temp.cleanup)
         self.root=Path(temp.name)
@@ -94,9 +97,9 @@ class NativeAttackParallelTests(unittest.TestCase):
         from experiments import run_injection_precheck as screen
         from experiments.common import injection_cohort as cohort
         suites=list(get_suites())[:2]
-        with serial_fixture.patched(),redirect_stdout(StringIO()), \
-             patch.object(screen,'resolve_model_config',side_effect=serial_fixture.resolve), \
-             patch.object(screen,'make_openai_compatible_pipeline',side_effect=serial_fixture.baseline), \
+        with serial_fixture.patched(),redirect_stdout(StringIO()),\
+             patch.object(screen,'resolve_model_config',side_effect=serial_fixture.resolve),\
+             patch.object(screen,'make_openai_compatible_pipeline',side_effect=serial_fixture.baseline),\
              patch.object(cohort,'resolve_model_config',side_effect=serial_fixture.resolve):
             self.assertEqual(screen.screen(config_path=None,run_name='screen',results_dir=self.root/'screen',suites=suites),0)
             original=self.root/'screen'/get_backend().id/'offline-model_screen/cohort.json'

@@ -1,12 +1,14 @@
+> 历史阶段分析：保留原实验名称和指标；当前实现以 [BaseIntent框架](../docs/framework.md) 和代码为准，本文件不作为运行或验收依赖。
+
 # DSCG 测试与优化计划
 
 ## 2026-10-23 v3.5 后续停止交付
 
 用户追加300万Tokens、取消请求次数上限后完成后续真实迭代：最佳完整六例5/6、同代码确认4/6；未满足两次独立各至少5/6，默认仍legacy/DSCG_v3.4。922请求、919成功响应、已知1,693,429Tokens，3次连接故障usage未知；用户已要求停止真实调用。L3有限思考512/2048未通过，曾出现反例危险allow，未推广。当前显式v35恢复为实际执行的round13，关闭思考、严格JSON Object协议；最后部分运行四条完整、2成功，不补齐假标签。
 
-[后续报告](./workshop/completed/v35_followup_20261023.md) · [阶段计划与剩余候选](./workshop/L2_L3_v35_followup_20261023.md)。下一步仅保留：完整结构化记录的L3呈现（prepared14未调用、未入生产）和主模型多步骤查询遗漏。需新授权后再真实验证；不修补判决、不动态补权、不改原生任务或评分。本轮未做离线回归/完整评测，研究门槛不变。
+后续报告（历史阶段资料，已退出当前文档入口） · 阶段计划与剩余候选（历史阶段资料，已退出当前文档入口）。下一步仅保留：完整结构化记录的L3呈现（prepared14未调用、未入生产）和主模型多步骤查询遗漏。需新授权后再真实验证；不修补判决、不动态补权、不改原生任务或评分。本轮未做离线回归/完整评测，研究门槛不变。
 
-原220请求/384803Tokens的三轮阶段与4/6结论独立保留：[历史报告](./workshop/completed/v35_live_iterations_20261023.md)。
+原220请求/384803Tokens的三轮阶段与4/6结论独立保留：历史报告（历史阶段资料，已退出当前文档入口）。
 
 更新时间：2026-10-22。当前主线是 **先修复 banking／Slack 的通用效用损失，再验证 L3 路由收益**；AgentDyn 的 L2 问题保留为独立后续事项。
 
@@ -14,7 +16,7 @@
 
 ## 0. 最新优化方案（2026-10-22，v3.4实施）
 
-基于最新256条baseline成功/v3.3失败配对，优先改L3，详见[L2／L3完整方案](./workshop/L2_L3_optimization_20261022.md)。已按用户要求实施DSCG_v3.4；用户改为跳过离线回归、直接用Qwen验证固定失败案例。结果见[实施记录](./workshop/completed/v34_decision_contract_20261022.md)；以下旧阶段统计不作为最新成绩。
+基于最新256条baseline成功/v3.3失败配对，优先改L3，详见L2／L3完整方案（历史阶段资料，已退出当前文档入口）。已按用户要求实施DSCG_v3.4；用户改为跳过离线回归、直接用Qwen验证固定失败案例。结果见实施记录（历史阶段资料，已退出当前文档入口）；以下旧阶段统计不作为最新成绩。
 
 - [x] L3使用已验证提供方的JSON Schema约束及有限短代码，保留严格宿主校验/Monitor；分开记录字段、请求与回执失败。
 - [x] L3只判断当前一步及参数事实依据，复核正确摘要、退款、地址与邀请被拒；先保留当前读取范围，shadow/selective另做同配置对照。
@@ -76,7 +78,7 @@
 - [x] **用户要求的框架优化已作为可测候选实现。** `task-alignment-v1`独立替换L2/L3提示，使用原简洁目录，不累计旧长候选；诊断导出默认authorized-v2，补齐合成授权/来源工具/schema检查，旧包按legacy-v1复核。默认legacy及历史响应不变。此次没有新增模型请求；[启用与对照命令](./docs/qwen_utility.md#task-alignment-v1)。
 - [ ] 同轮37项clean三臂、匹配攻击、97项clean及selective独立对照；尚未验证约5pp目标。
 
-[真实诊断报告](./workshop/completed/utility_diagnosis_20261021.md) · [导出/比较方法与响应格式](./docs/qwen_utility.md#2026-10-21固定分阶段诊断)。当前保留短版legacy；新task-alignment由用户下一轮benchmark显式检验，没有修改默认防御、协议、阈值或原始结果；尚未执行37项clean。
+真实诊断报告（历史阶段资料，已退出当前文档入口） · [导出/比较方法与响应格式](./docs/qwen_utility.md#2026-10-21固定分阶段诊断)。当前保留短版legacy；新task-alignment由用户下一轮benchmark显式检验，没有修改默认防御、协议、阈值或原始结果；尚未执行37项clean。
 
 **暂缓项：** 不先调路由阈值、扩展L1投影或增加证据预算。前两轮是shadow，v2虽为selective但无校准artifact，实际新增免审均为0；这不能解释为阈值导致误放或调阈值即可恢复TSR。这描述的是旧运行；当前已按第3节改为普通读取规则候选，personal仍审计，仍待新实验验证。
 
@@ -92,13 +94,13 @@
 - [ ] 后续用户启动固定banking/Slack新shadow，核对路由覆盖和真实阻断；再做同配置selective/baseline配对，报告TSR/ASR、联合成功、有效/错误分母、总Tokens和墙钟延迟。当前离线通过不证明效用/安全提升。
 - [ ] 私密频道/对象识别、独立终态与攻击安全验证仍待设计；不把工具级internal当作对象级公开认证。
 
-[当前规则](./docs/benchmark.md#默认-v33-策略与复测) · [实施记录](./workshop/completed/l3_read_policy_20261022.md)。历史threshold-read-v1及独立校准器保留，不控制当前免审。
+[当前规则](./docs/benchmark.md#默认-v33-策略与复测) · 实施记录（历史阶段资料，已退出当前文档入口）。历史threshold-read-v1及独立校准器保留，不控制当前免审。
 
 ## 4. AgentDyn：L2 专项问题（后续，待设计）
 
 **本节仅针对 AgentDyn 已观察的问题，不代表 AgentDojo 存在相同故障，也不改变当前 AgentDojo 测试优先级。**
 
-AgentDyn shopping 前三用户的单轮 clean：DeepSeek/Qwen baseline 均2/3，当前DSCG、protocol-v1、tool-semantics-v1均0/3。配置实际加载完整的AgentDyn内置65工具目录，授权状态合法且无解析错误；当前证据指向工具漏选。[小样本报告](./workshop/completed/agentdyn_zero_rates_20261020.md) · [根因分析](./workshop/artifacts/20261020_l2_root_cause/analysis.md)
+AgentDyn shopping 前三用户的单轮 clean：DeepSeek/Qwen baseline 均2/3，当前DSCG、protocol-v1、tool-semantics-v1均0/3。配置实际加载完整的AgentDyn内置65工具目录，授权状态合法且无解析错误；当前证据指向工具漏选。小样本报告（历史阶段资料，已退出当前文档入口） · 根因分析（历史阶段资料，已退出当前文档入口）
 
 | 待优化问题 | 当前证据与边界 |
 | --- | --- |
@@ -116,4 +118,4 @@ AgentDyn小样本baseline攻击ASR也为0，Qwen当轮GOAL预检失败；不能�
 
 每轮输出参数/配置表、成对结果与有效/错误分母、失败分类、完整成本和限制说明。当前优先交付 **banking／Slack 协议、授权及来源语义的分阶段对照**；L3读取规则的shadow/selective验证待用户实测，AgentDyn L2 保留为独立后续事项。
 
-E0 pending、I3 partial（24 valid/8 scope violations）、I2 locked不变；工程测试不替代研究闸门。详细历史统计、公式与修订前原文保留在[上一版归档](./workshop/artifacts/20261020_plan_scope_concise/plan.before.md)。
+E0 pending、I3 partial（24 valid/8 scope violations）、I2 locked不变；工程测试不替代研究闸门。详细历史统计、公式与修订前原文保留在上一版归档（历史阶段资料，已退出当前文档入口）。

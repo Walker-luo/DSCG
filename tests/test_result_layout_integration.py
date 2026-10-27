@@ -1,4 +1,7 @@
 """Native cache and evidence remain in place across the backend-folder change."""
+
+from artifact_support import ensure_artifacts
+ensure_artifacts('test_result_layout_integration')
 from contextlib import redirect_stdout
 from io import StringIO
 from pathlib import Path
@@ -7,7 +10,7 @@ import json
 import unittest
 from unittest.mock import patch
 
-from dscg.benchmark_catalog import get_backend, get_suites, get_suite
+from baseintent.benchmark_catalog import get_backend, get_suites, get_suite
 from experiments import run_partial_benchmark as partial, run_benchmark as full, run_injection_precheck as screen
 from experiments.common import injection_cohort as cohort
 import serial_fixture as fixture
@@ -15,7 +18,7 @@ import serial_fixture as fixture
 
 class ResultLayoutIntegrationTests(unittest.TestCase):
     def temporary(self):
-        root=Path(__file__).resolve().parents[1]/'workshop/artifacts/20261018_backend_result_layout/test_runs'
+        root=Path(__file__).resolve().parents[1]/'artifacts/tests/test_result_layout_integration'
         root.mkdir(parents=True,exist_ok=True)
         temp=TemporaryDirectory(dir=root);self.addCleanup(temp.cleanup)
         return Path(temp.name)
@@ -96,9 +99,9 @@ class ResultLayoutIntegrationTests(unittest.TestCase):
     def test_legacy_screen_and_cohort_keep_absolute_evidence_and_resume_in_place(self):
         root=self.temporary();backend=get_backend().id;name=get_suites()[0]
         old=root/f'offline-model_{backend}_screen'
-        with fixture.patched(),redirect_stdout(StringIO()), \
-             patch.object(screen,'resolve_model_config',return_value=fixture.MAIN), \
-             patch.object(screen,'make_openai_compatible_pipeline',side_effect=fixture.baseline), \
+        with fixture.patched(),redirect_stdout(StringIO()),\
+             patch.object(screen,'resolve_model_config',return_value=fixture.MAIN),\
+             patch.object(screen,'make_openai_compatible_pipeline',side_effect=fixture.baseline),\
              patch.object(cohort,'resolve_model_config',side_effect=fixture.resolve):
             with patch.object(screen,'resolve_run_path',return_value=old):
                 self.assertEqual(screen.screen(config_path=None,run_name='screen',suites=[name],results_dir=root),0)
@@ -116,7 +119,7 @@ class ResultLayoutIntegrationTests(unittest.TestCase):
             # Existing legacy screened measurements also resume in their own directory.
             legacy_measure=root/f'offline-model_{backend}_legacy_screened'
             options['run_name']='legacy_screened'
-            with patch.object(cohort,'resolve_run_path',return_value=legacy_measure), \
+            with patch.object(cohort,'resolve_run_path',return_value=legacy_measure),\
                  patch.object(partial,'resolve_run_path',return_value=legacy_measure):
                 self.assertEqual(partial.main(**options),0)
             bindings={p:p.read_bytes() for p in legacy_measure.glob('*/*/run_manifest.json')}

@@ -1,4 +1,7 @@
 """Full CLI suite subsets retain complete task catalogues; no model requests."""
+
+from artifact_support import ensure_artifacts
+ensure_artifacts('test_full_suites')
 from contextlib import ExitStack, redirect_stderr, redirect_stdout
 from io import StringIO
 import json
@@ -15,7 +18,7 @@ from test_full_benchmark import fake_pipeline, fake_attack, fake_results
 
 class FullSuiteTests(unittest.TestCase):
     def setUp(self):
-        root = Path(__file__).resolve().parents[1] / 'workshop/artifacts/20261018_dual_benchmark/runner/test_runs'
+        root = Path(__file__).resolve().parents[1] / 'artifacts/tests/test_full_suites'
         root.mkdir(parents=True, exist_ok=True)
         temp = TemporaryDirectory(dir=root); self.addCleanup(temp.cleanup)
         self.root = Path(temp.name)

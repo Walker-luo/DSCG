@@ -1,5 +1,5 @@
 """Native tool definitions and bounded single-call authorization step records."""
-from dscg.decision_schema import ACTION_PROTOCOL, MAX_STEPS, MAX_INTENT
+from baseintent.decision_schema import ACTION_PROTOCOL, MAX_STEPS, MAX_INTENT
 
 LEGACY_PROTOCOL = 'native-steps-v1'
 PROTOCOL = ACTION_PROTOCOL

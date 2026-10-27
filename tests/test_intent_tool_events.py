@@ -4,8 +4,8 @@ from copy import deepcopy
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
 import unittest
-from dscg import intent_flow as f
-from dscg.benchmark_catalog import get_suite,get_backend
+from baseintent import intent_flow as f
+from baseintent.benchmark_catalog import get_suite,get_backend
 
 
 def mapping(prepare=('get_webpage',), groups=(('invite_user_to_slack',),)):
@@ -56,7 +56,7 @@ class AssociationTests(unittest.TestCase):
         self.assertEqual(fields['completion_groups']['items']['items']['enum'],['invite_user_to_slack'])
 
     def test_compact_authorization_preserves_progress_map(self):
-        from dscg.pipelines import defended as d
+        from baseintent.pipelines import defended as d
         record={'step_tool_expectations':[dict(step_id='intent_1',prepare_tools=[],completion_groups=[])]}
         self.assertEqual(d._compact_authorization_record(record),record)
 
@@ -70,7 +70,7 @@ class HostDiagnosticTests(unittest.TestCase):
     def test_host_event_never_inherits_previous_semantic_response(self):
         from tempfile import TemporaryDirectory
         from pathlib import Path
-        from dscg.task_diagnostics import DiagnosticSession,record_event
+        from baseintent.task_diagnostics import DiagnosticSession,record_event
         with TemporaryDirectory() as root:
             logger=SimpleNamespace(dirpath=root,context=dict(pipeline_name='p',suite_name='s',
                 user_task_id='u',attack_type='none'))
@@ -79,7 +79,7 @@ class HostDiagnosticTests(unittest.TestCase):
                 record_event('intent_progress',dict(revision=2, observations=[dict(
                     progress_source='host',route_reason='PREPARATION_OBSERVED')]))
                 session.finish({})
-            rows=[json.loads(l) for l in (Path(root)/'p/s/u/none/none.dscg.jsonl').read_text().splitlines()]
+            rows=[json.loads(l) for l in (Path(root)/'p/s/u/none/none.baseintent.jsonl').read_text().splitlines()]
             event=next(r for r in rows if r['event']=='intent_progress')
             self.assertNotIn('response_id',event)
 
@@ -162,9 +162,9 @@ class NativeEventPipelineTests(unittest.TestCase):
         import httpx
         from openai import OpenAI
         from agentdojo.functions_runtime import FunctionsRuntime
-        from dscg.pipelines import defended as d
-        from dscg.model_config import ModelConfig
-        from dscg.tool_metadata import load_tool_metadata
+        from baseintent.pipelines import defended as d
+        from baseintent.model_config import ModelConfig
+        from baseintent.tool_metadata import load_tool_metadata
         from test_request_compatibility import completion
         suite=get_suite('v1.2','slack')
         runtime=FunctionsRuntime(suite.tools)
@@ -202,7 +202,7 @@ class NativeEventPipelineTests(unittest.TestCase):
                     tool_metadata=load_tool_metadata('config/tools.agentdojo-v1.2.toml'))
                 result=pipe.query('Invite Fixture Guest at guest@example.org',runtime,env)
             self.assertEqual(count,{'generation':2,'progress':0})
-            state=result[-1]['dscg_intent_flow']
+            state=result[-1]['baseintent_intent_flow']
             self.assertEqual(state['steps'][0]['state'],'completed')
             self.assertEqual(state['observations'][-1]['progress_source'],'host')
             self.assertIsNone(state['steps'][0]['host_facts']['semantic_satisfied'])

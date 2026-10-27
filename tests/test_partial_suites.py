@@ -1,4 +1,7 @@
 """Offline suite selection: CLI scope, scored denominators, and cache identity."""
+
+from artifact_support import ensure_artifacts
+ensure_artifacts('test_partial_suites')
 from contextlib import ExitStack, redirect_stderr, redirect_stdout
 from io import StringIO
 import json
@@ -14,12 +17,12 @@ from experiments import run_partial_benchmark as runner
 
 class PartialSuiteTests(unittest.TestCase):
     def setUp(self):
-        self.artifacts = Path(__file__).resolve().parents[1] / 'workshop/artifacts/20261018_dual_benchmark/runner/test_runs'
+        self.artifacts = Path(__file__).resolve().parents[1] / 'artifacts/tests/test_partial_suites'
         self.artifacts.mkdir(parents=True, exist_ok=True)
 
     def offline(self, stack):
         pipeline = lambda *a, **kw: (
-            SimpleNamespace(name='offline', dscg_model_config={'model_id': 'offline'}),
+            SimpleNamespace(name='offline', baseintent_model_config={'model_id': 'offline'}),
             SimpleNamespace(total_prompt_tokens=0, total_completion_tokens=0, get_total_tokens=lambda: 0),
         )
         stack.enter_context(patch.object(runner, 'make_openai_compatible_pipeline', side_effect=pipeline))

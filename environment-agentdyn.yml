@@ -2,7 +2,7 @@ name: ipi-agentdyn
 # Current benchmark environment. Create alongside the historical ipi environment:
 #   conda env create -f environment-agentdyn.yml
 #   conda activate ipi-agentdyn
-#   python -m dscg.benchmark_catalog
+#   python -m baseintent.benchmark_catalog
 # Startup checks installation origin/revision and config/agentdyn.lock.json source hashes.
 # This declares top-level dependencies; it is not a complete transitive dependency lock.
 channels:

@@ -11,8 +11,8 @@ from pathlib import Path
 import tempfile
 import time
 
-from dscg.model_config import create_openai_client, reasoning_effort_for_config, resolve_model_config
-from dscg.request_compatibility import api_error_diagnostics
+from baseintent.model_config import create_openai_client, reasoning_effort_for_config, resolve_model_config
+from baseintent.request_compatibility import api_error_diagnostics
 from experiments.diagnostics.utility_stages import (
     RESPONSE_SCHEMA, _destination, build_stage, compare_stage, digest, main as compare_cli)
 
@@ -50,7 +50,7 @@ def collect_stage(bundle, config, output_dir, *, max_calls, client_factory=None)
     _save(output/'bundle.json',bundle)
     result = dict(schema_version=RESPONSE_SCHEMA, bundle_sha256=bundle['bundle_sha256'],
                   model_config=config.public_dict(), records=[], collector=dict(
-                      schema_version='dscg.utility-collector.v1', status='prepared',
+                      schema_version='baseintent.utility-collector.v1', status='prepared',
                       stage=bundle['stage'], max_calls=max_calls, attempted_calls=0,
                       sdk_max_retries=0, tools_executed=0, order='counterbalanced_case_repetition_pairs'))
     _save(output/'responses.json',result)
@@ -128,7 +128,7 @@ def main(argv=None):
     reference = json.loads(args.reference_manifest.read_text())
     model = reference['security_model' if args.stage=='audit' else 'main_model']
     config = resolve_model_config(model['model_id'],provider=model['provider'],base_url=model['base_url'],
-                                  api_key_env=model.get('api_key_env'),prefix='DSCG_DIAGNOSTIC')
+                                  api_key_env=model.get('api_key_env'),prefix='BASEINTENT_DIAGNOSTIC')
     bundle = build_stage(args.stage)
     result = collect_stage(bundle,config,args.output_dir,max_calls=args.max_calls)
     compare_cli(['compare','--bundle',str(args.output_dir/'bundle.json'),

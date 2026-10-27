@@ -13,7 +13,7 @@ function dashboard(fetch = async () => ({ok: true, json: async () => []})) {
     return nodes.get(selector);
   };
   for (const id of ['#use-input-isolation', '#use-sandbox', '#use-security-checker', '#authorization-precheck', '#planning-tool-view', '#delegated-tasks']) node(id).checked = true;
-  node('#pipeline-type').value = 'newframe';
+  node('#pipeline-type').value = 'baseintent';
   node('#run-attack').value = 'true';
   node('#trace-level').value = 'summary';
   node('#selection-seed').value = '20260927';
@@ -31,10 +31,14 @@ test('submitted config carries an independently disabled L1 and selected trace l
   const ui = dashboard();
   ui.node('#use-input-isolation').checked = false;
   ui.node('#trace-level').value = 'standard';
-  const config = ui.run('getSelectedConfig()');
-  assert.equal(config.input_isolation, false);
-  assert.equal(config.authorization_precheck, true);
-  assert.equal(config.trace_level, 'standard');
+  for (const type of ['baseintent', 'newframe']) {
+    ui.node('#pipeline-type').value = type;
+    const config = ui.run('getSelectedConfig()');
+    assert.equal(config.origin, false);
+    assert.equal(config.input_isolation, false);
+    assert.equal(config.authorization_precheck, true);
+    assert.equal(config.trace_level, 'standard');
+  }
 });
 
 test('removing L2 disables its precheck while retaining L1 and L3', () => {
@@ -47,7 +51,7 @@ test('removing L2 disables its precheck while retaining L1 and L3', () => {
   assert.equal(config.use_security_checker, true);
 });
 
-test('V2 control removes L1 and candidate precheck but keeps authorization and auditing', () => {
+test('entry ablation control removes L1 and candidate precheck but keeps authorization and auditing', () => {
   const ui = dashboard();
   ui.run("applyDefensePreset('v2')");
   const config = ui.run('getSelectedConfig()');
@@ -122,7 +126,7 @@ test('draft flow follows the effective tool view and delegation switches', () =>
   ui.run("applyDefensePreset('v2')");
   assert.equal(ui.node('#delegation-flow').hidden, true);
   assert.doesNotMatch(ui.node('#framework-flow').textContent, /已授权工具视图/);
-  assert.match(ui.node('#layer-config-note').textContent, /不是历史 V2/);
+  assert.match(ui.node('#layer-config-note').textContent, /入口消融/);
 });
 
 test('saved run keeps its own version and distinguishes router off from disabled L3', async () => {
@@ -134,6 +138,8 @@ test('saved run keeps its own version and distinguishes router off from disabled
   await ui.run("loadOverview('historical-run')");
   assert.match(ui.node('#overview-content').innerHTML, /result-version">three-layer-v1/);
   assert.match(ui.node('#overview-content').innerHTML, /off[^<]*仍启用 L3/);
+  assert.match(ui.node('#overview-content').innerHTML, /历史运行的免审范围未确认/);
+  assert.doesNotMatch(ui.node('#overview-content').innerHTML, /固定豁免/);
   assert.match(ui.node('#overview-content').innerHTML, /L2 1 \/ 2/);
   assert.match(ui.node('#overview-content').innerHTML, /成本未标为可比较/);
   assert.equal(ui.node('#workspace-framework').textContent, 'future-engine-version');

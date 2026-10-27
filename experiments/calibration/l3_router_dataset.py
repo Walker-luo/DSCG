@@ -7,8 +7,8 @@ import argparse
 import json
 from hashlib import sha256
 from pathlib import Path
-from dscg.audit_router import (LABELS, LABEL_SOURCES, INPUT_SCHEMA, argument_flags, digest, risk_score, validate_completeness_flags)
-from dscg.audit_context import FACT_BUDGET, MAX_RESULTS, MAX_CALL_ARGUMENTS
+from baseintent.audit_router import (LABELS, LABEL_SOURCES, INPUT_SCHEMA, argument_flags, digest, risk_score, validate_completeness_flags)
+from baseintent.audit_context import FACT_BUDGET, MAX_RESULTS, MAX_CALL_ARGUMENTS
 
 
 def _sha(value):
@@ -80,7 +80,7 @@ def build_dataset(input_path, output_dir):
     # An unseen development tool cannot qualify in calibration or test.
     for r in rows:r['eligible'] &= tools.get(r['tool_name'])==r['tool_schema_hash']
     groups={split:sorted(g for g,s in group_splits.items() if s==split) for split in ('development','calibration','test')}
-    manifest=dict(schema_version='dscg.router-dataset.v1',input_file_sha256=sha256(src.read_bytes()).hexdigest(),
+    manifest=dict(schema_version='baseintent.router-dataset.v1',input_file_sha256=sha256(src.read_bytes()).hexdigest(),
                   feature_version='lexical-max-v1',valid_actions=len(rows),valid_groups=len(group_splits),
                   invalid_actions=len(excluded),excluded=excluded,split_groups=groups,bindings=bindings,
                   approved_tool_schema_hashes=tools,label_sources=sorted(sources),cost_unit='audit-packet-json-characters',

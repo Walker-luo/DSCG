@@ -1,11 +1,14 @@
 """Frozen-list validation never opens the original screening evidence."""
+
+from artifact_support import ensure_artifacts
+ensure_artifacts('test_cohort_lightweight')
 from copy import deepcopy
 import json
 from pathlib import Path
 import unittest
 from unittest.mock import patch
 
-from dscg.model_config import ModelConfig
+from baseintent.model_config import ModelConfig
 from experiments.common import injection_cohort as cohort
 from test_injection_precheck import FakeSuite
 from test_partial_agentdyn import TemporaryDirectory, DOJO_IDENTITY, profile
@@ -13,7 +16,7 @@ from test_partial_agentdyn import TemporaryDirectory, DOJO_IDENTITY, profile
 
 class CohortLightweightTests(unittest.TestCase):
     def setUp(self):
-        root = Path(__file__).resolve().parents[1] / 'workshop/artifacts/20261021_cohort_lightweight/tests'
+        root = Path(__file__).resolve().parents[1] / 'artifacts/tests/test_cohort_lightweight'
         root.mkdir(parents=True, exist_ok=True)
         temp = TemporaryDirectory(dir=root); self.addCleanup(temp.cleanup)
         self.path = Path(temp.name) / 'cohort.json'
@@ -38,9 +41,9 @@ class CohortLightweightTests(unittest.TestCase):
 
     def test_reads_only_frozen_list_and_ignores_original_goals_decisions_and_evidence(self):
         original = self.path.read_bytes()
-        with patch.object(cohort, '_file_hash', side_effect=AssertionError('evidence hash')), \
-             patch.object(cohort, '_trace_status', side_effect=AssertionError('native scoring')), \
-             patch.object(cohort, '_decision', side_effect=AssertionError('decision reconstruction')), \
+        with patch.object(cohort, '_file_hash', side_effect=AssertionError('evidence hash')),\
+             patch.object(cohort, '_trace_status', side_effect=AssertionError('native scoring')),\
+             patch.object(cohort, '_decision', side_effect=AssertionError('decision reconstruction')),\
              patch.object(cohort, '_binding', side_effect=AssertionError('GOAL catalogue')):
             self.assertEqual(cohort._validate_cohort(self.path, self.config), self.value)
         self.assertEqual(self.path.read_bytes(), original)

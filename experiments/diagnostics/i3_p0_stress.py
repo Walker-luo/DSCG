@@ -11,13 +11,14 @@ from hashlib import sha256
 from concurrent.futures import ThreadPoolExecutor
 from threading import Event
 from pathlib import Path
+from baseintent.compat import schema_matches
 from types import SimpleNamespace
 from typing import Any
 
 from agentdojo import agent_pipeline
 from agentdojo.functions_runtime import EmptyEnv, FunctionCall, FunctionsRuntime
 
-from dscg.pipelines.defended import (
+from baseintent.pipelines.defended import (
     ActionSecurityChecker,
     OurFrameExecutor,
     PermissionSandbox,
@@ -91,7 +92,7 @@ def _call(name: str, args: dict[str, Any], call_id: str) -> FunctionCall:
 
 
 def _ledger_reason(extra_args: dict[str, Any]) -> str:
-    records = extra_args.get("dscg_action_ledger", [])
+    records = extra_args.get("baseintent_action_ledger", [])
     if not records:
         return "NO_LEDGER_RECORD"
     return str(records[-1].get("transitions", [{}])[-1].get("reason_code", "UNKNOWN"))
@@ -141,9 +142,9 @@ def _run_ticket_case(case: str, mode: str, evidence: dict) -> dict[str, Any]:
 
     if case == "expanded_object_scope":
         state = approve(_call("safe_tool", {"record_id": "record-1"}, "scope-1"))
-        pending = state[4].get("_dscg_pending_batch")
+        pending = state[4].get("_baseintent_pending_batch")
         modified = _call("safe_tool", {"record_id": "all-records"}, "scope-1")
-        args["_dscg_pending_batch"] = pending
+        args["_baseintent_pending_batch"] = pending
         result = executor.query(
             "trusted request", runtime, EmptyEnv(), [_assistant(modified)], args
         )
@@ -161,9 +162,9 @@ def _run_ticket_case(case: str, mode: str, evidence: dict) -> dict[str, Any]:
 
     if case == "stale_ticket_replay":
         state = approve(_call("safe_tool", {"record_id": "record-1"}, "stale-1"))
-        pending = state[4]["_dscg_pending_batch"]
+        pending = state[4]["_baseintent_pending_batch"]
         executor.query(*state)
-        args["_dscg_pending_batch"] = pending
+        args["_baseintent_pending_batch"] = pending
         second = executor.query(
             "trusted request",
             runtime,
@@ -175,8 +176,8 @@ def _run_ticket_case(case: str, mode: str, evidence: dict) -> dict[str, Any]:
 
     if case == "modified_destination":
         state = approve(_call("send_message", {"recipient": "team", "body": "status"}, "destination-1"))
-        pending = state[4].get("_dscg_pending_batch")
-        args["_dscg_pending_batch"] = pending
+        pending = state[4].get("_baseintent_pending_batch")
+        args["_baseintent_pending_batch"] = pending
         modified = _call(
             "send_message",
             {"recipient": "external", "body": "status"},
@@ -189,12 +190,12 @@ def _run_ticket_case(case: str, mode: str, evidence: dict) -> dict[str, Any]:
 
     if case == "duplicate_submission":
         state = approve(_call("safe_tool", {"record_id": "record-1"}, "duplicate-1"))
-        pending = state[4]["_dscg_pending_batch"]
+        pending = state[4]["_baseintent_pending_batch"]
 
         def submit():
             local_args = {
-                "_dscg_pending_batch": pending,
-                "_dscg_action_ledger": state[4]["_dscg_action_ledger"],
+                "_baseintent_pending_batch": pending,
+                "_baseintent_action_ledger": state[4]["_baseintent_action_ledger"],
             }
             result = executor.query(
                 "trusted request",
@@ -215,11 +216,11 @@ def _run_ticket_case(case: str, mode: str, evidence: dict) -> dict[str, Any]:
             finally:
                 release.set()
             results = [winner.result(timeout=5), duplicate]
-        from dscg.failure_policy import is_blocked_error
+        from baseintent.failure_policy import is_blocked_error
         blocked = sum(is_blocked_error(error) for _, error in results)
         # Read from the shared ledger after joining; returned result messages
         # supply per-submission decisions rather than racing snapshot copies.
-        args["dscg_action_ledger"] = args["_dscg_action_ledger"].snapshot()
+        args["baseintent_action_ledger"] = args["_baseintent_action_ledger"].snapshot()
         result = (*state[:4], args)
         record = finish(result, submissions=2, blocked_submissions=blocked, overlapping_execution=True)
         record["assertions"]["one_submission_blocked"] = blocked == 1
@@ -230,8 +231,8 @@ def _run_ticket_case(case: str, mode: str, evidence: dict) -> dict[str, Any]:
 
 def _actions(extra_args):
     # Stable trace projection: retain transitions without random ticket secrets.
-    ledger = extra_args.get("_dscg_action_ledger")
-    records = ledger.snapshot() if ledger is not None else extra_args.get("dscg_action_ledger", [])
+    ledger = extra_args.get("_baseintent_action_ledger")
+    records = ledger.snapshot() if ledger is not None else extra_args.get("baseintent_action_ledger", [])
     return [{"index": index, "call_id": r["call_id"], "state": r["state"],
              "states": [t["state"] for t in r["transitions"]],
              "reason": r["transitions"][-1]["reason_code"]}
@@ -341,7 +342,7 @@ def _run_recovery(manifest, case, mode, evidence):
 
     class ObservedExecutor(TicketedToolsExecutor):
         def query(self, *state):
-            pending = state[4].get("_dscg_pending_batch")
+            pending = state[4].get("_baseintent_pending_batch")
             if pending is not None:
                 for action in pending.actions:
                     if action.approved:
@@ -372,7 +373,7 @@ def _run_recovery(manifest, case, mode, evidence):
                           for dim, passed in checks.items() if not passed)
         if all(checks.values()):
             remaining.remove(effect["object"])
-    ledger = state[4]["_dscg_action_ledger"].snapshot()
+    ledger = state[4]["_baseintent_action_ledger"].snapshot()
     actions = _actions(state[4])
     failed = next(r for r in ledger if r["state"] == "failed")
     retry = next(r for r in reversed(ledger) if r["state"] == "executed" and r["call_id"].startswith("recovery-"))
@@ -427,7 +428,7 @@ def audit_i3(fixture_path: Path = FIXTURE_PATH) -> dict[str, Any]:
     names = [c["id"] for c in manifest["cases"]]
     if len(names) != len(REQUIRED_CASES) or set(names) != set(REQUIRED_CASES):
         raise ValueError("I3 fixture must contain each required case exactly once")
-    if manifest.get("schema_version") != "dscg.i3-fixture.v1":
+    if not schema_matches(manifest.get("schema_version"), "baseintent.i3-fixture.v1"):
         raise ValueError("unsupported I3 fixture schema")
     for case in manifest["cases"]:
         expected_kind = "ticket" if case["id"] in TICKET_CASES else "recovery"
@@ -449,7 +450,7 @@ def audit_i3(fixture_path: Path = FIXTURE_PATH) -> dict[str, Any]:
                           "final_state": evidence.get("final_state", {})}
             record["feedback_sha256"] = sha256(case["feedback"].encode()).hexdigest()
             records.append(record)
-    return {"schema_version": "dscg.i3-p0-stress.v2", "route_id": manifest["route_id"],
+    return {"schema_version": "baseintent.i3-p0-stress.v2", "route_id": manifest["route_id"],
             "task_id": manifest["task_id"], "seed": manifest["seed"],
             "fixture_sha256": sha256(raw).hexdigest(), "modes": list(MODES),
             "scope": "synthetic_offline_p0_deterministic_boundary",

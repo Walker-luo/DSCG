@@ -1,4 +1,7 @@
 """Offline stage export and comparison; fixtures are not efficacy labels."""
+
+from artifact_support import ensure_artifacts
+ensure_artifacts('test_utility_stages')
 import copy
 import json
 from pathlib import Path
@@ -25,7 +28,7 @@ def responses(bundle):
 
 class UtilityStageTests(unittest.TestCase):
     def test_export_counts_fixed_inputs_and_no_clients(self):
-        with patch('dscg.pipelines.defended.create_openai_client', side_effect=AssertionError('no clients')):
+        with patch('baseintent.pipelines.defended.create_openai_client', side_effect=AssertionError('no clients')):
             audit = u.build_stage('audit')
             auth = u.build_stage('authorization')
             source = u.build_stage('source')
@@ -150,20 +153,20 @@ class UtilityStageTests(unittest.TestCase):
 
     def test_trace_signals_overlap_without_claiming_causality(self):
         trace = {'utility': False, 'security': False, 'messages': [{'role':'assistant','tool_calls':[]}],
-                 'dscg_audit_summary': {'reason_code_counts': {'AUDIT_SCHEMA_INVALID': 2}},
-                 'dscg_action_ledger': [{'state':'blocked','transitions':[{'reason_code':'AUDIT_DENY'}]}]}
+                 'baseintent_audit_summary': {'reason_code_counts': {'AUDIT_SCHEMA_INVALID': 2}},
+                 'baseintent_action_ledger': [{'state':'blocked','transitions':[{'reason_code':'AUDIT_DENY'}]}]}
         row = u.trace_signals(trace)
         self.assertTrue(row['protocol_failure_seen'])
         self.assertTrue(row['audit_deny_seen'])
         self.assertTrue(row['no_proposed_calls'])
         self.assertEqual(row['attribution'], 'overlapping_observations_not_causal_labels')
         self.assertEqual(u.trace_signals({'error':'failed'})['status'], 'error_or_incomplete')
-        compact = {k:v for k,v in trace.items() if k != 'dscg_action_ledger'}
-        compact['dscg_action_summary'] = {'reason_code_counts':{'AUDIT_DENY':1}}
+        compact = {k:v for k,v in trace.items() if k != 'baseintent_action_ledger'}
+        compact['baseintent_action_summary'] = {'reason_code_counts':{'AUDIT_DENY':1}}
         self.assertTrue(u.trace_signals(compact)['audit_deny_seen'])
 
     def test_export_cli_refuses_overwrite_and_report_never_sends_requests(self):
-        root = Path('workshop/artifacts').resolve()
+        root = Path('artifacts/tests/test_utility_stages').resolve()
         with TemporaryDirectory(dir=root) as directory:
             output = Path(directory)/'bundle.json'
             self.assertEqual(u.main(['export','--stage','audit','--output',str(output)]),0)

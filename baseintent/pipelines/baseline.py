@@ -1,4 +1,5 @@
 import os
+from baseintent.compat import getenv
 from pathlib import Path
 # import cyclopts
 import json
@@ -6,14 +7,14 @@ import csv
 from pathlib import Path
 
 #统计token
-from dscg.paths import RESULTS_DIR
-from dscg.model_config import (
+from baseintent.paths import RESULTS_DIR
+from baseintent.model_config import (
     ModelConfig,
     create_openai_client,
     reasoning_effort_for_config,
     resolve_model_config,
 )
-from dscg.token_tracking import TokenTrackerClient
+from baseintent.token_tracking import TokenTrackerClient
 
 from agentdojo import agent_pipeline, functions_runtime, logging, benchmark, attacks
 from agentdojo.task_suite import get_suite
@@ -45,7 +46,7 @@ def make_openai_compatible_pipeline(
     """
     构建一个原始的 AgentDojo Pipeline，支持任意 OpenAI-compatible 模型。
 
-    API key 和 base URL 可直接传入，也可通过 DSCG_MAIN_* 环境变量配置。
+    API key 和 base URL 可直接传入，也可通过 BASEINTENT_MAIN_* 环境变量配置。
     """
     config = model_config or resolve_model_config(
         model_id,
@@ -54,7 +55,7 @@ def make_openai_compatible_pipeline(
         provider=provider,
         api_key_env=api_key_env,
         config_path=config_path,
-        prefix="DSCG_MAIN",
+        prefix="BASEINTENT_MAIN",
     )
     client = create_openai_client(config)
 
@@ -100,7 +101,7 @@ def make_openai_compatible_pipeline(
     
     # 给 pipeline 命名，方便日志记录
     pipeline.name = f"{llm.name}_{ad_defense}" if ad_defense else llm.name
-    pipeline.dscg_model_config = config.public_dict()
+    pipeline.baseintent_model_config = config.public_dict()
     return pipeline, tracked_client
 
 
@@ -307,7 +308,7 @@ def main(
 
 if __name__ == "__main__":
     main(
-        model_id=os.getenv("DSCG_MAIN_MODEL_ID", "qwen3-max"),
+        model_id=getenv("BASEINTENT_MAIN_MODEL_ID", "qwen3-max"),
         suites=["workspace"],
         run_attack=True,
         defense="spotlighting_with_delimiting",

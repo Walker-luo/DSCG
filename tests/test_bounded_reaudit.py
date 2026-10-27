@@ -4,8 +4,8 @@ import unittest
 from types import SimpleNamespace
 from unittest.mock import Mock
 from agentdojo.functions_runtime import FunctionsRuntime, FunctionCall, EmptyEnv
-from dscg.pipelines.defended import ActionSecurityChecker, PermissionSandbox, ReferenceMonitor
-from dscg.tool_metadata import set_tool_metadata
+from baseintent.pipelines.defended import ActionSecurityChecker, PermissionSandbox, ReferenceMonitor
+from baseintent.tool_metadata import set_tool_metadata
 
 class BoundedReauditTests(unittest.TestCase):
     def setUp(self):
@@ -22,19 +22,19 @@ class BoundedReauditTests(unittest.TestCase):
         return checker
     def test_one_semantic_abstain_can_be_clarified_without_dropping_history(self):
         checker=self.checker(['abstain','allow'])
-        state=checker.query('Read task facts',self.runtime,EmptyEnv(),self.messages,{'dscg_action_ledger':[{'tool_name':'old','state':'executed'}]})
+        state=checker.query('Read task facts',self.runtime,EmptyEnv(),self.messages,{'baseintent_action_ledger':[{'tool_name':'old','state':'executed'}]})
         self.assertEqual(checker._request_audit.call_count,2)
-        self.assertEqual(state[-1]['_dscg_audit_decision']['decision'],'allow')
+        self.assertEqual(state[-1]['_baseintent_audit_decision']['decision'],'allow')
         packet=checker._request_audit.call_args.args[-1]
         self.assertEqual(len(packet['action_history']),1)
         self.assertIn('clarification',packet)
-        self.assertEqual(len(state[-1]['dscg_audit_decisions']),2)
+        self.assertEqual(len(state[-1]['baseintent_audit_decisions']),2)
     def test_persistent_uncertainty_is_blocked_and_retry_is_bounded(self):
         checker=self.checker(['abstain','abstain','allow'])
         state=checker.query('Read facts',self.runtime,EmptyEnv(),self.messages,{})
         state=ReferenceMonitor(checker.sandbox,True).query(*state)
         self.assertEqual(checker._request_audit.call_count,2)
-        self.assertEqual(state[-1]['dscg_action_ledger'][0]['state'],'blocked')
+        self.assertEqual(state[-1]['baseintent_action_ledger'][0]['state'],'blocked')
     def test_parser_timeout_denial_and_default_do_not_retry(self):
         for outcomes,enabled in [(['garbage','allow'],True),([TimeoutError(),'allow'],True),(['deny','allow'],True),(['abstain','allow'],False)]:
             checker=self.checker(outcomes,enabled)
@@ -44,15 +44,15 @@ class BoundedReauditTests(unittest.TestCase):
         checker=self.checker(['abstain','allow']);checker.sandbox.allowed_tools=[]
         state=checker.query('Read facts',self.runtime,EmptyEnv(),self.messages,{})
         state=ReferenceMonitor(checker.sandbox,True).query(*state)
-        self.assertEqual(state[-1]['dscg_action_ledger'][0]['state'],'blocked')
+        self.assertEqual(state[-1]['baseintent_action_ledger'][0]['state'],'blocked')
     def test_truncated_current_history_is_not_removed_for_retry(self):
         checker=self.checker(['abstain','allow'])
         checker.query('Read facts',self.runtime,EmptyEnv(),self.messages,
-                      {'dscg_action_ledger':[{'state':'executed'}]*33})
+                      {'baseintent_action_ledger':[{'state':'executed'}]*33})
         self.assertEqual(checker._request_audit.call_count,1)
     def test_public_read_bypass_has_no_semantic_attempt_or_model_call(self):
         set_tool_metadata(self.runtime,{'read_private':dict(effect='read',source='local',sink='none',sensitivity='public',idempotent=True,reversible=True)})
         checker=self.checker(['allow'])
         state=checker.query('Read facts',self.runtime,EmptyEnv(),self.messages,{})
         checker._request_audit.assert_not_called()
-        self.assertEqual(state[-1]['_dscg_audit_decision']['reason_code'],'READ_AUDIT_BYPASS')
+        self.assertEqual(state[-1]['_baseintent_audit_decision']['reason_code'],'READ_AUDIT_BYPASS')

@@ -13,7 +13,7 @@ from experiments import run_partial_benchmark as runner
 
 
 def pipeline_factory(*args, **kwargs):
-    return SimpleNamespace(name="offline", dscg_model_config={"model_id": "offline"}), SimpleNamespace(
+    return SimpleNamespace(name="offline", baseintent_model_config={"model_id": "offline"}), SimpleNamespace(
         total_prompt_tokens=10, total_completion_tokens=5, get_total_tokens=lambda: 15,
     )
 

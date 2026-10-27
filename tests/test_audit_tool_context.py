@@ -7,8 +7,8 @@ from types import SimpleNamespace
 import unittest
 from unittest.mock import Mock, patch
 from agentdojo.functions_runtime import FunctionsRuntime, FunctionCall, EmptyEnv
-from dscg.pipelines.defended import ActionSecurityChecker, AuditSchemaError, PermissionSandbox, ReferenceMonitor, TicketedToolsExecutor
-from dscg.tool_metadata import load_tool_metadata, set_tool_metadata
+from baseintent.pipelines.defended import ActionSecurityChecker, AuditSchemaError, PermissionSandbox, ReferenceMonitor, TicketedToolsExecutor
+from baseintent.tool_metadata import load_tool_metadata, set_tool_metadata
 
 
 def user(text):
@@ -119,8 +119,8 @@ class AuditToolContextTests(unittest.TestCase):
 
 class BuiltinMetadataDefaultsTests(unittest.TestCase):
     def test_checkout_without_local_file_uses_shipped_catalog(self):
-        from dscg.benchmark_catalog import get_backend
-        with TemporaryDirectory() as directory, patch('dscg.tool_metadata.DEFAULT_TOOL_METADATA_PATH', Path(directory)/'missing.toml'):
+        from baseintent.benchmark_catalog import get_backend
+        with TemporaryDirectory() as directory, patch('baseintent.tool_metadata.DEFAULT_TOOL_METADATA_PATH', Path(directory)/'missing.toml'):
             catalog = load_tool_metadata(env={})
         self.assertEqual(catalog, load_tool_metadata(get_backend().tool_metadata_path, env={}))
 
@@ -128,7 +128,7 @@ class BuiltinMetadataDefaultsTests(unittest.TestCase):
         with TemporaryDirectory() as directory:
             path = Path(directory)/'local.toml'
             path.write_text('[tools.custom]\neffect="read"\n')
-            with patch('dscg.tool_metadata.DEFAULT_TOOL_METADATA_PATH', path):
+            with patch('baseintent.tool_metadata.DEFAULT_TOOL_METADATA_PATH', path):
                 self.assertEqual(set(load_tool_metadata(path, env={})), {"custom"})
                 with self.assertRaisesRegex(ValueError,"unassigned custom"):
                     load_tool_metadata(env={})

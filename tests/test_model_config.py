@@ -2,7 +2,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 import unittest
 
-from dscg.model_config import (
+from baseintent.model_config import (
     DEEPSEEK_MODEL_IDS,
     PROVIDER_PRESETS,
     load_model_settings,
@@ -56,7 +56,7 @@ api_key = "security-key"
 
         main_config = resolve_model_config(config_path=path, env={})
         security_config = resolve_model_config(
-            prefix="DSCG_SEC",
+            prefix="BASEINTENT_SEC",
             config_path=path,
             env={},
             fallback=main_config,
@@ -78,9 +78,9 @@ api_key = "local-key"
 """
         )
         env = {
-            "DSCG_MAIN_PROVIDER": "openai",
-            "DSCG_MAIN_MODEL_ID": "env-model",
-            "DSCG_MAIN_API_KEY": "env-key",
+            "BASEINTENT_MAIN_PROVIDER": "openai",
+            "BASEINTENT_MAIN_MODEL_ID": "env-model",
+            "BASEINTENT_MAIN_API_KEY": "env-key",
         }
 
         config = resolve_model_config(
@@ -106,9 +106,9 @@ api_key = "local-key"
 """
         )
         env = {
-            "DSCG_MAIN_PROVIDER": "deepseek",
-            "DSCG_MAIN_MODEL_ID": "env-model",
-            "DSCG_MAIN_API_KEY": "env-key",
+            "BASEINTENT_MAIN_PROVIDER": "deepseek",
+            "BASEINTENT_MAIN_MODEL_ID": "env-model",
+            "BASEINTENT_MAIN_API_KEY": "env-key",
         }
 
         config = resolve_model_config(config_path=path, env=env)
@@ -131,7 +131,7 @@ api_key = "local-key"
         )
 
         security_config = resolve_model_config(
-            prefix="DSCG_SEC",
+            prefix="BASEINTENT_SEC",
             local_settings={},
             env={},
             fallback=main_config,

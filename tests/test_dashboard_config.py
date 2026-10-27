@@ -193,7 +193,14 @@ class DashboardConfigTests(unittest.TestCase):
         with patch("dashboard.app.FRAMEWORK_VERSION", "future-engine-version", create=True):
             client = app.test_client()
             self.assertEqual(client.get("/api/config").get_json().get("framework_version"), "future-engine-version")
-            self.assertIn('data-framework-version="future-engine-version"', client.get("/").get_data(as_text=True))
+            page = client.get("/").get_data(as_text=True)
+            self.assertIn('data-framework-version="future-engine-version"', page)
+            self.assertIn('<title>BaseIntent · Agent 安全评测台</title>', page)
+            self.assertIn('prepare_tools / completion_groups', page)
+            self.assertIn('personal/secret', page)
+            self.assertIn('CLI 默认 shadow', page)
+            self.assertNotIn('覆盖有效 deny', page)
+            self.assertNotIn('selective 须满足硬条件与兼容校准', page)
 
 
 if __name__ == "__main__":

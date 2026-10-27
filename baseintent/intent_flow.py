@@ -5,14 +5,14 @@ from hashlib import sha256
 import json
 import re
 import time
-from dscg import task_diagnostics as diagnostics
+from baseintent import task_diagnostics as diagnostics
 
-from dscg.decision_schema import load_decision_json, response_format, contract_identity, AUDIT_SCHEMA
-from dscg.token_tracking import TokenTrackerClient
-from dscg.failure_policy import FRAMEWORK_FAILURE_CODES, FAILURE_POLICY
+from baseintent.decision_schema import load_decision_json, response_format, contract_identity, AUDIT_SCHEMA
+from baseintent.token_tracking import TokenTrackerClient
+from baseintent.failure_policy import FRAMEWORK_FAILURE_CODES, FAILURE_POLICY
 
 AUTH_PROTOCOL = 'intent-global-tools-v4-keyed-event-links'
-PROGRESS_PROTOCOL = 'dscg.intent-progress.host-events.v3'
+PROGRESS_PROTOCOL = 'baseintent.intent-progress.host-events.v3'
 READ_POLICY = 'read-sensitivity-v1'
 MAX_STEPS, MAX_INTENT = 24, 256
 GOAL_KINDS = ('facts', 'effect', 'answer', 'condition', 'conditional_effect')
@@ -199,7 +199,7 @@ def identity():
         audit=AUDIT_POLICY, progress=PROGRESS_POLICY, intent_schema=INTENT_SCHEMA,
         progress_schema=PROGRESS_SCHEMA, progress_intermediate_schema=progress_schema(False),
         tool_schema=tools_schema(['registered_action']), request_format='schema-in-packet-v1',
-        audit_input='dscg.audit-input.intent-flow.v2', final_continuations_per_intent=1,
+        audit_input='baseintent.audit-input.intent-flow.v2', final_continuations_per_intent=1,
         request_options=dict(temperature=0.0, timeout=30.0, sdk_retries=0))
 
 
@@ -211,7 +211,7 @@ def decision_contracts(main, audit, *, enabled=True, bounded=False):
         intent_progress={**contract_identity(main, PROGRESS_SCHEMA, 'intent_progress'),
                          'intermediate_schema_sha256': contract_identity(main, progress_schema(False), 'intent_progress')['schema_sha256'],
                          'protocol': PROGRESS_PROTOCOL} if enabled and not bounded else None,
-        audit=contract_identity(audit, AUDIT_SCHEMA, 'dscg_audit_v2') if audit else None)
+        audit=contract_identity(audit, AUDIT_SCHEMA, 'baseintent_audit_v2') if audit else None)
 
 
 def request_json(llm, phase, policy, packet, schema):
@@ -222,7 +222,7 @@ def request_json(llm, phase, policy, packet, schema):
         raise IntentFlowError('INTENT_INPUT_INVALID', phase) from exc
     kwargs = dict(model=llm.name, messages=[dict(role='system', content=policy),
         dict(role='user', content=content)],
-        response_format=response_format(getattr(llm, 'dscg_model_config', None), schema, phase),
+        response_format=response_format(getattr(llm, 'baseintent_model_config', None), schema, phase),
         temperature=0.0, timeout=30.0)
     reasoning = getattr(llm, 'reasoning_effort', None)
     if reasoning is not None:
@@ -301,7 +301,7 @@ def compile_authorization(llm, request, catalog, actions):
 
 def exempt_read(runtime, call, sandbox=None):
     """Tool-level policy only, deliberately no URL or per-object classification."""
-    from dscg.tool_metadata import metadata_for_runtime
+    from baseintent.tool_metadata import metadata_for_runtime
     name = call.get('function') if isinstance(call, dict) else call.function
     args = call.get('args') if isinstance(call, dict) else call.args
     status = metadata_for_runtime(runtime).get(name)

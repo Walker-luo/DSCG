@@ -1,4 +1,4 @@
-"""Native baseline/DSCG clients with an offline malformed generation response."""
+"""Native baseline/BASEINTENT clients with an offline malformed generation response."""
 from contextlib import contextmanager
 from contextvars import ContextVar
 import json
@@ -7,7 +7,7 @@ from unittest.mock import patch
 import httpx
 from openai import OpenAI
 
-from dscg.model_config import ModelConfig
+from baseintent.model_config import ModelConfig
 from test_request_compatibility import completion
 
 CONFIG=ModelConfig('gpt-4o-2024-05-13','offline-key','https://offline.invalid/v1','custom')
@@ -17,7 +17,7 @@ _CLIENTS=ContextVar('fixture_clients',default=None)
 
 
 def factory(origin,**options):
-    from dscg.pipelines import baseline,defended
+    from baseintent.pipelines import baseline,defended
     clients=[];state={'generation':0}
     def handler(request):
         value=json.loads(request.content)
@@ -58,8 +58,8 @@ def factory(origin,**options):
 @contextmanager
 def patched():
     from experiments import run_partial_benchmark as runner
-    with patch.object(runner,'resolve_model_config',return_value=CONFIG), \
-         patch.object(runner,'make_openai_compatible_pipeline',side_effect=lambda *a,**k:factory(True,**k)), \
+    with patch.object(runner,'resolve_model_config',return_value=CONFIG),\
+         patch.object(runner,'make_openai_compatible_pipeline',side_effect=lambda *a,**k:factory(True,**k)),\
          patch.object(runner,'make_defended_pipeline',side_effect=lambda *a,**k:factory(False,**k)):
         yield
 

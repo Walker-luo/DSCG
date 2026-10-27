@@ -15,12 +15,12 @@ from pathlib import Path
 import re
 import tempfile
 
-SCHEMA = 'dscg.l3-router-summary.v2'
+SCHEMA = 'baseintent.l3-router-summary.v2'
 THRESHOLD_POLICY = 'threshold-read-v1'
 READ_POLICY = 'read-purpose-v2'
 DIRECT_POLICIES = {THRESHOLD_POLICY, READ_POLICY}
 MARKER = '<!-- ' + SCHEMA + ' -->'
-OWNED_SCHEMAS = (SCHEMA, 'dscg.l3-router-summary.v1')
+OWNED_SCHEMAS = (SCHEMA, 'baseintent.l3-router-summary.v1', 'dscg.l3-router-summary.v1', 'dscg.l3-router-summary.v2')
 JSON_NAME, MD_NAME = 'l3_router_summary.json', 'l3_router_summary.md'
 MODES = {'off', 'shadow', 'selective', 'baseline', 'unknown'}
 COVERAGE = ('planned_traces', 'read_traces', 'event_traces', 'no_candidate_traces',
@@ -41,7 +41,7 @@ def _safe(root, path):
 
 
 def _read(root, path):
-    from dscg.task_diagnostics import load_task_trace
+    from baseintent.task_diagnostics import load_task_trace
     value = load_task_trace(_safe(root, path))
     if not isinstance(value, dict):
         raise ValueError('expected JSON object')
@@ -356,9 +356,9 @@ def collect_routing_summary(run_dir):
                         acc.c['unknown_audit_call_records'] += 1; acc.c['unknown_audit_cost_traces'] += 1
                     continue
                 covered['read_traces'] += 1
-                if raw.get('dscg_diagnostics_status') in ('missing','corrupt','invalid_reference','incomplete'):
+                if raw.get('baseintent_diagnostics_status') in ('missing','corrupt','invalid_reference','incomplete'):
                     covered['diagnostic_unavailable_traces'] += 1
-                    issue('diagnostic_'+raw['dscg_diagnostics_status'],path)
+                    issue('diagnostic_'+raw['baseintent_diagnostics_status'],path)
                     for acc in (total,stats):
                         acc.c['unknown_audit_call_records'] += 1
                         acc.c['unknown_audit_cost_traces'] += 1
@@ -373,7 +373,7 @@ def collect_routing_summary(run_dir):
                     for acc in (total,stats):
                         acc.c['unknown_audit_call_records'] += 1; acc.c['unknown_audit_cost_traces'] += 1
                     continue
-                frame = raw.get('dscg_framework') if isinstance(raw.get('dscg_framework'), dict) else {}
+                frame = raw.get('baseintent_framework') if isinstance(raw.get('baseintent_framework'), dict) else {}
                 config = _config(frame, binding, descriptor['baseline'], group_backend or benchmark)
                 config_key = json.dumps(config, sort_keys=True, ensure_ascii=False)
                 if config_key not in configs:
@@ -386,7 +386,7 @@ def collect_routing_summary(run_dir):
                 group_config = comparison_stats[comparison_key]
                 accumulators = (total, stats, selected['stats'], group_config['stats'])
                 for acc in accumulators: acc.observe_config(config)
-                events = raw.get('dscg_router_events')
+                events = raw.get('baseintent_router_events')
                 if isinstance(events, list) and events:
                     covered['event_traces'] += 1
                     for row in events:
@@ -415,7 +415,7 @@ def collect_routing_summary(run_dir):
                         for acc in accumulators: acc.event(row)
                 elif config['mode'] in {'off', 'baseline'}:
                     covered['disabled_traces'] += 1
-                    routing = raw.get('dscg_layer_routing')
+                    routing = raw.get('baseintent_layer_routing')
                     calls = routing.get('semantic_audit_calls') if isinstance(routing,dict) else None
                     for acc in accumulators:
                         if descriptor['baseline'] or frame.get('use_security_checker') is False:

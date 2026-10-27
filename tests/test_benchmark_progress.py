@@ -1,4 +1,7 @@
 """Progress mode retains the native task order and result shape."""
+
+from artifact_support import ensure_artifacts
+ensure_artifacts('test_benchmark_progress')
 from contextlib import redirect_stdout
 from io import StringIO
 from types import SimpleNamespace
@@ -35,7 +38,7 @@ class ProgressAdapterTests(TestCase):
                 raise TypeError('sensitive-prompt-text')
             return True, True
 
-        with patch.object(benchmark, 'run_task_without_injection_tasks', side_effect=preflight), \
+        with patch.object(benchmark, 'run_task_without_injection_tasks', side_effect=preflight),\
              patch.object(benchmark, 'run_task_with_injection_tasks') as scored:
             with self.assertRaises(TypeError) as caught:
                 run_suite_with_progress(None, suite, SimpleNamespace(is_dos_attack=False), None, False,
@@ -43,13 +46,13 @@ class ProgressAdapterTests(TestCase):
                     on_step=lambda _phase: None)
         self.assertEqual(calls, ['i0', 'i1'])
         scored.assert_not_called()
-        self.assertEqual(caught.exception._dscg_execution_stage, 'goal_preflight')
-        self.assertEqual(caught.exception._dscg_task_id, 'i1')
+        self.assertEqual(caught.exception._baseintent_execution_stage, 'goal_preflight')
+        self.assertEqual(caught.exception._baseintent_task_id, 'i1')
 
     def test_readonly_native_exception_is_not_replaced_by_progress_annotation(self):
         class ReadonlyError(RuntimeError):
             def __setattr__(self, name, value):
-                if name.startswith('_dscg_'):
+                if name.startswith('_baseintent_'):
                     raise TypeError('readonly')
                 super().__setattr__(name, value)
         suite = FakeSuite()
@@ -149,7 +152,7 @@ class InstalledNativeProgressParityTests(TestCase):
         from tempfile import TemporaryDirectory
         from agentdojo import attacks, logging
         from agentdojo.types import ChatAssistantMessage, text_content_block_from_string
-        from dscg.benchmark_catalog import get_backend, get_suite
+        from baseintent.benchmark_catalog import get_backend, get_suite
         from experiments.common.native_cache_compat import ensure_native_cache_model_ready
 
         ensure_native_cache_model_ready()
@@ -157,7 +160,7 @@ class InstalledNativeProgressParityTests(TestCase):
         suite = get_suite('v1.2', suite_name)
         users = list(suite.user_tasks)[:1]
         targets = list(suite.injection_tasks)[:2]
-        artifact_root = Path(__file__).resolve().parents[1] / 'workshop/artifacts/20261020_deepseek_agentdyn_typeerror/test_runs'
+        artifact_root = Path(__file__).resolve().parents[1] / 'artifacts/tests/test_benchmark_progress'
         artifact_root.mkdir(parents=True, exist_ok=True)
 
         def run(root, with_progress):

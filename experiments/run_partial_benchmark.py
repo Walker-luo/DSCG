@@ -1,6 +1,7 @@
 import argparse
 from contextlib import closing
 import os
+from baseintent.compat import getenv
 from pathlib import Path
 import csv
 from time import monotonic
@@ -10,20 +11,20 @@ from copy import copy
 
 from agentdojo import logging, benchmark, attacks
 from agentdojo.attacks.attack_registry import ATTACKS
-from dscg.benchmark_catalog import get_suite, benchmark_identity, validate_backend, get_backend, get_suites, SUITE_VERSION
+from baseintent.benchmark_catalog import get_suite, benchmark_identity, validate_backend, get_backend, get_suites, SUITE_VERSION
 import json
 
-from dscg.model_config import ModelConfigurationError, resolve_model_config
-from dscg.paths import RESULTS_DIR, BENCHMARK_RESULTS_DIR
-from dscg.audit_router import (DEFAULT_THRESHOLD, POLICY_VERSION as ROUTER_POLICY_VERSION,
+from baseintent.model_config import ModelConfigurationError, resolve_model_config
+from baseintent.paths import RESULTS_DIR, BENCHMARK_RESULTS_DIR
+from baseintent.audit_router import (DEFAULT_THRESHOLD, POLICY_VERSION as ROUTER_POLICY_VERSION,
                                validate_router_options, summarize_events, LocalAuditRouter)
-from dscg.input_isolation import FRAMEWORK_VERSION, framework_version_for_profile
-from dscg.l1_projection import MODES as L1_PROJECTION_MODES, PROFILE_SHA256 as L1_PROFILE_SHA256
-from dscg.pipelines.baseline import make_openai_compatible_pipeline
-from dscg.pipelines.defended import make_defended_pipeline, router_configuration_hash, defended_pipeline_name
-from dscg.prompt_profiles import PROFILES as PROMPT_PROFILES, validate_profile, profile_binding
-from dscg.intent_evidence import audit_model_settings
-from dscg.tool_metadata import ToolMetadataError, load_tool_metadata, validate_benchmark_tool_metadata, resolve_tool_metadata
+from baseintent.input_isolation import FRAMEWORK_VERSION, framework_version_for_profile
+from baseintent.l1_projection import MODES as L1_PROJECTION_MODES, PROFILE_SHA256 as L1_PROFILE_SHA256
+from baseintent.pipelines.baseline import make_openai_compatible_pipeline
+from baseintent.pipelines.defended import make_defended_pipeline, router_configuration_hash, defended_pipeline_name
+from baseintent.prompt_profiles import PROFILES as PROMPT_PROFILES, validate_profile, profile_binding
+from baseintent.intent_evidence import audit_model_settings
+from baseintent.tool_metadata import ToolMetadataError, load_tool_metadata, validate_benchmark_tool_metadata, resolve_tool_metadata
 from experiments.common.benchmark_outcomes import project_outcomes
 from experiments.common.partial_reporting import collect_suite_report, write_run_overview
 from experiments.common.partial_controls import (validate_controls, make_task_manifest, load_task_manifest,
@@ -90,7 +91,7 @@ def _validate_prompt_profile(origin, use_sandbox, use_checker, profile):
 
 
 def _router_trace_summary(suite_dir, task_keys, attack_name, run_attack):
-    from dscg.task_diagnostics import load_task_trace
+    from baseintent.task_diagnostics import load_task_trace
     events=[];recorded=0
     unavailable=0
     for key in task_keys:
@@ -99,9 +100,9 @@ def _router_trace_summary(suite_dir, task_keys, attack_name, run_attack):
         try:
             if not path.resolve().is_relative_to(suite_dir.resolve()):continue
             trace=load_task_trace(path)
-            if trace.get('dscg_diagnostics_status') in ('missing','corrupt','invalid_reference','incomplete'):
+            if trace.get('baseintent_diagnostics_status') in ('missing','corrupt','invalid_reference','incomplete'):
                 unavailable+=1;continue
-            value=trace.get("dscg_router_events")
+            value=trace.get("baseintent_router_events")
             if isinstance(value,list) and all(isinstance(e,dict) for e in value):
                 recorded+=1;events.extend(value)
         except (OSError,ValueError,AttributeError):continue
@@ -114,7 +115,7 @@ def _describe_pipeline(model_id, sec_model_id, *, origin, defense, **options):
     """Resolve public identity without clients, pipelines, attacks or model requests."""
     prompt_profile = options.get('prompt_profile', 'legacy')
     _validate_prompt_profile(origin, options['use_sandbox'], options['use_security_checker'], prompt_profile)
-    main = resolve_model_config(model_id, prefix='DSCG_MAIN', **{
+    main = resolve_model_config(model_id, prefix='BASEINTENT_MAIN', **{
         k: options.get(k) for k in ('api_key', 'base_url', 'provider', 'api_key_env', 'config_path')})
     name = f'{main.model_id}_{defense}' if origin and defense else main.model_id
     security, optimization = {}, {}
@@ -125,7 +126,7 @@ def _describe_pipeline(model_id, sec_model_id, *, origin, defense, **options):
         view, delegated = options['planning_tool_view'] and sandbox, options['delegated_tasks'] and sandbox
         router, config_hash = None, None
         if checker:
-            audit = resolve_model_config(sec_model_id, prefix='DSCG_SEC', fallback=main,
+            audit = resolve_model_config(sec_model_id, prefix='BASEINTENT_SEC', fallback=main,
                 config_path=options.get('config_path'), **{
                     k: options.get('sec_' + k) for k in ('api_key', 'base_url', 'provider', 'api_key_env')})
             security = audit_model_settings(audit, prompt_profile)
@@ -144,14 +145,14 @@ def _describe_pipeline(model_id, sec_model_id, *, origin, defense, **options):
                         'audit_router_artifact_sha256': router.artifact_sha256 if router else None,
                         **profile_binding(prompt_profile)}
         if prompt_profile == 'legacy':
-            from dscg.failure_policy import FAILURE_POLICY
+            from baseintent.failure_policy import FAILURE_POLICY
             optimization['task_failure_policy'] = FAILURE_POLICY
         name = defended_pipeline_name(main.model_id, use_sandbox=sandbox, use_security_checker=checker,
             input_isolation=isolation, authorization_precheck=sandbox, l1_projection_mode=projection,
             planning_tool_view=view, delegated_tasks=delegated, audit_router_mode=options['audit_router_mode'],
             audit_router=router, router_config_hash=config_hash, prompt_profile=prompt_profile)
-    return SimpleNamespace(name=name, dscg_model_config=main.public_dict(),
-                           dscg_security_model_config=security, dscg_optimization_config=optimization)
+    return SimpleNamespace(name=name, baseintent_model_config=main.public_dict(),
+                           baseintent_security_model_config=security, baseintent_optimization_config=optimization)
 
 
 def main(
@@ -387,7 +388,7 @@ def main(
                 run_records.append({'attack': name, 'status': 'completed', 'output_dir': str(base / name)})
 
         manifest = {
-            "schema_version": "dscg.attack-manifest.v2", "benchmark": benchmark_identity(),
+            "schema_version": "baseintent.attack-manifest.v2", "benchmark": benchmark_identity(),
             "task_scope": task_scope,
             "result_layout": result_layout(logdir, backend.id, base),
             "pipeline_name": context.get("pipeline_name"),
@@ -508,7 +509,7 @@ def _run_single_attack(
             tool_metadata = load_tool_metadata(selection.path)
         if resource_cache is not None:
             resource_cache['metadata'] = (metadata_selection, tool_metadata)
-    active_defense = defense if origin else "dscg"
+    active_defense = defense if origin else "baseintent"
     logdir = Path(results_dir) if results_dir is not None else BENCHMARK_RESULTS_DIR if task_scope in {'full', 'screened'} else RESULTS_DIR / "partial_benchmark"
     logdir.mkdir(parents=True, exist_ok=True)
     output_dir: Path | None = None
@@ -572,8 +573,8 @@ def _run_single_attack(
                 )
 
 
-        main_model_config = getattr(pipeline, "dscg_model_config", {})
-        sec_model_config = getattr(pipeline, "dscg_security_model_config", {})
+        main_model_config = getattr(pipeline, "baseintent_model_config", {})
+        sec_model_config = getattr(pipeline, "baseintent_security_model_config", {})
         resolved_model_id = main_model_config.get("model_id", model_id)
         resolved_sec_model_id = None if origin or not use_security_checker else sec_model_config.get("model_id", sec_model_id)
         original_name = pipeline.name
@@ -591,7 +592,7 @@ def _run_single_attack(
             # Bind the entire selection, including disjoint subsets, before any
             # scored execution or report rewrite under this run name.
             bind(base_output_dir / 'suite_manifest.json', {
-                'schema_version': 'dscg.full-suites.v2' if task_scope == 'full' else 'dscg.partial-suites.v2',
+                'schema_version': 'baseintent.full-suites.v2' if task_scope == 'full' else 'baseintent.partial-suites.v2',
                 'benchmark': benchmark_identity(),
                 'suites': suites,
             })
@@ -614,13 +615,13 @@ def _run_single_attack(
         attack = None if not run_attack or prepare_only else attacks.load_attack(attack_name, suite, pipeline)
         is_dos_attack = bool(run_attack and ATTACKS[attack_name].is_dos_attack)
 
-        # Share the same scope/IDs across baseline and DSCG; only partial is capped.
+        # Share the same scope/IDs across baseline and BaseIntent; only partial is capped.
         selected_users, selected_injections = select_tasks(
             frozen_tasks, suite_name, user_task_ids, injection_task_ids, run_attack, is_dos_attack,
             task_scope=task_scope,
         )
         run_binding = {
-            "schema_version": f"dscg.{task_scope}-run.v2",
+            "schema_version": f"baseintent.{task_scope}-run.v2",
             "benchmark": benchmark_identity(),
             "task_scope": task_scope,
             "task_selection": {"users": selected_users, "injections": selected_injections,
@@ -640,10 +641,10 @@ def _run_single_attack(
             'planning_tool_view': bool(planning_tool_view and not origin),
             'delegated_tasks': bool(delegated_tasks and not origin),
             "audit_router_mode": audit_router_mode,
-            "audit_router_artifact_sha256": getattr(pipeline,"dscg_optimization_config",{}).get("audit_router_artifact_sha256"),
-            "audit_router_config_sha256": getattr(pipeline,"dscg_optimization_config",{}).get("audit_router_config_sha256"),
-            **({'task_failure_policy': pipeline.dscg_optimization_config['task_failure_policy']}
-               if getattr(pipeline,'dscg_optimization_config',{}).get('task_failure_policy') else {}),
+            "audit_router_artifact_sha256": getattr(pipeline,"baseintent_optimization_config",{}).get("audit_router_artifact_sha256"),
+            "audit_router_config_sha256": getattr(pipeline,"baseintent_optimization_config",{}).get("audit_router_config_sha256"),
+            **({'task_failure_policy': pipeline.baseintent_optimization_config['task_failure_policy']}
+               if getattr(pipeline,'baseintent_optimization_config',{}).get('task_failure_policy') else {}),
         }
         if audit_router_mode != 'off':
             run_binding.update(audit_router_threshold=audit_router_threshold,
@@ -738,7 +739,7 @@ def _run_single_attack(
             sec_total_tokens = sec_tracker.get_total_tokens() 
 
         summary_data = {
-            "schema_version": "dscg.benchmark-summary.v2", "benchmark": benchmark_identity(),
+            "schema_version": "baseintent.benchmark-summary.v2", "benchmark": benchmark_identity(),
             "task_scope": task_scope,
             "suites": suites,
             "suite_scope": "all_registered" if set(suites) == set(backend.suites) else "selected",
@@ -835,7 +836,7 @@ def cli(argv: list[str] | None = None, *, task_scope: str = 'partial', entrypoin
         raise ValueError('task scope must be partial or full')
     full = task_scope == 'full'
     parser = argparse.ArgumentParser(
-        description="运行 DSCG 的当前基准全量评测（所选场景全部用户/注入任务）。" if full else "运行 DSCG 的当前基准小批量回归评测，可指定场景。"
+        description="运行 BASEINTENT 的当前基准全量评测（所选场景全部用户/注入任务）。" if full else "运行 BASEINTENT 的当前基准小批量回归评测，可指定场景。"
     )
     parser.add_argument('--suites', nargs='+', metavar='SUITE', default=None,
                         help='选择当前环境支持的场景；默认全部场景，full保留所选场景全部任务。')
@@ -850,17 +851,17 @@ def cli(argv: list[str] | None = None, *, task_scope: str = 'partial', entrypoin
     parser.add_argument(
         "--baseline",
         action="store_true",
-        help="运行无防御原生基线；与默认 DSCG 使用相同任务范围和注入攻击。",
+        help="运行无防御原生基线；与默认 BASEINTENT 使用相同任务范围和注入攻击。",
     )
     parser.add_argument('--progress', action='store_true',
                         help='按攻击/场景显示进度条；分别计数原生GOAL预检与计分任务。')
     cache_policy = parser.add_mutually_exclusive_group()
     cache_policy.add_argument('--reuse', action='store_true',
-        help='按原name显式续跑，保留原名单与原生缓存规则；覆盖DSCG_FORCE_RERUN，不自动重试错误。')
+        help='按原name显式续跑，保留原名单与原生缓存规则；覆盖BASEINTENT_FORCE_RERUN，不自动重试错误。')
     cache_policy.add_argument(
         "--force-rerun",
         action="store_true",
-        help="重新执行任务，不复用已有结果；也可设置 DSCG_FORCE_RERUN=1。",
+        help="重新执行任务，不复用已有结果；也可设置 BASEINTENT_FORCE_RERUN=1。",
     )
     parser.add_argument(
         "--name",
@@ -871,8 +872,8 @@ def cli(argv: list[str] | None = None, *, task_scope: str = 'partial', entrypoin
     parser.add_argument(
         "--trace-level",
         choices=("summary", "standard", "full"),
-        default=os.getenv("DSCG_TRACE_LEVEL", "summary"),
-        help="独立 DSCG 诊断文件详细度；默认 summary，任务 JSON 始终精简。",
+        default=getenv("BASEINTENT_TRACE_LEVEL", "summary"),
+        help="独立 BASEINTENT 诊断文件详细度；默认 summary，任务 JSON 始终精简。",
     )
     parser.add_argument(
         "--include-extra-info",
@@ -883,7 +884,7 @@ def cli(argv: list[str] | None = None, *, task_scope: str = 'partial', entrypoin
         "--tool-metadata",
         dest="tool_metadata_path",
         metavar="PATH",
-        default=os.getenv("DSCG_TOOL_METADATA"),
+        default=getenv("BASEINTENT_TOOL_METADATA"),
         help="显式工具风险元数据 TOML；默认本地覆盖或当前基准内置分类，缺失/非法工具按 critical 处理。",
     )
     parser.add_argument(
@@ -901,12 +902,12 @@ def cli(argv: list[str] | None = None, *, task_scope: str = 'partial', entrypoin
     parser.add_argument('--no-tool-view', action='store_true', help='L2 对照：规划器展示完整工具目录，保留执行权限检查。')
     parser.add_argument('--no-delegated-tasks', action='store_true', help='关闭显式任务文件展开，用于原任务编译对照。')
     parser.add_argument('--prompt-profile', choices=PROMPT_PROFILES, default='legacy',
-                        help='legacy=DSCG_v3.5 意图流程（默认）；legacy-v34=历史v3.4对照；其余为显式旧候选')
+                        help='legacy=BaseIntent 意图流程（默认）；legacy-v34=历史v3.4对照；其余为显式旧候选')
     parser.add_argument('--l1-projection-mode', choices=('off','shadow','projected'), default='projected',
                         help='L1有限交易投影，默认projected；off保留旧来源封装，shadow只观察。')
-    # None selects the profile default below: DSCG shadow, baseline/NoChecker off.
+    # None selects the profile default below: BaseIntent shadow, baseline/NoChecker off.
     parser.add_argument("--audit-router-mode", choices=("off", "shadow", "selective"), default=None,
-                        help="L3纯算法路由；DSCG CLI默认shadow，baseline/NoChecker默认off；可显式选择。")
+                        help="L3纯算法路由；BASEINTENT CLI默认shadow，baseline/NoChecker默认off；可显式选择。")
     parser.add_argument("--audit-router-artifact", help="已停用；请改用 --audit-router-threshold。")
     parser.add_argument("--audit-router-threshold", type=float, default=DEFAULT_THRESHOLD,
                         help="诊断阈值 [0,1]，默认0.70；read-purpose-v2按读取规则免审，不按分数阈值。")
@@ -976,15 +977,15 @@ def cli(argv: list[str] | None = None, *, task_scope: str = 'partial', entrypoin
                 dispatch_options.pop('task_scope', None)
             dispatch_options['cohort_path'] = cohort_path
         status = execution(
-            model_id=os.getenv("DSCG_MAIN_MODEL_ID"),
-            sec_model_id=os.getenv("DSCG_SEC_MODEL_ID"),
-            provider=os.getenv("DSCG_MAIN_PROVIDER"),
-            sec_provider=os.getenv("DSCG_SEC_PROVIDER"),
+            model_id=getenv("BASEINTENT_MAIN_MODEL_ID"),
+            sec_model_id=getenv("BASEINTENT_SEC_MODEL_ID"),
+            provider=getenv("BASEINTENT_MAIN_PROVIDER"),
+            sec_provider=getenv("BASEINTENT_SEC_PROVIDER"),
             suites=selected_suites,
             run_attack=not args.clean,
             origin=args.baseline,
             defense=None,
-            force_rerun=False if args.reuse else args.force_rerun or os.getenv("DSCG_FORCE_RERUN", "0").lower() in {"1", "true", "yes"},
+            force_rerun=False if args.reuse else args.force_rerun or getenv("BASEINTENT_FORCE_RERUN", "0").lower() in {"1", "true", "yes"},
             reuse=args.reuse,
             progress=args.progress,
             run_name=args.run_name,
@@ -1004,7 +1005,7 @@ def cli(argv: list[str] | None = None, *, task_scope: str = 'partial', entrypoin
         )
     except ModelConfigurationError as exc:
         print(f"模型配置错误: {exc}")
-        print("请设置 DSCG_MAIN_* 环境变量，或复制 config/models.example.toml 为 config/models.local.toml 后填写。")
+        print("请设置 BASEINTENT_MAIN_* 环境变量，或复制 config/models.example.toml 为 config/models.local.toml 后填写。")
         return 1
     except ToolMetadataError as exc:
         print(f"工具元数据错误: {exc}", flush=True)

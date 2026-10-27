@@ -10,18 +10,18 @@ from contextlib import contextmanager
 from pathlib import Path
 
 from agentdojo.attacks.attack_registry import ATTACKS
-from dscg.benchmark_catalog import get_suite, benchmark_identity, validate_backend, get_backend, get_suites, same_backend
-from dscg.model_config import resolve_model_config
-from dscg.intent_evidence import audit_model_settings
-from dscg.audit_router import DEFAULT_THRESHOLD, validate_router_options, POLICY_VERSION
-from dscg.paths import BENCHMARK_RESULTS_DIR, RESULTS_DIR
+from baseintent.benchmark_catalog import get_suite, benchmark_identity, validate_backend, get_backend, get_suites, same_backend
+from baseintent.model_config import resolve_model_config
+from baseintent.intent_evidence import audit_model_settings
+from baseintent.audit_router import DEFAULT_THRESHOLD, validate_router_options, POLICY_VERSION
+from baseintent.paths import BENCHMARK_RESULTS_DIR, RESULTS_DIR
 from experiments import run_partial_benchmark as shared
 from experiments.common.partial_controls import source_revision, guard_run, validate_controls
 from experiments.common.benchmark_reuse import ReusePlan
 from experiments.common.result_paths import resolve_run_path
 from experiments.common.benchmark_execution import PreparedBindings
 
-SCHEMA = 'dscg.injection-screen.v2'
+SCHEMA = 'baseintent.injection-screen.v2'
 LEGACY_RULE = 'keep-any-valid-success; exclude-after-two-valid-failures; errors-unresolved'
 RULE = 'single-attempt; keep-valid-success; skip-failure-or-error; no-retests'
 COHORT_VALIDATION = {'mode': 'model_backend_suites_v1', 'cohort_digest_verified': True,
@@ -98,7 +98,8 @@ def _source_compatible(recorded, current, check_python=True):
 
 def _bindings_compatible(recorded, current):
     def normalize(binding):
-        return {'suite_version': binding.get('suite_version'), 'rule': binding.get('rule'),
+        return {'schema_version': binding.get('schema_version'),
+                'suite_version': binding.get('suite_version'), 'rule': binding.get('rule'),
                 'main_model': binding.get('main_model'),
                 'catalog': {name: {'user_task_ids': entry.get('user_task_ids'),
                     'injection_task_ids': list(entry.get('injection_tasks', {})),
@@ -111,7 +112,8 @@ def _bindings_compatible(recorded, current):
 
 def _binding_error(recorded, current):
     old, new = recorded.get('main_model', {}), current.get('main_model', {})
-    fields = [f'main_model.{key}' for key in sorted(set(old) | set(new)) if old.get(key) != new.get(key)]
+    fields = ['schema_version'] if recorded.get('schema_version') != current.get('schema_version') else []
+    fields += [f'main_model.{key}' for key in sorted(set(old) | set(new)) if old.get(key) != new.get(key)]
     if not same_backend(recorded.get('benchmark'), current.get('benchmark')):
         fields.append('benchmark')
     if recorded.get('catalog') != current.get('catalog'):
@@ -296,7 +298,7 @@ def _preflight_report(base, cohort, active, attacks, selected_tasks=None):
                         record['status'] = 'invalid'
                 records.append(record)
     _replace(base / 'preflight_report.json', {
-        'schema_version': 'dscg.preflight-report.v2', 'benchmark': benchmark_identity(),
+        'schema_version': 'baseintent.preflight-report.v2', 'benchmark': benchmark_identity(),
         'scope': 'unscored native per-attack goal prechecks; separate from original screening',
         'planned_preflight_samples': len(records), 'counts': dict(Counter(r['status'] for r in records)),
         'preflight_total_tokens': None, 'records': records, 'aggregate_run_costs': aggregate_costs,
@@ -342,7 +344,7 @@ def run_screened(cohort_path, *, config_path=None, run_name=None, results_dir=No
                       audit_retries=controls.get('audit_retries', 0), completion_prompt=controls.get('completion_prompt', False))
     security_model = None
     if not origin and use_checker:
-        security_config = resolve_model_config(sec_model_id, config_path=config_path, prefix='DSCG_SEC', fallback=config,
+        security_config = resolve_model_config(sec_model_id, config_path=config_path, prefix='BASEINTENT_SEC', fallback=config,
             **{k: controls['sec_' + k] for k in ('api_key', 'base_url', 'provider', 'api_key_env') if 'sec_' + k in controls})
         security_model = audit_model_settings(security_config, controls.get('prompt_profile', 'legacy'))
     selected, catalog_sizes = {}, {}
@@ -362,9 +364,9 @@ def run_screened(cohort_path, *, config_path=None, run_name=None, results_dir=No
             'use_sandbox': True, 'use_security_checker': True, 'planning_tool_view': True,
             'delegated_tasks': True, 'l1_projection_mode': 'projected', 'audit_retries': 0,
             'completion_prompt': False}.items()}
-        from dscg.prompt_profiles import profile_binding
+        from baseintent.prompt_profiles import profile_binding
         identity = {**profile_binding(controls.get('prompt_profile', 'legacy')),
-                    'schema_version': 'dscg.screened-run.v2', 'benchmark': benchmark_identity(), 'task_scope': task_scope, 'requested_suites': requested, 'selected_tasks': selected,
+                    'schema_version': 'baseintent.screened-run.v2', 'benchmark': benchmark_identity(), 'task_scope': task_scope, 'requested_suites': requested, 'selected_tasks': selected,
                     'cohort_sha256': cohort['cohort_sha256'], 'main_model': config.public_dict(), 'security_model': security_model,
                     'baseline': origin, 'attacks': names, 'audit_router_mode': audit_router_mode,
                     **({'audit_router_threshold': audit_router_threshold, 'audit_router_policy_version': POLICY_VERSION}
@@ -377,7 +379,7 @@ def run_screened(cohort_path, *, config_path=None, run_name=None, results_dir=No
         if not (base / 'screened_run_manifest.json').exists() and any(base.glob('*/*/run_manifest.json')):
             raise ValueError('existing non-screened run; use a new --name')
         prepared.check(base / 'screened_run_manifest.json', identity)
-        attachment = {'schema_version': 'dscg.screened-cohort.v2', 'benchmark': benchmark_identity(), 'scope': 'capability-conditioned screened subset', 'task_scope': task_scope,
+        attachment = {'schema_version': 'baseintent.screened-cohort.v2', 'benchmark': benchmark_identity(), 'scope': 'capability-conditioned screened subset', 'task_scope': task_scope,
                       'cohort_validation': dict(COHORT_VALIDATION),
                       'cohort_path': str(cohort_path), 'cohort': cohort,
                       'selected_tasks': selected, 'requested_suites': requested,

@@ -7,9 +7,9 @@ from pathlib import Path
 import shutil
 from typing import Mapping
 
-from dscg import benchmark_catalog
+from baseintent import benchmark_catalog
 
-from dscg.tool_metadata import (
+from baseintent.tool_metadata import (
     PROJECT_ROOT,
     ToolMetadataError,
     ToolRiskMetadata,

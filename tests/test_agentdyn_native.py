@@ -3,6 +3,9 @@
 Direct injection-goal scripts test the oracle plumbing, not attack generation or
 defense efficacy. OTP is extracted from real tool feedback, never environment state.
 """
+
+from artifact_support import ensure_artifacts
+ensure_artifacts('test_agentdyn_native')
 import json
 import re
 import unittest
@@ -17,9 +20,9 @@ from agentdojo.agent_pipeline import BasePipelineElement, ToolsExecutor
 from agentdojo.agent_pipeline.tool_execution import tool_result_to_str
 from agentdojo.functions_runtime import FunctionCall, FunctionsRuntime
 from agentdojo.types import text_content_block_from_string as block
-from dscg.benchmark_catalog import BenchmarkConfigurationError, get_backend, get_suites, get_suite, validate_backend
-from dscg.pipelines.defended import ActionSecurityChecker, PermissionSandbox, ReferenceMonitor, TicketedToolsExecutor
-from dscg.tool_metadata import ToolMetadataError, load_tool_metadata, set_tool_metadata
+from baseintent.benchmark_catalog import BenchmarkConfigurationError, get_backend, get_suites, get_suite, validate_backend
+from baseintent.pipelines.defended import ActionSecurityChecker, PermissionSandbox, ReferenceMonitor, TicketedToolsExecutor
+from baseintent.tool_metadata import ToolMetadataError, load_tool_metadata, set_tool_metadata
 
 
 def call(name, **args):
@@ -133,7 +136,7 @@ class AgentDynNativeTests(unittest.TestCase):
         for name in get_suites():
             with self.subTest(suite=name):
                 suite = self.suites[name]
-                marker = 'DSCG_OFFLINE_INJECTION_CANARY'
+                marker = 'BASEINTENT_OFFLINE_INJECTION_CANARY'
                 vectors = suite.get_injection_vector_defaults()
                 env = suite.load_and_inject_default_environment({key: marker for key in vectors})
                 runtime = FunctionsRuntime(suite.tools)
@@ -174,17 +177,17 @@ class AgentDynNativeTests(unittest.TestCase):
         from experiments import run_partial_benchmark as runner
         class NativeErrorAgent(BasePipelineElement):
             name = 'gpt-4o'
-            dscg_model_config = {'model_id': 'gpt-4o-2024-05-13'}
+            baseintent_model_config = {'model_id': 'gpt-4o-2024-05-13'}
             def query(self, *args, **kwargs):
                 raise json.JSONDecodeError('offline authored native failure', '', 0)
         tracker = SimpleNamespace(total_prompt_tokens=0, total_completion_tokens=0, get_total_tokens=lambda: 0)
-        root = Path(__file__).resolve().parents[1] / 'workshop/artifacts/20261018_dual_benchmark/native_errors'
+        root = Path(__file__).resolve().parents[1] / 'artifacts/tests/test_agentdyn_native'
         root.mkdir(parents=True, exist_ok=True)
         output = StringIO()
         with TemporaryDirectory(dir=root) as directory, redirect_stdout(output), patch.object(
                 runner, 'make_openai_compatible_pipeline', return_value=(NativeErrorAgent(), tracker)), patch.object(
                 runner, '_describe_pipeline', return_value=SimpleNamespace(
-                    name='gpt-4o', dscg_model_config=NativeErrorAgent.dscg_model_config)):
+                    name='gpt-4o', baseintent_model_config=NativeErrorAgent.baseintent_model_config)):
             status = runner.main(origin=True, suites=['shopping'], attack='important_instructions',
                                  run_name='native_error', results_dir=directory)
             self.assertEqual(status, 1)
@@ -212,10 +215,10 @@ class AgentDynNativeTests(unittest.TestCase):
         tracker = SimpleNamespace(total_prompt_tokens=0, total_completion_tokens=0, get_total_tokens=lambda: 0)
         config = normalize_config(dict(suites=['shopping'], origin=True, run_attack=True,
             attack_name='important_instructions', max_user_tasks=1, max_injection_tasks=1))
-        root = Path(__file__).resolve().parents[1] / 'workshop/artifacts/20261018_dual_benchmark/native_errors'
+        root = Path(__file__).resolve().parents[1] / 'artifacts/tests/test_agentdyn_native'
         root.mkdir(parents=True, exist_ok=True)
-        with TemporaryDirectory(dir=root) as directory, patch.object(web, 'DASHBOARD_RESULTS_DIR', Path(directory)), \
-                patch.object(web, 'make_openai_compatible_pipeline', return_value=(ErrorAgent(), tracker)), \
+        with TemporaryDirectory(dir=root) as directory, patch.object(web, 'DASHBOARD_RESULTS_DIR', Path(directory)),\
+                patch.object(web, 'make_openai_compatible_pipeline', return_value=(ErrorAgent(), tracker)),\
                 patch.object(web.threading, 'Thread'):
             try:
                 web.run_test_thread('offline-native-error', config)

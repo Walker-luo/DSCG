@@ -1,3 +1,6 @@
+
+from artifact_support import ensure_artifacts
+ensure_artifacts('test_qwen_utility')
 # Frozen v3.4 controls; intent-flow defaults are tested in test_intent_flow*.py.
 from tests.authorization_fixture import adapt_client
 """Protocol and prompt-candidate regression; no model network requests."""
@@ -12,8 +15,8 @@ from tests.test_partial_agentdyn import legacy_suite_dispatch
 from unittest.mock import Mock, patch
 
 from agentdojo.functions_runtime import FunctionsRuntime, FunctionCall, EmptyEnv
-from dscg.pipelines import defended as d
-from dscg.tool_metadata import load_tool_metadata, set_tool_metadata
+from baseintent.pipelines import defended as d
+from baseintent.tool_metadata import load_tool_metadata, set_tool_metadata
 
 
 def model(text, finish='stop', refusal=None):
@@ -56,9 +59,9 @@ class AuditProtocolDiagnosticsTests(unittest.TestCase):
         call = FunctionCall(function='get_webpage', args={'url': 'https://article.example'}, id='read')
         state = checker.query('Read https://article.example', r, EmptyEnv(), [
             {'role': 'user', 'content': [{'type': 'text', 'content': 'Read https://article.example'}]},
-            {'role': 'assistant', 'content': [], 'tool_calls': [call]}], {'_dscg_trace_level': level})
+            {'role': 'assistant', 'content': [], 'tool_calls': [call]}], {'_baseintent_trace_level': level})
         state = d.ReferenceMonitor(sandbox, True).query(*state)
-        return state[-1]['dscg_audit_decisions'][-1]
+        return state[-1]['baseintent_audit_decisions'][-1]
 
     def test_default_audit_request_is_compact_and_keeps_data_and_json_contract(self):
         response = '{"decision":"allow","violations":[],"confidence":0.9,"reason_code":"ALIGNED"}'
@@ -152,7 +155,7 @@ class PromptProfileTests(unittest.TestCase):
         for row in source['cases']:
             packet = row['packet']
             self.assertTrue(all(r['trust'] == 'untrusted' for r in packet['recent_tool_results']))
-            self.assertEqual(packet['schema_version'], 'dscg.audit-input.v2')
+            self.assertEqual(packet['schema_version'], 'baseintent.audit-input.v2')
         # Author labels only exercise the handoff; they are not predicted model judgments.
         for outcome in ('deny', 'abstain'):
             llm = model(json.dumps(dict(decision=outcome, violations=['OFF_TASK'], confidence=1, reason_code='FIXTURE')))
@@ -166,7 +169,7 @@ class PromptProfileTests(unittest.TestCase):
                                                    prompt_profile='tool-semantics-v1')
             with self.assertRaises(d.AuthorizationCompilationError):
                 compiler.compile(d.TrustedTaskRequest('Read the page'), r)
-        r._dscg_tool_metadata['post_webpage'] = {'effect': 'invented'}
+        r._baseintent_tool_metadata['post_webpage'] = {'effect': 'invented'}
         compiler = d.ToolAuthorizationCompiler(model('{"tools":[]}'), prompt_profile='tool-semantics-v1')
         contract = compiler.compile(d.TrustedTaskRequest('Read the page'), r)
         sandbox = d.PermissionSandbox()
@@ -187,9 +190,9 @@ class PromptProfileTests(unittest.TestCase):
                 actual, _, _ = d.make_defended_pipeline('qwen3.7-flash', prompt_profile=profile,
                                                        **options)
             self.assertEqual(described.name, actual.name)
-            self.assertEqual(described.dscg_optimization_config['audit_router_config_sha256'],
-                             actual.dscg_optimization_config['audit_router_config_sha256'])
-            hashes.add(actual.dscg_optimization_config['audit_router_config_sha256'])
+            self.assertEqual(described.baseintent_optimization_config['audit_router_config_sha256'],
+                             actual.baseintent_optimization_config['audit_router_config_sha256'])
+            hashes.add(actual.baseintent_optimization_config['audit_router_config_sha256'])
             names.add(actual.name)
         self.assertEqual(len(hashes), 4)
         self.assertEqual(len(names), 4)
@@ -197,7 +200,7 @@ class PromptProfileTests(unittest.TestCase):
     def test_cli_and_dashboard_reject_candidate_for_baseline_or_no_checker(self):
         from experiments.run_benchmark import cli
         from dashboard.evaluation import normalize_config
-        from dscg.benchmark_catalog import get_suites
+        from baseintent.benchmark_catalog import get_suites
         for switch in ('--baseline', '--no-checker'):
             errors = StringIO()
             with self.subTest(switch=switch), redirect_stderr(errors):
@@ -212,7 +215,7 @@ class PromptProfileTests(unittest.TestCase):
         self.assertNotEqual(active['prompt_profile_sha256'], 'client-forged')
         active = normalize_config({'suites': list(get_suites()), 'prompt_profile_sha256': 'client-forged'})
         self.assertNotEqual(active['prompt_profile_sha256'], 'client-forged')
-        self.assertEqual(active['framework_version'], 'DSCG_v3.5')
+        self.assertEqual(active['framework_version'], 'BaseIntent')
 
     def test_full_partial_and_cohort_cli_forward_profile_without_model_requests(self):
         from experiments import run_benchmark as full, run_partial_benchmark as partial
@@ -227,17 +230,17 @@ class PromptProfileTests(unittest.TestCase):
 
     def test_offline_runner_binds_candidate_and_refuses_same_named_legacy(self):
         from experiments import run_partial_benchmark as runner
-        from dscg.benchmark_catalog import get_suites, get_backend
+        from baseintent.benchmark_catalog import get_suites, get_backend
         # Run the real preflight/factory/manifest path; replace only the model transport
         # and scored native loop. This proves binding, not tool or model efficacy.
         def scored(*args, **kwargs):
             return {'utility_results': dict.fromkeys(kwargs['user_tasks'], True)}
-        artifacts = Path(__file__).resolve().parents[1] / 'workshop/artifacts/20261019_qwen_utility'
+        artifacts = Path(__file__).resolve().parents[1] / 'artifacts/tests/test_qwen_utility'
         artifacts.mkdir(parents=True, exist_ok=True)
-        with TemporaryDirectory(dir=artifacts) as directory, \
-                patch.object(d, 'create_openai_client', return_value=Mock()), \
-                patch.object(runner.benchmark, 'benchmark_suite_without_injections', side_effect=scored), \
-                patch.object(runner, 'run_suite_with_progress', side_effect=legacy_suite_dispatch), \
+        with TemporaryDirectory(dir=artifacts) as directory,\
+                patch.object(d, 'create_openai_client', return_value=Mock()),\
+                patch.object(runner.benchmark, 'benchmark_suite_without_injections', side_effect=scored),\
+                patch.object(runner, 'run_suite_with_progress', side_effect=legacy_suite_dispatch),\
                 redirect_stdout(StringIO()):
             options = dict(model_id='qwen3.7-flash', api_key='offline-key', suites=[get_suites()[0]],
                            run_attack=False, results_dir=directory, run_name='bound', audit_router_mode='shadow')
@@ -251,9 +254,9 @@ class PromptProfileTests(unittest.TestCase):
 
     def test_cohort_and_manifest_bindings_reject_other_candidates_and_legacy_cache(self):
         from experiments.common.benchmark_reuse import _compatible_binding
-        from dscg.benchmark_catalog import benchmark_identity
-        from dscg.prompt_profiles import profile_binding
-        old = {'benchmark': benchmark_identity(), 'schema_version': 'dscg.screened-run.v2',
+        from baseintent.benchmark_catalog import benchmark_identity
+        from baseintent.prompt_profiles import profile_binding
+        old = {'benchmark': benchmark_identity(), 'schema_version': 'baseintent.screened-run.v2',
                'controls': {'planning_tool_view': True}}
         for profile in ('protocol-v1', 'tool-semantics-v1', 'source-context-v1'):
             candidate = {**old, **profile_binding(profile)}

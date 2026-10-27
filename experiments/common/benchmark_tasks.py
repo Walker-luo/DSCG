@@ -8,7 +8,7 @@ import warnings
 from agentdojo import benchmark
 from agentdojo.agent_pipeline.llms.openai_llm import _openai_to_tool_call
 from experiments.common.error_diagnostics import execution_error_diagnostics
-from dscg.intent_flow import IntentFlowError
+from baseintent.intent_flow import IntentFlowError
 
 
 class _TaskToolJSONAbort(Exception):
@@ -97,7 +97,7 @@ class _TaskPipelineProbe:
                 return
             for element in getattr(node, 'elements', ()):
                 visit(element)
-            # Baseline contains native LLM elements; DSCG's executor exposes llm.
+            # Baseline contains native LLM elements; BaseIntent's executor exposes llm.
             # Do not traverse audit small_llm or arbitrary model/client state.
             llm = getattr(node, 'llm', None)
             if llm is not None:
@@ -147,13 +147,13 @@ def run_native_suite(pipeline, suite, attack, logdir, force_rerun, *,
         except Exception as exc:
             if probe.error is None:
                 try:
-                    exc._dscg_execution_stage = stage
-                    exc._dscg_task_id = task_id
+                    exc._baseintent_execution_stage = stage
+                    exc._baseintent_task_id = task_id
                 except (AttributeError, TypeError):
                     pass
                 raise
         if probe.error is not None:
-            record = {'schema_version': 'dscg.task-error.v1', 'invocation_id': invocation,
+            record = {'schema_version': 'baseintent.task-error.v1', 'invocation_id': invocation,
                       'suite': suite.name, 'attack': attack.name if attack is not None else 'none',
                       'stage': stage, 'user_task_id': user_id, 'injection_task_id': target_id,
                       **probe.error}

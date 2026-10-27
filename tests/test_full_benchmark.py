@@ -12,17 +12,17 @@ from unittest.mock import patch
 from agentdojo.attacks.attack_registry import ATTACKS
 from agentdojo.task_suite import get_suite
 
-from dscg.paths import BENCHMARK_RESULTS_DIR
+from baseintent.paths import BENCHMARK_RESULTS_DIR
 from experiments import run_benchmark as full
 from experiments import run_partial_benchmark as shared
 from experiments.common.partial_controls import make_task_manifest, select_tasks, source_revision
-from dscg.pipelines.defended import _append_full_trace
+from baseintent.pipelines.defended import _append_full_trace
 
 SUITES = ('workspace', 'travel', 'banking', 'slack')
 
 
 def fake_pipeline(*args, **kwargs):
-    return SimpleNamespace(name='offline-model', dscg_model_config={'model_id': 'offline-model'}), SimpleNamespace(
+    return SimpleNamespace(name='offline-model', baseintent_model_config={'model_id': 'offline-model'}), SimpleNamespace(
         total_prompt_tokens=0, total_completion_tokens=0, get_total_tokens=lambda: 0,
     )
 
@@ -175,7 +175,7 @@ class FullExecutionTests(unittest.TestCase):
                     self.assertEqual(summary['task_selection']['injection_task_ids'], list(suite.injection_tasks))
                     self.assertEqual(summary['task_counts']['planned_tasks'], len(suite.user_tasks) * len(suite.injection_tasks))
                     self.assertEqual(summary['task_scope'], 'full')
-                    self.assertEqual(summary['defense'], None if origin else 'dscg')
+                    self.assertEqual(summary['defense'], None if origin else 'baseintent')
                     self.assertTrue((output / 'run_manifest.json').exists())
                     if origin:
                         self.assertNotIn('sec_overhead', summary)
@@ -253,7 +253,7 @@ class FullExecutionTests(unittest.TestCase):
         def factory(*args, **kwargs):
             pipeline, tracker = fake_pipeline()
             pipeline.name = model
-            pipeline.dscg_model_config['model_id'] = model
+            pipeline.baseintent_model_config['model_id'] = model
             return pipeline, tracker
 
         def execute(*args, **kwargs):
@@ -261,7 +261,7 @@ class FullExecutionTests(unittest.TestCase):
                 {'role': 'user', 'content': [{'type': 'text', 'content': 'offline full fixture'}]},
                 {'role': 'assistant', 'content': [{'type': 'text', 'content': 'done'}], 'tool_calls': None},
             ])
-            _append_full_trace({'_dscg_trace_level': 'full'}, 'fixture', {'offline': True})
+            _append_full_trace({'_baseintent_trace_level': 'full'}, 'fixture', {'offline': True})
             return True, False
 
         with TemporaryDirectory() as directory, redirect_stdout(StringIO()), patch.object(
@@ -277,7 +277,7 @@ class FullExecutionTests(unittest.TestCase):
             scored = list(output.glob('user_task_*/tool_knowledge/injection_task_*.json'))
             self.assertEqual(len(scored), len(suite.user_tasks) * len(suite.injection_tasks))
             last = output / list(suite.user_tasks)[-1] / 'tool_knowledge' / f'{list(suite.injection_tasks)[-1]}.json'
-            self.assertTrue(last.with_suffix('.dscg_trace.jsonl.gz').exists())
+            self.assertTrue(last.with_suffix('.baseintent_trace.jsonl.gz').exists())
             original = last.read_bytes()
             self.assertEqual(full.main(**options), 0)
             self.assertEqual(task.call_count, expected)

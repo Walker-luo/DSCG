@@ -9,7 +9,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from experiments.diagnostics.i3_p0_stress import REQUIRED_CASES, FIXTURE_PATH, audit_i3, main, write_report
-from dscg.pipelines.defended import (ActionLedger, ActionState, PermissionSandbox,
+from baseintent.pipelines.defended import (ActionLedger, ActionState, PermissionSandbox,
                                      ReferenceMonitor, TicketedToolsExecutor)
 from agentdojo.functions_runtime import EmptyEnv, FunctionCall, FunctionsRuntime
 
@@ -43,7 +43,7 @@ class I3P0StressTests(unittest.TestCase):
 
     def test_error_feedback_reaches_recovery_and_preserves_tool_contract(self):
         report = self.report
-        self.assertEqual(report["schema_version"], "dscg.i3-p0-stress.v2")
+        self.assertEqual(report["schema_version"], "baseintent.i3-p0-stress.v2")
         self.assertEqual(report["counts"], {
             "total": 24, "valid": 24, "invalid": 0, "error": 0, "skipped": 0,
             "scope_violations": 8, "tool_boundary_violations": 0,
@@ -225,11 +225,11 @@ class I3StateTransitionTests(unittest.TestCase):
             FunctionCall(function="safe_tool", args={}, id="concurrent")]}
         with redirect_stdout(io.StringIO()):
             state = monitor.query("trusted", runtime, EmptyEnv(), [candidate], {})
-            pending = state[4]["_dscg_pending_batch"]
-            ledger = state[4]["_dscg_action_ledger"]
+            pending = state[4]["_baseintent_pending_batch"]
+            ledger = state[4]["_baseintent_action_ledger"]
             def submit():
                 return executor.query(*state[:4], {
-                    "_dscg_pending_batch": pending, "_dscg_action_ledger": ledger})
+                    "_baseintent_pending_batch": pending, "_baseintent_action_ledger": ledger})
             with ThreadPoolExecutor(max_workers=1) as pool:
                 winner = pool.submit(submit)
                 try:
@@ -264,21 +264,21 @@ class I3StateTransitionTests(unittest.TestCase):
                 FunctionCall(function="safe_tool", args={}, id=call_id)]}
         with redirect_stdout(io.StringIO()):
             state = monitor.query("trusted", runtime, EmptyEnv(), [candidate("first")], {})
-            first_ticket = state[4]["_dscg_pending_batch"]
+            first_ticket = state[4]["_baseintent_pending_batch"]
             state = executor.query(*state)
-            self.assertEqual(state[4]["dscg_action_ledger"][0]["state"], "failed")
-            state[4]["_dscg_pending_batch"] = first_ticket
+            self.assertEqual(state[4]["baseintent_action_ledger"][0]["state"], "failed")
+            state[4]["_baseintent_pending_batch"] = first_ticket
             replay = executor.query(*state[:3], [candidate("first")], state[4])
-            self.assertEqual(replay[4]["dscg_action_ledger"][-1]["transitions"][-1]["reason_code"],
+            self.assertEqual(replay[4]["baseintent_action_ledger"][-1]["transitions"][-1]["reason_code"],
                              "REPLAYED_EXECUTION_TICKET")
             self.assertEqual(len(attempts), 1)
             state = monitor.query(*replay[:3], [*replay[3], candidate("retry")], replay[4])
-            retry_ticket = state[4]["_dscg_pending_batch"]
+            retry_ticket = state[4]["_baseintent_pending_batch"]
             self.assertNotEqual(first_ticket.actions[0].ticket, retry_ticket.actions[0].ticket)
             self.assertNotEqual(first_ticket.actions[0].action_id, retry_ticket.actions[0].action_id)
             state = executor.query(*state)
         self.assertEqual(effects, ["completed"])
-        self.assertEqual([a["state"] for a in state[4]["dscg_action_ledger"]],
+        self.assertEqual([a["state"] for a in state[4]["baseintent_action_ledger"]],
                          ["failed", "blocked", "executed"])
 
     def test_legal_paths_and_all_illegal_transitions(self):

@@ -6,7 +6,7 @@ import unittest
 import yaml
 
 from agentdojo.functions_runtime import FunctionCall, FunctionsRuntime
-from dscg.pipelines.defended import ActionSecurityChecker
+from baseintent.pipelines.defended import ActionSecurityChecker
 
 
 def user(text):

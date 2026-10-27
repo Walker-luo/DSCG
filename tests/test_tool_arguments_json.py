@@ -1,4 +1,7 @@
 """Real native suite and MockTransport: bad model JSON never executes a tool."""
+
+from artifact_support import ensure_artifacts
+ensure_artifacts('test_tool_arguments_json')
 from contextlib import redirect_stdout
 from io import StringIO
 import json
@@ -11,8 +14,8 @@ from unittest.mock import patch
 import httpx
 from openai import OpenAI
 from agentdojo import agent_pipeline
-from dscg.benchmark_catalog import get_backend,get_suite,get_suites
-from dscg.token_tracking import TokenTrackerClient
+from baseintent.benchmark_catalog import get_backend,get_suite,get_suites
+from baseintent.token_tracking import TokenTrackerClient
 from experiments.common.benchmark_progress import run_suite_with_progress
 from experiments.common.native_cache_compat import ensure_native_cache_model_ready
 from test_request_compatibility import completion
@@ -20,7 +23,7 @@ from test_request_compatibility import completion
 
 class ToolArgumentsJSONTests(unittest.TestCase):
     def setUp(self):
-        root=Path(__file__).resolve().parents[1]/'workshop/artifacts/20261021_tool_arguments_json/tests'
+        root=Path(__file__).resolve().parents[1]/'artifacts/tests/test_tool_arguments_json'
         root.mkdir(parents=True,exist_ok=True)
         temp=TemporaryDirectory(dir=root);self.addCleanup(temp.cleanup)
         self.root=Path(temp.name);self.suite=get_suite('v1.2',get_suites()[0])

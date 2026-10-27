@@ -5,9 +5,9 @@ from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
 from agentdojo.functions_runtime import FunctionsRuntime,FunctionCall,EmptyEnv
-from dscg import audit_router as a
-from dscg.pipelines import defended as d
-from dscg.tool_metadata import set_tool_metadata
+from baseintent import audit_router as a
+from baseintent.pipelines import defended as d
+from baseintent.tool_metadata import set_tool_metadata
 
 
 class ReadPolicyTests(unittest.TestCase):
@@ -103,7 +103,7 @@ class ReadPolicyTests(unittest.TestCase):
             for element in (pre,checker,monitor,d.TicketedToolsExecutor(monitor)):state=element.query(*state)
             self.assertEqual(checker.requests,1 if mode=='shadow' else 0)
             self.assertEqual(self.effects,[] if mode=='shadow' else ['general','random'])
-            self.assertTrue(state[-1]['dscg_router_events'][0]['would_bypass'])
+            self.assertTrue(state[-1]['baseintent_router_events'][0]['would_bypass'])
 
     def test_second_read_mutation_invalidates_the_whole_receipt(self):
         router=a.LocalAuditRouter('selective'); verifier=a.RouterReceiptVerifier(); pre=d.ToolAuthorizationPrecheck(self.sandbox)
@@ -125,7 +125,7 @@ class ReadPolicyTests(unittest.TestCase):
     def test_current_action_packet_exposes_effect_and_native_schema(self):
         checker=d.ActionSecurityChecker(SimpleNamespace(name='offline'),sandbox=self.sandbox, prompt_profile='legacy-v34')
         packet=checker._audit_packet('Read the page then send the summary',self.runtime,[self.call()],{})
-        self.assertEqual(packet['schema_version'],'dscg.audit-input.v3')
+        self.assertEqual(packet['schema_version'],'baseintent.audit-input.v3')
         self.assertEqual(packet['current_actions'][0]['operation_effect'],'read')
         self.assertEqual(packet['current_actions'][0]['host_parameter_schema'],self.runtime.functions['read_data'].parameters.model_json_schema())
 
@@ -139,4 +139,4 @@ class ReadPolicyTests(unittest.TestCase):
         record=d.AuditDecision('f'*64,decision,vs,confidence,reason,'a'*64,'b'*64,'offline',1.,'ok').public_dict()
         self.assertTrue(d._is_valid_audit_record(record,'f'*64))
 
-    def test_unified_internal_identity(self):self.assertEqual(d.framework_version_for_profile('legacy-v34'),'DSCG_v3.4')
+    def test_unified_internal_identity(self):self.assertEqual(d.framework_version_for_profile('legacy-v34'),'BaseIntent-legacy-v34')

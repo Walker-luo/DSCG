@@ -1,5 +1,5 @@
 /**
- * DSCG Dashboard - 前端应用逻辑
+ * BaseIntent Dashboard - 前端应用逻辑
  * 实时日志 / 图表渲染 / 对比分析 / 报告生成
  */
 
@@ -236,11 +236,11 @@ function updateRunPreview() {
     defenseLabel = [isolation && "L1", sandbox && "L2", checker && "L3"].filter(Boolean).join(" + ") || "关闭防御";
   }
   $("#layer-config-note").textContent = !(sandbox || checker)
-    ? "L2/L3 全关时 L1 随之关闭；该 DSCG 消融仍使用 Monitor，与原生 Baseline 的工具循环不同。"
-    : sandbox && !precheck ? "已关闭候选前置检查；工具授权仍由 Monitor 检查。重审 0 次，完成提示关闭。"
-    : "Monitor 与一次性票据负责执行。L2 支持授权工具视图与显式任务来源展开；重审 0 次，完成提示关闭。";
+    ? "L2/L3 全关时 L1 随之关闭；该 BaseIntent 消融仍使用 Monitor，与原生 Baseline 的工具循环不同。"
+    : sandbox && !precheck ? "已关闭候选前置检查；工具授权仍由 Monitor 检查。宿主事件与模型语义进度分别记录。"
+    : "Monitor 与一次性票据负责执行。L2 支持授权工具视图与显式任务来源展开；宿主事件与模型语义进度分别记录。";
   if (!isOrigin && $('#defense-preset').value === 'v2') {
-    $('#layer-config-note').textContent = 'V2 风格关闭 L1、前置检查、工具视图和任务展开，保留新版目录复核；不是历史 V2 的精确复现。';
+    $('#layer-config-note').textContent = '入口消融关闭 L1、前置检查、工具视图和任务展开，保留工具授权与目录复核。';
   }
   [["l1", isolation], ["l2", sandbox], ["l3", checker]].forEach(([id, enabled]) => {
     const layer = $("#preview-layer-" + id);
@@ -250,13 +250,13 @@ function updateRunPreview() {
   $("#workspace-framework").textContent = isOrigin ? `${benchmarkLabel} 原生循环` : frameworkVersion;
   $("#workspace-mode").textContent = withAttack ? "对抗评测" : "良性效用评测";
   $("#framework-flow").textContent = isOrigin
-    ? `${benchmarkLabel} 原生规划与工具执行；DSCG 三层不参与运行。`
+    ? `${benchmarkLabel} 原生规划与工具执行；BaseIntent 三层不参与运行。`
     : `${sandbox ? "任务授权 → " : ""}${toolView ? "已授权工具视图 → " : ""}主模型规划${isolation ? "（返回经 L1）" : ""} → ${precheck ? "L2 整批前置 → " : ""}${checker ? "L3 动作审计 → " : ""}Monitor / 票据执行`;
   $('#delegation-flow').hidden = !delegated;
   $('#preview-layer-l2 small').textContent = `${toolView ? '仅展示已授权工具' : '完整工具目录'}；${precheck ? '非法批次整体拒绝' : '执行前复核权限'}`;
   $('#workspace-audit-note').textContent = isOrigin
-    ? 'DSCG 控件不参与原生评测。'
-    : checker ? '选择性路由默认 off，L3 仍启用；公开无外发读取沿用免审。'
+    ? 'BaseIntent 控件不参与原生评测。'
+    : checker ? '网页/API 默认 off，CLI 默认 shadow；各模式均免审 public/internal 读取，其余保留 L3。'
     : '本配置关闭 L3；工具执行仍由 Monitor 与票据控制。';
 
   if ($("#preview-suites")) $("#preview-suites").textContent = `${selectedSuites.length} / ${allSuites.length}`;
@@ -642,9 +642,11 @@ async function loadOverview(runId) {
     const routerMode = framework?.audit_router_mode ?? config.audit_router_mode;
     const auditNote = layerFlag('use_security_checker') === false ? 'L3 已关闭，选择性路由不使用。' :
       layerFlag('use_security_checker') !== true ? 'L3 开关未记录；选择性路由状态未确认。' :
-      routerMode === 'off' ? '选择性路由 off；仍启用 L3，公开无外发读取沿用免审。' :
-      routerMode === 'shadow' ? '选择性路由 shadow；仅观察分数，保留 L3 审计。' :
-      routerMode === 'selective' ? '选择性路由 selective；符合硬条件且校准兼容时才免审，其余保留 L3。' :
+      !String(framework?.framework_version ?? config.framework_version ?? '').startsWith('BaseIntent') ?
+        (['off', 'shadow', 'selective'].includes(routerMode) ? `路由 ${routerMode}；仍启用 L3。历史运行的免审范围未确认。` : '历史运行：L3 已启用，路由及免审范围未确认。') :
+      routerMode === 'off' ? '路由 off；仍启用 L3，固定豁免已授权的 public/internal 读取。' :
+      routerMode === 'shadow' ? '路由 shadow；保留固定 public/internal 读取豁免，其余动作审计。' :
+      routerMode === 'selective' ? '路由 selective；固定豁免已授权的 public/internal 读取，无运行时校准要求。' :
       'L3 已启用；选择性路由模式未记录。';
     const costUnready = suites.some(s => s.cost_comparison_ready === false);
     const costScopes = [...new Set(suites.map(s => s.cost_scope).filter(s => typeof s === 'string'))];
@@ -661,13 +663,13 @@ async function loadOverview(runId) {
       ['L2 累计完整目录定义', statValue('l2', 'catalog_tools_total')],
       ['L2 授权编译次数', statValue('l2', 'authorization_compilations')],
       ['已展开任务来源', statValue('l2', 'delegated_tasks_expanded')],
-      ['L3 公开读取免审批次', statValue('routing', 'public_read_bypass_batches')],
+      ['L3 public/internal 读取免审批次', statValue('routing', 'public_read_bypass_batches')],
       ['L3 实际语义调用', statValue('routing', 'semantic_audit_calls')],
     ];
     const totalTokens = s => (s.overhead?.total_tokens || 0) + (s.sec_overhead?.total_tokens || 0);
     $("#overview-content").innerHTML = `
       <div class="result-heading"><div><h3>${escapeHtml(config.label || '运行结果')}</h3><p>${escapeHtml(config.benchmark?.id || '历史 / unknown')} · ${escapeHtml(runId)} · ${escapeHtml(run.completed_at ? new Date(run.completed_at).toLocaleString('zh-CN') : '未完成')}</p></div><span class="result-version">${escapeHtml(config.origin ? (config.benchmark?.id ? `${config.benchmark.id} 原生` : '历史原生循环') : framework?.framework_version || config.framework_version || '历史版本 · 未记录')}</span></div>
-      <div class="effective-config"><strong>本次实际配置</strong>${config.origin ? '<span>原生工具循环 · 无 DSCG 层</span>' :
+      <div class="effective-config"><strong>本次实际配置</strong>${config.origin ? '<span>原生工具循环 · 无 BaseIntent 层</span>' :
         layerBadge('L1 返回隔离', layerFlag('input_isolation')) + layerBadge('L2 工具授权', layerFlag('use_sandbox')) +
         layerBadge('L2 前置检查', layerFlag('authorization_precheck')) +
         layerBadge('L2 工具视图', layerFlag('planning_tool_view')) +
@@ -1252,7 +1254,7 @@ async function loadReport() {
           <tr><td class="text-muted">测试套件</td><td>${escapeHtml((config.suites || []).join(", "))}</td></tr>
           <tr><td class="text-muted">攻击模式</td><td>${config.run_attack ? "启用" : "禁用"}</td></tr>
           <tr><td class="text-muted">攻击类型</td><td>${escapeHtml(config.run_attack === false ? "不适用" : config.attack_name || "未记录")}</td></tr>
-          <tr><td class="text-muted">框架</td><td>${config.origin ? "原始模型" : "DSCG"}</td></tr>
+          <tr><td class="text-muted">框架</td><td>${escapeHtml(config.origin ? "原始模型" : config.framework_version || "历史 / 未记录")}</td></tr>
           ${config.defense ? `<tr><td class="text-muted">AgentDojo 防御</td><td>${escapeHtml(config.defense)}</td></tr>` : ""}
           ${!config.origin ? `
             <tr><td class="text-muted">框架版本</td><td>${escapeHtml(config.framework_version || '未记录')}</td></tr>
@@ -1326,8 +1328,9 @@ async function quickCompare(template) {
   const isOrigin = r => r.config?.origin === true || r.config?.origin === "true";
 
   switch (template) {
+    case "baseline_vs_baseintent":
     case "baseline_vs_newframe":
-      // 选一个 origin 和一个 newframe
+      // 选一个原生运行和一个 BaseIntent 运行
       const baseline = runs.find(r => isOrigin(r));
       const nf = runs.find(r => !isOrigin(r) && r.config?.use_sandbox !== false && r.config?.use_security_checker !== false);
       if (baseline) runIds.push(baseline.run_id);
@@ -1339,7 +1342,7 @@ async function quickCompare(template) {
       break;
 
     case "ablation_study":
-      // 找 newframe 的不同消融配置
+      // 找 BaseIntent 的不同消融配置
       const nfRuns = runs.filter(r => !isOrigin(r));
       // 优先: OursFull, NoSandbox, NoChecker
       const full = nfRuns.find(r => r.run_id.includes("OursFull") || (r.config?.use_sandbox !== false && r.config?.use_security_checker !== false));

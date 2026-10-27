@@ -341,5 +341,5 @@
 
   const api = { metricInfo, metricConfigs, scatterConfig, canUseRadar, createExperimentStyles, describeExperiment, createBarFill };
   if (typeof module === "object" && module.exports) module.exports = api;
-  else root.DSCGHistoryCharts = api;
+  else root.BaseIntentHistoryCharts = api;
 })(typeof window === "undefined" ? globalThis : window);

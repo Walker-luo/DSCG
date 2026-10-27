@@ -5,7 +5,7 @@ from functools import lru_cache
 import subprocess
 from importlib.metadata import version
 from pathlib import Path
-from dscg.benchmark_catalog import get_backend, get_suites, SUITE_VERSION, get_suite, benchmark_identity, same_backend
+from baseintent.benchmark_catalog import get_backend, get_suites, SUITE_VERSION, get_suite, benchmark_identity, same_backend
 
 
 class RunConfigurationError(ValueError):
@@ -14,7 +14,7 @@ class RunConfigurationError(ValueError):
 
 def validate_controls(*, origin=False,use_security_checker=True,audit_retries=0,completion_prompt=False):
     if origin and (not use_security_checker or audit_retries or completion_prompt):
-        raise ValueError('native baseline cannot use DSCG ablation options')
+        raise ValueError('native baseline cannot use BASEINTENT ablation options')
     if audit_retries not in (0,1) or (not use_security_checker and audit_retries):
         raise ValueError('audit retries require checker and must be 0 or 1')
 
@@ -24,11 +24,11 @@ def make_task_manifest(task_scope='partial'):
         raise ValueError('task scope must be partial or full')
     identity = benchmark_identity()
     if task_scope == 'full':
-        return {'schema_version': 'dscg.full-tasks.v2', 'benchmark': identity, 'suite_version': SUITE_VERSION, 'seed': None,
+        return {'schema_version': 'baseintent.full-tasks.v2', 'benchmark': identity, 'suite_version': SUITE_VERSION, 'seed': None,
                 'selection_rule': 'all-registered-tasks (DoS uses first injection per user)',
                 'suites': {name: {'user_task_ids': list(get_suite('v1.2', name).user_tasks),
                                   'injection_task_ids': list(get_suite('v1.2', name).injection_tasks)} for name in get_suites()}}
-    return {'schema_version':'dscg.partial-tasks.v2','benchmark': identity,'suite_version':SUITE_VERSION,'seed':7,
+    return {'schema_version':'baseintent.partial-tasks.v2','benchmark': identity,'suite_version':SUITE_VERSION,'seed':7,
             'selection_rule':'registration-order-prefix (seed is metadata, not API determinism)',
             'suites':{name:{'user_task_ids':list(get_suite('v1.2',name).user_tasks)[:3],
                             'injection_task_ids':list(get_suite('v1.2',name).injection_tasks)[:3]} for name in get_suites()}}
@@ -40,7 +40,7 @@ def load_task_manifest(path):
     if not isinstance(result,dict) or result.get('suite_version')!='v1.2' or not isinstance(result.get('suites'),dict):
         raise ValueError('invalid v1.2 task manifest')
     if not same_backend(result.get('benchmark'), benchmark_identity()) or result.get('schema_version') not in {
-            'dscg.partial-tasks.v2', 'dscg.full-tasks.v2', 'dscg.injection-screen.v2'}:
+            'baseintent.partial-tasks.v2', 'baseintent.full-tasks.v2', 'baseintent.injection-screen.v2'}:
         raise ValueError('task manifest benchmark identity/protocol differs; export a new manifest for the current backend')
     return result
 
@@ -71,7 +71,7 @@ def select_tasks(manifest,suite_name,users,injections,run_attack,is_dos,*,task_s
             raise ValueError('full benchmark requires all registered task IDs in registration order; partial manifests cannot reduce it')
         return selected_users, selected_injections[:1] if is_dos and run_attack else selected_injections
     if task_scope in {'screened', 'partial_screened'}:
-        if (manifest.get('schema_version') != 'dscg.injection-screen.v2' or not manifest.get('cohort_sha256')
+        if (manifest.get('schema_version') != 'baseintent.injection-screen.v2' or not manifest.get('cohort_sha256')
                 or selected_users != list(users)
                 or selected_injections != [i for i in injections if i in selected_injections]):
             raise ValueError('screened cohort must retain all user tasks and registered injection order')

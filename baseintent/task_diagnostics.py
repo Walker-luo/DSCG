@@ -6,10 +6,11 @@ import hashlib
 import json
 from pathlib import Path
 from uuid import uuid4
+from baseintent.compat import normalize_legacy_keys, compatible_json_load, schema_matches
 
-SCHEMA = 'dscg.task-diagnostics.v2'
-LEGACY_SCHEMA = 'dscg.task-diagnostics.v1'
-_current = ContextVar('dscg_task_diagnostics', default=None)
+SCHEMA = 'baseintent.task-diagnostics.v2'
+LEGACY_SCHEMA = 'baseintent.task-diagnostics.v1'
+_current = ContextVar('baseintent_task_diagnostics', default=None)
 
 
 class DiagnosticWriteError(OSError):
@@ -51,8 +52,8 @@ class DiagnosticSession:
                 directory = _within(group, group/str(context['user_task_id'])/str(context['attack_type']))
                 directory.mkdir(parents=True, exist_ok=True)
                 stem = str(context.get('injection_task_id') or 'none')
-                self.path = _within(directory, directory/(stem+'.dscg.jsonl'))
-                self.response_path = _within(directory, directory/(stem+'.dscg.responses.jsonl'))
+                self.path = _within(directory, directory/(stem+'.baseintent.jsonl'))
+                self.response_path = _within(directory, directory/(stem+'.baseintent.responses.jsonl'))
                 config_ref = self._configuration(group)
                 with self.path.open('ab+') as stream:
                     stream.seek(0, 2)
@@ -60,7 +61,7 @@ class DiagnosticSession:
                         stream.seek(-1, 2)
                         if stream.read(1) != b'\n': stream.write(b'\n')
                     offset = stream.tell()
-                self.logger.context['dscg_diagnostics'] = dict(path=self.path.name,
+                self.logger.context['baseintent_diagnostics'] = dict(path=self.path.name,
                     attempt_id=self.attempt_id, offset=offset)
                 self.emit('task_start', {'config_ref': '../../'+config_ref, 'trace_level':self.level,
                     'responses_path': self.response_path.name})
@@ -80,7 +81,7 @@ class DiagnosticSession:
             config = {'manifest':'run_manifest.json', 'framework_manifest_keys':keys,
                       'framework':{k:v for k,v in frame.items() if k not in keys}}
         data = _json(config).encode('utf-8')
-        name = 'dscg_config.'+hashlib.sha256(data).hexdigest()[:16]+'.json'
+        name = 'baseintent_config.'+hashlib.sha256(data).hexdigest()[:16]+'.json'
         path = _within(group, group/name)
         try:
             with path.open('xb') as stream: stream.write(data)
@@ -153,7 +154,7 @@ class DiagnosticSession:
                     stream.seek(-1,2)
                     if stream.read(1) != b'\n': stream.write(b'\n')
                 offset = stream.tell()
-                stream.write((_json(dict(schema_version='dscg.model-response.v1',
+                stream.write((_json(dict(schema_version='baseintent.model-response.v1',
                     attempt_id=self.attempt_id, event='model_response', record=record))+'\n').encode('utf-8'))
             self.response_refs[phase] = dict(path=self.response_path.name, offset=offset,
                 response_id=record['response_id'])
@@ -163,14 +164,14 @@ class DiagnosticSession:
             raise DiagnosticWriteError('DIAGNOSTIC_WRITE_FAILED') from exc
 
     def sync(self, context):
-        for index,record in enumerate(context.get('dscg_router_events', [])):
+        for index,record in enumerate(context.get('baseintent_router_events', [])):
             self.routers[index] = deepcopy(record)
-        excluded = {'dscg_framework','dscg_authorizations','dscg_audit_decisions',
-                    'dscg_action_ledger','dscg_router_events','dscg_trace_artifact'}
+        excluded = {'baseintent_framework','baseintent_authorizations','baseintent_audit_decisions',
+                    'baseintent_action_ledger','baseintent_router_events','baseintent_trace_artifact'}
         for key,value in context.items():
-            if key.startswith('dscg_') and key not in excluded:
+            if key.startswith('baseintent_') and key not in excluded:
                 self.latest[key] = deepcopy(value)
-        flow = self.latest.get('dscg_intent_flow')
+        flow = self.latest.get('baseintent_intent_flow')
         if isinstance(flow, dict):
             flow.pop('observations', None)
             for step in flow.get('steps',[]): step.pop('intent',None)
@@ -178,7 +179,7 @@ class DiagnosticSession:
     def finish(self, context, *, failed=False):
         if self.finished: return
         self.finished = True
-        if 'dscg_cost' in context: self.latest['dscg_cost'] = deepcopy(context['dscg_cost'])
+        if 'baseintent_cost' in context: self.latest['baseintent_cost'] = deepcopy(context['baseintent_cost'])
         self._flush_audits()
         for record in self.action_updates.values():
             record.pop('schema_version',None)
@@ -189,11 +190,11 @@ class DiagnosticSession:
                       or k in ('artifact_sha256','model_config_sha256'))
                       and k not in ('router_schema','feature_version','features','tool_schema_hash','contract_version')}
             self._write('audit_router',record,router_index=index,module='L3')
-        l1 = {k:self.latest.pop(k) for k in ('dscg_input_isolation','dscg_l1_projection') if k in self.latest}
+        l1 = {k:self.latest.pop(k) for k in ('baseintent_input_isolation','baseintent_l1_projection') if k in self.latest}
         if l1:self._write('l1_summary',l1,module='L1')
-        self.latest.pop('dscg_trace_level',None)
-        status = ('infrastructure_error' if failed or self.latest.get('dscg_infrastructure_failure') else
-                  self.latest.get('dscg_termination',{}).get('kind','finished'))
+        self.latest.pop('baseintent_trace_level',None)
+        status = ('infrastructure_error' if failed or self.latest.get('baseintent_infrastructure_failure') else
+                  self.latest.get('baseintent_termination',{}).get('kind','finished'))
         self.emit('task_end', {'status':status, 'summary':self.latest})
 
 
@@ -258,24 +259,25 @@ def load_diagnostic_events(path, *, offset=0):
     with opener(path,'rb') as stream:
         stream.seek(offset)
         for line in stream:
-            if line.strip(): yield json.loads(line)
+            if line.strip(): yield normalize_legacy_keys(json.loads(line))
 
 
 def merge_task_diagnostics(path, raw):
-    if not isinstance(raw,dict) or 'dscg_diagnostics' not in raw: return raw
+    raw = normalize_legacy_keys(raw)
+    if not isinstance(raw,dict) or 'baseintent_diagnostics' not in raw: return raw
     result = deepcopy(raw)
     # A broken reference must never resurrect unrelated/stale inline diagnostics.
     for key in list(result):
-        if key.startswith('dscg_') and key != 'dscg_diagnostics': result.pop(key)
-    ref = raw['dscg_diagnostics']; path = Path(path)
+        if key.startswith('baseintent_') and key != 'baseintent_diagnostics': result.pop(key)
+    ref = raw['baseintent_diagnostics']; path = Path(path)
     try:
-        if (not isinstance(ref,dict) or ref.get('path') != path.with_suffix('.dscg.jsonl').name
+        if (not isinstance(ref,dict) or ref.get('path') not in (path.with_suffix('.baseintent.jsonl').name,path.with_suffix('.dscg.jsonl').name)
                 or not isinstance(ref.get('attempt_id'),str) or not ref['attempt_id']
                 or type(ref.get('offset',0)) is not int or ref.get('offset',0)<0):
             raise ValueError('invalid diagnostic reference')
         side = _within(path.parent,path.parent/ref['path'])
     except (ValueError,TypeError):
-        result['dscg_diagnostics_status']='invalid_reference';return result
+        result['baseintent_diagnostics_status']='invalid_reference';return result
     audits, actions, observations = [], {}, {}
     authorizations, routers, config = [], {}, None
     response_refs, validations = {}, []
@@ -283,9 +285,9 @@ def merge_task_diagnostics(path, raw):
     start, end = False, False
     try:
         for row in load_diagnostic_events(side,offset=ref.get('offset',0)):
-            if row.get('schema_version') not in (SCHEMA,LEGACY_SCHEMA) or row.get('attempt_id') != ref['attempt_id']:
+            if not any(schema_matches(row.get('schema_version'),v) for v in (SCHEMA,LEGACY_SCHEMA)) or row.get('attempt_id') != ref['attempt_id']:
                 raise ValueError('diagnostic attempt mismatch')
-            new_schema = row['schema_version'] == SCHEMA
+            new_schema = schema_matches(row['schema_version'],SCHEMA)
             event,record=row['event'],row['record']
             response_ref = row.get('response_ref')
             if response_ref is not None:
@@ -297,16 +299,16 @@ def merge_task_diagnostics(path, raw):
                 start=True
                 group=path.parent.parent.parent
                 cfg_path=_within(group,path.parent/record['config_ref'])
-                config=json.loads(cfg_path.read_text(encoding='utf-8'))
+                config=compatible_json_load(cfg_path)
                 frame=dict(config.get('framework',{}))
                 if config.get('manifest'):
-                    binding=json.loads(_within(group,cfg_path.parent/config['manifest']).read_text(encoding='utf-8'))
-                    frame.update({k:binding[k] for k in config.get('framework_manifest_keys',[])})
-                result['dscg_framework']=frame
-                result['dscg_trace_level']=record['trace_level']
+                    binding=compatible_json_load(_within(group,cfg_path.parent/config['manifest']))
+                    frame.update({next(iter(normalize_legacy_keys({k:None}))):binding[next(iter(normalize_legacy_keys({k:None})))] for k in config.get('framework_manifest_keys',[])})
+                result['baseintent_framework']=frame
+                result['baseintent_trace_level']=record['trace_level']
             elif event=='authorization': authorizations.append(record)
             elif event in ('audit_decision','audit_decision_final'):
-                if new_schema:record.setdefault('schema_version','dscg.audit-decision.v1')
+                if new_schema:record.setdefault('schema_version','baseintent.audit-decision.v1')
                 index,length=row.get('history_index'),row.get('history_length')
                 if index is not None:
                     if (type(index) is not int or type(length) is not int or
@@ -327,17 +329,17 @@ def merge_task_diagnostics(path, raw):
             elif event=='task_end':result.update(record['summary']);end=True;break
         if not start:raise ValueError('missing diagnostic attempt')
     except FileNotFoundError:
-        result['dscg_diagnostics_status']='missing';return result
+        result['baseintent_diagnostics_status']='missing';return result
     except (OSError,ValueError,TypeError,KeyError,AttributeError):
         # Never turn incomplete/corrupt diagnostics into zero audits or zero costs.
         for k in list(result):
-            if k.startswith('dscg_') and k!='dscg_diagnostics':result.pop(k)
-        result['dscg_diagnostics_status']='corrupt';return result
-    result.update(dscg_task_id=ref['attempt_id'], dscg_authorizations=authorizations,
-        dscg_audit_decisions=audits, dscg_action_ledger=list(actions.values()),
-        dscg_router_events=[routers[k] for k in sorted(routers)], dscg_diagnostics_status='complete' if end else 'incomplete')
-    if isinstance(result.get('dscg_intent_flow'),dict):
-        state=result['dscg_intent_flow']
+            if k.startswith('baseintent_') and k!='baseintent_diagnostics':result.pop(k)
+        result['baseintent_diagnostics_status']='corrupt';return result
+    result.update(baseintent_task_id=ref['attempt_id'], baseintent_authorizations=authorizations,
+        baseintent_audit_decisions=audits, baseintent_action_ledger=list(actions.values()),
+        baseintent_router_events=[routers[k] for k in sorted(routers)], baseintent_diagnostics_status='complete' if end else 'incomplete')
+    if isinstance(result.get('baseintent_intent_flow'),dict):
+        state=result['baseintent_intent_flow']
         state['observations']=[x for rev in sorted(observations) for x in observations[rev]]
         if new_schema and authorizations:
             intents=authorizations[-1].get('authorization_steps',[])
@@ -347,12 +349,12 @@ def merge_task_diagnostics(path, raw):
         replies=[];response_status='complete'
         for response_ref in response_refs.values():
             try:
-                if (response_ref.get('path') != path.with_suffix('.dscg.responses.jsonl').name
+                if (response_ref.get('path') not in (path.with_suffix('.baseintent.responses.jsonl').name,path.with_suffix('.dscg.responses.jsonl').name)
                         or type(response_ref.get('offset')) is not int or response_ref['offset']<0):
                     raise ValueError('invalid response reference')
                 response_path=_within(path.parent,path.parent/response_ref['path'])
                 response=next(load_diagnostic_events(response_path,offset=response_ref['offset']))
-                if (response.get('schema_version')!='dscg.model-response.v1'
+                if (not schema_matches(response.get('schema_version'),'baseintent.model-response.v1')
                         or response.get('attempt_id')!=ref['attempt_id']
                         or response.get('record',{}).get('response_id')!=response_ref['response_id']):
                     raise ValueError('response identity mismatch')
@@ -361,9 +363,9 @@ def merge_task_diagnostics(path, raw):
                 response_status='missing'
             except (OSError,ValueError,TypeError,KeyError,AttributeError,StopIteration):
                 response_status='corrupt'
-        result.update(dscg_model_responses=replies, dscg_responses_status=response_status,
-                      dscg_validation_failures=validations)
-        if response_status!='complete':result['dscg_diagnostics_status']='incomplete'
+        result.update(baseintent_model_responses=replies, baseintent_responses_status=response_status,
+                      baseintent_validation_failures=validations)
+        if response_status!='complete':result['baseintent_diagnostics_status']='incomplete'
     return result
 
 
@@ -376,15 +378,15 @@ def diagnostic_dependencies(path):
     """Existing companion bytes needed to keep a native reuse snapshot readable."""
     path=Path(path);files=[]
     try:
-        raw=json.loads(path.read_text(encoding='utf-8'));ref=raw.get('dscg_diagnostics',{})
-        if ref.get('path')!=path.with_suffix('.dscg.jsonl').name:return files
+        raw=compatible_json_load(path);ref=raw.get('baseintent_diagnostics',{})
+        if ref.get('path') not in (path.with_suffix('.baseintent.jsonl').name,path.with_suffix('.dscg.jsonl').name):return files
         side=_within(path.parent,path.parent/ref['path'])
         if not side.is_file():return files
         files.append(side)
         start=next(load_diagnostic_events(side,offset=ref.get('offset',0)))
         if start.get('attempt_id')!=ref.get('attempt_id') or start.get('event')!='task_start':return files
         response_name=start['record'].get('responses_path')
-        if response_name==path.with_suffix('.dscg.responses.jsonl').name:
+        if response_name in (path.with_suffix('.baseintent.responses.jsonl').name,path.with_suffix('.dscg.responses.jsonl').name):
             response_path=_within(path.parent,path.parent/response_name)
             if response_path.is_file():files.append(response_path)
         group=path.parent.parent.parent

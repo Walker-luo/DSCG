@@ -3,7 +3,7 @@ import json
 import tempfile
 import unittest
 from pathlib import Path
-from dscg import audit_router as a
+from baseintent import audit_router as a
 
 
 class DatasetTests(unittest.TestCase):

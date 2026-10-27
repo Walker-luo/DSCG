@@ -2,9 +2,9 @@
 import argparse
 import json
 from pathlib import Path
-from dscg.audit_router import SCHEMA,FEATURE_VERSION,INPUT_SCHEMA,LABELS,LABEL_SOURCES,calibrate,digest,load_json,validate_artifact
+from baseintent.audit_router import SCHEMA,FEATURE_VERSION,INPUT_SCHEMA,LABELS,LABEL_SOURCES,calibrate,digest,load_json,validate_artifact
 
-PRESET_SCHEMA = 'dscg.router-calibration-preset.v1'
+PRESET_SCHEMA = 'baseintent.router-calibration-preset.v1'
 
 
 def load_preset(path):

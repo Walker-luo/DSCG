@@ -1,6 +1,6 @@
 import unittest
 
-from dscg.harness_records import RunRecord, SampleRecord, SampleStatus
+from baseintent.harness_records import RunRecord, SampleRecord, SampleStatus
 
 
 class HarnessRecordTests(unittest.TestCase):

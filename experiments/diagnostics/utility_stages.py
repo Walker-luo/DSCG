@@ -12,16 +12,16 @@ from pathlib import Path
 from types import SimpleNamespace
 
 from agentdojo.functions_runtime import FunctionsRuntime, FunctionCall
-from dscg.pipelines import defended as d
-from dscg.tool_metadata import load_tool_metadata, set_tool_metadata, metadata_for_runtime
+from baseintent.pipelines import defended as d
+from baseintent.tool_metadata import load_tool_metadata, set_tool_metadata, metadata_for_runtime
 from experiments.diagnostics.utility_packets import build_packets
-from dscg.prompt_profiles import audit_policy
-from dscg.task_diagnostics import load_task_trace
+from baseintent.prompt_profiles import audit_policy
+from baseintent.task_diagnostics import load_task_trace
 
 ROOT = Path(__file__).resolve().parents[2]
 FIXTURES = ROOT / 'tests/fixtures'
-BUNDLE_SCHEMA = 'dscg.utility-stage.v1'
-RESPONSE_SCHEMA = 'dscg.utility-responses.v1'
+BUNDLE_SCHEMA = 'baseintent.utility-stage.v1'
+RESPONSE_SCHEMA = 'baseintent.utility-responses.v1'
 STAGES = {'audit': ('legacy', 'protocol-v1'),
           'authorization': ('protocol-v1', 'tool-semantics-v1'),
           'source': ('tool-semantics-v1', 'source-context-v1')}
@@ -352,7 +352,7 @@ def compare_stage(bundle, responses=None):
     passed = (target_complete and profiles[candidate][metric] < profiles[control][metric] and not new_unsafe
               and profiles[candidate]['protocol_failures'] <= profiles[control]['protocol_failures']
               and not any(p['execution_errors'] for p in profiles.values()))
-    return dict(schema_version='dscg.utility-comparison.v1', stage=bundle['stage'],
+    return dict(schema_version='baseintent.utility-comparison.v1', stage=bundle['stage'],
                 bundle_sha256=bundle['bundle_sha256'], model_config_sha256=digest(model) if model else None,
                 status='not_measured' if not trials else 'complete' if complete else 'incomplete',
                 missing_responses=missing, paired_trials=len(paired), new_unsafe_pairs=new_unsafe,
@@ -366,26 +366,26 @@ def compare_stage(bundle, responses=None):
 def trace_signals(trace):
     """Overlapping observations only; never infer a unique root cause or rescore."""
     valid = not trace.get('error') and all(isinstance(trace.get(k),bool) for k in ('utility','security'))
-    diagnostic_available=trace.get('dscg_diagnostics_status') not in ('missing','corrupt','invalid_reference','incomplete')
+    diagnostic_available=trace.get('baseintent_diagnostics_status') not in ('missing','corrupt','invalid_reference','incomplete')
     messages = trace.get('messages')
     complete_messages = (isinstance(messages,list) and bool(messages)
                          and all(isinstance(m,dict) for m in messages))
-    reasons = set((trace.get('dscg_audit_summary') or {}).get('reason_code_counts',{}))
-    final = set((trace.get('dscg_action_summary') or {}).get('reason_code_counts',{}))
-    for row in trace.get('dscg_action_ledger') or []:
+    reasons = set((trace.get('baseintent_audit_summary') or {}).get('reason_code_counts',{}))
+    final = set((trace.get('baseintent_action_summary') or {}).get('reason_code_counts',{}))
+    for row in trace.get('baseintent_action_ledger') or []:
         if isinstance(row,dict) and str(row.get('state','')).lower() == 'blocked':
             final.update(t.get('reason_code') for t in row.get('transitions',[]) if isinstance(t,dict))
-    for row in trace.get('dscg_audit_decisions') or []:
+    for row in trace.get('baseintent_audit_decisions') or []:
         if isinstance(row,dict):
             reasons.add(row.get('reason_code'))
     return dict(status='valid' if valid else 'error_or_incomplete',
                 native_utility=trace.get('utility') if valid else None,
                 native_security=trace.get('security') if valid else None,
                 protocol_failure_seen=('AUDIT_SCHEMA_INVALID' in reasons
-                                       if diagnostic_available and ('dscg_audit_summary' in trace or 'dscg_audit_decisions' in trace) else None),
-                audit_deny_seen=('AUDIT_DENY' in final if diagnostic_available and ('dscg_action_summary' in trace or 'dscg_action_ledger' in trace) else None),
-                audit_abstain_seen=('AUDIT_ABSTAIN' in final if diagnostic_available and ('dscg_action_summary' in trace or 'dscg_action_ledger' in trace) else None),
-                diagnostic_status=trace.get('dscg_diagnostics_status','legacy_inline'),
+                                       if diagnostic_available and ('baseintent_audit_summary' in trace or 'baseintent_audit_decisions' in trace) else None),
+                audit_deny_seen=('AUDIT_DENY' in final if diagnostic_available and ('baseintent_action_summary' in trace or 'baseintent_action_ledger' in trace) else None),
+                audit_abstain_seen=('AUDIT_ABSTAIN' in final if diagnostic_available and ('baseintent_action_summary' in trace or 'baseintent_action_ledger' in trace) else None),
+                diagnostic_status=trace.get('baseintent_diagnostics_status','legacy_inline'),
                 no_proposed_calls=(not any(m.get('tool_calls') for m in messages if isinstance(m,dict))
                                    if valid and complete_messages else None),
                 attribution='overlapping_observations_not_causal_labels')
@@ -393,8 +393,8 @@ def trace_signals(trace):
 
 def _destination(path):
     path = path.resolve()
-    if not path.is_relative_to((ROOT/'workshop/artifacts').resolve()):
-        raise ValueError('output must be a new path under workshop/artifacts/')
+    if not path.is_relative_to((ROOT/'artifacts').resolve()):
+        raise ValueError('output must be a new path under artifacts/')
     return path
 
 

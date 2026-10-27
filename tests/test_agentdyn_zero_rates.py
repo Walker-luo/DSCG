@@ -42,10 +42,10 @@ class DiagnosisTests(unittest.TestCase):
                 'utility': False, 'security': False, 'error': None,
                 'injections': {'x': 'payload-marker'},
                 'messages': [{'role': 'tool', 'content': 'payload-marker',
-                              'error': None}, {'role': 'tool', 'content': 'DSCG_BLOCKED',
-                                               'error': 'DSCG_BLOCKED'}],
-                'dscg_authorizations': [{'allowed_tools': ['other_tool']}],
-                'dscg_cost': {'models': [{'generation': {'total_tokens': 10}}]},
+                              'error': None}, {'role': 'tool', 'content': 'BASEINTENT_BLOCKED',
+                                               'error': 'BASEINTENT_BLOCKED'}],
+                'baseintent_authorizations': [{'allowed_tools': ['other_tool']}],
+                'baseintent_cost': {'models': [{'generation': {'total_tokens': 10}}]},
             }))
             with patch.object(diag, 'get_suite', return_value=_Suite()):
                 report = diag.analyze_run(root)
@@ -62,7 +62,7 @@ class DiagnosisTests(unittest.TestCase):
             'utility': None, 'security': None, 'error': {'type': 'APIError'},
             'injections': {'x': 'payload-marker'},
             'messages': [{'role': 'tool', 'content': 'different content'}],
-            'dscg_authorizations': []}, ['required_tool'])
+            'baseintent_authorizations': []}, ['required_tool'])
         self.assertEqual(result['status'], 'error')
         self.assertFalse(result['payload_visible_exact'])
         self.assertIsNone(result['reference_tools_missing'])
@@ -71,7 +71,7 @@ class DiagnosisTests(unittest.TestCase):
     def test_last_authorization_is_used_without_unioning_old_permissions(self):
         result = diag.inspect_trace({
             'utility': False, 'security': False, 'error': None,
-            'dscg_authorizations': [{'allowed_tools': ['required_tool']},
+            'baseintent_authorizations': [{'allowed_tools': ['required_tool']},
                                     {'allowed_tools': ['other_tool']}]}, ['required_tool'])
         self.assertEqual(result['reference_tools_missing'], ['required_tool'])
 

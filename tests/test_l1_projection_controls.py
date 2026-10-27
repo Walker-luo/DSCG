@@ -11,10 +11,10 @@ from unittest.mock import Mock, patch
 from tests import test_l1_projection as fixture_module
 from tests import test_partial_attacks as partial_fixture
 from tests.test_l1_projection import REQUEST, ATTACK
-from dscg.model_config import ModelConfig
-from dscg.benchmark_catalog import get_backend
-from dscg.pipelines.defended import OurFrameExecutor, make_defended_pipeline
-from dscg.l1_projection import PROFILE_SHA256
+from baseintent.model_config import ModelConfig
+from baseintent.benchmark_catalog import get_backend
+from baseintent.pipelines.defended import OurFrameExecutor, make_defended_pipeline
+from baseintent.l1_projection import PROFILE_SHA256
 from dashboard.evaluation import normalize_config
 from experiments import run_partial_benchmark as runner
 
@@ -28,7 +28,7 @@ class Recorder:
 class ProjectionControlTests(unittest.TestCase):
     def factory(self,**flags):
         config=ModelConfig(provider='custom',model_id='offline',api_key='fixture',base_url='http://offline')
-        with patch('dscg.pipelines.defended.create_openai_client',return_value=Mock()):
+        with patch('baseintent.pipelines.defended.create_openai_client',return_value=Mock()):
             return make_defended_pipeline(model_config=config,sec_model_config=config,**flags)[0]
 
     def test_default_executor_changes_effective_payload_but_returns_original_history(self):
@@ -37,19 +37,19 @@ class ProjectionControlTests(unittest.TestCase):
         state=executor.query(REQUEST,fixture.runtime,{},raw,{})
         self.assertNotIn(ATTACK,str(llm.view))
         self.assertEqual(state[3][:-1],before)
-        self.assertEqual(state[4]['dscg_l1_projection']['projected_returns'],1)
-        self.assertEqual(state[4]['dscg_l1_projection']['profile_sha256'],PROFILE_SHA256)
+        self.assertEqual(state[4]['baseintent_l1_projection']['projected_returns'],1)
+        self.assertEqual(state[4]['baseintent_l1_projection']['profile_sha256'],PROFILE_SHA256)
 
     def test_modes_bind_pipeline_name_framework_and_router_configuration(self):
         names=[];hashes=[]
         for mode in ('off','shadow','projected'):
             pipeline=self.factory(l1_projection_mode=mode,audit_router_mode='shadow')
-            config=pipeline.dscg_optimization_config
+            config=pipeline.baseintent_optimization_config
             self.assertEqual(config['l1_projection_mode'],mode)
             self.assertEqual(config['l1_projection_profile_sha256'],PROFILE_SHA256)
             names.append(pipeline.name);hashes.append(config['audit_router_config_sha256'])
         self.assertEqual(len(set(names)),3);self.assertEqual(len(set(hashes)),3)
-        self.assertEqual(self.factory(input_isolation=False).dscg_optimization_config['l1_projection_mode'],'off')
+        self.assertEqual(self.factory(input_isolation=False).baseintent_optimization_config['l1_projection_mode'],'off')
         with self.assertRaises(ValueError):self.factory(l1_projection_mode='guess')
 
     def test_dashboard_effective_mode_defaults_and_disabled_input(self):
@@ -71,7 +71,7 @@ class ProjectionControlTests(unittest.TestCase):
     def test_manifest_binds_mode_and_refuses_named_cache_from_another_mode(self):
         def factory(*args,**kwargs):
             pipeline,tracker=partial_fixture.fake_pipeline()
-            pipeline.dscg_optimization_config={'l1_projection_mode':kwargs['l1_projection_mode'],
+            pipeline.baseintent_optimization_config={'l1_projection_mode':kwargs['l1_projection_mode'],
                                                'l1_projection_profile_sha256':PROFILE_SHA256}
             return pipeline,tracker,None
         with TemporaryDirectory() as directory, redirect_stdout(StringIO()), patch.object(
@@ -93,10 +93,10 @@ class ProjectionControlTests(unittest.TestCase):
 
     def test_existing_positional_factory_and_executor_arguments_keep_their_meaning(self):
         config=ModelConfig(provider='custom',model_id='offline',api_key='fixture',base_url='http://offline')
-        with patch('dscg.pipelines.defended.create_openai_client',return_value=Mock()):
+        with patch('baseintent.pipelines.defended.create_openai_client',return_value=Mock()):
             pipeline=make_defended_pipeline(None,None,True,True,'summary',None,0,False,True,False,
                                            model_config=config,sec_model_config=config)[0]
-        self.assertFalse(pipeline.dscg_optimization_config['authorization_precheck'])
+        self.assertFalse(pipeline.baseintent_optimization_config['authorization_precheck'])
         executor=OurFrameExecutor(Recorder(),None,'summary',None,True,False)
         self.assertFalse(executor.planning_tool_view)
         self.assertEqual(executor.l1_projection_mode,'projected')
@@ -107,7 +107,7 @@ class ProjectionControlTests(unittest.TestCase):
         llm=Recorder();executor=OurFrameExecutor(llm)
         state=executor.query(REQUEST,fixture.runtime,{},raw,{})
         self.assertIn(ATTACK,str(llm.view))
-        self.assertEqual(state[4]['dscg_l1_projection']['projected_returns'],0)
+        self.assertEqual(state[4]['baseintent_l1_projection']['projected_returns'],0)
 
     def test_missing_blank_or_mixed_actual_user_does_not_match_supplied_query(self):
         for kind in ('missing','blank','mixed'):
@@ -118,4 +118,4 @@ class ProjectionControlTests(unittest.TestCase):
             llm=Recorder();state=OurFrameExecutor(llm).query(REQUEST,fixture.runtime,{},raw,{})
             with self.subTest(kind=kind):
                 self.assertIn(ATTACK,str(llm.view))
-                self.assertEqual(state[4]['dscg_l1_projection']['projected_returns'],0)
+                self.assertEqual(state[4]['baseintent_l1_projection']['projected_returns'],0)

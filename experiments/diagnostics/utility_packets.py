@@ -9,9 +9,9 @@ from pathlib import Path
 from types import SimpleNamespace
 
 from agentdojo.functions_runtime import FunctionsRuntime, FunctionCall
-from dscg.pipelines.defended import ActionSecurityChecker, PermissionSandbox
-from dscg.prompt_profiles import PROFILES, profile_binding
-from dscg.tool_metadata import load_tool_metadata, set_tool_metadata
+from baseintent.pipelines.defended import ActionSecurityChecker, PermissionSandbox
+from baseintent.prompt_profiles import PROFILES, profile_binding
+from baseintent.tool_metadata import load_tool_metadata, set_tool_metadata
 
 FIXTURE = Path(__file__).resolve().parents[2] / 'tests/fixtures/qwen_utility_cases.json'
 
@@ -59,7 +59,7 @@ def build_packets(profile='source-context-v1'):
         packet = checker._audit_packet(case['request'], runtime, [action], {}, messages)
         rows.append({'id': case['id'], 'category': case['category'],
                      'authored_expectation': case['expected'], 'packet': packet})
-    return {'schema_version': 'dscg.utility-packets.v1', 'prompt_profile': profile,
+    return {'schema_version': 'baseintent.utility-packets.v1', 'prompt_profile': profile,
             **profile_binding('legacy-v34' if profile == 'legacy' else profile), 'system_policy': checker.SYSTEM_POLICY,
             'model_calls': 0, 'executed_tools': 0, 'limitations': fixture['limitations'], 'cases': rows}
 
@@ -69,9 +69,9 @@ def main(argv=None):
     parser.add_argument('--profile', choices=PROFILES, default='source-context-v1')
     parser.add_argument('--output', type=Path, required=True)
     args = parser.parse_args(argv)
-    root = Path(__file__).resolve().parents[2] / 'workshop/artifacts'
+    root = Path(__file__).resolve().parents[2] / 'artifacts'
     if not args.output.resolve().is_relative_to(root.resolve()) or args.output.suffix != '.json':
-        parser.error('--output must be a new JSON under workshop/artifacts/')
+        parser.error('--output must be a new JSON under artifacts/')
     value = build_packets(args.profile)
     args.output.parent.mkdir(parents=True, exist_ok=True)
     with args.output.open('x', encoding='utf-8') as stream:

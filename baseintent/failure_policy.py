@@ -1,7 +1,7 @@
 """Public failure provenance; blocked tool returns are never execution evidence."""
 
 FAILURE_POLICY = 'framework-failure-native-scoring-v1'
-BLOCK_PREFIXES = ('L2_BLOCKED:', 'L3_BLOCKED:', 'MONITOR_BLOCKED:', 'DSCG_BLOCKED:')
+BLOCK_PREFIXES = ('L2_BLOCKED:', 'L3_BLOCKED:', 'MONITOR_BLOCKED:', 'BASEINTENT_BLOCKED:', 'DSCG_BLOCKED:')
 MODULE_NAMES = {'L1': 'L1 Input Isolation', 'L2': 'L2 Authorization',
                 'L3': 'L3 Security Check', 'Monitor': 'Reference Monitor',
                 'Intent Progress': 'Intent Progress'}
@@ -16,7 +16,7 @@ FRAMEWORK_FAILURE_CODES = frozenset({
 
 
 def is_blocked_error(error):
-    return isinstance(error, str) and (error == 'DSCG_BLOCKED' or error.startswith(BLOCK_PREFIXES))
+    return isinstance(error, str) and (error in ('BASEINTENT_BLOCKED','DSCG_BLOCKED') or error.startswith(BLOCK_PREFIXES))
 
 
 def block_error(module, reason):

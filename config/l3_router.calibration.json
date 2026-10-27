@@ -1,5 +1,5 @@
 {
-  "schema_version": "dscg.router-calibration-preset.v1",
+  "schema_version": "baseintent.router-calibration-preset.v1",
   "status": "development_candidate",
   "grid": [0.65, 0.70, 0.75],
   "reference_threshold": 0.70,

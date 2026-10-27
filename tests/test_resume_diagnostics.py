@@ -73,7 +73,7 @@ class ResumeDiagnosticsTests(unittest.TestCase):
                     self.assertEqual(cli(['--baseline']), 1)
                 self.assertIn('screening source changed', stream.getvalue())
                 self.assertNotIn('模型配置错误', stream.getvalue())
-                self.assertNotIn('DSCG_MAIN_*', stream.getvalue())
+                self.assertNotIn('BASEINTENT_MAIN_*', stream.getvalue())
 
 
 # Explicitly retain historical upstream suites as generic offline fixtures.

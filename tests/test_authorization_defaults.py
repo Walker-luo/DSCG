@@ -7,7 +7,7 @@ import unittest
 from unittest.mock import Mock
 
 from agentdojo.functions_runtime import FunctionsRuntime, EmptyEnv
-from dscg.pipelines.defended import (
+from baseintent.pipelines.defended import (
     ToolAuthorizationCompiler, TrustedTaskRequest, OurFrameExecutor,
     PermissionSandbox, _compact_authorization_record,
 )
@@ -78,7 +78,7 @@ class AuthorizationDefaultsTests(unittest.TestCase):
                 extra = {}
                 OurFrameExecutor(llm, sandbox=sandbox, prompt_profile='legacy-v34').query("adjust payment", runtime(), EmptyEnv(),
                     [{"role": "user", "content": [{"type": "text", "content": "adjust payment"}]}], extra)
-                record = _compact_authorization_record(extra["dscg_authorization"])
+                record = _compact_authorization_record(extra["baseintent_authorization"])
                 self.assertEqual(record.get("error_code"), code)
                 self.assertEqual(record["policy_state"], "error")
                 self.assertFalse(sandbox.assess("send_money", runtime())[0])

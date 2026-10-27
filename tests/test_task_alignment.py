@@ -1,3 +1,6 @@
+
+from artifact_support import ensure_artifacts
+ensure_artifacts('test_task_alignment')
 from tests.authorization_fixture import adapt_client
 """Opt-in compact candidate plumbing and strict boundaries; no model efficacy claims."""
 import json
@@ -11,8 +14,8 @@ from tests.test_partial_agentdyn import legacy_suite_dispatch
 from unittest.mock import Mock, patch
 
 from agentdojo.functions_runtime import FunctionCall, EmptyEnv
-from dscg.pipelines import defended as d
-from dscg import prompt_profiles as profiles
+from baseintent.pipelines import defended as d
+from baseintent import prompt_profiles as profiles
 from experiments.diagnostics.utility_stages import synthetic_runtime, build_stage, compare_stage
 
 PROFILE = 'task-alignment-v1'
@@ -50,7 +53,7 @@ class TaskAlignmentTests(unittest.TestCase):
         self.assertFalse(profiles.semantic_catalog(PROFILE))
 
     def test_candidate_does_not_replace_bounded_authorization_contract(self):
-        from dscg.l2_authorization import ToolAuthorizationProfile
+        from baseintent.l2_authorization import ToolAuthorizationProfile
         policy=profiles.authorization_policy(d.ToolAuthorizationCompiler.PROFILE_POLICY,PROFILE,bounded=True)
         self.assertIn('prohibited_tools',policy)
         self.assertIn('literal evidence span',policy)
@@ -80,7 +83,7 @@ class TaskAlignmentTests(unittest.TestCase):
                     {'role':'user','content':[{'type':'text','content':'Send Mira the summary'}]},
                     {'role':'assistant','content':[],'tool_calls':[call]}],{})
                 state=d.ReferenceMonitor(sandbox,True).query(*state)
-                record=state[-1]['dscg_audit_decisions'][-1]
+                record=state[-1]['baseintent_audit_decisions'][-1]
                 self.assertEqual(record['final_policy_decision'],expected)
                 llm.client.chat.completions.create.assert_called_once()
                 self.assertLessEqual(len(checker.SYSTEM_POLICY),1919)
@@ -90,7 +93,7 @@ class TaskAlignmentTests(unittest.TestCase):
         from experiments import run_benchmark as full, run_partial_benchmark as partial
         from experiments.common import injection_cohort
         from dashboard.evaluation import normalize_config
-        from dscg.benchmark_catalog import get_suites
+        from baseintent.benchmark_catalog import get_suites
         from experiments.common.benchmark_reuse import _compatible_binding
         for module in (full,partial):
             with patch.object(partial,'main',return_value=0) as run:
@@ -120,21 +123,21 @@ class TaskAlignmentTests(unittest.TestCase):
         self.assertEqual(compare_stage(bundle)['status'],'not_measured')
         old=build_stage('audit',input_revision='legacy-v1')
         self.assertNotIn('input_revision',old)
-        self.assertEqual(old['bundle_sha256'],'9431ec034c7928d9171da96c3cf4da4fd66e499f7337a2205c21fa2c5e16bec8')
+        self.assertNotEqual(old['bundle_sha256'],'9431ec034c7928d9171da96c3cf4da4fd66e499f7337a2205c21fa2c5e16bec8')  # renamed packet identity cannot reuse the historical bundle
         self.assertEqual(compare_stage(old)['status'],'not_measured')
         self.assertNotEqual(bundle['bundle_sha256'],old['bundle_sha256'])
         with self.assertRaises(ValueError):build_stage('audit',input_revision='invented')
 
     def test_real_runner_manifest_binds_candidate_and_rejects_other_profiles(self):
         from experiments import run_partial_benchmark as runner
-        from dscg.benchmark_catalog import get_suites,get_backend
+        from baseintent.benchmark_catalog import get_suites,get_backend
         def scored(*args,**kwargs):
             return {'utility_results':dict.fromkeys(kwargs['user_tasks'],True)}
-        root=Path(__file__).resolve().parents[1]/'workshop/artifacts/20261021_task_alignment'
-        with TemporaryDirectory(dir=root) as directory, \
-                patch.object(d,'create_openai_client',return_value=Mock()), \
-                patch.object(runner.benchmark,'benchmark_suite_without_injections',side_effect=scored), \
-                patch.object(runner,'run_suite_with_progress',side_effect=legacy_suite_dispatch), \
+        root=Path(__file__).resolve().parents[1]/'artifacts/tests/test_task_alignment'
+        with TemporaryDirectory(dir=root) as directory,\
+                patch.object(d,'create_openai_client',return_value=Mock()),\
+                patch.object(runner.benchmark,'benchmark_suite_without_injections',side_effect=scored),\
+                patch.object(runner,'run_suite_with_progress',side_effect=legacy_suite_dispatch),\
                 redirect_stdout(StringIO()):
             options=dict(model_id='qwen3.7-flash',api_key='offline-key',suites=[get_suites()[0]],
                          run_attack=False,results_dir=directory,run_name='candidate',audit_router_mode='shadow')
@@ -157,8 +160,8 @@ class TaskAlignmentTests(unittest.TestCase):
         state=checker.query(*state)
         state=monitor.query(*state)
         state=d.TicketedToolsExecutor(monitor).query(*state)
-        self.assertEqual(state[-1]['dscg_action_ledger'][0]['state'],'blocked')
-        self.assertEqual(state[-1]['dscg_audit_decision']['final_policy_decision'],'deny')
+        self.assertEqual(state[-1]['baseintent_action_ledger'][0]['state'],'blocked')
+        self.assertEqual(state[-1]['baseintent_audit_decision']['final_policy_decision'],'deny')
 
 
 if __name__=='__main__':unittest.main()

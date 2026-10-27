@@ -8,13 +8,10 @@ config/*.local.toml
 config/tools.local.toml
 /examples/
 /download/
-# Workshop generated runs and validation artifacts
-/workshop/results/
-/workshop/artifacts/
-# Local duplicate source snapshots; keep archive indexes/manifests and completed reports
-/workshop/archive/**/originals/
-/workshop/archive/original_documents/
-/workshop/archive/**/intervening_snapshots/
-/workshop/archive/project_structure_20261008/before/
 /docs/figures/benchmarks/
 /report/
+
+# BaseIntent generated validation evidence
+/artifacts/
+
+/workshop/

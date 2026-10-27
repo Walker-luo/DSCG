@@ -10,8 +10,8 @@ import json
 from collections import Counter
 from pathlib import Path
 
-from dscg.benchmark_catalog import get_suite
-from dscg.task_diagnostics import load_task_trace
+from baseintent.benchmark_catalog import get_suite
+from baseintent.task_diagnostics import load_task_trace
 
 
 def _read(path):
@@ -34,10 +34,10 @@ def _strings(value):
 
 
 def _tokens(trace):
-    if 'dscg_cost' not in trace:
+    if 'baseintent_cost' not in trace:
         return None
     total = 0
-    for model in trace.get('dscg_cost', {}).get('models', []):
+    for model in trace.get('baseintent_cost', {}).get('models', []):
         if isinstance(model, dict):
             for role in model.values():
                 if isinstance(role, dict):
@@ -49,7 +49,7 @@ def inspect_trace(trace, reference_tools):
     """Inspect recorded labels without recomputing native utility/security."""
     error = trace.get('error')
     valid = error is None and isinstance(trace.get('utility'), bool) and isinstance(trace.get('security'), bool)
-    authorizations = trace.get('dscg_authorizations') or []
+    authorizations = trace.get('baseintent_authorizations') or []
     allowed = set(authorizations[-1].get('allowed_tools') or []) if authorizations else set()
     missing = sorted(set(reference_tools) - allowed) if authorizations else None
     messages = trace.get('messages') or []
@@ -57,9 +57,9 @@ def inspect_trace(trace, reference_tools):
     payloads = [value for value in (trace.get('injections') or {}).values() if isinstance(value, str) and value]
     visible = any(payload in text for message in tool_messages
                   for text in _strings(message.get('content')) for payload in payloads)
-    from dscg.failure_policy import is_blocked_error
+    from baseintent.failure_policy import is_blocked_error
     blocked = sum(is_blocked_error(message.get('error')) or
-                  any('DSCG_BLOCKED' in text for text in _strings(message.get('content')))
+                  any('BASEINTENT_BLOCKED' in text for text in _strings(message.get('content')))
                   for message in tool_messages)
     audit_blocked = sum('AUDIT_' in str(message.get('error') or '')
                         for message in tool_messages)
@@ -177,7 +177,7 @@ def analyze_run(run_dir):
         'known_trace_tokens_subtotal': sum(row['total_tokens'] for row in valid if row['total_tokens'] is not None),
         'unknown_trace_token_count': sum(row['total_tokens'] is None for row in valid),
     })
-    return {'schema_version': 'dscg.agentdyn-zero-rates.v1', 'run_dir': str(run_dir),
+    return {'schema_version': 'baseintent.agentdyn-zero-rates.v1', 'run_dir': str(run_dir),
             'model_id': manifest.get('model_id'), 'benchmark': manifest['benchmark'],
             'counts': dict(counts), 'preflight_counts': dict(Counter(row['status'] for row in preflights)),
             'tasks': tasks, 'preflights': preflights, 'issues': issues,

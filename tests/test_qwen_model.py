@@ -1,7 +1,7 @@
 """Qwen defaults and credential-safe configuration, without network calls."""
 import unittest
 from unittest.mock import Mock, patch
-from dscg.model_config import resolve_model_config, reasoning_effort_for_config, ModelConfigurationError
+from baseintent.model_config import resolve_model_config, reasoning_effort_for_config, ModelConfigurationError
 
 
 class QwenModelTests(unittest.TestCase):
@@ -9,7 +9,7 @@ class QwenModelTests(unittest.TestCase):
         from agentdojo.functions_runtime import FunctionsRuntime
         from openai.types.chat import ChatCompletionMessage
         from types import SimpleNamespace
-        from dscg.pipelines import baseline, defended
+        from baseintent.pipelines import baseline, defended
         config = resolve_model_config('qwen3.7-flash', api_key='fixture-key', local_settings={}, env={})
         client = Mock()
         client.chat.completions.create.return_value = SimpleNamespace(
@@ -30,7 +30,7 @@ class QwenModelTests(unittest.TestCase):
         settings = {'providers': {'dashscope': {'api_key': 'offline-qwen-key',
             'base_url': 'https://workspace.cn-beijing.maas.aliyuncs.com/compatible-mode/v1'}}}
         main = resolve_model_config(local_settings=settings, env={}, api_key='offline-qwen-key')
-        audit = resolve_model_config(prefix='DSCG_SEC', local_settings=settings, env={}, fallback=main)
+        audit = resolve_model_config(prefix='BASEINTENT_SEC', local_settings=settings, env={}, fallback=main)
         self.assertEqual(main.model_id, 'qwen3.7-flash')
         self.assertEqual(audit, main)
         self.assertIn('workspace.cn-beijing', main.base_url)

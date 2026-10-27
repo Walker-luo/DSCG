@@ -4,8 +4,8 @@ import json
 import unittest
 from types import SimpleNamespace
 from agentdojo.functions_runtime import FunctionsRuntime, FunctionCall, EmptyEnv
-from dscg.pipelines.defended import ActionSecurityChecker, PermissionSandbox, ReferenceMonitor, TicketedToolsExecutor, ToolAuthorizationCompiler, TrustedTaskRequest
-from dscg.tool_metadata import load_tool_metadata, set_tool_metadata, metadata_for_runtime
+from baseintent.pipelines.defended import ActionSecurityChecker, PermissionSandbox, ReferenceMonitor, TicketedToolsExecutor, ToolAuthorizationCompiler, TrustedTaskRequest
+from baseintent.tool_metadata import load_tool_metadata, set_tool_metadata, metadata_for_runtime
 
 class WebRoutingTests(unittest.TestCase):
     def test_both_shipped_catalogs_mark_fetch_as_external(self):
@@ -43,4 +43,4 @@ class WebRoutingTests(unittest.TestCase):
                 state=(request,runtime,EmptyEnv(),[{'role':'assistant','content':[], 'tool_calls':[call]}],{})
                 state=checker.query(*state);state=monitor.query(*state);state=TicketedToolsExecutor(monitor).query(*state)
                 self.assertEqual(executed,[url] if decision=='allow' else [])
-                self.assertNotEqual(state[-1]['dscg_audit_decisions'][0]['reason_code'],'READ_AUDIT_BYPASS')
+                self.assertNotEqual(state[-1]['baseintent_audit_decisions'][0]['reason_code'],'READ_AUDIT_BYPASS')

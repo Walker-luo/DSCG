@@ -1,4 +1,7 @@
 """CLI accounting and real spawn isolation; all model responses are local fixtures."""
+
+from artifact_support import ensure_artifacts
+ensure_artifacts('test_tool_arguments_runner')
 from contextlib import redirect_stdout
 from io import StringIO
 import json
@@ -7,7 +10,7 @@ from tempfile import TemporaryDirectory
 import unittest
 from unittest.mock import patch
 
-from dscg.benchmark_catalog import get_backend,get_suites
+from baseintent.benchmark_catalog import get_backend,get_suites
 from experiments import run_partial_benchmark as runner,run_benchmark as full
 from experiments.common.attack_execution import iter_attack_results,iter_serial_results
 import tool_arguments_fixture as fixture
@@ -19,7 +22,7 @@ def inline(jobs,*,on_event):return iter_serial_results(jobs,on_event=on_event,ex
 
 class ToolArgumentsRunnerTests(unittest.TestCase):
     def setUp(self):
-        root=Path(__file__).resolve().parents[1]/'workshop/artifacts/20261021_tool_arguments_json/runner'
+        root=Path(__file__).resolve().parents[1]/'artifacts/tests/test_tool_arguments_runner'
         root.mkdir(parents=True,exist_ok=True)
         temp=TemporaryDirectory(dir=root);self.addCleanup(temp.cleanup);self.root=Path(temp.name)
 
@@ -32,7 +35,7 @@ class ToolArgumentsRunnerTests(unittest.TestCase):
             for progress,dispatch in [(False,inline),(True,spawned)]:
                 name=f'{origin}_{progress}'
                 options=dict(prompt_profile='legacy-v34',origin=origin,suites=[suite],attack=attacks,results_dir=self.root,run_name=name,progress=progress)
-                with self.subTest(origin=origin,progress=progress),fixture.patched(), \
+                with self.subTest(origin=origin,progress=progress),fixture.patched(),\
                      patch.object(runner,'iter_attack_results',side_effect=dispatch),redirect_stdout(StringIO()) as output:
                     self.assertEqual(runner.main(**options),1,output.getvalue())
                 base=self.base(name)
@@ -101,7 +104,7 @@ class ToolArgumentsRunnerTests(unittest.TestCase):
             self.assertEqual(data['task_error_diagnostics'][0]['stage'],'scored_task' if run_attack else 'clean_task')
 
     def test_full_and_cohort_use_the_same_task_error_policy(self):
-        from dscg.benchmark_catalog import get_suite,benchmark_identity
+        from baseintent.benchmark_catalog import get_suite,benchmark_identity
         from experiments.common import injection_cohort as cohort
         suite_name=get_suites()[0];suite=get_suite('v1.2',suite_name)
         frozen={'schema_version':cohort.SCHEMA,'suite_version':'v1.2','benchmark':benchmark_identity(),
@@ -111,8 +114,8 @@ class ToolArgumentsRunnerTests(unittest.TestCase):
         path=self.root/'frozen/cohort.json';path.parent.mkdir();path.write_text(json.dumps(frozen))
         cases=[(full.main,'full',None),(full.main,'full_cohort',path),(runner.main,'partial_cohort',path)]
         for entry,name,path in cases:
-            with self.subTest(scope=name),fixture.patched(), \
-                 patch.object(cohort,'resolve_model_config',return_value=fixture.CONFIG), \
+            with self.subTest(scope=name),fixture.patched(),\
+                 patch.object(cohort,'resolve_model_config',return_value=fixture.CONFIG),\
                  patch.object(runner,'iter_attack_results',side_effect=inline),redirect_stdout(StringIO()) as output:
                 self.assertEqual(entry(origin=True,suites=[suite_name],attack='ignore_previous',results_dir=self.root,run_name=name,cohort_path=path),1,output.getvalue())
             data=json.loads((self.base(name)/'ignore_previous'/suite_name/'summary.json').read_text())

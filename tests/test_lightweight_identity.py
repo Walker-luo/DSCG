@@ -5,7 +5,7 @@ import json
 import unittest
 from unittest.mock import patch
 
-from dscg import benchmark_catalog as catalog
+from baseintent import benchmark_catalog as catalog
 from experiments.common import benchmark_reuse as reuse
 
 
@@ -31,7 +31,7 @@ class LightweightIdentityTests(unittest.TestCase):
     def test_shadowed_import_path_is_rejected(self):
         dist = SimpleNamespace(version='0.1.35', read_text=lambda _: None,
                                locate_file=lambda _: Path('/installed/agentdojo'))
-        with patch.object(catalog, 'distribution', return_value=dist), \
+        with patch.object(catalog, 'distribution', return_value=dist),\
              patch.object(catalog, '_package_root', return_value=Path('/shadowed/agentdojo')):
             with self.assertRaisesRegex(ValueError, 'path'):
                 catalog.benchmark_identity()
@@ -39,7 +39,7 @@ class LightweightIdentityTests(unittest.TestCase):
     def test_informational_source_metadata_is_resolved_once_without_source_reads(self):
         from experiments.common import partial_controls as controls
         controls._source_metadata.cache_clear()
-        with patch.object(controls.subprocess, 'check_output', return_value='fixture-commit\n') as git, \
+        with patch.object(controls.subprocess, 'check_output', return_value='fixture-commit\n') as git,\
              patch.object(Path, 'read_bytes', side_effect=AssertionError('source read')):
             self.assertNotIn('source_sha256', controls.source_revision())
             self.assertNotIn('source_sha256', controls.source_revision())
@@ -48,9 +48,9 @@ class LightweightIdentityTests(unittest.TestCase):
 
     def test_backend_metadata_does_not_scan_or_read_source(self):
         dist = SimpleNamespace(version='0.1.35', read_text=lambda _: None)
-        with patch.object(catalog, 'distribution', return_value=dist), \
-             patch.object(catalog, '_package_root', return_value=Path('/fixture/agentdojo')), \
-             patch.object(Path, 'rglob', side_effect=AssertionError('source scan')), \
+        with patch.object(catalog, 'distribution', return_value=dist),\
+             patch.object(catalog, '_package_root', return_value=Path('/fixture/agentdojo')),\
+             patch.object(Path, 'rglob', side_effect=AssertionError('source scan')),\
              patch.object(Path, 'read_bytes', side_effect=AssertionError('source hash')):
             identity = catalog.benchmark_identity()
         self.assertEqual(identity['id'], 'agentdojo')
@@ -60,7 +60,7 @@ class LightweightIdentityTests(unittest.TestCase):
 
     def test_old_source_hash_and_python_patch_are_not_resume_requirements(self):
         identity = catalog.benchmark_identity()
-        binding = {'schema_version': 'dscg.partial-run.v2', 'benchmark': identity,
+        binding = {'schema_version': 'baseintent.partial-run.v2', 'benchmark': identity,
                    'main_model': {'model_id': 'offline'}, 'profile': 'baseline',
                    'task_selection': {'users': ['u0'], 'injections': ['i0']},
                    'attack': 'tool_knowledge', 'source': {'python': '3.10.19', 'source_sha256': {'x': 'old'}}}

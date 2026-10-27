@@ -1,7 +1,7 @@
 (() => {
   const colors = ["--blue", "--amber", "--purple", "--green", "--red"];
-  const historyCharts = window.DSCGHistoryCharts;
-  const historySelection = window.DSCGHistorySelection;
+  const historyCharts = window.BaseIntentHistoryCharts;
+  const historySelection = window.BaseIntentHistorySelection;
   const analysisRequests = historySelection.createRequestGate();
   let filters = { folder: "all", backend: "all", models: null, attack: "all" };
   let suiteSelection = null;
@@ -268,7 +268,7 @@
       const disposition = response.headers.get("Content-Disposition") || "";
       const filename = disposition.match(/filename="?([a-zA-Z0-9_.-]+\.zip)"?/);
       link.href = url;
-      link.download = filename ? filename[1] : "dscg-history-analysis.zip";
+      link.download = filename ? filename[1] : "baseintent-history-analysis.zip";
       document.body.append(link);
       link.click();
       link.remove();

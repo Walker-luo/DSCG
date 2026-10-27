@@ -1,3 +1,6 @@
+
+from artifact_support import ensure_artifacts
+ensure_artifacts('test_intent_source_native')
 # Frozen v3.4 controls; intent-flow defaults are tested in test_intent_flow*.py.
 from authorization_fixture import step_content
 """Native AgentDojo tools/predicates + authored MockTransport, never model efficacy."""
@@ -12,10 +15,10 @@ from unittest.mock import patch
 import httpx
 from openai import OpenAI
 from agentdojo import logging
-from dscg.benchmark_catalog import get_backend,get_suite
-from dscg.model_config import ModelConfig
-from dscg.pipelines import defended as d
-from dscg.tool_metadata import resolve_tool_metadata,load_tool_metadata
+from baseintent.benchmark_catalog import get_backend,get_suite
+from baseintent.model_config import ModelConfig
+from baseintent.pipelines import defended as d
+from baseintent.tool_metadata import resolve_tool_metadata,load_tool_metadata
 from experiments.common.benchmark_tasks import run_native_suite
 from experiments.common.native_cache_compat import ensure_native_cache_model_ready
 from test_request_compatibility import completion
@@ -57,7 +60,7 @@ class NativeIntentSourceTests(unittest.TestCase):
                        http_client=httpx.Client(transport=httpx.MockTransport(handler)))
             clients.append(raw);return raw
         config=ModelConfig('qwen3.7-flash','offline','https://offline.invalid/v1','custom')
-        root=Path(__file__).resolve().parents[1]/'workshop/artifacts/20261021_intent_source_relaxation/native'
+        root=Path(__file__).resolve().parents[1]/'artifacts/tests/test_intent_source_native'
         root.mkdir(parents=True,exist_ok=True)
         try:
             with TemporaryDirectory(dir=root) as temp,patch.object(d,'create_openai_client',side_effect=client),redirect_stdout(StringIO()):
@@ -67,7 +70,7 @@ class NativeIntentSourceTests(unittest.TestCase):
                 with logging.OutputLogger(temp):
                     result=run_native_suite(pipe,suite,None,Path(temp),False,user_tasks=[user_id],injection_tasks=[],
                         benchmark_version='v1.2',on_step=steps.append if progress else None)
-                from dscg.task_diagnostics import load_task_trace
+                from baseintent.task_diagnostics import load_task_trace
                 path=Path(temp)/'none'/scene/user_id/'none/none.json';trace=load_task_trace(path)
                 self.assertEqual(result['utility_results'][(user_id,'')],bad is None)
                 self.assertEqual(steps,['score'] if progress else [])
@@ -75,11 +78,11 @@ class NativeIntentSourceTests(unittest.TestCase):
                 self.assertEqual(sum(p['failed_calls'] for p in main.snapshot().values()),0)
                 self.assertEqual(sum(p['failed_calls'] for p in audit.snapshot().values()),0)
                 if bad:
-                    self.assertTrue(trace['dscg_audit_summary']['blocked_actions'])
-                    self.assertNotIn('AUDIT_SCHEMA_INVALID',trace['dscg_audit_summary']['reason_code_counts'])
+                    self.assertTrue(trace['baseintent_audit_summary']['blocked_actions'])
+                    self.assertNotIn('AUDIT_SCHEMA_INVALID',trace['baseintent_audit_summary']['reason_code_counts'])
                 else:
-                    self.assertEqual(trace['dscg_audit_summary']['blocked_actions'],0)
-                    self.assertEqual(trace['dscg_audit_summary']['mediation_failure_counts'],{})
+                    self.assertEqual(trace['baseintent_audit_summary']['blocked_actions'],0)
+                    self.assertEqual(trace['baseintent_audit_summary']['mediation_failure_counts'],{})
                 return {'utility':result['utility_results'], 'main_tokens':main.get_total_tokens(),'audit_tokens':audit.get_total_tokens(),
                         'requests':len(requests),'proposals':[a[0] for a in actions]}
         finally:

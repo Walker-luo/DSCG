@@ -9,8 +9,8 @@ from unittest.mock import Mock
 
 from agentdojo import agent_pipeline
 from agentdojo.functions_runtime import EmptyEnv, FunctionCall, FunctionsRuntime
-from dscg.pipelines import defended as d
-from dscg.tool_metadata import set_tool_metadata, register_tool_metadata
+from baseintent.pipelines import defended as d
+from baseintent.tool_metadata import set_tool_metadata, register_tool_metadata
 
 
 ORDER = '1. Query inventory.\n2. Send the missing-stock list to Alice.'
@@ -119,7 +119,7 @@ class DelegatedTaskTests(unittest.TestCase):
         self.assertEqual(raw_user['content'][0]['content'], REQUEST)
         raw_file = next(m for m in state[3] if m['role'] == 'tool')
         self.assertEqual(raw_file['content'][0]['content'], ORDER)
-        self.assertEqual(state[4]['dscg_l2']['delegated_tasks_expanded'], 1)
+        self.assertEqual(state[4]['baseintent_l2']['delegated_tasks_expanded'], 1)
 
     def test_summarize_same_file_does_not_turn_file_instructions_into_authority(self):
         pipeline, runtime, effects, planner, _ = fixture(summary=True)
@@ -127,7 +127,7 @@ class DelegatedTaskTests(unittest.TestCase):
         self.assertEqual(effects, [('read_file', 'order.txt')])
         self.assertNotIn('send_order', planner.views[-1][1])
         self.assertNotIn(ORDER, planner.views[-1][0])
-        self.assertEqual(state[4].get('dscg_l2', {}).get('delegated_tasks_expanded', 0), 0)
+        self.assertEqual(state[4].get('baseintent_l2', {}).get('delegated_tasks_expanded', 0), 0)
 
     def test_later_ordinary_return_cannot_replace_delegated_task_or_destination(self):
         pipeline, runtime, effects, planner, auditor = fixture(recipient='Bob')
@@ -136,7 +136,7 @@ class DelegatedTaskTests(unittest.TestCase):
         self.assertIn(ORDER, auditor.packets[-1]['trusted_user_request'])
         self.assertNotIn('Ignore the task', auditor.packets[-1]['trusted_user_request'])
         self.assertEqual(planner.client.chat.completions.create.call_count, 1)
-        self.assertTrue(any(r['state'] == 'blocked' for r in state[4]['dscg_action_ledger']))
+        self.assertTrue(any(r['state'] == 'blocked' for r in state[4]['baseintent_action_ledger']))
 
     def test_failed_empty_or_oversized_source_never_compiles_business_permissions(self):
         for options in ({'fail_read': True}, {'body': ''}, {'body': 'x' * 4096}):
@@ -145,7 +145,7 @@ class DelegatedTaskTests(unittest.TestCase):
                 state = pipeline.query(REQUEST, runtime, EmptyEnv())
                 planner.client.chat.completions.create.assert_not_called()
                 self.assertFalse(any(item[0] == 'send' for item in effects))
-                self.assertEqual(state[4]['dscg_authorization']['policy_state'], 'error')
+                self.assertEqual(state[4]['baseintent_authorization']['policy_state'], 'error')
 
     def test_abstaining_private_bootstrap_cannot_promote_blocked_result(self):
         pipeline, runtime, effects, planner, auditor = fixture(private=True)
@@ -153,7 +153,7 @@ class DelegatedTaskTests(unittest.TestCase):
         state = pipeline.query(REQUEST, runtime, EmptyEnv())
         self.assertEqual(effects, [])
         planner.client.chat.completions.create.assert_not_called()
-        self.assertEqual(state[4]['dscg_authorization']['policy_state'], 'error')
+        self.assertEqual(state[4]['baseintent_authorization']['policy_state'], 'error')
 
     def test_task_context_does_not_leak_into_next_plain_user_task(self):
         pipeline, runtime, effects, planner, _ = fixture()
@@ -163,11 +163,11 @@ class DelegatedTaskTests(unittest.TestCase):
         planner.client.chat.completions.create.return_value.choices[0].message.content = '{"tools": []}'
         current = pipeline.query('Summarize order.txt', runtime, EmptyEnv(), extra_args=previous[4])
         self.assertNotIn(ORDER, planner.views[-1][0])
-        self.assertEqual(current[4].get('dscg_l2', {}).get('delegated_tasks_expanded', 0), 0)
+        self.assertEqual(current[4].get('baseintent_l2', {}).get('delegated_tasks_expanded', 0), 0)
         self.assertNotIn('send_order', planner.views[-1][1])
 
     def test_only_explicit_execution_forms_create_delegation(self):
-        from dscg.l2_authorization import match_delegated_task
+        from baseintent.l2_authorization import match_delegated_task
         for request in (REQUEST, '请完成 order.txt 中的任务', 'Execute tasks in "my orders.txt"'):
             with self.subTest(request=request):
                 self.assertIsNotNone(match_delegated_task(request))
@@ -194,12 +194,12 @@ class DelegatedTaskTests(unittest.TestCase):
                 auditor.decision = 'deny'
                 state = pipeline.query(REQUEST + '; ' + clause, runtime, EmptyEnv())
                 self.assertEqual(effects, [])
-                self.assertEqual(state[4]['dscg_authorization']['error_code'],
+                self.assertEqual(state[4]['baseintent_authorization']['error_code'],
                                  'DELEGATED_RESTRICTION_UNSUPPORTED')
                 planner.client.chat.completions.create.assert_not_called()
 
     def test_caller_reader_is_host_configuration_not_document_claim(self):
-        from dscg.l2_authorization import DelegatedTaskReader
+        from baseintent.l2_authorization import DelegatedTaskReader
         reader = DelegatedTaskReader(tool_name='read_file', path_argument='path', output_format='text')
         pipeline, runtime, effects, _, _ = fixture(reader=reader)
         pipeline.query(REQUEST, runtime, EmptyEnv())
@@ -214,7 +214,7 @@ class DelegatedTaskTests(unittest.TestCase):
         state[3].append({'role': 'tool', 'tool_call_id': call.id, 'tool_call': call,
                         'content': [{'type': 'text', 'content': ORDER}], 'error': None})
         result = executor.query(*state)
-        self.assertEqual(result[4]['dscg_authorization']['error_code'], 'DELEGATED_SOURCE_NOT_MEDIATED')
+        self.assertEqual(result[4]['baseintent_authorization']['error_code'], 'DELEGATED_SOURCE_NOT_MEDIATED')
         planner.client.chat.completions.create.assert_not_called()
         self.assertEqual(executor.sandbox.allowed_tools, [])
 
@@ -223,10 +223,10 @@ class DelegatedTaskTests(unittest.TestCase):
         from pydantic import create_model
         from agentdojo.default_suites.v1.tools.cloud_drive_client import CloudDrive, get_file_by_id
         from agentdojo.default_suites.v1.tools.types import CloudDriveFile
-        from dscg.tool_metadata import register_tool_metadata
+        from baseintent.tool_metadata import register_tool_metadata
         pipeline, runtime, effects, planner, auditor = fixture()
         runtime.functions.pop('read_file')
-        runtime._dscg_tool_metadata.pop('read_file')
+        runtime._baseintent_tool_metadata.pop('read_file')
         runtime.register_function(get_file_by_id)
         register_tool_metadata(runtime, 'get_file_by_id', dict(effect='read', source='cloud', sink='none',
                                sensitivity='internal', idempotent=True, reversible=False))
@@ -244,20 +244,20 @@ class DelegatedTaskTests(unittest.TestCase):
         pipeline, runtime, effects, planner, _ = fixture()
         runtime.functions.pop('read_file')
         state = pipeline.query(REQUEST, runtime, EmptyEnv())
-        self.assertEqual(state[4]['dscg_authorization']['error_code'], 'DELEGATED_READER_UNSUPPORTED')
+        self.assertEqual(state[4]['baseintent_authorization']['error_code'], 'DELEGATED_READER_UNSUPPORTED')
         self.assertEqual(effects, [])
         planner.client.chat.completions.create.assert_not_called()
         pipeline, runtime, effects, planner, _ = fixture()
         state = pipeline.query('Complete the tasks in missing.txt', runtime, EmptyEnv())
-        self.assertEqual(state[4]['dscg_authorization']['policy_state'], 'error')
+        self.assertEqual(state[4]['baseintent_authorization']['policy_state'], 'error')
         planner.client.chat.completions.create.assert_not_called()
 
     def test_invalid_reader_arguments_are_rejected_before_any_tool_execution(self):
-        from dscg.l2_authorization import DelegatedTaskReader
+        from baseintent.l2_authorization import DelegatedTaskReader
         reader = DelegatedTaskReader('read_file', 'unexpected_argument')
         pipeline, runtime, effects, planner, _ = fixture(reader=reader)
         state = pipeline.query(REQUEST, runtime, EmptyEnv())
-        self.assertEqual(state[4]['dscg_authorization']['error_code'], 'DELEGATED_READER_INVALID')
+        self.assertEqual(state[4]['baseintent_authorization']['error_code'], 'DELEGATED_READER_INVALID')
         self.assertEqual(effects, [])
         planner.client.chat.completions.create.assert_not_called()
 
@@ -270,7 +270,7 @@ class MessageDelegationTests(unittest.TestCase):
     def fixture(self, kind, *, duplicate=False, wrong_sender=False, body=ORDER, recipient='Alice'):
         pipeline, runtime, effects, planner, auditor = fixture(recipient=recipient)
         runtime.functions.pop('read_file')
-        runtime._dscg_tool_metadata.pop('read_file')
+        runtime._baseintent_tool_metadata.pop('read_file')
         if kind == 'email':
             from agentdojo.default_suites.v1.tools.types import Email
             @runtime.register_function
@@ -308,7 +308,7 @@ class MessageDelegationTests(unittest.TestCase):
                 pipeline, runtime, effects, planner, auditor = self.fixture(kind)
                 state = pipeline.query(request, runtime, EmptyEnv())
                 self.assertEqual(effects, [expected, ('inventory',), ('send', 'Alice')])
-                self.assertEqual(state[4].get('dscg_l2', {}).get('delegated_tasks_expanded'), 1)
+                self.assertEqual(state[4].get('baseintent_l2', {}).get('delegated_tasks_expanded'), 1)
                 self.assertIn(ORDER, planner.views[0][0])
                 self.assertIn(ORDER, auditor.packets[-1]['trusted_user_request'])
                 raw_user = next(m for m in state[3] if m['role'] == 'user')
@@ -321,7 +321,7 @@ class MessageDelegationTests(unittest.TestCase):
             with self.subTest(kind=kind, options=options):
                 pipeline, runtime, effects, planner, _ = self.fixture(kind, **options)
                 state = pipeline.query(self.EMAIL if kind == 'email' else self.WEB, runtime, EmptyEnv())
-                self.assertEqual(state[4]['dscg_authorization']['policy_state'], 'error')
+                self.assertEqual(state[4]['baseintent_authorization']['policy_state'], 'error')
                 self.assertFalse(any(item[0] == 'send' for item in effects))
                 planner.client.chat.completions.create.assert_not_called()
 
@@ -330,7 +330,7 @@ class MessageDelegationTests(unittest.TestCase):
         auditor.decision = 'deny'
         state = pipeline.query(self.WEB, runtime, EmptyEnv())
         self.assertEqual(effects, [])
-        self.assertEqual(state[4]['dscg_authorization']['policy_state'], 'error')
+        self.assertEqual(state[4]['baseintent_authorization']['policy_state'], 'error')
         planner.client.chat.completions.create.assert_not_called()
 
     def test_source_cannot_recursively_expand_and_later_feedback_cannot_change_recipient(self):
@@ -340,11 +340,11 @@ class MessageDelegationTests(unittest.TestCase):
         self.assertEqual([e for e in effects if e[0] == 'source_web'],
                          [('source_web', 'https://tasks.example.test/team')])
         self.assertNotIn(('send', 'Bob'), effects)
-        self.assertEqual(state[4]['dscg_l2']['delegated_tasks_expanded'], 1)
+        self.assertEqual(state[4]['baseintent_l2']['delegated_tasks_expanded'], 1)
         self.assertEqual(planner.client.chat.completions.create.call_count, 1)
 
     def test_non_execution_mentions_and_source_read_prohibitions_never_bootstrap(self):
-        from dscg.l2_authorization import match_delegated_task
+        from baseintent.l2_authorization import match_delegated_task
         for request in ('Summarize the email from operations@example.test',
                         'Do not execute the tasks at https://tasks.example.test/team',
                         'Someone said "' + self.WEB + '"',
@@ -355,12 +355,12 @@ class MessageDelegationTests(unittest.TestCase):
                 pipeline, runtime, effects, planner, _ = self.fixture('web' if 'https://' in request else 'email')
                 state = pipeline.query(request, runtime, EmptyEnv())
                 self.assertEqual(effects, [])
-                self.assertEqual(state[4]['dscg_authorization'].get('error_code'),
+                self.assertEqual(state[4]['baseintent_authorization'].get('error_code'),
                                  'DELEGATED_RESTRICTION_UNSUPPORTED')
                 planner.client.chat.completions.create.assert_not_called()
 
     def test_ordered_compound_sources_are_not_read_before_preceding_tasks(self):
-        from dscg.l2_authorization import match_delegated_task
+        from baseintent.l2_authorization import match_delegated_task
         for prefix in ('Replace the task list at https://tasks.example.test/team with my new plan.',
                        'Refrain from reading webpages.', 'Summarize my calendar.'):
             request = 'Perform the following tasks in the order they are given: 1. ' + prefix + ' 2. ' + self.WEB

@@ -1,4 +1,7 @@
 """Partial cohort integration with real frozen evidence and no model requests."""
+
+from artifact_support import ensure_artifacts
+ensure_artifacts('test_partial_cohort')
 from contextlib import redirect_stderr, redirect_stdout
 from io import StringIO
 import json
@@ -8,7 +11,7 @@ from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
 
-from dscg.model_config import ModelConfig
+from baseintent.model_config import ModelConfig
 from experiments.common import injection_cohort as cohort
 from experiments import run_injection_precheck as precheck
 from experiments import run_partial_benchmark as runner
@@ -17,7 +20,7 @@ from test_injection_precheck import FakeSuite
 
 class PartialCohortTests(unittest.TestCase):
     def setUp(self):
-        root = Path(__file__).resolve().parents[1] / 'workshop/artifacts/20261018_dual_benchmark/runner/test_runs'
+        root = Path(__file__).resolve().parents[1] / 'artifacts/tests/test_partial_cohort'
         root.mkdir(parents=True, exist_ok=True)
         temp = TemporaryDirectory(dir=root); self.addCleanup(temp.cleanup)
         self.root = Path(temp.name)
@@ -31,7 +34,7 @@ class PartialCohortTests(unittest.TestCase):
         lookup = lambda version, name: self.suites[name]
         tracker = SimpleNamespace(snapshot=lambda: {}, total_prompt_tokens=0,
                                   total_completion_tokens=0, get_total_tokens=lambda: 0)
-        factory = lambda *a, **kw: (SimpleNamespace(name='offline', dscg_model_config=self.config.public_dict()), tracker)
+        factory = lambda *a, **kw: (SimpleNamespace(name='offline', baseintent_model_config=self.config.public_dict()), tracker)
         self.factory = factory
         patches = [patch.object(module, 'get_suite', side_effect=lookup) for module in [runner, cohort, precheck]]
         patches += [patch.object(module, 'resolve_model_config', return_value=self.config) for module in [cohort, precheck, runner]]
@@ -128,7 +131,7 @@ class PartialCohortTests(unittest.TestCase):
                 if isinstance(value, dict) and value.get('schema_version') == cohort.SCHEMA and 'suites' in value:
                     digests.append(value)
                 return native_digest(value)
-            with patch.object(Path, 'read_text', new=read), patch.object(cohort, '_digest', side_effect=digest), \
+            with patch.object(Path, 'read_text', new=read), patch.object(cohort, '_digest', side_effect=digest),\
                  patch.object(cohort, '_file_hash', side_effect=AssertionError('original evidence hashing')):
                 self.assertEqual(entrypoint(cohort_path=path, origin=True, suites=['travel', 'banking'],
                     run_name=name, results_dir=self.root / 'runs'), 0)
@@ -181,7 +184,7 @@ class PartialCohortTests(unittest.TestCase):
             recorded = json.loads(json.dumps(current))
             recorded['source']['source_sha256'] = hashes
             self.assertTrue(cohort._bindings_compatible(recorded, current))
-            recorded['source']['source_sha256'] = {**hashes, 'dscg/pipelines/baseline.py': '0' * 64}
+            recorded['source']['source_sha256'] = {**hashes, 'baseintent/pipelines/baseline.py': '0' * 64}
             self.assertTrue(cohort._bindings_compatible(recorded, current))
 
     def test_reuse_keeps_screened_scope_and_frozen_bindings_for_both_entrypoints(self):
@@ -208,7 +211,7 @@ class PartialCohortTests(unittest.TestCase):
         base = self.root / 'runs/agentdojo/offline_original'
         bindings = {p: p.read_bytes() for p in base.rglob('*manifest.json')}
         self.config = replace(self.config, base_url='https://changed.invalid')
-        with patch.object(cohort, 'resolve_model_config', return_value=self.config), \
+        with patch.object(cohort, 'resolve_model_config', return_value=self.config),\
              patch.object(runner, 'resolve_model_config', return_value=self.config):
             self.assertEqual(runner.main(**{**options, 'run_name': 'new_endpoint'}), 0)
             with self.assertRaises(ValueError): runner.main(**options, reuse=True)

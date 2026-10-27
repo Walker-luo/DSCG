@@ -14,7 +14,8 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
-from dscg.request_compatibility import (
+from baseintent.compat import environment_aliases, getenv
+from baseintent.request_compatibility import (
     DASHSCOPE_ADAPTER, DEEPSEEK_ADAPTER, SystemRoleChatClient, DeepSeekChatClient,
 )
 
@@ -35,8 +36,8 @@ class ProviderPreset:
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_MODEL_CONFIG_PATH = PROJECT_ROOT / "config" / "models.local.toml"
 ROLE_CONFIG_SECTIONS = {
-    "DSCG_MAIN": ("main",),
-    "DSCG_SEC": ("security", "sec", "audit"),
+    "BASEINTENT_MAIN": ("main",),
+    "BASEINTENT_SEC": ("security", "sec", "audit"),
 }
 DEFAULT_MAIN_MODEL_ID = "qwen3.7-flash"
 DEEPSEEK_MODEL_IDS = ("deepseek-flash", "deepseek-v4-pro")
@@ -191,7 +192,7 @@ def infer_provider(model_id: str, base_url: str | None = None) -> str:
 
 
 def _env(mapping: Mapping[str, str], name: str | None) -> str | None:
-    return _clean(mapping.get(name)) if name else None
+    return _clean(getenv(name, environ=mapping)) if name else None
 
 
 def _resolve_config_path(
@@ -199,7 +200,7 @@ def _resolve_config_path(
     env: Mapping[str, str],
 ) -> Path:
     configured_path = _clean(os.fspath(config_path)) if config_path else _env(
-        env, "DSCG_MODEL_CONFIG"
+        env, "BASEINTENT_MODEL_CONFIG"
     )
     path = Path(configured_path).expanduser() if configured_path else DEFAULT_MODEL_CONFIG_PATH
     if not path.is_absolute():
@@ -214,7 +215,10 @@ def load_model_settings(
 ) -> dict[str, Any]:
     """Load ignored local model settings from TOML if the file exists."""
 
-    environ = os.environ if env is None else env
+    try:
+        environ = environment_aliases(os.environ if env is None else env)
+    except ValueError as exc:
+        raise ModelConfigurationError(str(exc)) from None
     path = _resolve_config_path(config_path, environ)
     if not path.exists():
         return {}
@@ -239,7 +243,7 @@ def _section_names(prefix: str) -> tuple[str, ...]:
     normalized = prefix.upper().rstrip("_")
     if normalized in ROLE_CONFIG_SECTIONS:
         return ROLE_CONFIG_SECTIONS[normalized]
-    return (normalized.lower().removeprefix("dscg_"),)
+    return (normalized.lower().removeprefix("baseintent_"),)
 
 
 def _as_mapping(value: Any, label: str) -> Mapping[str, Any]:
@@ -279,7 +283,7 @@ def resolve_model_config(
     base_url: str | None = None,
     provider: str | None = None,
     api_key_env: str | None = None,
-    prefix: str = "DSCG_MAIN",
+    prefix: str = "BASEINTENT_MAIN",
     env: Mapping[str, str] | None = None,
     config_path: str | os.PathLike[str] | None = None,
     local_settings: Mapping[str, Any] | None = None,
@@ -288,13 +292,17 @@ def resolve_model_config(
     """Resolve explicit values, environment variables and provider presets.
 
     Precedence for each field is explicit argument, ``<prefix>_*`` variable,
-    ``config/models.local.toml`` (or ``DSCG_MODEL_CONFIG``), provider preset,
+    ``config/models.local.toml`` (or ``BASEINTENT_MODEL_CONFIG``), provider preset,
     and finally compatibility defaults. ``fallback`` is used for a secondary
     model when it intentionally shares the primary endpoint.
     """
 
-    environ = os.environ if env is None else env
+    try:
+        environ = environment_aliases(os.environ if env is None else env)
+    except ValueError as exc:
+        raise ModelConfigurationError(str(exc)) from None
     prefix = prefix.upper().rstrip("_")
+    if prefix.startswith("DSCG_"): prefix = "BASEINTENT_" + prefix[5:]
     settings = (
         dict(local_settings)
         if local_settings is not None
@@ -311,7 +319,7 @@ def resolve_model_config(
     resolved_model_id = _clean(model_id) or _env(environ, f"{prefix}_MODEL_ID") or local_model_id
     if not resolved_model_id and fallback:
         resolved_model_id = fallback.model_id
-    if not resolved_model_id and prefix == "DSCG_MAIN":
+    if not resolved_model_id and prefix == "BASEINTENT_MAIN":
         resolved_model_id = DEFAULT_MAIN_MODEL_ID
     if not resolved_model_id:
         raise ModelConfigurationError(

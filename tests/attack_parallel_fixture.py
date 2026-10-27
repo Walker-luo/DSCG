@@ -9,7 +9,7 @@ import serial_fixture
 
 def execute_interruptible(job):
     """Pause between suites so interruption never tears a fixture JSON write."""
-    from dscg.benchmark_catalog import get_suites
+    from baseintent.benchmark_catalog import get_suites
     if job['suite'] != get_suites()[0]:
         while True:
             time.sleep(0.05)

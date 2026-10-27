@@ -24,14 +24,15 @@ from flask import (
 
 from agentdojo import logging as ad_logging, benchmark, attacks
 from agentdojo.attacks.attack_registry import ATTACKS
-from dscg.benchmark_catalog import (SUITE_VERSION, get_backend, get_suite, suite_catalog, validate_backend)
-from dscg.model_config import DEEPSEEK_MODEL_IDS
-from dscg.harness_records import SampleStatus
-from dscg.paths import DASHBOARD_RESULTS_DIR, RESULTS_DIR
-from dscg.pipelines.baseline import make_openai_compatible_pipeline
-from dscg.pipelines.defended import make_defended_pipeline
-from dscg.audit_router import DEFAULT_THRESHOLD
-from dscg.tool_metadata import resolve_tool_metadata, validate_benchmark_tool_metadata
+from baseintent.benchmark_catalog import (SUITE_VERSION, get_backend, get_suite, suite_catalog, validate_backend)
+from baseintent.compat import normalize_legacy_keys
+from baseintent.model_config import DEEPSEEK_MODEL_IDS
+from baseintent.harness_records import SampleStatus
+from baseintent.paths import DASHBOARD_RESULTS_DIR, RESULTS_DIR
+from baseintent.pipelines.baseline import make_openai_compatible_pipeline
+from baseintent.pipelines.defended import make_defended_pipeline
+from baseintent.audit_router import DEFAULT_THRESHOLD
+from baseintent.tool_metadata import resolve_tool_metadata, validate_benchmark_tool_metadata
 from experiments.diagnostics.harness_audit import rank_ids, security_result_fields
 from experiments.common.benchmark_outcomes import project_outcomes
 from experiments.common.attack_compatibility import check_attack_compatibility
@@ -39,7 +40,7 @@ from dashboard.history_export import build_history_export
 from dashboard.evaluation import FRAMEWORK_VERSION, aggregate, display_metrics, normalize_config, trace_stats
 
 app = Flask(__name__)
-app.secret_key = "newframe_dashboard_2024"
+app.secret_key = "baseintent_dashboard"
 
 # =============================================
 # 全局状态管理
@@ -331,8 +332,8 @@ def run_test_thread(run_id: str, config: dict):
                         tool_metadata=tool_metadata,
                     )
 
-                main_model_config = getattr(pipeline, "dscg_model_config", {})
-                sec_model_config = getattr(pipeline, "dscg_security_model_config", {})
+                main_model_config = getattr(pipeline, "baseintent_model_config", {})
+                sec_model_config = getattr(pipeline, "baseintent_security_model_config", {})
                 resolved_model_id = main_model_config.get("model_id", model_id)
                 resolved_sec_model_id = sec_model_config.get("model_id", sec_model_id)
                 config["resolved_main_model"] = main_model_config
@@ -448,7 +449,7 @@ def run_test_thread(run_id: str, config: dict):
                         "total_tokens": sec_tracker.get_total_tokens(),
                     }
 
-                framework = getattr(pipeline, "dscg_optimization_config", None)
+                framework = getattr(pipeline, "baseintent_optimization_config", None)
                 summary["framework"] = {**framework, "use_sandbox": use_sandbox} if framework else None
                 summary["task_selection"] = {"strategy": "seed_ranked" if max_user_tasks or max_injection_tasks else "all",
                                               "seed": selection_seed, "user_task_ids": selected_users,
@@ -531,7 +532,7 @@ def run_test_thread(run_id: str, config: dict):
             push_log(run_id, "info", f"🏁 测试全部完成! 结果已保存至 {run_dir}")
 
     except Exception as e:
-        from dscg.request_compatibility import api_error_diagnostics
+        from baseintent.request_compatibility import api_error_diagnostics
         diagnostic = api_error_diagnostics(e)
         if diagnostic is not None:
             error = {'error': type(e).__name__, 'api_error': diagnostic}
@@ -662,9 +663,9 @@ def _iter_history_files(results_root: Path, filename: str):
 def _read_history_json(path: Path) -> dict | None:
     try:
         with path.open("r", encoding="utf-8") as result_file:
-            data = json.load(result_file)
+            data = normalize_legacy_keys(json.load(result_file))
         return data if isinstance(data, dict) else None
-    except (OSError, UnicodeError, json.JSONDecodeError):
+    except (OSError, UnicodeError, ValueError):
         return None
 
 
@@ -1242,7 +1243,7 @@ def export_history_results():
         archive,
         mimetype="application/zip",
         as_attachment=True,
-        download_name=f"dscg-history-analysis-{exported_at:%Y%m%dT%H%M%SZ}.zip",
+        download_name=f"baseintent-history-analysis-{exported_at:%Y%m%dT%H%M%SZ}.zip",
     )
     response.headers["Cache-Control"] = "no-store"
     return response
@@ -1270,7 +1271,7 @@ def list_runs():
                 if result_file.exists() and d.name not in runs_store:
                     try:
                         with open(result_file, "r") as f:
-                            data = json.load(f)
+                            data = normalize_legacy_keys(json.load(f))
                         runs.append({
                             "run_id": d.name,
                             "config": _redact_run_config(data.get("config", {})),
@@ -1294,7 +1295,7 @@ def get_run(run_id: str):
         result_file = DASHBOARD_RESULTS_DIR / run_id / "overall_results.json"
         if result_file.exists():
             with open(result_file, "r") as f:
-                run = json.load(f)
+                run = normalize_legacy_keys(json.load(f))
             if isinstance(run, dict):
                 run["config"] = _redact_run_config(run.get("config", {}))
 
@@ -1316,7 +1317,7 @@ def get_suite_result(run_id: str, suite_name: str):
     summary_path = suite_dir / "summary.json"
     if summary_path.exists():
         with open(summary_path, "r") as f:
-            result["summary"] = json.load(f)
+            result["summary"] = normalize_legacy_keys(json.load(f))
     if csv_path.exists():
         records = []
         with open(csv_path, "r", encoding="utf-8") as f:
@@ -1408,7 +1409,7 @@ def compare_runs():
             result_file = DASHBOARD_RESULTS_DIR / rid / "overall_results.json"
             if result_file.exists():
                 with open(result_file, "r") as f:
-                    run = json.load(f)
+                    run = normalize_legacy_keys(json.load(f))
         if run:
             runs_data.append({**run, "aggregate_metrics": display_metrics(run)})
 
@@ -1489,14 +1490,14 @@ def download_report(run_id: str):
         result_file = DASHBOARD_RESULTS_DIR / run_id / "overall_results.json"
         if result_file.exists():
             with open(result_file, "r") as f:
-                run = json.load(f)
+                run = normalize_legacy_keys(json.load(f))
     if not run:
         return jsonify({"error": "Run not found"}), 404
 
     # 生成文本报告
     lines = []
     lines.append("=" * 60)
-    lines.append("  间接提示词注入防御框架 - 安全测试报告")
+    lines.append("  BaseIntent - 安全测试报告")
     lines.append("=" * 60)
     lines.append(f"运行 ID: {run_id}")
     lines.append(f"完成时间: {run.get('completed_at', 'N/A')}")
@@ -1510,7 +1511,7 @@ def download_report(run_id: str):
     lines.append(f"  测试套件: {', '.join(config.get('suites', []))}")
     lines.append(f"  执行攻击: {config.get('run_attack', True)}")
     lines.append(f"  攻击类型: {config.get('attack_name', 'N/A')}")
-    lines.append(f"  框架类型: {'原始模型' if config.get('origin') else 'DSCG'}")
+    lines.append(f"  框架类型: {'原始模型' if config.get('origin') else config.get('framework_version', '历史 / 未记录')}")
     if config.get("defense"):
         lines.append(f"  AgentDojo 防御: {config.get('defense')}")
     if not config.get("origin"):
@@ -1551,7 +1552,7 @@ def download_report(run_id: str):
         lines.append("")
 
     lines.append("=" * 60)
-    lines.append("  报告由 DSCG Web Dashboard 自动生成")
+    lines.append("  报告由 BaseIntent Web Dashboard 自动生成")
     lines.append("=" * 60)
 
     report_text = "\n".join(lines)
@@ -1560,7 +1561,7 @@ def download_report(run_id: str):
         report_text,
         mimetype="text/plain; charset=utf-8",
         headers={
-            "Content-Disposition": f"attachment; filename=report_{run_id}.txt"
+            "Content-Disposition": f"attachment; filename=baseintent-report-{run_id}.txt"
         }
     )
 
@@ -1574,7 +1575,7 @@ def get_html_report(run_id: str):
         result_file = DASHBOARD_RESULTS_DIR / run_id / "overall_results.json"
         if result_file.exists():
             with open(result_file, "r") as f:
-                run = json.load(f)
+                run = normalize_legacy_keys(json.load(f))
     if not run:
         return jsonify({"error": "Run not found"}), 404
 
@@ -1605,7 +1606,7 @@ if __name__ == "__main__":
 
     # ---- 打印启动信息 ----
     print("=" * 60)
-    print("  🔐 DSCG - Agent 安全评测台")
+    print("  🔐 BaseIntent - Agent 安全评测台")
     print("=" * 60)
 
     if is_docker:

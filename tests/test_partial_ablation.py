@@ -62,7 +62,7 @@ class CleanDenominatorTests(unittest.TestCase):
     def test_no_attack_summary_has_no_security_denominator(self):
         from types import SimpleNamespace
         tracker=SimpleNamespace(total_prompt_tokens=0,total_completion_tokens=0,get_total_tokens=lambda:0)
-        pipeline=SimpleNamespace(name='fixture',dscg_model_config={'model_id':'fixture'})
+        pipeline=SimpleNamespace(name='fixture',baseintent_model_config={'model_id':'fixture'})
         results={'utility_results':{('user_task_0','none'):True},'security_results':{('user_task_0','none'):True}}
         with TemporaryDirectory() as directory,redirect_stdout(StringIO()),patch.object(runner,'make_openai_compatible_pipeline',return_value=(pipeline,tracker)),patch.object(runner.benchmark,'benchmark_suite_without_injections',return_value=results):
             runner.main(origin=True,run_attack=False,suites=['workspace'],run_name='clean',results_dir=directory)
@@ -76,7 +76,7 @@ class MissingSecuritySummaryTests(unittest.TestCase):
     def test_all_missing_security_never_prints_zero_asr_or_perfect_defense(self):
         from types import SimpleNamespace
         tracker=SimpleNamespace(total_prompt_tokens=0,total_completion_tokens=0,get_total_tokens=lambda:0)
-        pipeline=SimpleNamespace(name='fixture',dscg_model_config={'model_id':'fixture'})
+        pipeline=SimpleNamespace(name='fixture',baseintent_model_config={'model_id':'fixture'})
         results={'utility_results':{('user_task_0','injection_task_0'):True},'security_results':{}}
         with TemporaryDirectory() as directory,redirect_stdout(StringIO()),patch.object(runner,'make_openai_compatible_pipeline',return_value=(pipeline,tracker)),patch.object(runner.attacks,'load_attack',return_value=SimpleNamespace(is_dos_attack=False)),patch.object(runner.benchmark,'benchmark_suite_with_injections',return_value=results):
             runner.main(origin=True,suites=['workspace'],run_name='missing',results_dir=directory)

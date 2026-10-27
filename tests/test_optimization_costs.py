@@ -1,7 +1,10 @@
+
+from artifact_support import ensure_artifacts
+ensure_artifacts('test_optimization_costs')
 import unittest
 from types import SimpleNamespace
 from dashboard.app import _normalize_history_suite
-from dscg.token_tracking import TokenTrackerClient
+from baseintent.token_tracking import TokenTrackerClient
 
 class CostTests(unittest.TestCase):
     def test_history_total_includes_security_without_overwriting_main(self):
@@ -46,7 +49,7 @@ class PersistedCostTests(unittest.TestCase):
         from agentdojo import agent_pipeline
         from agentdojo.logging import TraceLogger, OutputLogger
         from agentdojo.functions_runtime import FunctionsRuntime
-        from dscg.pipelines.defended import TaskIsolatedPipeline
+        from baseintent.pipelines.defended import TaskIsolatedPipeline
 
         def fail(**_kwargs):
             raise RuntimeError('PRIVATE_RESPONSE')
@@ -57,7 +60,7 @@ class PersistedCostTests(unittest.TestCase):
                 with tracker.phase('authorization'):
                     tracker.chat.completions.create(messages=[{'role': 'user', 'content': 'PRIVATE_REQUEST'}])
                 return q, r, e, m, a
-        root = Path(__file__).resolve().parents[1] / 'workshop/artifacts/20261020_deepseek_agentdyn_typeerror/test_runs'
+        root = Path(__file__).resolve().parents[1] / 'artifacts/tests/test_optimization_costs'
         root.mkdir(parents=True, exist_ok=True)
         with TemporaryDirectory(dir=root) as directory:
             pipeline = TaskIsolatedPipeline([Generate()], trackers=(tracker,))
@@ -65,9 +68,9 @@ class PersistedCostTests(unittest.TestCase):
                              pipeline_name='p', attack_type='none', injection_task_id=None):
                 with self.assertRaisesRegex(RuntimeError, 'PRIVATE_RESPONSE'):
                     pipeline.query('A', FunctionsRuntime())
-            from dscg.task_diagnostics import load_task_trace
+            from baseintent.task_diagnostics import load_task_trace
             trace = load_task_trace(Path(directory) / 'p/s/u/none/none.json')
-            phase = trace['dscg_cost']['models'][0]['authorization']
+            phase = trace['baseintent_cost']['models'][0]['authorization']
             self.assertEqual((phase['api_calls'], phase['failed_calls']), (1, 1))
             self.assertEqual(phase['last_api_error']['request_role_counts'], {'user': 1})
             self.assertNotIn('PRIVATE_', json.dumps(phase))
@@ -79,7 +82,7 @@ class PersistedCostTests(unittest.TestCase):
         from agentdojo import agent_pipeline
         from agentdojo.logging import TraceLogger, OutputLogger
         from agentdojo.functions_runtime import FunctionsRuntime
-        from dscg.pipelines.defended import TaskIsolatedPipeline
+        from baseintent.pipelines.defended import TaskIsolatedPipeline
         tracker=TokenTrackerClient(SimpleNamespace(chat=SimpleNamespace(completions=SimpleNamespace(
             create=lambda:SimpleNamespace(usage=SimpleNamespace(prompt_tokens=3,completion_tokens=2))))))
         class Generate(agent_pipeline.BasePipelineElement):
@@ -90,7 +93,7 @@ class PersistedCostTests(unittest.TestCase):
             pipeline=TaskIsolatedPipeline([Generate()],trackers=(tracker,))
             with TraceLogger(OutputLogger(directory),suite_name='s',user_task_id='u',pipeline_name='p',attack_type='none',injection_task_id=None):
                 pipeline.query('A',FunctionsRuntime());pipeline.query('B',FunctionsRuntime())
-            from dscg.task_diagnostics import load_task_trace
+            from baseintent.task_diagnostics import load_task_trace
             trace=load_task_trace(Path(directory)/'p/s/u/none/none.json')
-            self.assertEqual(trace['dscg_cost']['models'][0]['generation']['total_tokens'],5)
+            self.assertEqual(trace['baseintent_cost']['models'][0]['generation']['total_tokens'],5)
             self.assertEqual(tracker.get_total_tokens(),10)

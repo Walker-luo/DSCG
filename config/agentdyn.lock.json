@@ -1,5 +1,5 @@
 {
-  "schema_version": "dscg.agentdyn-lock.v1",
+  "schema_version": "baseintent.agentdyn-lock.v1",
   "repository": "https://github.com/SaFo-Lab/AgentDyn",
   "revision": "5353cf7615b135cace8d07c8f12dac53a16b6db3",
   "suite_version": "v1.2",

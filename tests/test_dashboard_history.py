@@ -143,7 +143,7 @@ class DashboardHistoryTests(unittest.TestCase):
         self.assertIn("benchmark_identity_unavailable", comparison["comparison_warnings"])
 
     def setUp(self):
-        artifact_root = Path(__file__).resolve().parents[1] / "workshop/artifacts/20261018_dual_benchmark/dashboard"
+        artifact_root = Path(__file__).resolve().parents[1] / "artifacts/20261027_project_cleanup/dashboard"
         artifact_root.mkdir(parents=True, exist_ok=True)
         self.temp_dir = tempfile.TemporaryDirectory(dir=artifact_root)
         self.results_root = Path(self.temp_dir.name)

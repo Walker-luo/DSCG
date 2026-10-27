@@ -11,8 +11,8 @@ from unittest.mock import Mock, patch
 from agentdojo import agent_pipeline
 from agentdojo.task_suite import get_suite
 
-from dscg.model_config import ModelConfigurationError, resolve_model_config
-from dscg.pipelines import baseline
+from baseintent.model_config import ModelConfigurationError, resolve_model_config
+from baseintent.pipelines import baseline
 from experiments import run_partial_benchmark as runner
 
 
@@ -35,7 +35,7 @@ class PartialBaselineTests(unittest.TestCase):
         self.assertEqual(options["run_name"], "baseline-check")
         self.assertEqual(options["attack"], ["important_instructions"])
 
-    def test_cli_default_keeps_dscg_and_cache_policy(self):
+    def test_cli_default_keeps_baseintent_and_cache_policy(self):
         with patch.object(runner, "main") as run, patch.dict(os.environ, {}, clear=True):
             self.assertEqual(runner.cli([]), 0)
         self.assertFalse(run.call_args.kwargs["origin"])
@@ -43,7 +43,7 @@ class PartialBaselineTests(unittest.TestCase):
 
     def test_cli_retains_force_rerun_environment_switch(self):
         with patch.object(runner, "main") as run, patch.dict(
-            os.environ, {"DSCG_FORCE_RERUN": "1"}, clear=True
+            os.environ, {"BASEINTENT_FORCE_RERUN": "1"}, clear=True
         ):
             self.assertEqual(runner.cli(["--baseline"]), 0)
         self.assertTrue(run.call_args.kwargs["force_rerun"])
@@ -56,7 +56,7 @@ class PartialBaselineTests(unittest.TestCase):
     def fake_pipeline(*args, **kwargs):
         pipeline = SimpleNamespace(
             name="offline-model",
-            dscg_model_config={"model_id": "offline-model"},
+            baseintent_model_config={"model_id": "offline-model"},
         )
         tracker = SimpleNamespace(
             total_prompt_tokens=0, total_completion_tokens=0,
@@ -76,7 +76,7 @@ class PartialBaselineTests(unittest.TestCase):
             "security_results": dict.fromkeys(keys, False),
         }
 
-    def test_baseline_and_dscg_use_identical_actual_catalog_subsets(self):
+    def test_baseline_and_baseintent_use_identical_actual_catalog_subsets(self):
         with TemporaryDirectory() as directory, redirect_stdout(StringIO()), patch.object(
             runner, "make_openai_compatible_pipeline", side_effect=self.fake_pipeline
         ) as original, patch.object(
@@ -87,7 +87,7 @@ class PartialBaselineTests(unittest.TestCase):
         ) as attack, patch.object(
             runner.benchmark, "benchmark_suite_with_injections", side_effect=self.fake_results
         ) as benchmark:
-            for origin, name in [(True, "baseline"), (False, "dscg")]:
+            for origin, name in [(True, "baseline"), (False, "baseintent")]:
                 runner.main(origin=origin, suites=SUITES, run_name=name,
                             force_rerun=True, results_dir=directory, attack="important_instructions")
             self.assertEqual(original.call_count, 4)
@@ -102,7 +102,7 @@ class PartialBaselineTests(unittest.TestCase):
                     "injection_task_ids": list(suite.injection_tasks)[:3],
                     "attack": "important_instructions",
                 }
-                for call_index, mode in [(index, "baseline"), (index + 4, "dscg")]:
+                for call_index, mode in [(index, "baseline"), (index + 4, "baseintent")]:
                     options = benchmark.call_args_list[call_index].kwargs
                     self.assertEqual(options["user_tasks"], expected["user_task_ids"])
                     self.assertEqual(options["injection_tasks"], expected["injection_task_ids"])
@@ -110,7 +110,7 @@ class PartialBaselineTests(unittest.TestCase):
                     report = json.loads((Path(directory) / f"agentdojo/offline-model_{mode}" / "important_instructions" / suite_name / "summary.json").read_text())
                     self.assertEqual(report["task_selection"], expected)
                     self.assertEqual(report["task_counts"]["total_tasks"], 9)
-                    self.assertEqual(report["defense"], None if mode == "baseline" else "dscg")
+                    self.assertEqual(report["defense"], None if mode == "baseline" else "baseintent")
                     if mode == "baseline":
                         self.assertNotIn("sec_overhead", report)
                 self.assertIsNone(original.call_args_list[index].kwargs["ad_defense"])
@@ -143,7 +143,7 @@ class PartialBaselineTests(unittest.TestCase):
         self.assertEqual([type(element) for element in pipeline.elements[-1].elements], [
             agent_pipeline.ToolsExecutor, agent_pipeline.OpenAILLM,
         ])
-        self.assertFalse(hasattr(pipeline, "dscg_security_model_config"))
+        self.assertFalse(hasattr(pipeline, "baseintent_security_model_config"))
 
 
 if __name__ == "__main__":

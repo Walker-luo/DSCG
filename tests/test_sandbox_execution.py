@@ -14,14 +14,14 @@ from agentdojo import agent_pipeline
 from agentdojo.logging import OutputLogger, TraceLogger
 from agentdojo.functions_runtime import EmptyEnv, FunctionCall, FunctionsRuntime
 
-from dscg.pipelines.defended import (
+from baseintent.pipelines.defended import (
     AUDIT_SCHEMA_VERSION, ActionLedger, ActionSecurityChecker, ActionState, OurFrameExecutor,
     PermissionSandbox, ReferenceMonitor, SandboxPolicyState, TicketedToolsExecutor,
     ToolAuthorizationCompiler, TrustedTaskRequest, _batch_fingerprint, make_defended_pipeline,
     _compact_action_record, _compact_authorization_record,
 )
-from dscg.model_config import ModelConfig
-from dscg.tool_metadata import metadata_for_runtime, set_tool_metadata
+from baseintent.model_config import ModelConfig
+from baseintent.tool_metadata import metadata_for_runtime, set_tool_metadata
 
 
 def assistant(*names):
@@ -171,7 +171,7 @@ class SandboxExecutionTests(unittest.TestCase):
             base_url="https://api.deepseek.com",
             provider="deepseek",
         )
-        with patch("dscg.pipelines.defended.create_openai_client", return_value=Mock()):
+        with patch("baseintent.pipelines.defended.create_openai_client", return_value=Mock()):
             pipeline, _, _ = make_defended_pipeline(model_config=config, sec_model_config=config, prompt_profile='legacy-v34')
         loop = pipeline.elements[-1]
         self.assertEqual(sum(isinstance(e, ReferenceMonitor) for e in loop.elements), 1)
@@ -192,7 +192,7 @@ class SandboxExecutionTests(unittest.TestCase):
         def propose(q, r, e, m, a):
             order.append("propose")
             self.assertEqual(sandbox.allowed_tools, ["safe_tool"])
-            self.assertEqual(a["dscg_authorization"]["contract_version"], sandbox.contract.contract_version)
+            self.assertEqual(a["baseintent_authorization"]["contract_version"], sandbox.contract.contract_version)
             return q, r, e, [*m, assistant("forbidden_tool", "safe_tool")], a
 
         llm.client.chat.completions.create.side_effect = compile_response
@@ -210,8 +210,8 @@ class SandboxExecutionTests(unittest.TestCase):
         first = executor.query("test", self.runtime, self.env, [USER], {})
         second = executor.query("test", self.runtime, self.env, [USER], first[4])
         self.assertEqual(llm.client.chat.completions.create.call_count, 1)
-        self.assertTrue(second[4]["dscg_authorization"].get("authorization_reused"))
-        self.assertEqual(sandbox.contract.contract_version, first[4]["dscg_authorization"]["contract_version"])
+        self.assertTrue(second[4]["baseintent_authorization"].get("authorization_reused"))
+        self.assertEqual(sandbox.contract.contract_version, first[4]["baseintent_authorization"]["contract_version"])
 
     def test_empty_compilation_blocks_first_candidate(self):
         llm = self.parser_llm('{"tools": []}')
@@ -252,7 +252,7 @@ class SandboxExecutionTests(unittest.TestCase):
         state = executor.query("test", self.runtime, self.env, [*state[3], new_user], state[4])
         self.assertNotEqual(sandbox.contract.contract_version, old_version)
         self.assertEqual(sandbox.allowed_tools, ["forbidden_tool"])
-        self.assertEqual(state[4]["dscg_authorization"]["contract_version"], sandbox.contract.contract_version)
+        self.assertEqual(state[4]["baseintent_authorization"]["contract_version"], sandbox.contract.contract_version)
         agent_pipeline.ToolsExecutor().query(*sandbox.query(*state))
         self.assertEqual(self.executed, [])  # old safe_tool proposal is now denied
 
@@ -263,7 +263,7 @@ class SandboxExecutionTests(unittest.TestCase):
             state = OurFrameExecutor(llm, sandbox, prompt_profile='legacy-v34').query("authorize safe_tool", self.runtime, self.env, messages, {})
             self.assertEqual(sandbox.policy_state, SandboxPolicyState.ERROR)
             self.assertIsNone(sandbox.contract)
-            self.assertIsNone(state[4]["dscg_authorization"]["contract_version"])
+            self.assertIsNone(state[4]["baseintent_authorization"]["contract_version"])
             llm.client.chat.completions.create.assert_not_called()
             agent_pipeline.ToolsExecutor().query(*sandbox.query(*state))
             self.assertEqual(self.executed, [])
@@ -294,8 +294,8 @@ class SandboxExecutionTests(unittest.TestCase):
             trace_path = Path(directory) / "test/offline/task/none/none.json"
             def propose(q, r, e, m, a):
                 trace = json.loads(trace_path.read_text())
-                self.assertEqual(trace["dscg_authorizations"][0]["contract_version"], sandbox.contract.contract_version)
-                self.assertNotIn("test request", json.dumps(trace["dscg_authorizations"]))
+                self.assertEqual(trace["baseintent_authorizations"][0]["contract_version"], sandbox.contract.contract_version)
+                self.assertNotIn("test request", json.dumps(trace["baseintent_authorizations"]))
                 return q, r, e, [*m, assistant()], a
             llm.query.side_effect = propose
             with logger:
@@ -320,27 +320,27 @@ class SandboxExecutionTests(unittest.TestCase):
                     )
 
                 trace = json.loads(trace_path.read_text())
-                self.assertEqual(trace["dscg_trace_level"], level)
+                self.assertEqual(trace["baseintent_trace_level"], level)
                 if level == "summary":
-                    self.assertNotIn("dscg_audit_decisions", trace)
-                    self.assertNotIn("dscg_action_ledger", trace)
-                    self.assertIn("dscg_audit_summary", trace)
-                    self.assertIn("dscg_action_summary", trace)
+                    self.assertNotIn("baseintent_audit_decisions", trace)
+                    self.assertNotIn("baseintent_action_ledger", trace)
+                    self.assertIn("baseintent_audit_summary", trace)
+                    self.assertIn("baseintent_action_summary", trace)
                     self.assertNotIn("_sha256", json.dumps(trace))
                     self.assertNotIn("arguments_sha256", json.dumps(trace))
                 elif level == "standard":
-                    self.assertIn("dscg_audit_decisions", trace)
-                    self.assertIn("dscg_action_ledger", trace)
-                    self.assertNotIn("dscg_trace_artifact", trace)
+                    self.assertIn("baseintent_audit_decisions", trace)
+                    self.assertIn("baseintent_action_ledger", trace)
+                    self.assertNotIn("baseintent_trace_artifact", trace)
                     self.assertTrue(all(
                         "transitions" not in record
-                        for record in trace["dscg_action_ledger"]
+                        for record in trace["baseintent_action_ledger"]
                     ))
                     self.assertNotIn("_sha256", json.dumps(trace))
                     self.assertNotIn("arguments_sha256", json.dumps(trace))
                 else:
-                    self.assertIn("dscg_audit_decisions", trace)
-                    sidecars = list(Path(directory).rglob("*.dscg_trace.jsonl.gz"))
+                    self.assertIn("baseintent_audit_decisions", trace)
+                    sidecars = list(Path(directory).rglob("*.baseintent_trace.jsonl.gz"))
                     self.assertEqual(len(sidecars), 1)
                     with gzip.open(sidecars[0], "rt", encoding="utf-8") as stream:
                         events = [json.loads(line) for line in stream]
@@ -348,7 +348,7 @@ class SandboxExecutionTests(unittest.TestCase):
                     sidecar_text = json.dumps(events)
                     self.assertIn("_sha256", sidecar_text)
                     self.assertEqual(
-                        trace["dscg_trace_artifact"]["format"], "jsonl.gz"
+                        trace["baseintent_trace_artifact"]["format"], "jsonl.gz"
                     )
 
     def test_task_json_projection_keeps_only_contract_and_runtime_state(self):
@@ -392,8 +392,8 @@ class SandboxExecutionTests(unittest.TestCase):
         def propose(q, r, e, m, a):
             self.assertIsNone(sandbox.contract)
             self.assertEqual(sandbox.allowed_tools, [])
-            self.assertEqual(a["dscg_authorization"]["policy_state"], "error")
-            self.assertIsNone(a["dscg_authorization"]["contract_version"])
+            self.assertEqual(a["baseintent_authorization"]["policy_state"], "error")
+            self.assertIsNone(a["baseintent_authorization"]["contract_version"])
             return q, r, e, [*m, assistant("safe_tool")], a
 
         llm.query.side_effect = propose
@@ -529,7 +529,7 @@ class SandboxExecutionTests(unittest.TestCase):
             """Transfer funds."""
             return "ok"
 
-        runtime._dscg_tool_metadata = {
+        runtime._baseintent_tool_metadata = {
             "transfer_funds": {
                 "effect": "financial",
                 "source": "local",
@@ -537,7 +537,7 @@ class SandboxExecutionTests(unittest.TestCase):
                 "sensitivity": "secret",
                 "idempotent": False,
                 "reversible": True,
-                "schema_version": "dscg.tool-risk.v0",
+                "schema_version": "baseintent.tool-risk.v0",
             }
         }
         status = metadata_for_runtime(runtime)["transfer_funds"]
@@ -561,18 +561,18 @@ class SandboxExecutionTests(unittest.TestCase):
         executor = TicketedToolsExecutor(monitor)
         state = executor.query("test", self.runtime, self.env, [assistant("safe_tool")], {})
         self.assertEqual(self.executed, [])
-        self.assertEqual(state[4]["dscg_action_ledger"][0]["state"], "blocked")
+        self.assertEqual(state[4]["baseintent_action_ledger"][0]["state"], "blocked")
 
     def test_unregistered_tool_is_recorded_as_critical(self):
         monitor = ReferenceMonitor(PermissionSandbox(["safe_tool"]), require_audit=False)
         executor = TicketedToolsExecutor(monitor)
         state = executor.query("test", self.runtime, self.env, [assistant("ghost_tool")], {})
-        record = state[4]["dscg_action_ledger"][0]
+        record = state[4]["baseintent_action_ledger"][0]
         self.assertEqual(record["risk_level"], "critical")
         self.assertEqual(record["metadata_state"], "missing_or_invalid")
         self.assertTrue(record["confirmation_required"])
         self.assertEqual(
-            state[4]["dscg_action_ledger"][0]["transitions"][-1]["reason_code"],
+            state[4]["baseintent_action_ledger"][0]["transitions"][-1]["reason_code"],
             "MISSING_EXECUTION_TICKET",
         )
 
@@ -581,21 +581,21 @@ class SandboxExecutionTests(unittest.TestCase):
         executor = TicketedToolsExecutor(monitor)
         state = ("test", self.runtime, self.env, [assistant("safe_tool")], {})
         state = monitor.query(*state)
-        pending = state[4]["_dscg_pending_batch"]
-        before = state[4]["dscg_action_ledger"]
+        pending = state[4]["_baseintent_pending_batch"]
+        before = state[4]["baseintent_action_ledger"]
         self.assertEqual(before[0]["state"], "approved")
         self.assertEqual(self.executed, [])
 
         state = executor.query(*state)
         self.assertEqual(self.executed, ["safe_tool"])
-        self.assertEqual(state[4]["dscg_action_ledger"][0]["state"], "executed")
+        self.assertEqual(state[4]["baseintent_action_ledger"][0]["state"], "executed")
 
         # Replaying the already consumed ticket creates a separate blocked event.
         replay_args = state[4]
-        replay_args["_dscg_pending_batch"] = pending
+        replay_args["_baseintent_pending_batch"] = pending
         executor.query("test", self.runtime, self.env, [assistant("safe_tool")], replay_args)
         self.assertEqual(self.executed, ["safe_tool"])
-        self.assertEqual([r["state"] for r in replay_args["dscg_action_ledger"]],
+        self.assertEqual([r["state"] for r in replay_args["baseintent_action_ledger"]],
                          ["executed", "blocked"])
 
     def test_batch_is_decided_before_any_member_executes(self):
@@ -604,14 +604,14 @@ class SandboxExecutionTests(unittest.TestCase):
         state = ("test", self.runtime, self.env,
                  [assistant("safe_tool", "forbidden_tool")], {})
         state = monitor.query(*state)
-        records = state[4]["dscg_action_ledger"]
+        records = state[4]["baseintent_action_ledger"]
         self.assertEqual(len({record["action_id"] for record in records}), 2)
         self.assertEqual([record["state"] for record in records], ["approved", "blocked"])
         self.assertEqual(self.executed, [])
 
         state = executor.query(*state)
         self.assertEqual(self.executed, ["safe_tool"])
-        self.assertEqual([record["state"] for record in state[4]["dscg_action_ledger"]],
+        self.assertEqual([record["state"] for record in state[4]["baseintent_action_ledger"]],
                          ["executed", "blocked"])
 
     def test_action_ledger_rejects_illegal_terminal_transition(self):
@@ -639,20 +639,20 @@ class SandboxExecutionTests(unittest.TestCase):
             id="audit-call-1",
         )
         message = {"role": "assistant", "content": [], "tool_calls": [call]}
-        extra_args = {"dscg_source_ids": {"audit-call-1": ["email:42"]}}
+        extra_args = {"baseintent_source_ids": {"audit-call-1": ["email:42"]}}
         state = checker.query("send the approved report", self.runtime, self.env, [message], extra_args)
 
         request = security_llm.client.chat.completions.create.call_args.kwargs
         self.assertEqual(request["response_format"], {"type": "json_object"})
         packet = json.loads(request["messages"][1]["content"])
-        self.assertEqual(packet["schema_version"], "dscg.audit-input.v3")
+        self.assertEqual(packet["schema_version"], "baseintent.audit-input.v3")
         action = packet["current_actions"][0]
         self.assertEqual(action["source_ids"], ["email:42"])
         self.assertEqual(action["untrusted_argument_data"]["role"], "system")
         self.assertNotIn("Tool: safe_tool", request["messages"][1]["content"])
         self.assertNotIn("Args:", request["messages"][1]["content"])
 
-        record = state[4]["_dscg_audit_decision"]
+        record = state[4]["_baseintent_audit_decision"]
         self.assertEqual(record["schema_version"], AUDIT_SCHEMA_VERSION)
         self.assertEqual(record["decision"], "allow")
         self.assertEqual(record["parser_status"], "ok")
@@ -675,14 +675,14 @@ class SandboxExecutionTests(unittest.TestCase):
                 executor = TicketedToolsExecutor(monitor)
                 state = ("test", self.runtime, self.env, [assistant("safe_tool")], {})
                 state = checker.query(*state)
-                audit = state[4]["_dscg_audit_decision"]
+                audit = state[4]["_baseintent_audit_decision"]
                 self.assertEqual(audit["decision"], "abstain")
                 state = monitor.query(*state)
                 state = executor.query(*state)
                 self.assertEqual(self.executed, [])
-                self.assertEqual(state[4]["dscg_action_ledger"][0]["state"], "blocked")
+                self.assertEqual(state[4]["baseintent_action_ledger"][0]["state"], "blocked")
                 self.assertIn(
-                    state[4]["dscg_action_ledger"][0]["transitions"][-1]["reason_code"],
+                    state[4]["baseintent_action_ledger"][0]["transitions"][-1]["reason_code"],
                     {"AUDIT_ABSTAIN", "AUDIT_SCHEMA_INVALID"},
                 )
 
@@ -695,7 +695,7 @@ class SandboxExecutionTests(unittest.TestCase):
         state = checker.query(
             "test", self.runtime, self.env, [assistant("safe_tool")], {}
         )
-        record = state[4]["_dscg_audit_decision"]
+        record = state[4]["_baseintent_audit_decision"]
         self.assertEqual(record["decision"], "abstain")
         self.assertEqual(record["reason_code"], "AUDIT_TIMEOUT")
         self.assertEqual(record["raw_response_sha256"],
@@ -728,7 +728,7 @@ class SandboxExecutionTests(unittest.TestCase):
         state = checker.query(
             "test", self.runtime, self.env,
             [{"role": "assistant", "content": [], "tool_calls": [call]}],
-            {"dscg_action_ledger": history},
+            {"baseintent_action_ledger": history},
         )
         packet = json.loads(
             security_llm.client.chat.completions.create.call_args.kwargs["messages"][1]["content"]
@@ -751,10 +751,10 @@ class SandboxExecutionTests(unittest.TestCase):
         state = monitor.query(*state)
         state = executor.query(*state)
         self.assertEqual(self.executed, [])
-        record = state[4]["dscg_action_ledger"][0]
+        record = state[4]["baseintent_action_ledger"][0]
         self.assertEqual(record["state"], "blocked")
         self.assertEqual(record["transitions"][-1]["reason_code"], "POLICY_INITIALIZED_EMPTY")
-        self.assertEqual(state[4]["dscg_audit_decision"]["final_policy_decision"], "deny")
+        self.assertEqual(state[4]["baseintent_audit_decision"]["final_policy_decision"], "deny")
 
     def test_sensitive_read_deny_does_not_block_source_read(self):
         runtime = FunctionsRuntime()
@@ -787,10 +787,10 @@ class SandboxExecutionTests(unittest.TestCase):
         state = monitor.query(*state)
         state = executor.query(*state)
         self.assertEqual(executed, ["read_private_file"])
-        record = state[4]["dscg_action_ledger"][0]
+        record = state[4]["baseintent_action_ledger"][0]
         self.assertEqual(record["state"], "executed")
         self.assertEqual(record["transitions"][1]["reason_code"], "READ_ONLY_SOURCE_ALLOW")
-        self.assertEqual(state[4]["dscg_audit_decision"]["final_policy_decision"], "allow")
+        self.assertEqual(state[4]["baseintent_audit_decision"]["final_policy_decision"], "allow")
 
     def test_reference_monitor_rejects_incomplete_forged_allow_record(self):
         calls = assistant("safe_tool")["tool_calls"]
@@ -803,16 +803,16 @@ class SandboxExecutionTests(unittest.TestCase):
         monitor = ReferenceMonitor(PermissionSandbox(["safe_tool"]), require_audit=True)
         state = monitor.query(
             "test", self.runtime, self.env, [assistant("safe_tool")],
-            {"_dscg_audit_decision": forged},
+            {"_baseintent_audit_decision": forged},
         )
         state = TicketedToolsExecutor(monitor).query(*state)
         self.assertEqual(self.executed, [])
         self.assertEqual(
-            state[4]["dscg_action_ledger"][0]["transitions"][-1]["reason_code"],
+            state[4]["baseintent_action_ledger"][0]["transitions"][-1]["reason_code"],
             "AUDIT_SCHEMA_INVALID",
         )
-        self.assertEqual(state[4]["dscg_audit_decision"]["decision"], "abstain")
-        self.assertEqual(state[4]["dscg_audit_decision"]["parser_status"], "failure")
+        self.assertEqual(state[4]["baseintent_audit_decision"]["decision"], "abstain")
+        self.assertEqual(state[4]["baseintent_audit_decision"]["parser_status"], "failure")
 
     def test_checker_denial_and_unauthorized_replan_are_both_mediated(self):
         security_llm = SimpleNamespace(query=Mock())
@@ -834,7 +834,7 @@ class SandboxExecutionTests(unittest.TestCase):
         state = monitor.query(*state)
         state = executor.query(*state)
         self.assertEqual(self.executed, [])
-        self.assertEqual(state[4]["dscg_action_ledger"][0]["state"], "blocked")
+        self.assertEqual(state[4]["baseintent_action_ledger"][0]["state"], "blocked")
 
         security_llm.query.return_value = (
             "test", self.runtime, self.env,
@@ -850,7 +850,7 @@ class SandboxExecutionTests(unittest.TestCase):
         retry_state = executor.query(*retry_state)
         self.assertEqual(self.executed, [])
         self.assertEqual(
-            [record["state"] for record in retry_state[4]["dscg_action_ledger"]],
+            [record["state"] for record in retry_state[4]["baseintent_action_ledger"]],
             ["blocked", "blocked"],
         )
 

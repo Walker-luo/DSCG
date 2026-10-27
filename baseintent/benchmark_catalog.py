@@ -70,7 +70,7 @@ def _inspect_backend():
     else:
         raise BenchmarkConfigurationError('unknown benchmark installation source/origin; use reviewed AgentDojo or AgentDyn')
     lock = _load_lock(profile)
-    if (not isinstance(lock,dict) or lock.get('schema_version') != f'dscg.{profile.id}-lock.v1'
+    if (not isinstance(lock,dict) or lock.get('schema_version') != f'baseintent.{profile.id}-lock.v1'
             or lock.get('repository') != profile.repository or lock.get('suite_version') != SUITE_VERSION
             or installed.version != lock.get('package_version') or installed.version != '0.1.35'):
         raise BenchmarkConfigurationError(f'invalid {profile.label} lock/version identity')

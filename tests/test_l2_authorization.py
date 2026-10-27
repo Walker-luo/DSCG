@@ -7,8 +7,8 @@ from types import SimpleNamespace
 from unittest.mock import Mock
 
 from agentdojo.functions_runtime import EmptyEnv, FunctionCall, FunctionsRuntime
-from dscg.pipelines import defended as d
-from dscg.tool_metadata import set_tool_metadata, register_tool_metadata
+from baseintent.pipelines import defended as d
+from baseintent.tool_metadata import set_tool_metadata, register_tool_metadata
 
 
 def response(text):
@@ -111,9 +111,9 @@ class PlanningViewTests(unittest.TestCase):
         self.assertEqual(llm.client.chat.completions.create.call_count, 1)
 
     def test_missing_metadata_is_not_visible_even_if_host_allowlist_contains_tool(self):
-        from dscg.l2_authorization import planning_runtime_view
+        from baseintent.l2_authorization import planning_runtime_view
         runtime, _ = make_runtime()
-        runtime._dscg_tool_metadata.pop('write_data')
+        runtime._baseintent_tool_metadata.pop('write_data')
         view, stats = planning_runtime_view(runtime, {'read_data', 'write_data'})
         self.assertEqual(set(view.functions), {'read_data'})
         self.assertEqual(stats['catalog_tools'], 2)
@@ -132,7 +132,7 @@ class PlanningViewTests(unittest.TestCase):
         for component in (precheck, monitor, d.TicketedToolsExecutor(monitor)):
             state = component.query(*state)
         self.assertEqual(effects, [])
-        self.assertEqual(state[4]['dscg_action_ledger'][0]['state'], 'blocked')
+        self.assertEqual(state[4]['baseintent_action_ledger'][0]['state'], 'blocked')
 
     def test_catalog_change_after_approval_cannot_execute_replacement(self):
         runtime, effects = make_runtime()
@@ -152,7 +152,7 @@ class PlanningViewTests(unittest.TestCase):
         self.assertIn('AUTH_CATALOG_CHANGED', state[3][-1]['error'])
 
     def test_planning_definition_edits_do_not_mutate_host_catalogue(self):
-        from dscg.l2_authorization import planning_runtime_view
+        from baseintent.l2_authorization import planning_runtime_view
         runtime, _ = make_runtime()
         description = runtime.functions['read_data'].description
         view, _ = planning_runtime_view(runtime, {'read_data'})
@@ -160,7 +160,7 @@ class PlanningViewTests(unittest.TestCase):
         self.assertEqual(runtime.functions['read_data'].description, description)
 
     def test_planning_schema_configuration_and_fields_are_isolated(self):
-        from dscg.l2_authorization import planning_runtime_view
+        from baseintent.l2_authorization import planning_runtime_view
         runtime, _ = make_runtime()
         view, _ = planning_runtime_view(runtime, {'read_data'})
         original = runtime.functions['read_data'].parameters
@@ -215,7 +215,7 @@ class BoundedProfileTests(unittest.TestCase):
     request = 'Update the record, do not send.'
 
     def profile(self, **changes):
-        from dscg.l2_authorization import ToolAuthorizationProfile
+        from baseintent.l2_authorization import ToolAuthorizationProfile
         options = dict(name='fixture-update', request_patterns=(r'Update the record, do not send\.',),
                        allowed_seed_tools=frozenset({'write_data', 'read_data'}),
                        prerequisites=(('write_data', ('read_data',)),))

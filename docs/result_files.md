@@ -1,147 +1,55 @@
-# 测试结果文件与L3路由汇总
-
-2026-10-26：默认legacy接入[v352 §4.7事件路由](../workshop/completed/intent_tool_events_20261026.md)。L2第二次请求以宿主固定step-ID键对象增加进度工具关联，不新增调用或权限；授权协议 `intent-global-tools-v4-keyed-event-links`，进度协议 `dscg.intent-progress.host-events.v3`。准备读取可由宿主记录；复杂目标仍需语义判断。`progress_source=host`没有新的response_id，不能沿用上一条模型原文。严格单次直接邀请完成模式不覆盖网站查邮箱／多人／条件／附加交付。新运行名和新配置绑定必需；Dashboard重启后随共享factory采用，无新增控件。
-
-
-## 精简任务轨迹与独立诊断
-
-2026-10-25 分层诊断 v2 起，新执行的共享DSCG pipeline任务采用如下结构；full、partial、cohort、clean及GOAL预检一致：
-
-```text
-injection_task_3/none/
-├── none.json
-├── none.dscg.jsonl
-└── none.dscg.responses.jsonl
-```
-
-计分任务同样使用 `<injection_task_id>.json` 和 `<injection_task_id>.dscg.jsonl`。
-
-宿主FSM进度协议`dscg.intent-progress.host-fsm.v2`起，L2的authorization_steps包含intent/goal_kind；进度原始回复只含satisfaction/evidence_ids。诊断observation中的intent_id/status/completion_kind/next_intent_id/skipped_intents/reason_code/host_facts由宿主派生，不是宽松修补的模型回复；skipped_intents固定为空，不猜测依赖跳过。host_facts的semantic_satisfied记录模型语义提案，与真实facts_observed/effect_observed/answer_emitted分开；不能单独当作完成真值。旧八字段进度记录保持原义，不重写。见[实施说明](../workshop/completed/intent_host_fsm_20261025.md)。
-
-- **主JSON**：完整原生messages／injections、任务ID、utility/security、error、duration及原生时间／版本；仅新增 `dscg_diagnostics` 引用，包含相对文件名、执行ID和起始字节位置，不内嵌框架配置、授权、路由、意图历史或Token统计。
-- **诊断JSONL v2**：保留L2授权／意图、每次审计的最终结果、每个动作的最终状态、进度、失败校验、L1统计和实际成本；审计与路由的重复更新合并，模块来源明确。task_end的status是执行收尾分类，任务是否成功仍以主JSON原生评分为准。
-- **原始回复附件**：L3／进度模型回复先保存至 `.dscg.responses.jsonl` 再解析。诊断通过相对路径、attempt／response ID及字节偏移引用；保留完整content／refusal、finish_reason、usage、耗时及调用／意图ID。格式错误、拒绝和截断同样留证；API没有响应时不伪造文本。L2只保存解析后的授权。
-- **公共配置**：每个攻击／场景只保存一次不可覆盖、去重的 `dscg_config.<摘要>.json`。有run_manifest时引用已有模型／工具配置，仅补充缺少的框架字段；其他共享pipeline调用保存公开配置。无凭证、HTTP头或SDK对象。
-
-不额外保存完整请求提示、工具返回正文或隐藏推理。原始模型返回文本不截断；消息和工具数据仍以主JSON为准。新执行不额外生成旧full gzip文件。读取器同时支持历史inline、v1 sidecar和gzip；原文附件缺失／损坏单独标记，已知成本不补零。
-
-`INTENT_INVALID_PROGRESS` 保留总错误码，在validation和framework_failure收尾中记录规则子码，例如 `INVALID_REASON`（含实际长度和256上限）、`NO_CURRENT_EFFECT_EVIDENCE`。这些收到模型回复后的协议失败采用原生终止机制，保留实际工具效果与已生成回答并交原生评分；不放宽校验、不修补、不新增重试。网络／API／内部异常仍记运行错误。正常工具阻挡分别使用 `L2_BLOCKED`、`L3_BLOCKED`、`MONITOR_BLOCKED`，历史 `DSCG_BLOCKED` 继续可读。
-
-程序读取请用 `dscg.task_diagnostics.load_task_trace(path)`，它在内存中合并防御字段，不改文件；可继续读取旧内嵌结构。旧full gzip可由同模块的 `load_diagnostic_events` 读取。诊断缺失、损坏、未结束或引用无效会明确标记，路由／成本保持未知，不能解释成零次审计。Dashboard与汇总读取使用相同规则。
-
-只有新执行写新格式；cache命中不新建模型回复、不改旧JSON。再次执行以新执行ID追加诊断，旧事件保留；主引用只选择当前执行，避免历史错误混入。写入失败显式报告，不退回向主JSON塞入诊断。
-
-v2的框架失败收尾／分母策略通过 `task_failure_policy` 及现有运行配置身份绑定，必须使用新运行名，不重新解释旧缓存／cohort。此前存储变更的离线记录见[历史记录](../workshop/completed/compact_task_diagnostics_20261025.md)。历史记录中不存在的原始审计回复无法补回。
-
-## v3.5 候选诊断
-
-历史显式 `intent-evidence-v35` 的授权记录保存完整 `tool_permissions`；L3 full附件保存有界assessment，公开记录用 `assessment_sha256` 及完整原回复摘要绑定判决。三个分析字段限256/384/256字符；allow/deny的missing_evidence必须是空字符串，abstain必须说明缺失依据。模型写“None.”仍是非空，不自动修补；协议失败、Monitor拒绝及最终原生utility分别查看。分析文字不授予权限。该候选使用v3输出协议与JSON Object，不修补响应，格式和实际审计设置进入配置身份；旧v1/v2原记录保留。[后续真实迭代](../workshop/completed/v35_followup_20261023.md)最佳5/6、确认4/6，未达推广门槛；当前默认是另一份[意图流程v3.5](./benchmark.md#默认-v35-意图流程)。
-
-新运行以根目录作为查阅入口，不再生成场景report.txt、攻击级或根级all_report.txt、单独攻击错误TXT。旧报告保留，不自动清理。此改动只影响派生展示，不进入防御/缓存配置身份，不改变模型、路由策略、校准阈值或评分。
-
-## 当前规则的shadow观察（DSCG_v3.4）
-
-read-purpose-v2按普通读取规则产生候选，不用分数/阈值筛选，不输出新规则阈值扫描。报告标记rule_based_unvalidated，分开统计候选的实际审计与Monitor判断、模型协议失败和审计记录校验失败；分歧不是安全标签。shadow仍执行审计，已知候选审计Token仅是反事实可省小计，selective实际总节省未知。缺失轨迹/成本保持未知，原公开免审不计为新增收益。[规则及边界](./benchmark.md#默认-v33-策略与复测)。
-
-## 历史shadow选阈值（2026-10-21）
-
-
-`threshold-read-v1` 使用经验阈值，默认0.70，不依赖artifact。根级报告按攻击/场景/配置比较0.65/0.70/0.75以及去重后的本次阈值，记录模拟免审、审计allow/deny/abstain分布、协议失败/未知状态及已知/未知审计Token。原公开免审不重复计入新增收益，selective真实Token节省仍未知。
-
-模拟比例只针对已记录事件；缺失轨迹或成本时保留已知小计，完整模拟Token为未知。每次事件保留四个信号、s、阈值、资格及回退原因、审计协议状态、最终Monitor决定和延迟。该统计帮助人工选择阈值，不自动调参，不把审计判断当安全标签。
-
-新策略显示“经验阈值、未独立校准”，没有artifact不是错误；旧 `local_calibrated_algorithm` 记录仍要求原artifact语义，不因新阈值被重新解释。历史报告与结果不自动改写，下文旧校准说明仅适用于旧策略。
+# 结果、诊断与评分
 
 ## 从哪里开始看
 
-| 文件 | 用途 |
+| 文件 | 内容 |
 | --- | --- |
-| `summary.md` | 配置/范围入口、每攻击/场景一行的TSR/ASR、分母、错误、Token；最多10个失败链接；链接到L3总报告 |
-| `l3_router_summary.md` | 全运行及各攻击/场景的路由统计、实际模式、校准状态、原因与完整性 |
-| `l3_router_summary.json` | 相同路由统计的结构化版本，包含完整分组配置及问题明细 |
-| `failure_cases.jsonl` | 完整失败/缺失案例及有界片段；摘要截取10个入口不减少此文件案例数 |
-| 场景`summary.json`、`detailed_results.csv` | 原聚合指标、配置及全部任务结果，供历史页/导出读取 |
-| 原始任务JSON及可选full附件 | 原生缓存、动作/审计记录、复核证据；保持原路径和格式 |
-| manifests、cohort、execution、reuse/validation快照 | 范围绑定、冻结名单、运行状态和续跑证据；不合并或移动 |
+| `summary.md` | 实际配置、范围、每攻击/场景 TSR/ASR、有效分母、错误与 Token |
+| `failure_cases.jsonl` | 完整失败/缺失索引；摘要中有限链接不减少这里的案例 |
+| `l3_router_summary.md/.json` | 路由原因、实际模式、完整性及已知成本 |
+| 场景 `summary.json` / `detailed_results.csv` | 原聚合和全部任务结果 |
+| `attack_manifest.json` / `run_manifest.json` | 实际后端、任务/攻击与有效配置绑定 |
+| `execution/<invocation>/execution.json` | 当前调用、攻击进程、状态和实际 wall time |
+| 原生任务 JSON 与诊断附件 | 交互、原生评分、框架事件和原始有限回复 |
 
-分组异常时，`execution/<invocation>/execution.json` 和 `failure_cases.jsonl` 的对应错误记录可包含 `execution_error`：执行阶段、任务 ID，以及最多 8 个模块/函数/行号。它不保存异常原文、请求、响应或局部变量。`--progress` 可标出 GOAL 预检、计分或 clean 任务；其他入口无法确定具体任务时阶段为 `group`。若模型请求失败，原始任务轨迹的 `dscg_cost.models` 可保留本任务新增的安全 `last_api_error` 诊断；先核对该诊断再判断是否为服务错误，不把分组异常计入有效评分分母。
+新 CLI 结果路径为 `<results-dir>/<backend>/<model>_<name>/`，Dashboard 使用 `results/dashboard/`。clean 的原生攻击组件仍为 `none`。保留原生路径以支持缓存/取证，不移动旧目录。新检查产物显式使用 `artifacts/<日期>_<任务>/`。
 
-CLI full/partial/cohort共用精简报告。Dashboard正常完成后也生成上述根级摘要、失败索引与L3报告，同时保留overall_results.json、CSV及原报告下载API；网页没有新增路由模式控件，不会因为报告功能自动开启shadow/selective。CLI中断可生成部分报告，未完成轨迹明确标记；后续续跑更新派生汇总，保留原有配置快照机制。旧TXT不会被清理，但不应当作续跑后的最新汇总。
+## 精简任务轨迹与独立诊断
 
-一般新运行目录：
+新执行写 BaseIntent 侧车：
 
 ```text
-results/benchmarks/<backend>/<model>_<name>/
-  summary.md
-  l3_router_summary.md
-  l3_router_summary.json
-  failure_cases.jsonl
-  attack_manifest.json             # 以及实际需要的cohort/执行/绑定记录
-  <attack>/<suite>/
-    summary.json
-    detailed_results.csv
-    run_manifest.json
-    <user>/<attack>/<injection>.json
+<task>.json
+<task>.baseintent.jsonl
+<task>.baseintent.responses.jsonl
 ```
 
-clean的攻击存储组件仍为none；Dashboard的原生轨迹目录与CSV目录可能不同，汇总器按已记录pipeline名称和任务选择读取，不移动它们。保留大量原生JSON是为了续跑和取证，本轮主要减少重复报告与查阅冗余，不代表磁盘空间可大幅下降。
+原生 JSON 保留交互、评分、错误、耗时及诊断引用；v2 诊断保存紧凑授权、意图、层路由、成本、最终审计和动作事件。不可变公开配置按攻击/场景去重，当前公开字段使用 `baseintent_*`。
 
-## 如何理解L3统计
+L3/progress 的完整 content 或 refusal 在解析前保存到响应附件，包括畸形/不完整回复；立即绑定相对路径、attempt/response ID 和字节偏移。只保存允许的 finish/usage/latency/call/intent 字段，L2 只存解析授权。不保存隐藏推理、HTTP 头、SDK 对象、凭证或重复完整提示/工具正文。
 
-- `coverage`区分计划、成功读取、含事件、明确无候选、路由关闭/原生baseline、缺失、损坏、身份冲突和越界路径。off只是关闭新增路由，**不等于关闭L3语义审计**。
-- `candidate_batches`包含记录的全部批次。`previously_audited_batches`表示排除原公开读取免审和L2前置拒绝后、原本需审计的批次；即使selective实际免审，它仍属于此分母。
-- `eligible_batches`只表示满足路由适用条件。`eligible_rate`以原本需审计的批次为分母，不平均场景比例，不是安全通过率。
-- `would_bypass_batches`为事件中模拟判断，`actual_bypass_batches`为实际新增选择性免审；原公开读取免审单独列示，不能算新增算法收益。
-- 缺少/无效校准文件、无认证阈值或不兼容配置时，shadow有效模拟节省显示未知，不能把would_bypass=0解释成已经证明无收益。selective实际Token节省始终未知，没有反事实轨迹就不估算。
-- 缺少范围、轨迹或有效事件时，整体审计调用/有效模拟节省保持未知；`known_shadow_would_save_tokens`仅为已知部分的小计，不能替代全运行节省。
-- `known_semantic_audit_tokens`只累加可用的计分轨迹事件usage；未知批次/轨迹单列。off缺少路由事件时可从原layer_routing读取已记录调用次数，但不伪造费用。不要再把这些Token加到已有运行总Token上；原总量可能已包含GOAL预检。
-- Shadow模拟免审与实际审计allow/deny/abstain的交叉计数只是判断分歧，不是误放率或独立安全真值。未审计事件标记not_audited，不当作丢失的语义判断。
-- 实际模式、提示候选、模型/路由配置摘要和校准artifact分组展示；不同组不合并风险分数和阈值。分位数从原事件重新计算，沿用现有floor((n-1)*q)口径，不平均组内P95。原字段缺失为unrecorded/unknown，不推造身份。
+宿主派生的 intent_id/status/completion_kind/next_intent_id/reason_code/host_facts 不是模型原始控制字段。`progress_source=host` 没有新 response_id，不能拿上一条模型回复当作本次原文；跳步列表保持为空。模型语义结果与 host 的事实/效果/回答标志分别记录。
 
-读取范围来自当前运行声明的任务列表，只读计分任务，不递归抓取所有JSON。GOAL预检、旧reuse/validation快照及其他运行不会进入统计。缺少声明范围或存在不一致会报告问题；最多展开100条问题位置，完整问题类型计数保留。Markdown列出摘要，JSON保留完整结构。
+程序读取使用 `baseintent.task_diagnostics.load_task_trace(path)`，在内存中合并，不改文件。兼容旧 inline、v1、gzip、`.dscg.jsonl/.dscg.responses.jsonl` 和 `DSCG_BLOCKED`，缺失/损坏/未结束或无效引用明确标记。旧字节和版本身份保持原样，缺失回复不补造、缺失成本不补零。详见[迁移](migration.md)。
 
-## 给旧目录补充报告
+cache 命中不生成模型回复、不重写旧文件；真实重跑追加新 attempt，当前引用绑定当前执行。策略/schema/模型/有效防御配置变化须新名称，无跨策略缓存或 cohort 自动迁移。
 
-不需要API Key、模型或安装相同后端；只需能运行标准库Python：
+## 评分与错误
 
-```bash
-python -m experiments.diagnostics.summarize_results \
-  --run-dir results/benchmarks/agentdojo/qwen3.7-flash_DSCG
-```
+有效 TSR = utility=true / 有效 utility 布尔数；有效 ASR = security=true / 有效原生 security 布尔数。clean ASR 不适用。计划、尝试、完成、有效、错误、未完成和不支持分别报告，不把错误当成功防御。
 
-本轮只对这个指定目录回填。其他旧运行可手动指定路径，支持带声明元数据的CLI当前/旧路径和Dashboard整体结果。默认**仅新增两份l3_router_summary文件**，不改原summary.md、场景summary、CSV、TXT、任务JSON、cohort或manifests；不会自动扫描修改整个results/。
+已收到的已知 L2/progress 输出缺陷及有界无进展使用原生 `AbortAgentError` 停止，保留已执行效果和已有最终回答，再由原生谓词评分。未完成且攻击未成功可以是 False/False；框架终止也可能 utility=true。L3 deny/协议缺陷保留既有受限重规划。
 
-报告已存在时默认拒绝覆盖。确需重新读取原始记录后刷新：
+API/超时、输入/目录/内部/I/O 错误及主模型畸形工具参数 JSON 属基础设施错误，效用/安全标签为空。参数不修补，畸形批次不执行。当前阻断层分别为 L2、L3、Monitor。安全错误诊断只记录允许的类型/代码/字段子码和有限栈位置，不保存请求、响应、局部变量或凭证。
 
-```bash
-python -m experiments.diagnostics.summarize_results \
-  --run-dir results/benchmarks/agentdojo/qwen3.7-flash_DSCG --refresh
-```
+## 成本与比较
 
-refresh只替换具有本工具schema/Markdown标记的两份报告，不覆盖同名个人文件。生成时持有目录锁、检查现有CLI运行锁、临时写入后原子替换单文件；符号链接输出拒绝。先确认运行已停止；Dashboard在另一服务进程中的活动状态不能仅凭文件锁完整识别。两份报告的时间来源相同，若进程在两次替换之间崩溃，可在运行停止后refresh重建。
+generation、`authorization_intents`、`authorization_tools`、`intent_progress` 和 audit 按实际 usage 计数。GOAL 与计分分别统计，当前 invocation 与缓存/完整运行分别统计。已知 Token 是小计；缺失 usage、连接失败服务成本和不完整附件保持未知。
 
-所有指标只是已保存事件的统计，不验证远端模型版本，不更改研究闸门，也不证明防御有效或阈值已可部署。
+固定 public/internal 读取在所有模式免审，不能用旧 shadow 候选数量推定当前实际节省；阈值扫描不改变当前规则。工具级免审不证明目的地或对象安全，见[框架边界](framework.md)。
 
-## 工具参数错误记录
+比较前对齐已记录的后端、实际任务 ID、攻击、模型/请求配置及评分口径。`paired_comparison_ready` 只报告已记录范围的对齐，不证明模型服务、攻击投递和 oracle 同轮一致；`cost_comparison_ready=false` 时不计算完整成本收益。历史身份未知时保持 unknown，不按目录或当前环境补写。
 
-CLI测量的每个`<attack>/<suite>/task_errors.jsonl`只追加本次新出现的主模型工具参数JSON语法错误，每行含invocation_id、阶段/任务ID、固定错误码、解析位置、参数长度及有限堆栈；不含参数正文、异常原文或凭证。原生轨迹不补造utility/security标签。场景summary.json的task_error_diagnostics仅含本次事件；当前评分及失败索引不扫描历史错误文件来反推失败。
+## 只读汇总
 
-新错误记录还区分`empty_arguments`和`json_syntax`，保存`response_finish_reason`及`response_completion_tokens`；无法取得时为null。`length`可作为输出达到服务长度限制的线索；其他结束原因不能证明参数完整，也不能反推历史错误的原因。
-
-计分/clean错误行的派生标签为空、sample_status=infrastructure_error，保留计划数但排除有效TSR/ASR分母。GOAL预检错误使用goal_preflight阶段与独立计数，根摘要明确显示，不进入评分分母。进度100%表示尝试已结束；有错误仍返回退出码1。API成功返回后发生格式错误，Token已计入，不把它计作HTTP失败。
-
-显式reuse仍由原生loader决定缓存完整性，完整错误缓存不自动重试；缺失/不完整任务按原规则补测并保存旧字节快照。历史task_errors.jsonl原样保留；新尝试成功时只在历史中保留旧错误。screen/Dashboard及其他JSON异常不应用这套单任务隔离。详见[完整指南](./benchmark.md#工具参数-json-解析错误)。
-
-## 审计与交接诊断
-
-v3.2的审计事件保留`mediation_diagnostics`：`checker_parser_status`和受限`checker_protocol_diagnostics`记录原始模型协议观察，`audit_record_status`记录审计记录校验，`router_handoff_status`记录路由回执交接。`failure_stage`分别为`model_protocol`、`model_request`、`audit_record`或`router_handoff`，正常为空；未检查/未知状态不反推模型错误。审计摘要新增`mediation_failure_counts`，并继续保留原始解析计数。
-
-不要仅凭`AUDIT_SCHEMA_INVALID`断定模型JSON格式失败：可能是记录或回执校验失败，即使原始解析为ok仍会拒绝执行。新增字段不保存响应正文或异常原文，不放宽Monitor；旧轨迹缺字段时保留未知，不回填历史结果。
-
-## L2步骤记录（v3.3）
-
-默认授权的 `dscg_authorizations` 每条记录新增 `authorization_protocol=action-steps-v2` 和 `authorization_steps`（intent/tools）。只记录请求的动作步骤，不含已自动可用的读取，不再重复输出顶层tools。该映射只记录一次授权模型的自述，不认证步骤完整、参数正确或任务成功。`allowed_tools` 仍是工具级有效授权；显式旧候选/受限授权没有这些字段时不补造。新协议和提示身份进入现有绑定，旧策略结果请保留并使用新运行名。
-
-## v3.4判决诊断
-
-新默认审计记录的protocol_diagnostics标明output_contract=dscg.audit-decision.v2及实际response_format；字段失败仅记录固定字段路径、预期/实际类型、数量/长度和结束原因，不输出正文。模型协议、API、Monitor记录校验和回执交接失败分开统计。旧记录缺字段时不补造。有限代码/跨字段错误仍使原生效用失败，不能因是协议错误就删出TSR；主模型工具参数JSON基础设施错误仍沿用原有null处理。详见[当前契约](./benchmark.md#默认-v34-策略与复测)。
+已有目录可用 `python -m experiments.diagnostics.summarize_results --help` 查看路由报告生成选项。默认保护已有报告，显式刷新仅限该工具拥有的派生产物；不改原生评分、轨迹或历史模型回复。Dashboard 和 CLI 共用读取、分母与成本契约，完整失败索引优先于短摘要。

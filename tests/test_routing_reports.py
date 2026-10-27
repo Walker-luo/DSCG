@@ -1,4 +1,7 @@
 """Result reporting with synthetic stored traces; no backend or model requests."""
+
+from artifact_support import ensure_artifacts
+ensure_artifacts('test_routing_reports')
 from copy import deepcopy
 import json
 import os
@@ -8,7 +11,7 @@ import unittest
 from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
-ARTIFACTS = ROOT / 'workshop/artifacts/20261019_result_reports'
+ARTIFACTS = ROOT / 'artifacts/tests/test_routing_reports'
 BENCHMARK = {'id': 'fixture-backend', 'revision': 'fixture-1', 'suite_version': 'v1.2'}
 
 
@@ -25,11 +28,11 @@ def event(**changes):
 def trace(events, user='u0', **changes):
     row = dict(suite_name='sample', user_task_id=user, injection_task_id='i0', attack_type='attack',
                utility=True, security=False, error=None, benchmark_version='v1.2',
-               dscg_framework={'audit_router_mode': 'shadow', 'audit_router_artifact_sha256': 'a' * 64,
+               baseintent_framework={'audit_router_mode': 'shadow', 'audit_router_artifact_sha256': 'a' * 64,
                                'audit_router_config_sha256': 'b' * 64, 'audit_router_load_error': None},
                messages=[{'role': 'assistant', 'tool_calls': [{'id': 'c', 'function': 'read'}]}])
     if events is not None:
-        row['dscg_router_events'] = events
+        row['baseintent_router_events'] = events
     row.update(changes)
     return row
 
@@ -62,7 +65,7 @@ class RoutingReportTests(unittest.TestCase):
             artifact_sha256=None,score=.99,threshold=.70,threshold_applied=False,
             route_reason='ORDINARY_READ_BATCH',audit_parser_status='ok',raw_audit_decision='abstain',
             final_monitor_decision='deny')])
-        row['dscg_framework'].update(audit_router_policy_version='read-purpose-v2',audit_router_threshold=.70,
+        row['baseintent_framework'].update(audit_router_policy_version='read-purpose-v2',audit_router_threshold=.70,
                                      audit_router_artifact_sha256=None)
         self.fixture({'u0':row});report=collect_routing_summary(self.root)
         self.assertEqual(report['configurations'][0]['calibration_status'],'rule_based_unvalidated')
@@ -130,7 +133,7 @@ class RoutingReportTests(unittest.TestCase):
         from experiments.common.routing_reports import collect_routing_summary
         row = trace([event(artifact_sha256=None, threshold=None, would_bypass=False,
                            route_reason='ARTIFACT_INVALID_OR_MISSING')])
-        row['dscg_framework'].update(audit_router_artifact_sha256=None, audit_router_load_error='ARTIFACT_MISSING')
+        row['baseintent_framework'].update(audit_router_artifact_sha256=None, audit_router_load_error='ARTIFACT_MISSING')
         self.fixture({'u0': row})
         report = collect_routing_summary(self.root)
         self.assertEqual(report['totals']['eligible_batches'], 1)
@@ -144,7 +147,7 @@ class RoutingReportTests(unittest.TestCase):
                   event(policy_version='threshold-read-v1', score=.70, threshold=.72, artifact_sha256=None,
                         audit_parser_status='failure', raw_audit_decision='abstain', semantic_audit_tokens=None)]
         row = trace(events)
-        row['dscg_framework'].update(audit_router_policy_version='threshold-read-v1',
+        row['baseintent_framework'].update(audit_router_policy_version='threshold-read-v1',
             audit_router_threshold=.72, audit_router_artifact_sha256=None)
         self.fixture({'u0': row})
         report = collect_routing_summary(self.root)
@@ -167,7 +170,7 @@ class RoutingReportTests(unittest.TestCase):
         from experiments.common.routing_reports import collect_routing_summary
         row = trace([event(policy_version='threshold-read-v1', score=.64, threshold=.70,
                            artifact_sha256=None, semantic_audit_tokens=100)])
-        row['dscg_framework'].update(audit_router_policy_version='threshold-read-v1',
+        row['baseintent_framework'].update(audit_router_policy_version='threshold-read-v1',
             audit_router_threshold=.70, audit_router_artifact_sha256=None)
         self.fixture({'u0': row})
         manifest = json.loads((self.root/'attack/sample/run_manifest.json').read_text())
@@ -181,10 +184,10 @@ class RoutingReportTests(unittest.TestCase):
     def test_legacy_generated_reports_can_refresh(self):
         from experiments.common.routing_reports import write_routing_summary
         self.fixture({'u0':trace([event()])})
-        self.put('l3_router_summary.json', {'schema_version':'dscg.l3-router-summary.v1'})
-        (self.root/'l3_router_summary.md').write_text('<!-- dscg.l3-router-summary.v1 -->\nold report\n')
+        self.put('l3_router_summary.json', {'schema_version':'baseintent.l3-router-summary.v1'})
+        (self.root/'l3_router_summary.md').write_text('<!-- baseintent.l3-router-summary.v1 -->\nold report\n')
         report = write_routing_summary(self.root, refresh=True)
-        self.assertEqual(report['schema_version'], 'dscg.l3-router-summary.v2')
+        self.assertEqual(report['schema_version'], 'baseintent.l3-router-summary.v2')
 
     def test_no_candidates_missing_corrupt_and_wrong_identity_are_distinct(self):
         from experiments.common.routing_reports import collect_routing_summary
@@ -204,7 +207,7 @@ class RoutingReportTests(unittest.TestCase):
         a = trace([event(), event(eligible=False, would_bypass=False, score=None, threshold=None,
                   original_public_bypass=True, route_reason='READ_AUDIT_BYPASS', semantic_audit_calls=0, semantic_audit_tokens=0)])
         b = trace([event(mode='selective', actual_bypass=True, semantic_audit_calls=0, semantic_audit_tokens=0)], 'u1')
-        b['dscg_framework']['audit_router_mode'] = 'selective'
+        b['baseintent_framework']['audit_router_mode'] = 'selective'
         self.fixture({'u0':a,'u1':b})
         report = collect_routing_summary(self.root)
         self.assertEqual(len(report['configurations']), 2)
@@ -236,8 +239,8 @@ class RoutingReportTests(unittest.TestCase):
                      'task_selection':{'user_task_ids':['u0'],'injection_task_ids':[]},
                      'framework':{'audit_router_mode':'off'}}]))
         row=trace(None,injection_task_id=None,attack_type='none')
-        row['dscg_framework']['audit_router_mode']='off'
-        row['dscg_layer_routing']={'semantic_audit_calls':2}
+        row['baseintent_framework']['audit_router_mode']='off'
+        row['baseintent_layer_routing']={'semantic_audit_calls':2}
         self.put('native/sample/u0/none/none.json',row)
         report=collect_routing_summary(self.root)
         self.assertEqual(report['coverage']['disabled_traces'],1)
@@ -278,7 +281,7 @@ class RoutingReportTests(unittest.TestCase):
     def test_same_native_baseline_does_not_fabricate_shadow_savings(self):
         from experiments.common.routing_reports import collect_routing_summary
         row=trace(None)
-        row.pop('dscg_framework')
+        row.pop('baseintent_framework')
         self.fixture({'u0':row})
         path=self.root/'attack/sample/run_manifest.json';binding=json.loads(path.read_text())
         binding.update(profile='baseline',audit_router_mode='off');path.write_text(json.dumps(binding))

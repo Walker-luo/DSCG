@@ -1,4 +1,7 @@
 """Runtime profiles distinguish two same-version packages without env-name guesses."""
+
+from artifact_support import ensure_artifacts
+ensure_artifacts('test_agentdyn_catalog')
 import hashlib
 import json
 from pathlib import Path
@@ -7,11 +10,11 @@ from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
 
-from dscg import benchmark_catalog as catalog
+from baseintent import benchmark_catalog as catalog
 
 
 def TemporaryDirectory():
-    root = Path(__file__).resolve().parents[1] / 'workshop/artifacts/20261018_dual_benchmark/catalog_tests'
+    root = Path(__file__).resolve().parents[1] / 'artifacts/tests/test_agentdyn_catalog'
     root.mkdir(parents=True, exist_ok=True)
     return _TemporaryDirectory(dir=root)
 
@@ -21,7 +24,7 @@ class AgentDynCatalogTests(unittest.TestCase):
         root=Path(directory)/'agentdojo';root.mkdir()
         path=root/'benchmark.py';path.write_text('pinned implementation')
         sha=hashlib.sha256(path.read_bytes()).hexdigest()
-        lock={'schema_version':'dscg.agentdyn-lock.v1' if backend=='agentdyn' else 'dscg.agentdojo-lock.v1',
+        lock={'schema_version':'baseintent.agentdyn-lock.v1' if backend=='agentdyn' else 'baseintent.agentdojo-lock.v1',
               'repository': 'https://github.com/SaFo-Lab/AgentDyn' if backend=='agentdyn' else 'https://github.com/ethz-spylab/agentdojo',
               'revision':'a'*40 if backend=='agentdyn' else 'pypi:agentdojo==0.1.35',
               'suite_version':'v1.2','package_version':'0.1.35','source_sha256':{'benchmark.py':sha},

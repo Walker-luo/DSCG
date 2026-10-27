@@ -27,40 +27,40 @@ from agentdojo.models import MODEL_NAMES
 from agentdojo.benchmark import TaskResults
 
 #! 统计token消耗
-from dscg.token_tracking import TokenTrackerClient
-from dscg import intent_flow as flow
-from dscg.authorization_steps import PROTOCOL as STEP_PROTOCOL, POLICY as STEP_POLICY, LEGACY_PROTOCOL as LEGACY_STEP_PROTOCOL, native_catalog, parse_steps
-from dscg.decision_schema import (AUDIT_PROTOCOL, AUDIT_SCHEMA, action_schema, response_format,
+from baseintent.token_tracking import TokenTrackerClient
+from baseintent import intent_flow as flow
+from baseintent.authorization_steps import PROTOCOL as STEP_PROTOCOL, POLICY as STEP_POLICY, LEGACY_PROTOCOL as LEGACY_STEP_PROTOCOL, native_catalog, parse_steps
+from baseintent.decision_schema import (AUDIT_PROTOCOL, AUDIT_SCHEMA, action_schema, response_format,
                                   contract_identity, validate_audit, DecisionContractError,
                                   load_decision_json)
-from dscg.intent_evidence import (PROFILE as V35_PROFILE, AUTH_PROTOCOL as V35_AUTH_PROTOCOL,
+from baseintent.intent_evidence import (PROFILE as V35_PROFILE, AUTH_PROTOCOL as V35_AUTH_PROTOCOL,
     AUDIT_PROTOCOL as V35_AUDIT_PROTOCOL, MAIN_TASK_POLICY, ISOLATION_POLICY, REVIEW_RULES, DECISION_GUIDE, ENVELOPE_SCHEMA, permission_schema, parse_permissions, parse_envelope, audit_request_options, audit_model_settings, audit_contract_identity, AUDIT_FORMAT)
-from dscg.input_isolation import FRAMEWORK_VERSION, ISOLATION_RULE, build_isolated_view, framework_version_for_profile
-from dscg import task_diagnostics as diagnostics
-from dscg.failure_policy import FAILURE_POLICY, MODULE_NAMES, block_error, is_blocked_error
+from baseintent.input_isolation import FRAMEWORK_VERSION, ISOLATION_RULE, build_isolated_view, framework_version_for_profile
+from baseintent import task_diagnostics as diagnostics
+from baseintent.failure_policy import FAILURE_POLICY, MODULE_NAMES, block_error, is_blocked_error
 import warnings
-from dscg.l1_projection import (MODES as L1_PROJECTION_MODES, PROFILE_SHA256 as L1_PROFILE_SHA256,
+from baseintent.l1_projection import (MODES as L1_PROJECTION_MODES, PROFILE_SHA256 as L1_PROFILE_SHA256,
                                PROFILE as L1_PROFILE, trusted_request_for_view)
-from dscg.l2_authorization import (catalog_fingerprint, planning_runtime_view,
+from baseintent.l2_authorization import (catalog_fingerprint, planning_runtime_view,
                                   ToolAuthorizationProfile, L2AuthorizationError,
                                   validate_profile_decision, DelegatedTaskReader,
                                   EffectiveTaskContext, match_delegated_task,
                                   resolve_delegated_task, effective_delegated_task, DELEGATION_VERSION)
-from dscg.audit_router import (LocalAuditRouter, RouterReceiptVerifier, argument_flags,
+from baseintent.audit_router import (LocalAuditRouter, RouterReceiptVerifier, argument_flags,
                                normalized as router_normalized, digest as router_digest,
                                catalog_snapshot as router_catalog_snapshot, DEFAULT_THRESHOLD, POLICY_VERSION as ROUTER_POLICY_VERSION,
                                validate_router_options)
-from dscg.audit_context import (INPUT_SCHEMA as AUDIT_INPUT_SCHEMA_VERSION, EVIDENCE_VERSION,
+from baseintent.audit_context import (INPUT_SCHEMA as AUDIT_INPUT_SCHEMA_VERSION, EVIDENCE_VERSION,
                                 FACT_BUDGET, MAX_RESULTS, MAX_CALL_ARGUMENTS, select_tool_evidence)
-from dscg.prompt_profiles import (validate_profile, semantic_catalog, audit_policy,
+from baseintent.prompt_profiles import (validate_profile, semantic_catalog, audit_policy,
                                   authorization_policy, profile_binding, CATALOG_SCHEMA)
-from dscg.model_config import (
+from baseintent.model_config import (
     ModelConfig,
     create_openai_client,
     reasoning_effort_for_config,
     resolve_model_config,
 )
-from dscg.tool_metadata import (
+from baseintent.tool_metadata import (
     TOOL_METADATA_SCHEMA_VERSION,
     highest_risk,
     metadata_catalog_hash,
@@ -167,7 +167,7 @@ class PendingBatch:
     actions: tuple[PendingAction, ...]
 
 
-AUDIT_SCHEMA_VERSION = "dscg.audit-decision.v1"
+AUDIT_SCHEMA_VERSION = "baseintent.audit-decision.v1"
 AUDIT_DECISIONS = frozenset({"allow", "deny", "abstain"})
 AUDIT_REQUIRED_FIELDS = frozenset({"decision", "violations", "confidence", "reason_code"})
 AUDIT_MAX_ARGUMENT_DEPTH = 4
@@ -180,7 +180,7 @@ AUDIT_MAX_TOOL_DESCRIPTION_LENGTH = 512
 AUDIT_TIMEOUT_SECONDS = 30.0
 TRACE_LEVELS = frozenset({"summary", "standard", "full"})
 DEFAULT_TRACE_LEVEL = "summary"
-TRACE_ARTIFACT_SCHEMA_VERSION = "dscg.security-trace.v1"
+TRACE_ARTIFACT_SCHEMA_VERSION = "baseintent.security-trace.v1"
 
 
 class AuditSchemaError(ValueError):
@@ -327,7 +327,7 @@ def _normalise_audit_value(value: Any, depth: int = 0) -> Any:
 def _source_ids_for_call(call: Any, extra_args: dict) -> list[str]:
     """Read optional host-provided source IDs without trusting their contents."""
 
-    source_map = extra_args.get("dscg_source_ids", {})
+    source_map = extra_args.get("baseintent_source_ids", {})
     values: Any = []
     if isinstance(source_map, dict):
         call_id = _tool_call_id(call)
@@ -448,7 +448,7 @@ def _is_valid_audit_record(record: Any, batch_fingerprint: str) -> bool:
     if not required.issubset(record) or record.get("schema_version") != AUDIT_SCHEMA_VERSION:
         return False
     protocol = record.get('protocol_diagnostics', {}).get('output_contract') if isinstance(record.get('protocol_diagnostics'), dict) else None
-    if protocol in (AUDIT_PROTOCOL, V35_AUDIT_PROTOCOL, 'dscg.intent-evidence.v1', 'dscg.intent-evidence.v2') and record.get('parser_status') == 'ok':
+    if protocol in (AUDIT_PROTOCOL, V35_AUDIT_PROTOCOL, 'baseintent.intent-evidence.v1', 'baseintent.intent-evidence.v2') and record.get('parser_status') == 'ok':
         try:
             validate_audit({key: record.get(key) for key in AUDIT_SCHEMA['required']})
         except DecisionContractError:
@@ -514,7 +514,7 @@ def _checker_observation(record):
             if type(raw.get(key)) is int and raw[key] >= 0:
                 safe[key] = raw[key]
         for key, values in {
-            'output_contract': (AUDIT_PROTOCOL, V35_AUDIT_PROTOCOL, 'dscg.intent-evidence.v1', 'dscg.intent-evidence.v2'), 'response_format': ('json_schema', 'json_object'),
+            'output_contract': (AUDIT_PROTOCOL, V35_AUDIT_PROTOCOL, 'baseintent.intent-evidence.v1', 'baseintent.intent-evidence.v2'), 'response_format': ('json_schema', 'json_object'),
             'field_path': ('$', '$.decision', '$.violations', '$.confidence', '$.reason_code',
                            '$.verdict', '$.verdict.missing_evidence', '$.assessment', '$.assessment.purpose', '$.assessment.parameter_basis', '$.assessment.missing_evidence'),
             'expected_type': ('four-field object', 'decision enum', 'unique violation codes',
@@ -541,7 +541,7 @@ def _normalise_trace_level(value: Any) -> str:
 
 
 def _trace_level(extra_args: dict) -> str:
-    return _normalise_trace_level(extra_args.get("_dscg_trace_level", DEFAULT_TRACE_LEVEL))
+    return _normalise_trace_level(extra_args.get("_baseintent_trace_level", DEFAULT_TRACE_LEVEL))
 
 
 def _trace_logger():
@@ -681,7 +681,7 @@ def _audit_summary(records: list[dict]) -> dict:
         except (TypeError, ValueError):
             pass
     return {
-        "schema_version": "dscg.audit-summary.v1",
+        "schema_version": "baseintent.audit-summary.v1",
         "total_decisions": len(records),
         "decision_counts": dict(decisions),
         "parser_status_counts": dict(parser_statuses),
@@ -713,7 +713,7 @@ def _action_summary(records: list[dict]) -> dict:
                 if isinstance(transition, dict) and transition.get("reason_code"):
                     reason_codes[str(transition["reason_code"])] += 1
     return {
-        "schema_version": "dscg.action-summary.v1",
+        "schema_version": "baseintent.action-summary.v1",
         "total_actions": len(records),
         "state_counts": dict(states),
         "risk_level_counts": dict(risk_levels),
@@ -743,7 +743,7 @@ def _trace_artifact_path(logger) -> Path | None:
     injection_task_id = str(context.get("injection_task_id") or "none")
     directory = Path(dirpath) / pipeline_name / suite_name / user_task_id / attack_type
     directory.mkdir(parents=True, exist_ok=True)
-    return directory / f"{injection_task_id}.dscg_trace.jsonl.gz"
+    return directory / f"{injection_task_id}.baseintent_trace.jsonl.gz"
 
 
 def _append_full_trace(extra_args: dict, event_type: str, record: dict) -> None:
@@ -752,9 +752,9 @@ def _append_full_trace(extra_args: dict, event_type: str, record: dict) -> None:
     if diagnostics.current_session() is not None:
         occurrence = {}
         if event_type in ('audit_decision','audit_decision_final'):
-            length=len(extra_args.get('dscg_audit_decisions',[]))
+            length=len(extra_args.get('baseintent_audit_decisions',[]))
             occurrence={'history_index':length-1,'history_length':length}
-        elif event_type=='audit_router':occurrence={'router_index':len(extra_args.get('dscg_router_events',[]))-1}
+        elif event_type=='audit_router':occurrence={'router_index':len(extra_args.get('baseintent_router_events',[]))-1}
         if event_type == 'authorization': record = _compact_authorization_record(record)
         elif event_type in ('audit_decision','audit_decision_final') and _trace_level(extra_args) != 'full':
             record = _compact_audit_record(record)
@@ -770,7 +770,7 @@ def _append_full_trace(extra_args: dict, event_type: str, record: dict) -> None:
     path = _trace_artifact_path(logger)
     if path is None:
         return
-    extra_args["_dscg_trace_artifact"] = {
+    extra_args["_baseintent_trace_artifact"] = {
         "schema_version": TRACE_ARTIFACT_SCHEMA_VERSION,
         "path": path.name,
         "format": "jsonl.gz",
@@ -778,7 +778,7 @@ def _append_full_trace(extra_args: dict, event_type: str, record: dict) -> None:
     event = {
         "schema_version": TRACE_ARTIFACT_SCHEMA_VERSION,
         "event": event_type,
-        "task_id": extra_args.get("dscg_task_id"),
+        "task_id": extra_args.get("baseintent_task_id"),
         "record": deepcopy(record),
     }
     with gzip.open(path, "at", encoding="utf-8") as stream:
@@ -795,7 +795,7 @@ def _sync_trace_context(extra_args: dict) -> None:
     level = _trace_level(extra_args)
     raw_authorizations = [
         record
-        for record in extra_args.get("dscg_authorizations", [])
+        for record in extra_args.get("baseintent_authorizations", [])
         if isinstance(record, dict)
     ]
     authorizations = (
@@ -804,41 +804,41 @@ def _sync_trace_context(extra_args: dict) -> None:
         else [_compact_authorization_record(record) for record in raw_authorizations]
     )
     audits = [
-        record for record in extra_args.get("dscg_audit_decisions", [])
+        record for record in extra_args.get("baseintent_audit_decisions", [])
         if isinstance(record, dict)
     ]
     actions = [
-        record for record in extra_args.get("dscg_action_ledger", [])
+        record for record in extra_args.get("baseintent_action_ledger", [])
         if isinstance(record, dict)
     ]
     context = {
-        "dscg_trace_level": level,
-        "dscg_authorizations": authorizations,
-        "dscg_audit_summary": _audit_summary(audits),
-        "dscg_action_summary": _action_summary(actions),
+        "baseintent_trace_level": level,
+        "baseintent_authorizations": authorizations,
+        "baseintent_audit_summary": _audit_summary(audits),
+        "baseintent_action_summary": _action_summary(actions),
     }
-    for key in ("dscg_input_isolation", "dscg_l1_projection", "dscg_layer_routing", "dscg_framework", "dscg_router_events", "dscg_l2", "dscg_audit_evidence", "dscg_intent_flow", "dscg_termination", "dscg_infrastructure_failure"):
+    for key in ("baseintent_input_isolation", "baseintent_l1_projection", "baseintent_layer_routing", "baseintent_framework", "baseintent_router_events", "baseintent_l2", "baseintent_audit_evidence", "baseintent_intent_flow", "baseintent_termination", "baseintent_infrastructure_failure"):
         if key in extra_args:
             context[key] = deepcopy(extra_args[key])
-            if key == 'dscg_l1_projection' and level != 'full':
+            if key == 'baseintent_l1_projection' and level != 'full':
                 context[key].pop('profile_sha256', None)
     if diagnostics.current_session() is not None:
         diagnostics.sync_context(context)
         return
     if level == "standard":
-        context["dscg_audit_decisions"] = [_compact_audit_record(record) for record in audits]
-        context["dscg_action_ledger"] = [_compact_action_record(record) for record in actions]
+        context["baseintent_audit_decisions"] = [_compact_audit_record(record) for record in audits]
+        context["baseintent_action_ledger"] = [_compact_action_record(record) for record in actions]
     elif level == "full":
-        context["dscg_audit_decisions"] = deepcopy(audits)
-        context["dscg_action_ledger"] = deepcopy(actions)
-        if extra_args.get("_dscg_trace_artifact"):
-            context["dscg_trace_artifact"] = deepcopy(extra_args["_dscg_trace_artifact"])
+        context["baseintent_audit_decisions"] = deepcopy(audits)
+        context["baseintent_action_ledger"] = deepcopy(actions)
+        if extra_args.get("_baseintent_trace_artifact"):
+            context["baseintent_trace_artifact"] = deepcopy(extra_args["_baseintent_trace_artifact"])
     else:
         # A task may reuse a logger context in a custom harness. Remove old
         # full fields before saving the summary view.
-        logger.context.pop("dscg_audit_decisions", None)
-        logger.context.pop("dscg_action_ledger", None)
-        logger.context.pop("dscg_trace_artifact", None)
+        logger.context.pop("baseintent_audit_decisions", None)
+        logger.context.pop("baseintent_action_ledger", None)
+        logger.context.pop("baseintent_trace_artifact", None)
 
     logger.context.update(context)
     if hasattr(logger, "save"):
@@ -850,9 +850,9 @@ def _sync_trace_context(extra_args: dict) -> None:
 
 def _publish_authorization_record(extra_args: dict, record: dict) -> None:
     safe_record = deepcopy(record)
-    history = list(extra_args.get("dscg_authorizations", []))
+    history = list(extra_args.get("baseintent_authorizations", []))
     history.append(safe_record)
-    extra_args["dscg_authorizations"] = history
+    extra_args["baseintent_authorizations"] = history
     _append_full_trace(extra_args, "authorization", safe_record)
     _sync_trace_context(extra_args)
 
@@ -861,10 +861,10 @@ def _publish_audit_record(extra_args: dict, record: dict) -> None:
     """Keep full audit state for mediation, but persist a configurable view."""
 
     safe_record = deepcopy(record)
-    history = list(extra_args.get("dscg_audit_decisions", []))
+    history = list(extra_args.get("baseintent_audit_decisions", []))
     history.append(safe_record)
-    extra_args["dscg_audit_decisions"] = history
-    extra_args["dscg_audit_decision"] = safe_record
+    extra_args["baseintent_audit_decisions"] = history
+    extra_args["baseintent_audit_decision"] = safe_record
     _append_full_trace(extra_args, "audit_decision", safe_record)
     _sync_trace_context(extra_args)
 
@@ -873,7 +873,7 @@ def _publish_final_audit_record(extra_args: dict, record: dict) -> None:
     """Replace the current batch record and persist the configured view."""
 
     safe_record = deepcopy(record)
-    history = list(extra_args.get("dscg_audit_decisions", []))
+    history = list(extra_args.get("baseintent_audit_decisions", []))
     if (
         history
         and isinstance(history[-1], dict)
@@ -882,8 +882,8 @@ def _publish_final_audit_record(extra_args: dict, record: dict) -> None:
         history[-1] = safe_record
     else:
         history.append(safe_record)
-    extra_args["dscg_audit_decisions"] = history
-    extra_args["dscg_audit_decision"] = safe_record
+    extra_args["baseintent_audit_decisions"] = history
+    extra_args["baseintent_audit_decision"] = safe_record
     _append_full_trace(extra_args, "audit_decision_final", safe_record)
     _sync_trace_context(extra_args)
 
@@ -963,19 +963,19 @@ class ActionLedger:
 
 
 def _get_action_ledger(extra_args: dict) -> ActionLedger:
-    ledger = extra_args.get("_dscg_action_ledger")
+    ledger = extra_args.get("_baseintent_action_ledger")
     if not isinstance(ledger, ActionLedger):
         ledger = ActionLedger()
-        extra_args["_dscg_action_ledger"] = ledger
+        extra_args["_baseintent_action_ledger"] = ledger
     return ledger
 
 
 def _publish_action_ledger(extra_args: dict) -> None:
     ledger = _get_action_ledger(extra_args)
     snapshot = ledger.snapshot()
-    extra_args["dscg_action_ledger"] = snapshot
+    extra_args["baseintent_action_ledger"] = snapshot
     if _trace_level(extra_args) == "full" or diagnostics.current_session() is not None:
-        seen = extra_args.setdefault("_dscg_trace_action_versions", {})
+        seen = extra_args.setdefault("_baseintent_trace_action_versions", {})
         for record in snapshot:
             if not isinstance(record, dict):
                 continue
@@ -1045,7 +1045,7 @@ class ToolAuthorizationContract:
 
     def public_dict(self) -> dict:
         record = {
-            "schema_version": "dscg.tool-authorization.v1",
+            "schema_version": "baseintent.tool-authorization.v1",
             "authorization_source": self.authorization_source, 'task_phase': self.task_phase,
             "compiler_model": self.compiler_model,
             "user_request_sha256": self.user_request_sha256,
@@ -1165,7 +1165,7 @@ class ToolAuthorizationCompiler:
             # the contract instead of crashing the authorization path.  Host
             # code can still use ``set_tool_metadata`` when it wants strict
             # registration-time validation.
-            current = dict(getattr(runtime, "_dscg_tool_metadata", {}) or {})
+            current = dict(getattr(runtime, "_baseintent_tool_metadata", {}) or {})
             current.update(
                 {
                     name: value
@@ -1173,7 +1173,7 @@ class ToolAuthorizationCompiler:
                     if name in runtime.functions
                 }
             )
-            runtime._dscg_tool_metadata = current
+            runtime._baseintent_tool_metadata = current
         return metadata_for_runtime(runtime)
 
     def compile(self, request: TrustedTaskRequest, runtime) -> ToolAuthorizationContract:
@@ -1217,11 +1217,11 @@ class ToolAuthorizationCompiler:
         action_step_mode = step_mode and not getattr(self, '_legacy_audit_input', False)
         permission_mode = self.prompt_profile == V35_PROFILE and self.authorization_profile is None
         permissions = ()
-        decision_format = response_format(getattr(self.llm, 'dscg_model_config', None),
-            action_schema(action_tools), 'dscg_action_steps_v2') if action_step_mode else {'type': 'json_object'}
+        decision_format = response_format(getattr(self.llm, 'baseintent_model_config', None),
+            action_schema(action_tools), 'baseintent_action_steps_v2') if action_step_mode else {'type': 'json_object'}
         if permission_mode:
-            decision_format = response_format(getattr(self.llm, 'dscg_model_config', None),
-                permission_schema(action_tools), 'dscg_tool_permissions_v1')
+            decision_format = response_format(getattr(self.llm, 'baseintent_model_config', None),
+                permission_schema(action_tools), 'baseintent_tool_permissions_v1')
         steps = ()
         intents = ()
         goal_kinds = ()
@@ -1456,7 +1456,7 @@ class OurFrameExecutor(agent_pipeline.BasePipelineElement):
 
     @staticmethod
     def _l2_count(extra_args, key, amount=1):
-        stats = extra_args.setdefault('dscg_l2', {})
+        stats = extra_args.setdefault('baseintent_l2', {})
         stats[key] = stats.get(key, 0) + amount
 
     def _publish_grant(self, grant, extra_args):
@@ -1466,7 +1466,7 @@ class OurFrameExecutor(agent_pipeline.BasePipelineElement):
             tool_expectations=grant.progress_tool_expectations) if grant.authorization_intents else None
         record = grant.public_dict()
         record['policy_state'] = self.sandbox.policy_state.value
-        extra_args['dscg_authorization'] = record
+        extra_args['baseintent_authorization'] = record
         _publish_authorization_record(extra_args, record)
 
     def _task_failure(self, error, extra_args):
@@ -1477,9 +1477,9 @@ class OurFrameExecutor(agent_pipeline.BasePipelineElement):
         if self._task_context is not None:
             self._task_context = replace(self._task_context, stage='error',
                                          effective_request=self._task_context.original_request)
-        record = {**extra_args.get('dscg_authorization', {}), 'allowed_tools': [],
+        record = {**extra_args.get('baseintent_authorization', {}), 'allowed_tools': [],
                   'policy_state': 'error', 'error_code': getattr(error, 'reason_code', 'AUTH_INTERNAL_ERROR')}
-        extra_args['dscg_authorization'] = record
+        extra_args['baseintent_authorization'] = record
         _publish_authorization_record(extra_args, record)
         if self.authorization_compiler.prompt_profile == 'legacy' and self.authorization_compiler.authorization_profile is None:
             self.intent_flow = None
@@ -1488,7 +1488,7 @@ class OurFrameExecutor(agent_pipeline.BasePipelineElement):
     def _start_delegation(self, request, source, runtime, env, extra_args):
         metadata = self.authorization_compiler._runtime_metadata(runtime)
         spec = resolve_delegated_task(source, runtime, env, self.delegated_task_reader)
-        call_id = 'dscg-task-source-' + uuid4().hex
+        call_id = 'baseintent-task-source-' + uuid4().hex
         preparation = (request + '\nPreparation only: read the user-designated task source '
                        + spec.source_name + ' with ' + spec.tool_name + ' and host-resolved arguments '
                        + spec.arguments_json + '. Business actions are not authorized yet.')
@@ -1552,7 +1552,7 @@ class OurFrameExecutor(agent_pipeline.BasePipelineElement):
             module = 'L2' if exc.stage.startswith('authorization') else 'Intent Progress'
             termination = dict(kind='framework_failure', module=module,
                 reason_code=exc.reason_code, diagnostics=exc.diagnostics)
-            extra_args['dscg_termination'] = termination
+            extra_args['baseintent_termination'] = termination
             if self.on_authority_replaced is not None: self.on_authority_replaced()
             _sync_trace_context(extra_args)
             native_messages = exc.messages if exc.messages is not None else messages
@@ -1563,9 +1563,9 @@ class OurFrameExecutor(agent_pipeline.BasePipelineElement):
             raise stop from None
 
     def _query(self, query, runtime, env, messages, extra_args):
-        extra_args.setdefault("_dscg_trace_level", self.trace_level)
+        extra_args.setdefault("_baseintent_trace_level", self.trace_level)
         if hasattr(self, "framework_config"):
-            extra_args["dscg_framework"] = deepcopy(self.framework_config)
+            extra_args["baseintent_framework"] = deepcopy(self.framework_config)
         last_input = messages[-1] if messages else None
         role = (last_input.get("role") if isinstance(last_input, dict)
                 else getattr(last_input, "role", None))
@@ -1624,11 +1624,11 @@ class OurFrameExecutor(agent_pipeline.BasePipelineElement):
                 record["error_code"] = getattr(exc, "reason_code", "AUTH_INTERNAL_ERROR")
                 record["error_stage"] = getattr(exc, "stage", "authorization")
             record["policy_state"] = self.sandbox.policy_state.value
-            extra_args["dscg_authorization"] = record
+            extra_args["baseintent_authorization"] = record
             # Print a redacted summary even when the surrounding benchmark logger
             # is absent or an older AgentDojo version cannot persist custom fields.
             # print(
-            #     "[DSCG AUTHORIZATION] "
+            #     "[BaseIntent AUTHORIZATION] "
             #     f"state={record.get('policy_state')} "
             #     f"contract={record.get('contract_version') or 'none'} "
             #     f"tools={record.get('allowed_tools', [])}"
@@ -1662,7 +1662,7 @@ class OurFrameExecutor(agent_pipeline.BasePipelineElement):
             model_messages, stats = build_isolated_view(messages, runtime, trusted_request=projection_request,
                                                         projection_mode=self.l1_projection_mode,
                                                         isolation_rule=ISOLATION_POLICY if self.authorization_compiler.prompt_profile == V35_PROFILE else ISOLATION_RULE)
-            accumulated = extra_args.setdefault("dscg_input_isolation", {
+            accumulated = extra_args.setdefault("baseintent_input_isolation", {
                 "schema_version": stats["schema_version"], "model_requests": 0,
                 "tool_results_rendered": 0, "escaped_results_rendered": 0,
                 "added_characters_total": 0,
@@ -1671,7 +1671,7 @@ class OurFrameExecutor(agent_pipeline.BasePipelineElement):
             accumulated["tool_results_rendered"] += stats["tool_results"]
             accumulated["escaped_results_rendered"] += stats["escaped_results"]
             accumulated["added_characters_total"] += stats["added_characters"]
-            projected = extra_args.setdefault('dscg_l1_projection', {
+            projected = extra_args.setdefault('baseintent_l1_projection', {
                 'mode': self.l1_projection_mode, 'profile': L1_PROFILE, 'profile_sha256': L1_PROFILE_SHA256,
                 'fallback_reason_counts': {},
             })
@@ -1720,7 +1720,7 @@ class OurFrameExecutor(agent_pipeline.BasePipelineElement):
                     self.intent_flow.current['intent_id'] in self.intent_flow.continuations), catalog=catalog, runtime=runtime)
         except flow.IntentFlowError as exc:
             exc.messages = list(messages)
-            extra_args['dscg_intent_flow'] = {**self.intent_flow.snapshot(), 'error_code': exc.reason_code,
+            extra_args['baseintent_intent_flow'] = {**self.intent_flow.snapshot(), 'error_code': exc.reason_code,
                 'error_diagnostics':exc.diagnostics}
             if self.intent_flow.revision != before_revision:
                 _append_full_trace(extra_args, 'intent_progress', self.intent_flow.snapshot())
@@ -1728,7 +1728,7 @@ class OurFrameExecutor(agent_pipeline.BasePipelineElement):
             raise
         if before != self.intent_flow.binding() and self.on_authority_replaced:
             self.on_authority_replaced()
-        extra_args['dscg_intent_flow'] = self.intent_flow.snapshot()
+        extra_args['baseintent_intent_flow'] = self.intent_flow.snapshot()
         _append_full_trace(extra_args, 'intent_progress', self.intent_flow.snapshot())
         _sync_trace_context(extra_args)
 
@@ -1745,7 +1745,7 @@ class OurFrameExecutor(agent_pipeline.BasePipelineElement):
             response = generated[-1]
             raw.append(response); view.append(response)
             if response.get('tool_calls'):
-                extra_args['dscg_intent_flow'] = self.intent_flow.snapshot()
+                extra_args['baseintent_intent_flow'] = self.intent_flow.snapshot()
                 _sync_trace_context(extra_args)
                 return query, runtime, env, raw, extra_args
             if not active:
@@ -1970,7 +1970,7 @@ class BatchAuthorizationResult:
 
 
 def _routing_count(extra_args, key):
-    counts = extra_args.setdefault("dscg_layer_routing", {})
+    counts = extra_args.setdefault("baseintent_layer_routing", {})
     counts[key] = counts.get(key, 0) + 1
 
 
@@ -1982,8 +1982,8 @@ def _host_router_binding(query, runtime, calls, sandbox, router, messages, extra
     return {"task_sha256": _hash_json(query), "batch_fingerprint": _batch_fingerprint(calls),
             "authorization_state_sha256": state.state_sha256, "catalog_sha256": catalog,
             "context_sha256": _hash_json(messages), "mode": router.mode,
-            "action_history_sha256": _hash_json(extra_args.get("dscg_action_ledger",[])),
-            "source_ids_sha256": _hash_json(extra_args.get("dscg_source_ids",{})),
+            "action_history_sha256": _hash_json(extra_args.get("baseintent_action_ledger",[])),
+            "source_ids_sha256": _hash_json(extra_args.get("baseintent_source_ids",{})),
             "artifact_sha256": router.artifact_sha256,
             "threshold": router.threshold, "policy_version": router.policy_version,
             "artifact_content_sha256": router_digest(router.artifact),
@@ -1992,17 +1992,17 @@ def _host_router_binding(query, runtime, calls, sandbox, router, messages, extra
 
 def _host_intent_binding(query, runtime, calls, sandbox, messages, extra_args, active_flow):
     state = ToolAuthorizationPrecheck(sandbox).check(calls, runtime) if sandbox is not None else None
-    return dict(task_id=extra_args.get('dscg_task_id'), task_sha256=_hash_json(query), batch_fingerprint=_batch_fingerprint(calls),
+    return dict(task_id=extra_args.get('baseintent_task_id'), task_sha256=_hash_json(query), batch_fingerprint=_batch_fingerprint(calls),
         authorization_state=state.state_sha256 if state else 'no-sandbox',
         catalog_sha256=router_catalog_snapshot(runtime)[0], context_sha256=_hash_json(messages),
-        action_history_sha256=_hash_json(extra_args.get('dscg_action_ledger', [])),
-        source_ids_sha256=_hash_json(extra_args.get('dscg_source_ids', {})),
+        action_history_sha256=_hash_json(extra_args.get('baseintent_action_ledger', [])),
+        source_ids_sha256=_hash_json(extra_args.get('baseintent_source_ids', {})),
         intent_state_sha256=active_flow.binding() if active_flow is not None else None,
         read_policy=flow.READ_POLICY)
 
 
 def _publish_router_event(extra_args, event):
-    extra_args.setdefault("dscg_router_events", []).append(deepcopy(event))
+    extra_args.setdefault("baseintent_router_events", []).append(deepcopy(event))
     _routing_count(extra_args, "router_candidate_batches")
     if event.get("eligible"):
         _routing_count(extra_args, "router_eligible_batches")
@@ -2054,7 +2054,7 @@ class ToolAuthorizationPrecheck(agent_pipeline.BasePipelineElement):
 
     def resolve(self, calls, runtime, extra_args):
         current = self.check(calls, runtime)
-        receipt = extra_args.get("_dscg_precheck_result")
+        receipt = extra_args.get("_baseintent_precheck_result")
         if (not isinstance(receipt, BatchAuthorizationResult)
                 or receipt.batch_fingerprint != current.batch_fingerprint
                 or receipt.state_sha256 != current.state_sha256):
@@ -2063,13 +2063,13 @@ class ToolAuthorizationPrecheck(agent_pipeline.BasePipelineElement):
         return current
 
     def query(self, query, runtime, env, messages, extra_args):
-        extra_args.pop("_dscg_precheck_result", None)
-        extra_args.pop("_dscg_audit_decision", None)
+        extra_args.pop("_baseintent_precheck_result", None)
+        extra_args.pop("_baseintent_audit_decision", None)
         last = messages[-1] if messages else {}
         if last.get("role") != "assistant" or not last.get("tool_calls"):
             return query, runtime, env, messages, extra_args
         result = self.check(last["tool_calls"], runtime)
-        extra_args["_dscg_precheck_result"] = result
+        extra_args["_baseintent_precheck_result"] = result
         _routing_count(extra_args, "candidate_batches")
         _routing_count(extra_args, "precheck_rejected_batches" if result.rejected else "precheck_allowed_batches")
         _append_full_trace(extra_args, "authorization_precheck", {
@@ -2172,21 +2172,21 @@ class ReferenceMonitor(agent_pipeline.BasePipelineElement):
             if self.sandbox is not None and self.sandbox.contract is not None
             else "no-sandbox-contract"
         )
-        audit = extra_args.pop("_dscg_audit_decision", None)
+        audit = extra_args.pop("_baseintent_audit_decision", None)
         record_valid = _is_valid_audit_record(audit, fingerprint)
         audit_valid = record_valid
-        published = extra_args.get('dscg_audit_decisions', [])
+        published = extra_args.get('baseintent_audit_decisions', [])
         observed = published[-1] if isinstance(published, list) and published else None
         if not isinstance(observed, dict) or observed.get('batch_fingerprint') != fingerprint:
             observed = audit if record_valid else None
         mediation = _checker_observation(observed)
         mediation['audit_record_status'] = 'valid' if record_valid else 'missing' if audit is None else 'invalid'
         mediation['router_handoff_status'] = 'not_required'
-        router_token = extra_args.pop("_dscg_router_receipt", None)
+        router_token = extra_args.pop("_baseintent_router_receipt", None)
         flow_record = self.intent_read_policy or (isinstance(audit, dict) and 'intent_flow' in audit)
         flow_exempt = set()
         if flow_record:
-            token = extra_args.pop('_dscg_intent_receipt', None)
+            token = extra_args.pop('_baseintent_intent_receipt', None)
             active_flow = self.intent_flow_getter() if self.intent_flow_getter else None
             try:
                 binding = _host_intent_binding(query, runtime, tool_calls, self.sandbox, messages, extra_args, active_flow)
@@ -2230,13 +2230,13 @@ class ReferenceMonitor(agent_pipeline.BasePipelineElement):
             mediation['failure_stage'] = ('model_request' if audit.get('reason_code') in (
                 'AUDIT_MODEL_ERROR', 'AUDIT_TIMEOUT') else 'model_protocol')
         if mediation['failure_stage'] == 'model_request':
-            extra_args['dscg_infrastructure_failure'] = dict(module='L3',
+            extra_args['baseintent_infrastructure_failure'] = dict(module='L3',
                 reason_code=audit['reason_code'], stage='audit')
         if self.router_verifier is not None:
             self.router_verifier.discard(router_token)
         metadata = metadata_for_runtime(runtime)
         precheck_result = self.precheck.resolve(tool_calls, runtime, extra_args) if self.precheck else None
-        extra_args.pop("_dscg_precheck_result", None)
+        extra_args.pop("_baseintent_precheck_result", None)
 
         # Register every proposal before deciding any member of the batch.
         current_flow = self.intent_flow_getter() if self.intent_flow_getter else None
@@ -2335,7 +2335,7 @@ class ReferenceMonitor(agent_pipeline.BasePipelineElement):
             pending_actions.append(PendingAction(action_id, call, approved, reason_code, ticket,
                 **block_sources.get(action_id,{})))
 
-        extra_args["_dscg_pending_batch"] = PendingBatch(
+        extra_args["_baseintent_pending_batch"] = PendingBatch(
             batch_id=batch_id,
             fingerprint=fingerprint,
             actions=tuple(pending_actions),
@@ -2385,14 +2385,14 @@ class ReferenceMonitor(agent_pipeline.BasePipelineElement):
             if 'checker_protocol_diagnostics' in mediation:
                 invalid_record['protocol_diagnostics'] = mediation['checker_protocol_diagnostics']
             _publish_final_audit_record(extra_args, invalid_record)
-        events = extra_args.get("dscg_router_events", [])
+        events = extra_args.get("baseintent_router_events", [])
         if events and events[-1].get("candidate_fingerprint") == fingerprint:
             events[-1].update(mediation_failure_stage=mediation.get('failure_stage'), final_monitor_decision="allow" if approved_count == len(pending_actions) else "deny",
                               final_monitor_reason=(pending_actions[0].reason_code if len(pending_actions)==1 else
                                                     "POLICY_ALLOW" if approved_count==len(pending_actions) else "BATCH_DENY"))
             _sync_trace_context(extra_args)
         # print(
-        #     f"[DSCG MEDIATION] batch={batch_id} proposed={len(pending_actions)} "
+        #     f"[BaseIntent MEDIATION] batch={batch_id} proposed={len(pending_actions)} "
         #     f"approved={approved_count} blocked={len(pending_actions) - approved_count}"
         # )
         return query, runtime, env, messages, extra_args
@@ -2459,7 +2459,7 @@ class TicketedToolsExecutor(agent_pipeline.BasePipelineElement):
         if role != "assistant" or not tool_calls:
             return query, runtime, env, messages, extra_args
 
-        pending = extra_args.pop("_dscg_pending_batch", None)
+        pending = extra_args.pop("_baseintent_pending_batch", None)
         if not isinstance(pending, PendingBatch) or pending.fingerprint != _batch_fingerprint(tool_calls):
             pending = self._unmediated_batch(tool_calls, runtime, extra_args)
 
@@ -2523,9 +2523,9 @@ class TicketedToolsExecutor(agent_pipeline.BasePipelineElement):
 
 
 class TaskIsolatedPipeline(agent_pipeline.AgentPipeline):
-    """Create host-owned DSCG state once per outer task, retaining it in the loop.
+    """Create host-owned BASEINTENT state once per outer task, retaining it in the loop.
 
-    Explicit caller dictionaries carry non-DSCG host options only. Reusing the
+    Explicit caller dictionaries carry non-BASEINTENT host options only. Reusing the
     returned dictionary is a new task, never an authorization resume operation.
     A shared pipeline serializes outer calls because its sandbox is mutable.
     """
@@ -2555,13 +2555,13 @@ class TaskIsolatedPipeline(agent_pipeline.AgentPipeline):
         with self._task_lock:
             context = {
                 key: value for key, value in (extra_args or {}).items()
-                if not key.startswith(("dscg_", "_dscg_"))
+                if not key.startswith(("baseintent_", "_baseintent_"))
             }
-            context["dscg_task_id"] = str(uuid4())
+            context["baseintent_task_id"] = str(uuid4())
             logger = logging.Logger().get()
             if isinstance(getattr(logger, "context", None), dict):
                 for key in list(logger.context):
-                    if key.startswith(("dscg_", "_dscg_")):
+                    if key.startswith(("baseintent_", "_baseintent_")):
                         logger.context.pop(key)
             executor = self.task_executor
             if executor is not None:
@@ -2575,11 +2575,11 @@ class TaskIsolatedPipeline(agent_pipeline.AgentPipeline):
                 self.reference_monitor.revoke_tickets()
             costs_before = [t.snapshot() for t in self.trackers]
             started = time.perf_counter()
-            config = {'framework':getattr(self,'dscg_optimization_config',{}),
-                      'main_model':getattr(self,'dscg_model_config',{}),
-                      'security_model':getattr(self,'dscg_security_model_config',{}),
+            config = {'framework':getattr(self,'baseintent_optimization_config',{}),
+                      'main_model':getattr(self,'baseintent_model_config',{}),
+                      'security_model':getattr(self,'baseintent_security_model_config',{}),
                       'tool_metadata':{name:status.public_dict() for name,status in metadata_for_runtime(runtime).items()}}
-            with diagnostics.DiagnosticSession(logger, context['dscg_task_id'], config,
+            with diagnostics.DiagnosticSession(logger, context['baseintent_task_id'], config,
                     getattr(executor,'trace_level',DEFAULT_TRACE_LEVEL)) as session:
                 try:
                     return super().query(
@@ -2589,16 +2589,16 @@ class TaskIsolatedPipeline(agent_pipeline.AgentPipeline):
                 finally:
                     task_exception = sys.exc_info()[1]
                     task_failed = task_exception is not None and not isinstance(task_exception, FrameworkTaskStop)
-                    intent_state = context.get('dscg_intent_flow',{})
+                    intent_state = context.get('baseintent_intent_flow',{})
                     unfulfilled = [s['intent_id'] for s in intent_state.get('steps',[])
                                    if s.get('state') == 'unfulfilled']
                     if task_exception is None and unfulfilled:
-                        context['dscg_termination'] = dict(kind='framework_failure',module='Intent Progress',
+                        context['baseintent_termination'] = dict(kind='framework_failure',module='Intent Progress',
                             reason_code='INTENT_UNFULFILLED', intent_ids=unfulfilled)
                     _sync_trace_context(context)
                     if self.reference_monitor is not None:
                         self.reference_monitor.revoke_tickets()
-                    context["dscg_cost"] = {
+                    context["baseintent_cost"] = {
                         "elapsed_ms": round((time.perf_counter() - started) * 1000, 3),
                         "models": [self._cost_delta(tracker.snapshot(), before)
                                    for tracker, before in zip(self.trackers, costs_before)],
@@ -2608,9 +2608,9 @@ class TaskIsolatedPipeline(agent_pipeline.AgentPipeline):
                         if isinstance(logger, logging.TraceLogger):
                             logger.save()
                     except Exception as exc:
-                        context["dscg_trace_save_error"] = type(exc).__name__
+                        context["baseintent_trace_save_error"] = type(exc).__name__
                         if not task_failed: raise
-                        warnings.warn('DSCG diagnostic write failed during task failure: '+type(exc).__name__)
+                        warnings.warn('BASEINTENT diagnostic write failed during task failure: '+type(exc).__name__)
 
 
 class ActionSecurityChecker(agent_pipeline.BasePipelineElement):
@@ -2677,14 +2677,14 @@ class ActionSecurityChecker(agent_pipeline.BasePipelineElement):
         # Active routing authenticates every checker outcome, so a public
         # selective record cannot be relabeled as an ordinary allow.
         if self.audit_router is not None and self.audit_router.mode != "off" and self.router_verifier is not None:
-            self.router_verifier.discard(extra_args.pop("_dscg_router_receipt",None))
+            self.router_verifier.discard(extra_args.pop("_baseintent_router_receipt",None))
             try:
                 binding=_host_router_binding(query,runtime,calls,self.sandbox,self.audit_router,messages,extra_args)
-                extra_args["_dscg_router_receipt"]=self.router_verifier.issue(binding,record)
+                extra_args["_baseintent_router_receipt"]=self.router_verifier.issue(binding,record)
             except Exception:
                 pass  # Monitor fails closed if the host handoff is unavailable.
         _publish_audit_record(extra_args,record)
-        extra_args["_dscg_audit_decision"]=record
+        extra_args["_baseintent_audit_decision"]=record
 
     def _router_flags(self, query, runtime, calls, packet):
         flags = {"request_truncated": len(router_normalized(query)) > AUDIT_MAX_REQUEST_LENGTH,
@@ -2707,7 +2707,7 @@ class ActionSecurityChecker(agent_pipeline.BasePipelineElement):
         return results, omitted
 
     def _audit_packet(self, query, runtime, tool_calls, extra_args, messages=None) -> dict:
-        records = extra_args.get("dscg_action_ledger", [])
+        records = extra_args.get("baseintent_action_ledger", [])
         if not isinstance(records, list):
             records = []
         bounded_records = records[-AUDIT_MAX_HISTORY_RECORDS:]
@@ -2758,7 +2758,7 @@ class ActionSecurityChecker(agent_pipeline.BasePipelineElement):
         tool_results, window_truncated, selection = select_tool_evidence(
             messages, query, tool_calls, _normalise_text, _normalise_audit_value, argument_flags)
         packet = {
-            "schema_version": "dscg.audit-input.v4" if current_context else AUDIT_INPUT_SCHEMA_VERSION,
+            "schema_version": "baseintent.audit-input.v4" if current_context else AUDIT_INPUT_SCHEMA_VERSION,
             **({"decision_contract": AUDIT_SCHEMA} if current_context else {}),
             "trusted_user_request": _normalise_text(query, AUDIT_MAX_REQUEST_LENGTH),
             "current_actions": current_actions,
@@ -2791,7 +2791,7 @@ class ActionSecurityChecker(agent_pipeline.BasePipelineElement):
         }
 
         if self.prompt_profile == V35_PROFILE:
-            packet['schema_version'] = 'dscg.audit-input.v5.10'
+            packet['schema_version'] = 'baseintent.audit-input.v5.10'
             packet['decision_contract'] = ENVELOPE_SCHEMA
             effects = [a['operation_effect'] for a in current_actions]
             packet['review_stage'] = 'read' if effects and all(e == 'read' for e in effects) else 'mixed' if 'read' in effects else 'effect'
@@ -2812,7 +2812,7 @@ class ActionSecurityChecker(agent_pipeline.BasePipelineElement):
         if self.prompt_profile == 'legacy' and not getattr(self, '_legacy_audit_input', False):
             active_flow = self.intent_flow_getter() if self.intent_flow_getter else None
             current = active_flow.current if active_flow is not None else None
-            packet['schema_version'] = 'dscg.audit-input.intent-flow.v2'
+            packet['schema_version'] = 'baseintent.audit-input.intent-flow.v2'
             packet['current_goal_kind'] = current['goal_kind'] if current else None
             packet['original_user_request'] = query
             packet['current_intent'] = current['intent'] if current else None
@@ -2860,8 +2860,8 @@ class ActionSecurityChecker(agent_pipeline.BasePipelineElement):
             return {'type': AUDIT_FORMAT}
         if self.prompt_profile not in ('legacy', 'legacy-v34') or getattr(self, '_legacy_audit_input', False):
             return {'type': 'json_object'}
-        return response_format(getattr(self.small_llm, 'dscg_model_config', None),
-                               AUDIT_SCHEMA, 'dscg_audit_v2')
+        return response_format(getattr(self.small_llm, 'baseintent_model_config', None),
+                               AUDIT_SCHEMA, 'baseintent_audit_v2')
 
     def _request_audit(self, query, env, packet: dict):
         diagnostics.begin_model_call('audit')
@@ -2885,7 +2885,7 @@ class ActionSecurityChecker(agent_pipeline.BasePipelineElement):
         reasoning_effort = getattr(self.small_llm, "reasoning_effort", None)
         if reasoning_effort is not None:
             request_kwargs["reasoning_effort"] = reasoning_effort
-        audit_options = audit_request_options(getattr(self.small_llm, 'dscg_model_config', None), self.prompt_profile)
+        audit_options = audit_request_options(getattr(self.small_llm, 'baseintent_model_config', None), self.prompt_profile)
         if audit_options:
             request_kwargs.pop('reasoning_effort', None)
             request_kwargs.update(audit_options)
@@ -2951,7 +2951,7 @@ class ActionSecurityChecker(agent_pipeline.BasePipelineElement):
         rejected = self.precheck is not None and self.precheck.check(calls, runtime).rejected
         exempt = [] if terminal or rejected else [i for i, c in enumerate(calls) if flow.exempt_read(runtime, c, self.sandbox)]
         audited = [i for i in range(len(calls)) if i not in exempt]
-        before = len(extra_args.get('dscg_audit_decisions', []))
+        before = len(extra_args.get('baseintent_audit_decisions', []))
         if audited and not terminal:
             subset = dict(last, tool_calls=[calls[i] for i in audited])
             self._flow_dispatch = True
@@ -2959,9 +2959,9 @@ class ActionSecurityChecker(agent_pipeline.BasePipelineElement):
                 self.query(query, runtime, env, [*messages[:-1], subset], extra_args)
             finally:
                 self._flow_dispatch = False
-            record = deepcopy(extra_args.pop('_dscg_audit_decision', {}))
+            record = deepcopy(extra_args.pop('_baseintent_audit_decision', {}))
             if self.router_verifier:
-                self.router_verifier.discard(extra_args.pop('_dscg_router_receipt', None))
+                self.router_verifier.discard(extra_args.pop('_baseintent_router_receipt', None))
             # Preserve the actual semantic input/reply identity inside a full-batch record.
             record['semantic_batch_fingerprint'] = record.get('batch_fingerprint')
             record['batch_fingerprint'] = _batch_fingerprint(calls)
@@ -2977,25 +2977,25 @@ class ActionSecurityChecker(agent_pipeline.BasePipelineElement):
         binding = _host_intent_binding(query, runtime, calls, self.sandbox, messages, extra_args, active_flow)
         record['intent_flow'] = dict(state_sha256=binding['intent_state_sha256'],
             exempt_indices=exempt, audited_indices=audited, read_policy=flow.READ_POLICY)
-        del extra_args.setdefault('dscg_audit_decisions', [])[before:]
+        del extra_args.setdefault('baseintent_audit_decisions', [])[before:]
         _publish_audit_record(extra_args, record)
-        extra_args['_dscg_audit_decision'] = record
-        old = extra_args.pop('_dscg_intent_receipt', None)
+        extra_args['_baseintent_audit_decision'] = record
+        old = extra_args.pop('_baseintent_intent_receipt', None)
         if self.router_verifier:
             self.router_verifier.discard(old)
-            extra_args['_dscg_intent_receipt'] = self.router_verifier.issue(binding, record)
+            extra_args['_baseintent_intent_receipt'] = self.router_verifier.issue(binding, record)
         if exempt:
             _routing_count(extra_args, 'sensitivity_read_bypass_batches')
-            extra_args['dscg_layer_routing']['sensitivity_read_bypass_actions'] = (
-                extra_args['dscg_layer_routing'].get('sensitivity_read_bypass_actions', 0)+len(exempt))
+            extra_args['baseintent_layer_routing']['sensitivity_read_bypass_actions'] = (
+                extra_args['baseintent_layer_routing'].get('sensitivity_read_bypass_actions', 0)+len(exempt))
         _sync_trace_context(extra_args)
         return query, runtime, env, messages, extra_args
 
     def query(self, query, runtime, env, messages, extra_args):
         if self.prompt_profile == 'legacy' and not self._flow_dispatch and not getattr(self, '_legacy_audit_input', False):
             return self._query_intent_flow(query, runtime, env, messages, extra_args)
-        extra_args.pop("_dscg_audit_decision", None)
-        old_token = extra_args.pop("_dscg_router_receipt", None)
+        extra_args.pop("_baseintent_audit_decision", None)
+        old_token = extra_args.pop("_baseintent_router_receipt", None)
         if self.router_verifier is not None:
             self.router_verifier.discard(old_token)
         if not messages:
@@ -3034,7 +3034,7 @@ class ActionSecurityChecker(agent_pipeline.BasePipelineElement):
                                           "raw_audit_decision": "deny", "original_public_bypass": False})
                 return query, runtime, env, messages, extra_args
         packet = self._audit_packet(query, runtime, tool_calls, extra_args, messages=messages)
-        evidence_stats = extra_args.setdefault('dscg_audit_evidence', {'version': EVIDENCE_VERSION, 'packets': 0,
+        evidence_stats = extra_args.setdefault('baseintent_audit_evidence', {'version': EVIDENCE_VERSION, 'packets': 0,
             'selected_results': 0, 'omitted_results': 0, 'content_characters': 0, 'truncated_results': 0})
         evidence_stats['packets'] += 1
         for key in ('selected_results', 'omitted_results', 'content_characters'):
@@ -3103,8 +3103,8 @@ class ActionSecurityChecker(agent_pipeline.BasePipelineElement):
                         self.router_verifier.discard(token)
                         raise ValueError("router snapshot changed")
                     router_event.update(actual_bypass=True,raw_audit_decision=None)
-                    _publish_audit_record(extra_args,record);extra_args["_dscg_audit_decision"]=record
-                    extra_args["_dscg_router_receipt"]=token
+                    _publish_audit_record(extra_args,record);extra_args["_baseintent_audit_decision"]=record
+                    extra_args["_baseintent_router_receipt"]=token
                     _publish_router_event(extra_args,router_event)
                     return query,runtime,env,messages,extra_args
                 except diagnostics.DiagnosticWriteError:
@@ -3173,7 +3173,7 @@ class ActionSecurityChecker(agent_pipeline.BasePipelineElement):
             diagnostics.record_validation('audit', 'passed' if validation == 'passed' else 'failed',
                 diagnostics={'code':failure_type, 'field_validation':validation, **field_diagnostics})
             record['protocol_diagnostics'] = {
-                'schema_version': 'dscg.audit-protocol.v1',
+                'schema_version': 'baseintent.audit-protocol.v1',
                 'failure_type': failure_type,
                 'finish_reason': finish_reason or 'unknown',
                 'refusal_present': bool(refusal_present),
@@ -3238,9 +3238,9 @@ def router_configuration_hash(main_config, sec_config, *, input_isolation, autho
     """Describe the router request/configuration identity without creating clients."""
     authorization_policy_profile = ('legacy-v34' if profile_hash is not None
         and prompt_profile in ('legacy', V35_PROFILE) else prompt_profile)
-    decision_contracts = ({'audit': contract_identity(sec_config, AUDIT_SCHEMA, 'dscg_audit_v2'),
+    decision_contracts = ({'audit': contract_identity(sec_config, AUDIT_SCHEMA, 'baseintent_audit_v2'),
                            'authorization': {'protocol': STEP_PROTOCOL,
-                               'response_format': response_format(main_config, {}, 'dscg_action_steps_v2')['type']}
+                               'response_format': response_format(main_config, {}, 'baseintent_action_steps_v2')['type']}
                                if use_sandbox and profile_hash is None else
                                {'protocol': 'configured-profile-json-object', 'response_format': 'json_object'} if use_sandbox else None}
                           if prompt_profile in ('legacy', 'legacy-v34') else {})
@@ -3249,7 +3249,7 @@ def router_configuration_hash(main_config, sec_config, *, input_isolation, autho
         decision_contracts['task_failure_policy'] = FAILURE_POLICY
     if prompt_profile == V35_PROFILE:
         decision_contracts = {'audit': audit_contract_identity(sec_config),
-                              'authorization': {'protocol': V35_AUTH_PROTOCOL, 'response_format': response_format(main_config, {}, 'dscg_tool_permissions_v1')['type']} if profile_hash is None else {'protocol': 'configured-profile-json-object', 'response_format': 'json_object'}}
+                              'authorization': {'protocol': V35_AUTH_PROTOCOL, 'response_format': response_format(main_config, {}, 'baseintent_tool_permissions_v1')['type']} if profile_hash is None else {'protocol': 'configured-profile-json-object', 'response_format': 'json_object'}}
     return router_digest({**({'decision_contracts': decision_contracts} if decision_contracts else {}), **({"router_policy_version": ROUTER_POLICY_VERSION,
                                              "router_threshold": validate_router_options(audit_router_threshold),
                                              "router_scope": "ordinary-public-internal-read-batches-and-literal-public-web"}
@@ -3274,7 +3274,7 @@ def router_configuration_hash(main_config, sec_config, *, input_isolation, autho
                                            'delegated_task_protocol': DELEGATION_VERSION,
                                            "audit_retries": audit_retries,"completion_prompt": completion_prompt,
                                            "audit_timeout_seconds": AUDIT_TIMEOUT_SECONDS,
-                                           'audit_input_schema': 'dscg.audit-input.v5.10' if prompt_profile == V35_PROFILE else 'dscg.audit-input.v4' if prompt_profile in ('legacy', 'legacy-v34') else AUDIT_INPUT_SCHEMA_VERSION,
+                                           'audit_input_schema': 'baseintent.audit-input.v5.10' if prompt_profile == V35_PROFILE else 'baseintent.audit-input.v4' if prompt_profile in ('legacy', 'legacy-v34') else AUDIT_INPUT_SCHEMA_VERSION,
                                            'audit_evidence_version': EVIDENCE_VERSION,
                                            'audit_evidence_bounds': [FACT_BUDGET, MAX_RESULTS, MAX_CALL_ARGUMENTS],
                                            "input_bounds": [AUDIT_MAX_REQUEST_LENGTH,AUDIT_MAX_TOOL_DESCRIPTION_LENGTH,
@@ -3350,10 +3350,10 @@ def make_qwen_newFrame_pipeline(
     sec_model_config: ModelConfig | None = None,
 ):
     """
-    构建支持任意 OpenAI-compatible 模型的 DSCG 防御流水线。
+    构建支持任意 OpenAI-compatible 模型的 BASEINTENT 防御流水线。
 
     主模型与安全审计模型可以使用不同 provider。API key 和 base URL
-    可直接传入，也可使用 ``DSCG_MAIN_*`` / ``DSCG_SEC_*`` 环境变量。
+    可直接传入，也可使用 ``BASEINTENT_MAIN_*`` / ``BASEINTENT_SEC_*`` 环境变量。
 
     :param use_sandbox: 是否启用 PermissionSandbox (物理漏斗)
     :param use_security_checker: 是否启用 ActionSecurityChecker 语义风险信号
@@ -3391,7 +3391,7 @@ def make_qwen_newFrame_pipeline(
         provider=provider,
         api_key_env=api_key_env,
         config_path=config_path,
-        prefix="DSCG_MAIN",
+        prefix="BASEINTENT_MAIN",
     )
     client = create_openai_client(main_config)
 
@@ -3408,7 +3408,7 @@ def make_qwen_newFrame_pipeline(
         reasoning_effort=reasoning_effort_for_config(main_config),
     )
     llm.name = main_config.model_id
-    llm.dscg_model_config = main_config
+    llm.baseintent_model_config = main_config
 
     # 2. 动态实例化组件
     my_sandbox = None
@@ -3444,7 +3444,7 @@ def make_qwen_newFrame_pipeline(
             provider=sec_provider,
             api_key_env=sec_api_key_env,
             config_path=config_path,
-            prefix="DSCG_SEC",
+            prefix="BASEINTENT_SEC",
             fallback=main_config,
         )
         sec_client = create_openai_client(sec_config)
@@ -3457,7 +3457,7 @@ def make_qwen_newFrame_pipeline(
             reasoning_effort=reasoning_effort_for_config(sec_config),
         )
         sec_llm.name = sec_config.model_id
-        sec_llm.dscg_model_config = sec_config
+        sec_llm.baseintent_model_config = sec_config
         router_config_hash = router_configuration_hash(
             main_config, sec_config, input_isolation=input_isolation,
             authorization_precheck=authorization_precheck, l1_projection_mode=l1_projection_mode,
@@ -3515,12 +3515,12 @@ def make_qwen_newFrame_pipeline(
         delegated_tasks=delegated_tasks, audit_router_mode=audit_router_mode,
         audit_router=audit_router, router_config_hash=router_config_hash,
         profile_hash=profile_hash, reader_hash=reader_hash, prompt_profile=prompt_profile)
-    pipeline.dscg_optimization_config = {
+    pipeline.baseintent_optimization_config = {
         **profile_binding(prompt_profile),
         "framework_version": framework_version_for_profile(prompt_profile),
-        **({'decision_contracts': {'audit': contract_identity(sec_config, AUDIT_SCHEMA, 'dscg_audit_v2') if use_security_checker else None,
+        **({'decision_contracts': {'audit': contract_identity(sec_config, AUDIT_SCHEMA, 'baseintent_audit_v2') if use_security_checker else None,
                                   'authorization_protocol': (STEP_PROTOCOL if profile_hash is None else 'configured-profile-json-object') if use_sandbox else None,
-                                  'authorization_format': (response_format(main_config, {}, 'dscg_action_steps_v2')['type'] if profile_hash is None else 'json_object') if use_sandbox else None}}
+                                  'authorization_format': (response_format(main_config, {}, 'baseintent_action_steps_v2')['type'] if profile_hash is None else 'json_object') if use_sandbox else None}}
            if prompt_profile in ('legacy', 'legacy-v34') else {}),
         "input_isolation": input_isolation, "authorization_precheck": authorization_precheck,
         'l1_projection_mode': l1_projection_mode, 'l1_projection_profile_sha256': L1_PROFILE_SHA256,
@@ -3537,23 +3537,23 @@ def make_qwen_newFrame_pipeline(
         "audit_router_load_error": audit_router.error if audit_router else None,
     }
     if prompt_profile == 'legacy':
-        pipeline.dscg_optimization_config['task_failure_policy'] = FAILURE_POLICY
-        pipeline.dscg_optimization_config['decision_contracts'] = flow.decision_contracts(
+        pipeline.baseintent_optimization_config['task_failure_policy'] = FAILURE_POLICY
+        pipeline.baseintent_optimization_config['decision_contracts'] = flow.decision_contracts(
             main_config, sec_config if use_security_checker else None,
             enabled=use_sandbox, bounded=profile_hash is not None)
-        pipeline.dscg_optimization_config['read_exemption_policy'] = flow.READ_POLICY
-        pipeline.dscg_optimization_config['intent_flow_enabled'] = bool(use_sandbox and profile_hash is None)
-        pipeline.dscg_optimization_config['intent_flow_disabled_reason'] = (
+        pipeline.baseintent_optimization_config['read_exemption_policy'] = flow.READ_POLICY
+        pipeline.baseintent_optimization_config['intent_flow_enabled'] = bool(use_sandbox and profile_hash is None)
+        pipeline.baseintent_optimization_config['intent_flow_disabled_reason'] = (
             'explicit_no_sandbox' if not use_sandbox else 'host_profile' if profile_hash else None)
     if prompt_profile == V35_PROFILE:
-        pipeline.dscg_optimization_config['decision_contracts'] = {
+        pipeline.baseintent_optimization_config['decision_contracts'] = {
             'audit': audit_contract_identity(sec_config) if use_security_checker else None,
             'authorization_protocol': V35_AUTH_PROTOCOL if use_sandbox and profile_hash is None else 'configured-profile-json-object' if use_sandbox else None,
-            'authorization_format': response_format(main_config, {}, 'dscg_tool_permissions_v1')['type'] if use_sandbox and profile_hash is None else 'json_object' if use_sandbox else None}
-    new_executor.framework_config = pipeline.dscg_optimization_config
-    pipeline.dscg_model_config = main_config.public_dict()
+            'authorization_format': response_format(main_config, {}, 'baseintent_tool_permissions_v1')['type'] if use_sandbox and profile_hash is None else 'json_object' if use_sandbox else None}
+    new_executor.framework_config = pipeline.baseintent_optimization_config
+    pipeline.baseintent_model_config = main_config.public_dict()
     if use_security_checker:
-        pipeline.dscg_security_model_config = audit_model_settings(sec_config, prompt_profile)
+        pipeline.baseintent_security_model_config = audit_model_settings(sec_config, prompt_profile)
 
     return pipeline, main_tracker, sec_tracker
 

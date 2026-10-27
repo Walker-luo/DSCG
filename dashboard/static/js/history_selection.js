@@ -42,5 +42,5 @@
   }
   const api = { filterRuns, resolveFilters, visibleSelection, attackLabel, backendLabel, createRequestGate };
   if (typeof module === "object" && module.exports) module.exports = api;
-  else root.DSCGHistorySelection = api;
+  else root.BaseIntentHistorySelection = api;
 })(typeof window === "undefined" ? globalThis : window);

@@ -1,4 +1,7 @@
 """Chat transport contracts using MockTransport; no sockets or paid models."""
+
+from artifact_support import ensure_artifacts
+ensure_artifacts('test_request_compatibility')
 from copy import deepcopy
 import json
 from types import SimpleNamespace
@@ -10,8 +13,8 @@ from unittest.mock import patch
 import httpx
 from openai import BadRequestError, OpenAI, UnprocessableEntityError
 
-from dscg.model_config import ModelConfig, create_openai_client
-from dscg.token_tracking import TokenTrackerClient
+from baseintent.model_config import ModelConfig, create_openai_client
+from baseintent.token_tracking import TokenTrackerClient
 
 
 def completion(content='offline', calls=None):
@@ -106,7 +109,7 @@ class RequestCompatibilityTests(unittest.TestCase):
         self.assertEqual(len(captured), 1)
 
     def test_deepseek_adapter_identity_rejects_old_run_binding(self):
-        from dscg.benchmark_catalog import benchmark_identity
+        from baseintent.benchmark_catalog import benchmark_identity
         from experiments.common.benchmark_reuse import _compatible_binding
         config = self.config('deepseek', 'deepseek-flash')
         current = config.public_dict()
@@ -120,7 +123,7 @@ class RequestCompatibilityTests(unittest.TestCase):
     def test_deepseek_agentdyn_native_goal_and_tool_followup_roles(self):
         from agentdojo.agent_pipeline.llms.openai_llm import OpenAILLM, _message_to_openai
         from agentdojo.functions_runtime import FunctionCall, FunctionsRuntime
-        from dscg.benchmark_catalog import get_backend, get_suite
+        from baseintent.benchmark_catalog import get_backend, get_suite
         if get_backend().id != 'agentdyn':
             self.skipTest('AgentDyn native serializer is not installed')
         suite = get_suite('v1.2', 'shopping')
@@ -156,8 +159,8 @@ class RequestCompatibilityTests(unittest.TestCase):
         self.assertEqual(len(captured), 2)
 
     def test_deepseek_baseline_and_defended_factories_share_adapter(self):
-        from dscg.pipelines.baseline import make_openai_compatible_pipeline
-        from dscg.pipelines.defended import make_defended_pipeline
+        from baseintent.pipelines.baseline import make_openai_compatible_pipeline
+        from baseintent.pipelines.defended import make_defended_pipeline
         config = self.config('deepseek', 'deepseek-flash')
         def handler(request):
             value = json.loads(request.content)
@@ -172,7 +175,7 @@ class RequestCompatibilityTests(unittest.TestCase):
             defended, main_defended, security = make_defended_pipeline(
                 model_config=config, sec_model_config=config)
         for pipeline in (baseline, defended):
-            self.assertEqual(pipeline.dscg_model_config['chat_request_adapter'], 'deepseek-system-text-v1')
+            self.assertEqual(pipeline.baseintent_model_config['chat_request_adapter'], 'deepseek-system-text-v1')
         for tracker in (main, main_defended, security):
             tracker.chat.completions.create(model=config.model_id,
                 messages=[{'role': 'developer', 'content': 'trusted'}])
@@ -187,7 +190,7 @@ class RequestCompatibilityTests(unittest.TestCase):
             tracker.chat.completions.create(model='deepseek-flash',
                 messages=[{'role': 'developer', 'content': 'PRIVATE_REQUEST'},
                           {'role': 'user', 'content': 'task'}])
-        from dscg.request_compatibility import api_error_diagnostics
+        from baseintent.request_compatibility import api_error_diagnostics
         detail = api_error_diagnostics(failure.exception)
         self.assertEqual(detail['http_status'], 422)
         self.assertEqual(detail['request_role_counts'], {'system': 1, 'user': 1})
@@ -227,7 +230,7 @@ class RequestCompatibilityTests(unittest.TestCase):
         with self.assertRaises(BadRequestError) as error:
             tracked.chat.completions.create(model='fixture',
                 messages=[{'role':'developer','content':'PRIVATE_REQUEST'}])
-        from dscg.request_compatibility import api_error_diagnostics
+        from baseintent.request_compatibility import api_error_diagnostics
         detail = api_error_diagnostics(error.exception)
         self.assertEqual(detail['http_status'], 400)
         self.assertEqual(detail['provider_error_code'], 'InvalidParameter')
@@ -241,7 +244,7 @@ class RequestCompatibilityTests(unittest.TestCase):
         self.assertEqual(len(captured), 1)  # no request fallback or extra retry
 
     def test_diagnostics_reject_free_text_and_unrecognized_roles(self):
-        from dscg.request_compatibility import api_error_diagnostics
+        from baseintent.request_compatibility import api_error_diagnostics
         request = httpx.Request('POST', 'https://offline.invalid/v1/chat/completions')
         error = BadRequestError('SECRET', response=httpx.Response(400, request=request),
                                 body={'code':'PRIVATE TEXT', 'param':'SECRET REQUEST TEXT'})
@@ -254,7 +257,7 @@ class RequestCompatibilityTests(unittest.TestCase):
     def test_native_catalog_first_and_tool_followup_requests_share_adapter(self):
         from agentdojo.agent_pipeline.llms.openai_llm import OpenAILLM
         from agentdojo.functions_runtime import FunctionsRuntime
-        from dscg.benchmark_catalog import get_suites, get_suite
+        from baseintent.benchmark_catalog import get_suites, get_suite
         captured = []
         def handler(request):
             value = json.loads(request.content); captured.append(value)
@@ -286,10 +289,10 @@ class RequestCompatibilityTests(unittest.TestCase):
 
     def test_run_failure_index_keeps_bounded_api_diagnostics(self):
         from experiments.common.partial_reporting import write_run_overview
-        from dscg.benchmark_catalog import get_suites
-        artifacts = Path(__file__).resolve().parents[1]/'workshop/artifacts/20261019_agentdyn_qwen_roles'
+        from baseintent.benchmark_catalog import get_suites
+        artifacts = Path(__file__).resolve().parents[1]/'artifacts/tests/test_request_compatibility'
         artifacts.mkdir(parents=True, exist_ok=True)
-        detail = {'schema_version':'dscg.api-error.v1', 'http_status':400,
+        detail = {'schema_version':'baseintent.api-error.v1', 'http_status':400,
                   'provider_error_code':'InvalidParameter','provider_error_param':'messages[0].role',
                   'request_role_counts':{'system':1,'user':1}}
         suite = get_suites()[0]
@@ -304,18 +307,18 @@ class RequestCompatibilityTests(unittest.TestCase):
 
     def test_group_failure_diagnostics_reach_execution_manifest_and_index(self):
         from experiments import run_partial_benchmark as runner
-        from dscg.benchmark_catalog import get_backend, get_suites
+        from baseintent.benchmark_catalog import get_backend, get_suites
         from contextlib import redirect_stdout
         from io import StringIO
         import serial_fixture
-        from dscg.request_compatibility import attach_api_error
-        artifacts = Path(__file__).resolve().parents[1]/'workshop/artifacts/20261019_agentdyn_qwen_roles'
+        from baseintent.request_compatibility import attach_api_error
+        artifacts = Path(__file__).resolve().parents[1]/'artifacts/tests/test_request_compatibility'
         artifacts.mkdir(parents=True, exist_ok=True)
         request = httpx.Request('POST', 'https://offline.invalid/v1/chat/completions')
         error = BadRequestError('PRIVATE', response=httpx.Response(400, request=request),
                                 body={'code':'InvalidParameter','param':'messages[0].role','message':'PRIVATE'})
         detail = attach_api_error(error, [{'role':'system','content':'PRIVATE'}])
-        with TemporaryDirectory(dir=artifacts) as tmp, serial_fixture.patched(), redirect_stdout(StringIO()), \
+        with TemporaryDirectory(dir=artifacts) as tmp, serial_fixture.patched(), redirect_stdout(StringIO()),\
                 patch.object(runner, '_execute_group', side_effect=error):
             self.assertEqual(runner.main(origin=True, suites=[get_suites()[0]], attack='tool_knowledge',
                 results_dir=tmp, run_name='api_error'), 1)
@@ -328,8 +331,8 @@ class RequestCompatibilityTests(unittest.TestCase):
             self.assertNotIn('PRIVATE', json.dumps(manifest))
 
     def test_both_factories_use_policy_and_identity_blocks_old_cache(self):
-        from dscg.pipelines.baseline import make_openai_compatible_pipeline
-        from dscg.pipelines.defended import make_defended_pipeline, router_configuration_hash
+        from baseintent.pipelines.baseline import make_openai_compatible_pipeline
+        from baseintent.pipelines.defended import make_defended_pipeline, router_configuration_hash
         from experiments.common.benchmark_reuse import _compatible_binding
         config = self.config()
         def handler(request):
@@ -344,10 +347,10 @@ class RequestCompatibilityTests(unittest.TestCase):
             baseline, main = make_openai_compatible_pipeline(model_config=config)
             defended, main_defended, security = make_defended_pipeline(model_config=config, sec_model_config=config)
         for pipeline in (baseline, defended):
-            self.assertEqual(pipeline.dscg_model_config['chat_request_adapter'], 'dashscope-system-v1')
+            self.assertEqual(pipeline.baseintent_model_config['chat_request_adapter'], 'dashscope-system-v1')
         for tracker in (main, main_defended, security):
             tracker.chat.completions.create(model=config.model_id, messages=[{'role':'developer','content':'trusted'}])
-        from dscg.benchmark_catalog import benchmark_identity
+        from baseintent.benchmark_catalog import benchmark_identity
         old_public = {k:v for k,v in config.public_dict().items() if k != 'chat_request_adapter'}
         old = {'benchmark':benchmark_identity(), 'main_model': old_public}
         current = {'benchmark':benchmark_identity(), 'main_model': config.public_dict()}
@@ -381,19 +384,19 @@ class RequestCompatibilityTests(unittest.TestCase):
 
     def test_dashboard_api_failure_does_not_persist_raw_sdk_text(self):
         import dashboard.app as dashboard
-        from dscg.request_compatibility import attach_api_error
-        artifacts = Path(__file__).resolve().parents[1]/'workshop/artifacts/20261019_agentdyn_qwen_roles'
+        from baseintent.request_compatibility import attach_api_error
+        artifacts = Path(__file__).resolve().parents[1]/'artifacts/tests/test_request_compatibility'
         request = httpx.Request('POST', 'https://offline.invalid/v1/chat/completions')
         error = BadRequestError('PRIVATE_BODY', response=httpx.Response(400, request=request),
                                 body={'code':'InvalidParameter','param':'messages[0].role','message':'PRIVATE_BODY'})
         attach_api_error(error, [{'role':'system','content':'PRIVATE_REQUEST'}])
         config = {'suites':['fixture'],'run_attack':False,'origin':False}
-        with TemporaryDirectory(dir=artifacts) as tmp, \
-                patch.object(dashboard, 'DASHBOARD_RESULTS_DIR', Path(tmp)), \
-                patch.object(dashboard, 'validate_backend', return_value={'id':'fixture'}), \
-                patch.object(dashboard, 'make_defended_pipeline', side_effect=error), \
-                patch.object(dashboard, 'get_suite', return_value=SimpleNamespace(user_tasks={},injection_tasks={})), \
-                patch.object(dashboard, 'push_log') as log, patch.object(dashboard, 'push_done') as done, \
+        with TemporaryDirectory(dir=artifacts) as tmp,\
+                patch.object(dashboard, 'DASHBOARD_RESULTS_DIR', Path(tmp)),\
+                patch.object(dashboard, 'validate_backend', return_value={'id':'fixture'}),\
+                patch.object(dashboard, 'make_defended_pipeline', side_effect=error),\
+                patch.object(dashboard, 'get_suite', return_value=SimpleNamespace(user_tasks={},injection_tasks={})),\
+                patch.object(dashboard, 'push_log') as log, patch.object(dashboard, 'push_done') as done,\
                 patch.object(dashboard.threading, 'Thread'):
             dashboard.run_test_thread('api_error_fixture', config)
             value = json.loads((Path(tmp)/'api_error_fixture/execution_error.json').read_text())
@@ -404,8 +407,8 @@ class RequestCompatibilityTests(unittest.TestCase):
 
     def test_direct_goal_screen_failure_keeps_safe_diagnostics(self):
         from experiments import run_injection_precheck as screen
-        from dscg.request_compatibility import attach_api_error
-        artifacts = Path(__file__).resolve().parents[1]/'workshop/artifacts/20261019_agentdyn_qwen_roles'
+        from baseintent.request_compatibility import attach_api_error
+        artifacts = Path(__file__).resolve().parents[1]/'artifacts/tests/test_request_compatibility'
         request = httpx.Request('POST', 'https://offline.invalid/v1/chat/completions')
         error = BadRequestError('PRIVATE', response=httpx.Response(400, request=request),
                                 body={'code':'InvalidParameter','message':'PRIVATE'})
@@ -420,21 +423,21 @@ class RequestCompatibilityTests(unittest.TestCase):
 
     def test_dashboard_write_error_cannot_hide_terminal_api_failure(self):
         import dashboard.app as dashboard
-        from dscg.request_compatibility import attach_api_error
-        artifacts = Path(__file__).resolve().parents[1]/'workshop/artifacts/20261019_agentdyn_qwen_roles'
+        from baseintent.request_compatibility import attach_api_error
+        artifacts = Path(__file__).resolve().parents[1]/'artifacts/tests/test_request_compatibility'
         request = httpx.Request('POST', 'https://offline.invalid/v1/chat/completions')
         error = BadRequestError('PRIVATE', response=httpx.Response(400, request=request), body={'code':'InvalidParameter'})
         attach_api_error(error, [{'role':'system','content':'PRIVATE'}])
         run_id = 'api_write_failure_fixture'
         dashboard.runs_store[run_id] = {'status':'running'}
         try:
-            with TemporaryDirectory(dir=artifacts) as tmp, \
-                    patch.object(dashboard, 'DASHBOARD_RESULTS_DIR', Path(tmp)), \
-                    patch.object(dashboard, 'validate_backend', return_value={'id':'fixture'}), \
-                    patch.object(dashboard, 'make_defended_pipeline', side_effect=error), \
-                    patch.object(dashboard, 'get_suite', return_value=SimpleNamespace(user_tasks={},injection_tasks={})), \
-                    patch.object(dashboard, 'push_log') as log, patch.object(dashboard, 'push_done') as done, \
-                    patch.object(dashboard.threading, 'Thread'), \
+            with TemporaryDirectory(dir=artifacts) as tmp,\
+                    patch.object(dashboard, 'DASHBOARD_RESULTS_DIR', Path(tmp)),\
+                    patch.object(dashboard, 'validate_backend', return_value={'id':'fixture'}),\
+                    patch.object(dashboard, 'make_defended_pipeline', side_effect=error),\
+                    patch.object(dashboard, 'get_suite', return_value=SimpleNamespace(user_tasks={},injection_tasks={})),\
+                    patch.object(dashboard, 'push_log') as log, patch.object(dashboard, 'push_done') as done,\
+                    patch.object(dashboard.threading, 'Thread'),\
                     patch.object(Path, 'write_text', side_effect=OSError('PRIVATE_DISK_DETAIL')):
                 dashboard.run_test_thread(run_id, {'suites':['fixture'],'run_attack':False,'origin':False})
                 self.assertEqual(dashboard.runs_store[run_id]['status'], 'error')

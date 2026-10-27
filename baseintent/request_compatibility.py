@@ -8,7 +8,7 @@ import re
 
 DASHSCOPE_ADAPTER = 'dashscope-system-v1'
 DEEPSEEK_ADAPTER = 'deepseek-system-text-v1'
-ERROR_SCHEMA = 'dscg.api-error.v1'
+ERROR_SCHEMA = 'baseintent.api-error.v1'
 _ROLES = frozenset({'system', 'developer', 'user', 'assistant', 'tool', 'function', 'other'})
 
 
@@ -26,7 +26,7 @@ def _role_counts(messages):
 
 def api_error_diagnostics(exc, messages=None):
     """Return whitelisted metadata, never an exception string/body or content."""
-    stored = getattr(exc, '_dscg_api_error', None)
+    stored = getattr(exc, '_baseintent_api_error', None)
     status = getattr(exc, 'status_code', None)
     if not isinstance(stored, dict) and messages is None and type(status) is not int:
         return None
@@ -46,7 +46,7 @@ def api_error_diagnostics(exc, messages=None):
 def attach_api_error(exc, messages):
     detail = api_error_diagnostics(exc, messages)
     try:
-        exc._dscg_api_error = detail
+        exc._baseintent_api_error = detail
     except (AttributeError, TypeError):
         pass
     return detail

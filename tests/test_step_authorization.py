@@ -5,8 +5,8 @@ from typing import Annotated
 from types import SimpleNamespace
 from unittest.mock import Mock
 from agentdojo.functions_runtime import FunctionsRuntime
-from dscg.pipelines import defended as d
-from dscg.tool_metadata import set_tool_metadata
+from baseintent.pipelines import defended as d
+from baseintent.tool_metadata import set_tool_metadata
 
 def runtime():
  r=FunctionsRuntime()
@@ -52,10 +52,10 @@ class StepAuthorizationTests(unittest.TestCase):
   self.assertIn('discover',grant.allowed_tools)
   self.assertNotIn('send_channel_message',grant.allowed_tools)
  def test_version_and_default_policy_identity(self):
-  self.assertEqual(d.framework_version_for_profile('legacy-v34'),'DSCG_v3.4');self.assertIn('steps',d.ToolAuthorizationCompiler.SYSTEM_POLICY)
+  self.assertEqual(d.framework_version_for_profile('legacy-v34'),'BaseIntent-legacy-v34');self.assertIn('steps',d.ToolAuthorizationCompiler.SYSTEM_POLICY)
  def test_router_identity_binds_the_policy_actually_used_by_each_profile(self):
   from unittest.mock import patch
-  from dscg.model_config import ModelConfig
+  from baseintent.model_config import ModelConfig
   cfg=ModelConfig('offline','offline','https://offline.invalid','custom')
   options=dict(input_isolation=True,authorization_precheck=True,l1_projection_mode='projected',planning_tool_view=True,delegated_tasks=True)
   def identity(profile):return d.router_configuration_hash(cfg,cfg,prompt_profile=profile,**options)

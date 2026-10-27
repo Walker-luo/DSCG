@@ -67,7 +67,7 @@ class AttackExecutionTests(unittest.TestCase):
         from multiprocessing.process import BaseProcess
         native_start=BaseProcess.start
         def start(process):
-            if process.name=='dscg-a':raise OSError('private-start-error')
+            if process.name=='baseintent-a':raise OSError('private-start-error')
             return native_start(process)
         with patch.object(BaseProcess,'start',new=start):
             results=dict(iter_attack_results(self.jobs(),on_event=lambda _:None,execute=probe))

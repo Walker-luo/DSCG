@@ -19,8 +19,8 @@ def check_attack_compatibility(suite, attack_name: str,
             if any(call.placeholder_args is None for call in calls):
                 affected.append(task_id)
         except Exception as exc:
-            exc._dscg_execution_stage = 'attack_compatibility'
-            exc._dscg_task_id = task_id
+            exc._baseintent_execution_stage = 'attack_compatibility'
+            exc._baseintent_task_id = task_id
             raise
     if not affected:
         return None

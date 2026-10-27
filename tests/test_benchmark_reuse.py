@@ -1,4 +1,7 @@
 """Explicit resume preserves native caching and immutable run evidence."""
+
+from artifact_support import ensure_artifacts
+ensure_artifacts('test_benchmark_reuse')
 from contextlib import redirect_stdout, redirect_stderr
 from io import StringIO
 import json
@@ -21,7 +24,7 @@ class ReuseCliTests(unittest.TestCase):
     def test_both_cli_reuse_overrides_environment_and_preserves_omission(self):
         for cli in (runner.cli, full.cli):
             with self.subTest(cli=cli), patch.object(runner, 'main', return_value=0) as run, patch.dict(
-                os.environ, {'DSCG_FORCE_RERUN': '1'}, clear=True
+                os.environ, {'BASEINTENT_FORCE_RERUN': '1'}, clear=True
             ):
                 self.assertEqual(cli(['--reuse', '--name', 'old', '--baseline']), 0)
                 self.assertTrue(run.call_args.kwargs['reuse'])
@@ -42,7 +45,7 @@ class ReuseCliTests(unittest.TestCase):
 
 class ReuseIntegrationTests(unittest.TestCase):
     def setUp(self):
-        artifacts = Path(__file__).resolve().parents[1] / 'workshop/artifacts/20261018_dual_benchmark/runner/test_runs'
+        artifacts = Path(__file__).resolve().parents[1] / 'artifacts/tests/test_benchmark_reuse'
         artifacts.mkdir(parents=True, exist_ok=True)
         temp = TemporaryDirectory(dir=artifacts); self.addCleanup(temp.cleanup)
         self.root = Path(temp.name); self.executed = []
@@ -135,7 +138,7 @@ class ReuseIntegrationTests(unittest.TestCase):
         self.assertEqual(self.run_benchmark(reuse=True), 0)
         self.assertEqual(path.read_bytes(), original)
         self.assertEqual(len(self.executed), calls)
-        binding['source']['source_sha256']['dscg/pipelines/defended.py'] = '0' * 64
+        binding['source']['source_sha256']['baseintent/pipelines/defended.py'] = '0' * 64
         path.write_text(json.dumps(binding)); before = self.files()
         self.assertEqual(self.run_benchmark(reuse=True), 0)
         self.assertEqual(path.read_bytes(), before[path.relative_to(self.base)])

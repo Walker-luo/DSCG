@@ -14,11 +14,11 @@ from agentdojo import attacks
 from agentdojo.task_suite import get_suite
 
 from experiments import run_partial_benchmark as runner
-from dscg.pipelines.defended import _append_full_trace
+from baseintent.pipelines.defended import _append_full_trace
 
 
 def fake_pipeline(*args, **kwargs):
-    return SimpleNamespace(name="offline-model", dscg_model_config={"model_id": "offline-model"}), SimpleNamespace(
+    return SimpleNamespace(name="offline-model", baseintent_model_config={"model_id": "offline-model"}), SimpleNamespace(
         total_prompt_tokens=0, total_completion_tokens=0, get_total_tokens=lambda: 0,
     )
 
@@ -116,7 +116,7 @@ class PartialAttackTests(unittest.TestCase):
         ) as benchmark:
             for preset, origin in [(preset, origin) for preset in selections for origin in [True, False]]:
                 selected_attacks = selections[preset]
-                mode = f"{'baseline' if origin else 'dscg'}_{preset}"
+                mode = f"{'baseline' if origin else 'baseintent'}_{preset}"
                 self.assertEqual(runner.main(origin=origin, suites=["workspace"], run_name=mode,
                                              results_dir=directory, force_rerun=True,
                                              **({"attack": "all"} if preset == "all" else {})), 0)
@@ -173,7 +173,7 @@ class PartialAttackTests(unittest.TestCase):
         def pipeline_factory(*args, **kwargs):
             pipeline, tracker = fake_pipeline()
             pipeline.name = model_id
-            pipeline.dscg_model_config["model_id"] = model_id
+            pipeline.baseintent_model_config["model_id"] = model_id
             return pipeline, tracker
 
         def execute(*args, **kwargs):
@@ -181,7 +181,7 @@ class PartialAttackTests(unittest.TestCase):
                 {"role": "user", "content": [{"type": "text", "content": "offline fixture"}]},
                 {"role": "assistant", "content": [{"type": "text", "content": "done"}], "tool_calls": None},
             ])
-            _append_full_trace({"_dscg_trace_level": "full"}, "fixture", {"offline": True})
+            _append_full_trace({"_baseintent_trace_level": "full"}, "fixture", {"offline": True})
             return True, False
 
         with TemporaryDirectory() as directory, redirect_stdout(StringIO()), patch.object(
@@ -204,7 +204,7 @@ class PartialAttackTests(unittest.TestCase):
             cached = runner.benchmark.load_task_results(attack_name, "workspace", "user_task_0",
                                                         attack_name, injection, root)
             self.assertTrue(cached.utility)
-            with gzip.open(trace.with_suffix(".dscg_trace.jsonl.gz"), "rt") as stream:
+            with gzip.open(trace.with_suffix(".baseintent_trace.jsonl.gz"), "rt") as stream:
                 self.assertEqual(json.loads(stream.readline())["event"], "fixture")
             self.assertTrue((result / "summary.json").exists())
             self.assertTrue((root / "summary.md").exists())

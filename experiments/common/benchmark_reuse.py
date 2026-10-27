@@ -9,7 +9,7 @@ from agentdojo.benchmark import load_task_results
 from pydantic import ValidationError
 
 from experiments.common.partial_controls import RunConfigurationError
-from dscg.benchmark_catalog import benchmark_identity, same_backend
+from baseintent.benchmark_catalog import benchmark_identity, same_backend
 
 
 def _read(path):
@@ -37,7 +37,7 @@ def configuration(value):
     if not isinstance(value, dict):
         return value
     result = {key: item for key, item in value.items() if key not in _PROVENANCE_FIELDS}
-    if value.get('schema_version') == 'dscg.screened-run.v2':
+    if value.get('schema_version') == 'baseintent.screened-run.v2':
         # Effective tool contents are checked in every group binding.
         result.pop('tool_metadata_sha256', None)
         result.pop('tool_metadata_path', None)
@@ -53,7 +53,7 @@ def _compatible_binding(old, current):
 
 
 def execution_plan(task_scope, suites, attacks, cohort_sha256=None):
-    result = {'schema_version': 'dscg.benchmark-plan.v2', 'benchmark': benchmark_identity(), 'task_scope': task_scope,
+    result = {'schema_version': 'baseintent.benchmark-plan.v2', 'benchmark': benchmark_identity(), 'task_scope': task_scope,
               'suites': list(suites), 'attacks': list(attacks)}
     if cohort_sha256 is not None: result['cohort_sha256'] = cohort_sha256
     return result
@@ -193,9 +193,9 @@ class ReusePlan:
                 load_task_results(storage, suite, task, attack, Path(filename).stem, self.base)
             except ValidationError:
                 snapshot(path)
-                sidecar = path.with_suffix('.dscg_trace.jsonl.gz')
+                sidecar = path.with_suffix('.baseintent_trace.jsonl.gz')
                 if sidecar.is_file(): snapshot(sidecar)
-                from dscg.task_diagnostics import diagnostic_dependencies
+                from baseintent.task_diagnostics import diagnostic_dependencies
                 for dependency in diagnostic_dependencies(path):snapshot(dependency)
             except (OSError, ValueError, KeyError, TypeError):
                 pass  # Preserve the native error path, including malformed JSON.

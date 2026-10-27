@@ -19,12 +19,12 @@ import re
 from urllib.parse import urlsplit
 import unicodedata
 
-from dscg.tool_metadata import metadata_for_runtime, metadata_catalog_hash
-from dscg.audit_context import INPUT_SCHEMA
+from baseintent.tool_metadata import metadata_for_runtime, metadata_catalog_hash
+from baseintent.audit_context import INPUT_SCHEMA
 
-SCHEMA = 'dscg.audit-router.algorithm.v1'
+SCHEMA = 'baseintent.audit-router.algorithm.v1'
 FEATURE_VERSION = 'lexical-max-v1'
-RUNTIME_SCHEMA = 'dscg.audit-router.read-policy.v2'
+RUNTIME_SCHEMA = 'baseintent.audit-router.read-policy.v2'
 POLICY_VERSION = 'read-purpose-v2'
 DEFAULT_THRESHOLD = 0.70
 LABELS = {'safe_and_sufficient', 'unsafe', 'insufficient_or_ambiguous', 'unjudgeable'}

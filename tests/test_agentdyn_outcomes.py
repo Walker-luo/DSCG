@@ -1,4 +1,7 @@
 """Native caught errors must not become successful attacks or defenses."""
+
+from artifact_support import ensure_artifacts
+ensure_artifacts('test_agentdyn_outcomes')
 import json
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -8,7 +11,7 @@ import unittest
 class OutcomeTests(unittest.TestCase):
     def test_error_trace_excluded_without_modifying_native_fields_or_other_samples(self):
         from experiments.common.benchmark_outcomes import project_outcomes
-        root = Path(__file__).resolve().parents[1] / 'workshop/artifacts/20261018_dual_benchmark/outcomes'
+        root = Path(__file__).resolve().parents[1] / 'artifacts/tests/test_agentdyn_outcomes'
         root.mkdir(parents=True, exist_ok=True)
         with TemporaryDirectory(dir=root) as directory:
             suite = Path(directory)
@@ -30,7 +33,7 @@ class OutcomeTests(unittest.TestCase):
 
     def test_clean_error_has_no_utility_label_and_no_security_denominator(self):
         from experiments.common.benchmark_outcomes import project_outcomes
-        root = Path(__file__).resolve().parents[1] / 'workshop/artifacts/20261018_dual_benchmark/outcomes'
+        root = Path(__file__).resolve().parents[1] / 'artifacts/tests/test_agentdyn_outcomes'
         root.mkdir(parents=True, exist_ok=True)
         with TemporaryDirectory(dir=root) as directory:
             trace = Path(directory)/'u0/none/none.json';trace.parent.mkdir(parents=True)

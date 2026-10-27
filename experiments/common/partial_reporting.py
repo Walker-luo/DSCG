@@ -4,8 +4,8 @@ import json
 from pathlib import Path
 from urllib.parse import quote
 
-from dscg.benchmark_catalog import benchmark_identity, get_backend, get_suites
-from dscg.task_diagnostics import load_task_trace
+from baseintent.benchmark_catalog import benchmark_identity, get_backend, get_suites
+from baseintent.task_diagnostics import load_task_trace
 
 
 MAX_EXCERPTS = 6
@@ -43,17 +43,17 @@ def _read_excerpts(path: Path) -> tuple[str, list[dict], bool]:
     messages = [(i, message) for i, message in enumerate(raw["messages"])
                 if isinstance(message, dict)]
     excerpts = []
-    if raw.get('dscg_diagnostics_status') in ('missing','corrupt','invalid_reference','incomplete'):
-        excerpts.append(_excerpt('diagnostic_error','/dscg_diagnostics',raw['dscg_diagnostics_status']))
+    if raw.get('baseintent_diagnostics_status') in ('missing','corrupt','invalid_reference','incomplete'):
+        excerpts.append(_excerpt('diagnostic_error','/baseintent_diagnostics',raw['baseintent_diagnostics_status']))
     task_error = bool(raw.get("error"))
     if task_error:
         excerpts.append(_excerpt("task_error", "/error", str(raw["error"])))
-    if isinstance(raw.get('dscg_termination'),dict):
-        excerpts.append(_excerpt('framework_failure','/dscg_termination',
-            json.dumps(raw['dscg_termination'],ensure_ascii=False)))
-    for action in raw.get('dscg_action_ledger',[]):
+    if isinstance(raw.get('baseintent_termination'),dict):
+        excerpts.append(_excerpt('framework_failure','/baseintent_termination',
+            json.dumps(raw['baseintent_termination'],ensure_ascii=False)))
+    for action in raw.get('baseintent_action_ledger',[]):
         if action.get('blocked_by'):
-            excerpts.append(_excerpt('module_block','/dscg_action_ledger',
+            excerpts.append(_excerpt('module_block','/baseintent_action_ledger',
                 json.dumps({k:action[k] for k in ('call_id','tool_name','blocked_by','block_reason') if k in action},ensure_ascii=False)))
             break
 
@@ -75,7 +75,7 @@ def _read_excerpts(path: Path) -> tuple[str, list[dict], bool]:
                                  json.dumps(tool_calls, ensure_ascii=False)))
 
     injections = raw.get("injections")
-    payloads = [value for value in injections.values() if isinstance(value, str) and value.strip()] \
+    payloads = [value for value in injections.values() if isinstance(value, str) and value.strip()]\
         if isinstance(injections, dict) else []
     # Match the entire payload, including common serialized string forms.
     # Never guess a malicious span from keywords or an auditor's opinion.
@@ -219,7 +219,7 @@ def write_run_overview(base_dir: Path, attack_names: list[str], suites: list[str
                           **({'execution_error': run['execution_error']} if 'execution_error' in run else {}),
                           **({'api_error': run['api_error']} if 'api_error' in run else {})})
     for line, case in enumerate(cases, 1):
-        case.update(schema_version="dscg.partial-failure.v2", benchmark=benchmark_identity(), case_id=f"F{line:04d}", detail_line=line)
+        case.update(schema_version="baseintent.partial-failure.v2", benchmark=benchmark_identity(), case_id=f"F{line:04d}", detail_line=line)
     with detail_path.open("w", encoding="utf-8") as stream:
         for case in cases:
             stream.write(json.dumps(case, ensure_ascii=False) + "\n")

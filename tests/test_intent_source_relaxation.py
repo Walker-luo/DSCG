@@ -1,3 +1,6 @@
+
+from artifact_support import ensure_artifacts
+ensure_artifacts('test_intent_source_relaxation')
 # Frozen v3.4 controls; intent-flow defaults are tested in test_intent_flow*.py.
 from authorization_fixture import adapt_client
 """Default prompt contract and strict mediation diagnostics, without model calls."""
@@ -12,9 +15,9 @@ from tempfile import TemporaryDirectory
 from unittest.mock import patch
 
 from agentdojo.functions_runtime import EmptyEnv,FunctionCall
-from dscg.pipelines import defended as d
-from dscg.audit_router import LocalAuditRouter,RouterReceiptVerifier
-from dscg.input_isolation import FRAMEWORK_VERSION
+from baseintent.pipelines import defended as d
+from baseintent.audit_router import LocalAuditRouter,RouterReceiptVerifier
+from baseintent.input_isolation import FRAMEWORK_VERSION
 from experiments.diagnostics.utility_stages import synthetic_runtime
 
 
@@ -28,7 +31,7 @@ def model(payload):
 
 class IntentSourceRelaxationTests(unittest.TestCase):
     def test_default_version_and_compact_audit_contract(self):
-        self.assertEqual(d.framework_version_for_profile('legacy-v34'),'DSCG_v3.4')
+        self.assertEqual(d.framework_version_for_profile('legacy-v34'),'BaseIntent-legacy-v34')
         policy=d.ActionSecurityChecker.SYSTEM_POLICY
         self.assertLessEqual(len(policy),1200)
         for field in ('decision','violations','confidence','reason_code'):
@@ -68,7 +71,7 @@ class IntentSourceRelaxationTests(unittest.TestCase):
 
     def finish(self,monitor,state):
         state=monitor.query(*state)
-        record=state[-1]['dscg_audit_decisions'][-1]
+        record=state[-1]['baseintent_audit_decisions'][-1]
         return state,record
 
     def test_legal_audit_handoff_remains_valid(self):
@@ -87,7 +90,7 @@ class IntentSourceRelaxationTests(unittest.TestCase):
 
     def test_invalid_record_preserves_published_parser_observation_not_private_values(self):
         monitor,state=self.prepared()
-        state[-1]['_dscg_audit_decision']['confidence']='PRIVATE_PAYLOAD'
+        state[-1]['_baseintent_audit_decision']['confidence']='PRIVATE_PAYLOAD'
         state,record=self.finish(monitor,state)
         diagnostic=record['mediation_diagnostics']
         self.assertEqual(record['final_policy_decision'],'deny')
@@ -102,15 +105,15 @@ class IntentSourceRelaxationTests(unittest.TestCase):
         for mutation in ('missing','binding','record','replay'):
             with self.subTest(mutation=mutation):
                 monitor,state=self.prepared()
-                token=state[-1]['_dscg_router_receipt']
-                original=dict(state[-1]['_dscg_audit_decision'])
-                if mutation=='missing':state[-1].pop('_dscg_router_receipt')
+                token=state[-1]['_baseintent_router_receipt']
+                original=dict(state[-1]['_baseintent_audit_decision'])
+                if mutation=='missing':state[-1].pop('_baseintent_router_receipt')
                 elif mutation=='binding':state=('A different task',*state[1:])
-                elif mutation=='record':state[-1]['_dscg_audit_decision']['reason_code']='CHANGED'
+                elif mutation=='record':state[-1]['_baseintent_audit_decision']['reason_code']='CHANGED'
                 else:
                     state,_=self.finish(monitor,state)
-                    state[-1]['_dscg_router_receipt']=token
-                    state[-1]['_dscg_audit_decision']=original
+                    state[-1]['_baseintent_router_receipt']=token
+                    state[-1]['_baseintent_audit_decision']=original
                 state,record=self.finish(monitor,state)
                 diagnostic=record['mediation_diagnostics']
                 self.assertEqual(record['final_policy_decision'],'deny')
@@ -124,19 +127,19 @@ class IntentSourceRelaxationTests(unittest.TestCase):
             monitor,state=self.prepared(json.dumps(dict(decision=decision,violations=['OFF_TASK'],confidence=.9,reason_code='OFF_TASK')))
             state,record=self.finish(monitor,state)
             self.assertEqual(record['final_policy_decision'],'deny')
-            self.assertTrue(all(not item.approved for item in state[-1]['_dscg_pending_batch'].actions))
+            self.assertTrue(all(not item.approved for item in state[-1]['_baseintent_pending_batch'].actions))
 
     def test_previous_defense_version_cannot_resume_and_baseline_stays_native(self):
         import serial_fixture
-        from dscg.benchmark_catalog import get_backend,get_suites
+        from baseintent.benchmark_catalog import get_backend,get_suites
         from experiments import run_partial_benchmark as runner
-        root=Path(__file__).resolve().parents[1]/'workshop/artifacts/20261021_intent_source_relaxation'
+        root=Path(__file__).resolve().parents[1]/'artifacts/tests/test_intent_source_relaxation'
         with TemporaryDirectory(dir=root) as temp,serial_fixture.patched(),redirect_stdout(StringIO()):
             options=dict(suites=[get_suites()[0]],run_attack=False,results_dir=temp,run_name='binding',prompt_profile='legacy-v34')
             self.assertEqual(runner.main(**options),0)
             path=Path(temp)/get_backend().id/'offline-model_binding/none'/get_suites()[0]/'run_manifest.json'
             binding=json.loads(path.read_text())
-            self.assertEqual(binding['defense_version'],'DSCG_v3.4')
+            self.assertEqual(binding['defense_version'],'BaseIntent-legacy-v34')
             binding['defense_version']='three-layer-v3.1';path.write_text(json.dumps(binding))
             before={p:p.read_bytes() for p in Path(temp).rglob('*') if p.is_file()}
             with patch.object(runner,'iter_attack_results') as dispatch:

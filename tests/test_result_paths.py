@@ -1,4 +1,7 @@
 """Backend folder layout and deterministic, non-migrating legacy resolution."""
+
+from artifact_support import ensure_artifacts
+ensure_artifacts('test_result_paths')
 from pathlib import Path
 from tempfile import TemporaryDirectory
 import unittest
@@ -8,7 +11,7 @@ from experiments.common.result_paths import resolve_run_path, run_component
 
 class ResultPathTests(unittest.TestCase):
     def temporary(self):
-        root=Path(__file__).resolve().parents[1]/'workshop/artifacts/20261018_backend_result_layout/test_runs'
+        root=Path(__file__).resolve().parents[1]/'artifacts/tests/test_result_paths'
         root.mkdir(parents=True,exist_ok=True)
         temp=TemporaryDirectory(dir=root); self.addCleanup(temp.cleanup)
         return Path(temp.name)
@@ -17,7 +20,7 @@ class ResultPathTests(unittest.TestCase):
         for backend in ('agentdojo','agentdyn'):
             self.assertEqual(resolve_run_path(Path('results/partial_benchmark'),backend,'qwen3.7-flash','baseline'),
                              Path('results/partial_benchmark')/backend/'qwen3.7-flash_baseline')
-        self.assertEqual(run_component('model',None,default_name='model-DSCG'), 'model-DSCG')
+        self.assertEqual(run_component('model',None,default_name='model-BASEINTENT'), 'model-BASEINTENT')
         self.assertEqual(run_component('Qwen/model','trial/name'), 'Qwen-model_trial-name')
 
     def test_legacy_is_only_used_on_resume_and_new_path_always_wins(self):

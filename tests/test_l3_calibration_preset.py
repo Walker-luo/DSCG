@@ -1,4 +1,7 @@
 """Offline preset/CLI contracts; no models or original experiment writes."""
+
+from artifact_support import ensure_artifacts
+ensure_artifacts('test_l3_calibration_preset')
 from contextlib import redirect_stderr, redirect_stdout
 from copy import deepcopy
 from io import StringIO
@@ -8,12 +11,12 @@ from tempfile import TemporaryDirectory
 import unittest
 from unittest.mock import patch
 
-from dscg.audit_router import calibrate, LocalAuditRouter
+from baseintent.audit_router import calibrate, LocalAuditRouter
 from experiments.calibration import calibrate_l3_router as cli
 
 ROOT = Path(__file__).resolve().parents[1]
 PRESET = ROOT / 'config/l3_router.calibration.json'
-ARTIFACTS = ROOT / 'workshop/artifacts/20261019_l3_preset'
+ARTIFACTS = ROOT / 'artifacts/tests/test_l3_calibration_preset'
 
 
 class CalibrationPresetTests(unittest.TestCase):
@@ -68,7 +71,7 @@ class CalibrationPresetTests(unittest.TestCase):
             self.assertEqual(error.exception.code, 2)
 
     def test_invalid_schema_status_grid_reference_and_targets_are_rejected(self):
-        good = {'schema_version': 'dscg.router-calibration-preset.v1',
+        good = {'schema_version': 'baseintent.router-calibration-preset.v1',
                 'status': 'development_candidate', 'grid': [.65, .7, .75],
                 'reference_threshold': .7, 'epsilon': .05, 'delta': .05}
         changes = [('schema_version', 'deployment'), ('status', 'certified'),
@@ -116,7 +119,7 @@ class CalibrationPresetTests(unittest.TestCase):
                 task = f'Read budget {index}'
                 record['packet']['trusted_user_request'] = task
                 record['packet']['current_actions'][0]['host_tool_description'] = task
-                from dscg.audit_router import digest
+                from baseintent.audit_router import digest
                 record['input_sha256'] = digest(record['packet'])
                 records.append(record)
             src = self.root/f'input_{count}.jsonl'

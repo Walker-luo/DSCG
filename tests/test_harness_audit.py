@@ -3,7 +3,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from dscg.harness_records import SampleStatus
+from baseintent.harness_records import SampleStatus
 from experiments.diagnostics.harness_audit import (
     audit_cases,
     classify_sample,

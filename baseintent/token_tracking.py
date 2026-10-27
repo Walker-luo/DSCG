@@ -4,7 +4,7 @@ from contextlib import contextmanager
 from contextvars import ContextVar
 from copy import deepcopy
 from time import perf_counter
-from dscg.request_compatibility import attach_api_error
+from baseintent.request_compatibility import attach_api_error
 
 class _CompletionsProxy:
     def __init__(self, completions, tracker):
@@ -49,8 +49,8 @@ class _ChatProxy:
 class TokenTrackerClient:
     def __init__(self, client, default_phase='generation'):
         self._client = client
-        self._phase = ContextVar('dscg_api_phase', default=default_phase)
-        self._no_retries = ContextVar('dscg_no_retries', default=False)
+        self._phase = ContextVar('baseintent_api_phase', default=default_phase)
+        self._no_retries = ContextVar('baseintent_no_retries', default=False)
         self.reset()
 
     def get_total_tokens(self):

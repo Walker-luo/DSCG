@@ -1,4 +1,7 @@
 """Offline screening contracts: native logging/scoring, no remote model calls."""
+
+from artifact_support import ensure_artifacts
+ensure_artifacts('test_injection_precheck')
 from contextlib import redirect_stdout, redirect_stderr
 from io import StringIO
 import json
@@ -10,7 +13,7 @@ import unittest
 from unittest.mock import patch
 
 from agentdojo import logging
-from dscg.model_config import ModelConfig
+from baseintent.model_config import ModelConfig
 
 try:
     from experiments import run_injection_precheck as precheck
@@ -52,7 +55,7 @@ class FakeSuite:
 class InjectionPrecheckTests(unittest.TestCase):
     def setUp(self):
         self.assertIsNotNone(precheck, 'standalone injection precheck entrypoint is missing')
-        artifacts = Path(__file__).resolve().parents[1] / 'workshop/artifacts/20261018_dual_benchmark/runner/test_runs'
+        artifacts = Path(__file__).resolve().parents[1] / 'artifacts/tests/test_injection_precheck'
         artifacts.mkdir(parents=True, exist_ok=True)
         self.temp = TemporaryDirectory(dir=artifacts)
         self.addCleanup(self.temp.cleanup)
@@ -70,7 +73,7 @@ class InjectionPrecheckTests(unittest.TestCase):
             self.addCleanup(p.stop)
 
     def factory(self, **kwargs):
-        return SimpleNamespace(name='offline', dscg_model_config=self.config.public_dict()), SimpleNamespace(snapshot=lambda: {})
+        return SimpleNamespace(name='offline', baseintent_model_config=self.config.public_dict()), SimpleNamespace(snapshot=lambda: {})
 
     @property
     def output(self):
@@ -474,7 +477,7 @@ class InjectionPrecheckTests(unittest.TestCase):
         binding = self.legacy_binding()
         (self.output / 'screen_manifest.json').write_text(json.dumps(binding))
         current = precheck.source_revision()
-        current['source_sha256'] = {'dscg/pipelines/baseline.py': '0' * 64}
+        current['source_sha256'] = {'baseintent/pipelines/baseline.py': '0' * 64}
         with patch.object(cohort_module, 'source_revision', return_value=current):
             self.assertEqual(self.screen(), 0)
         self.assertEqual(len(self.suite.executed), 2)
@@ -501,10 +504,24 @@ class InjectionPrecheckTests(unittest.TestCase):
         binding['screening_script_sha256'] = '0' * 64
         self.assertTrue(cohort_module._bindings_compatible(binding, current))
 
+    def test_pending_cross_namespace_screen_is_rejected_without_calls_or_writes(self):
+        self.assertEqual(self.screen(),0)
+        (self.output/'cohort.json').unlink()
+        manifest=self.output/'screen_manifest.json'
+        binding=json.loads(manifest.read_text())
+        binding['schema_version']='dscg.injection-screen.v2'
+        manifest.write_text(json.dumps(binding))
+        before={p:p.read_bytes() for p in self.output.rglob('*') if p.is_file()}
+        executed=list(self.suite.executed)
+        with self.assertRaisesRegex(ValueError,'schema'):
+            self.screen()
+        self.assertEqual(self.suite.executed,executed)
+        self.assertEqual({p:p.read_bytes() for p in self.output.rglob('*') if p.is_file()},before)
+
     def test_source_changes_do_not_block_identical_screen_configuration(self):
         binding = self.legacy_binding()
         current = precheck._binding(self.config, ['workspace'])
-        current['source']['source_sha256'] = {'dscg/unknown_new_layer.py': '0' * 64}
+        current['source']['source_sha256'] = {'baseintent/unknown_new_layer.py': '0' * 64}
         self.assertTrue(cohort_module._bindings_compatible(binding, current))
 
     def test_native_logged_context_error_is_not_a_valid_failure(self):
@@ -555,7 +572,7 @@ class InjectionPrecheckTests(unittest.TestCase):
         self.screen()
         from tests.test_full_benchmark import fake_attack, fake_results
         def fake_pipeline(*args, **kwargs):
-            return SimpleNamespace(name='offline', dscg_model_config=self.config.public_dict()), SimpleNamespace(
+            return SimpleNamespace(name='offline', baseintent_model_config=self.config.public_dict()), SimpleNamespace(
                 total_prompt_tokens=0, total_completion_tokens=0, get_total_tokens=lambda: 0)
         from experiments import run_benchmark as full
         with patch.object(precheck.shared, 'get_suite', return_value=self.suite), patch.object(precheck.shared, 'make_openai_compatible_pipeline', side_effect=fake_pipeline), patch.object(

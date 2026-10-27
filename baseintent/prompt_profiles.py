@@ -2,11 +2,11 @@
 import hashlib
 import json
 
-from dscg.intent_evidence import (PROFILE as V35_PROFILE, AUTH_POLICY as V35_AUTH_POLICY,
+from baseintent.intent_evidence import (PROFILE as V35_PROFILE, AUTH_POLICY as V35_AUTH_POLICY,
     AUDIT_POLICY as V35_AUDIT_POLICY, MAIN_TASK_POLICY, ISOLATION_POLICY, REVIEW_RULES, DECISION_GUIDE, AUDIT_THINKING, AUDIT_FORMAT, AUDIT_PROTOCOL as V35_OUTPUT_PROTOCOL, ENVELOPE_SCHEMA, permission_schema)
 
 PROFILES = ('legacy', 'legacy-v34', 'protocol-v1', 'tool-semantics-v1', 'source-context-v1', 'task-alignment-v1', V35_PROFILE)
-CATALOG_SCHEMA = 'dscg.authorization-tool-semantics.v1'
+CATALOG_SCHEMA = 'baseintent.authorization-tool-semantics.v1'
 
 TASK_ALIGNMENT_RULE = (
     'Match each explicitly requested step to the tool operation and object/destination kind. '
@@ -110,7 +110,7 @@ def semantic_catalog(profile):
 def audit_policy(legacy, profile):
     validate_profile(profile)
     if profile == 'legacy':
-        from dscg.intent_flow import AUDIT_POLICY
+        from baseintent.intent_flow import AUDIT_POLICY
         return AUDIT_POLICY
     if profile == 'legacy-v34':
         return legacy
@@ -125,7 +125,7 @@ def audit_policy(legacy, profile):
 def authorization_policy(legacy, profile, *, bounded=False):
     validate_profile(profile)
     if profile == 'legacy' and not bounded:
-        from dscg.intent_flow import INTENT_POLICY
+        from baseintent.intent_flow import INTENT_POLICY
         return INTENT_POLICY
     if profile == V35_PROFILE:
         return legacy if bounded else V35_AUTH_POLICY
@@ -140,7 +140,7 @@ def profile_binding(profile):
     if profile == 'legacy-v34':
         return {}
     if profile == 'legacy':
-        from dscg.intent_flow import identity
+        from baseintent.intent_flow import identity
         return {'prompt_profile': profile, 'prompt_profile_sha256': hashlib.sha256(
             json.dumps(identity(), sort_keys=True, ensure_ascii=False).encode()).hexdigest()}
     value = {'profile': profile, 'protocol': PROTOCOL_RULE,
@@ -157,6 +157,6 @@ def profile_binding(profile):
                  'audit_response_format': AUDIT_FORMAT,
                  'planning_tool_order': 'native-registration-v1', 'main_task_policy': MAIN_TASK_POLICY, 'isolation_policy': ISOLATION_POLICY, 'review_rules': REVIEW_RULES, 'decision_guide': DECISION_GUIDE,
                  'envelope_schema': ENVELOPE_SCHEMA, 'permission_schema_template': permission_schema(['registered_action']),
-                 'catalog_schema': 'native-tools-separated-v1', 'audit_input': 'dscg.audit-input.v5.10'}
+                 'catalog_schema': 'native-tools-separated-v1', 'audit_input': 'baseintent.audit-input.v5.10'}
     digest = hashlib.sha256(json.dumps(value, sort_keys=True, ensure_ascii=False).encode()).hexdigest()
     return {'prompt_profile': profile, 'prompt_profile_sha256': digest}

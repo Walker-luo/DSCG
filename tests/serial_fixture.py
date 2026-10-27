@@ -3,14 +3,14 @@ from types import SimpleNamespace
 from contextlib import contextmanager
 from unittest.mock import patch
 from pathlib import Path
-from dscg.benchmark_catalog import get_suites, get_suite
-from dscg.model_config import ModelConfig
+from baseintent.benchmark_catalog import get_suites, get_suite
+from baseintent.model_config import ModelConfig
 
 MAIN = ModelConfig('offline-model', 'fixture-key', 'https://example.invalid', 'custom')
 AUDIT = ModelConfig('offline-audit', 'fixture-key', 'https://example.invalid', 'custom')
 
 def resolve(*args, **kwargs):
-    return AUDIT if kwargs.get('prefix') == 'DSCG_SEC' else MAIN
+    return AUDIT if kwargs.get('prefix') == 'BASEINTENT_SEC' else MAIN
 
 class Tracker:
     def __init__(self): self.total_prompt_tokens=0; self.total_completion_tokens=0
@@ -19,12 +19,12 @@ class Tracker:
 
 def baseline(*args, **kwargs):
     tracker=Tracker()
-    pipe=SimpleNamespace(name='offline-model',dscg_model_config=MAIN.public_dict(),main_tracker=tracker)
+    pipe=SimpleNamespace(name='offline-model',baseintent_model_config=MAIN.public_dict(),main_tracker=tracker)
     return pipe,tracker
 
 def defended(*args, **kwargs):
     pipe,main=baseline(); audit=Tracker()
-    pipe.dscg_security_model_config=AUDIT.public_dict()
+    pipe.baseintent_security_model_config=AUDIT.public_dict()
     pipe.sec_tracker=audit
     from experiments import run_partial_benchmark as runner
     description = runner._describe_pipeline(args[0] if args else None, args[1] if len(args)>1 else None,
@@ -32,7 +32,7 @@ def defended(*args, **kwargs):
             l1_projection_mode='projected', planning_tool_view=True, delegated_tasks=True,
             audit_router_mode='off', audit_router_artifact=None, audit_retries=0, completion_prompt=False), **kwargs})
     pipe.name = description.name
-    pipe.dscg_optimization_config = description.dscg_optimization_config
+    pipe.baseintent_optimization_config = description.baseintent_optimization_config
     return pipe,main,audit
 
 def attack(name,*args):
@@ -53,10 +53,10 @@ def execute(suite,pipeline,task,injection_task=None,injections=None):
 def patched(execute_fn=execute):
     from experiments import run_partial_benchmark as runner
     from experiments.common.attack_execution import iter_serial_results
-    with patch.object(runner,'iter_attack_results',side_effect=iter_serial_results), \
-         patch.object(runner,'make_openai_compatible_pipeline',side_effect=baseline), \
-         patch.object(runner,'make_defended_pipeline',side_effect=defended), \
-         patch.object(runner,'resolve_model_config',side_effect=resolve), \
-         patch.object(runner.attacks,'load_attack',side_effect=attack), \
+    with patch.object(runner,'iter_attack_results',side_effect=iter_serial_results),\
+         patch.object(runner,'make_openai_compatible_pipeline',side_effect=baseline),\
+         patch.object(runner,'make_defended_pipeline',side_effect=defended),\
+         patch.object(runner,'resolve_model_config',side_effect=resolve),\
+         patch.object(runner.attacks,'load_attack',side_effect=attack),\
          patch.object(type(get_suite('v1.2',get_suites()[0])),'run_task_with_pipeline',new=execute_fn):
         yield

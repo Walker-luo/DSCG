@@ -4,11 +4,11 @@ import json
 from copy import deepcopy
 from pathlib import Path
 
-from dscg.benchmark_catalog import get_suites
-from dscg.input_isolation import FRAMEWORK_VERSION, framework_version_for_profile
-from dscg.audit_router import DEFAULT_THRESHOLD, validate_router_options
-from dscg.l1_projection import MODES as L1_PROJECTION_MODES
-from dscg.prompt_profiles import validate_profile, profile_binding
+from baseintent.benchmark_catalog import get_suites
+from baseintent.input_isolation import FRAMEWORK_VERSION, framework_version_for_profile
+from baseintent.audit_router import DEFAULT_THRESHOLD, validate_router_options
+from baseintent.l1_projection import MODES as L1_PROJECTION_MODES
+from baseintent.prompt_profiles import validate_profile, profile_binding
 
 ROUTING_KEYS = ("candidate_batches", "precheck_allowed_batches", "precheck_rejected_batches",
                 "public_read_bypass_batches", "semantic_audit_calls")
@@ -149,7 +149,7 @@ def display_metrics(run):
 
 def trace_stats(root, pipeline_name, suite, attack, task_keys):
     """Read only scored native task traces, excluding attack-generation preflights."""
-    from dscg.task_diagnostics import load_task_trace
+    from baseintent.task_diagnostics import load_task_trace
     root = Path(root).resolve()
     stats = {"expected_records": len(task_keys), "trace_records": 0, "routing_records": 0,
              "isolation_records": 0, "routing": dict.fromkeys(ROUTING_KEYS, 0),
@@ -166,11 +166,11 @@ def trace_stats(root, pipeline_name, suite, attack, task_keys):
         except (OSError, ValueError):
             continue
         stats["trace_records"] += 1
-        if trace.get('dscg_diagnostics_status') in ('missing','corrupt','invalid_reference','incomplete'):
+        if trace.get('baseintent_diagnostics_status') in ('missing','corrupt','invalid_reference','incomplete'):
             stats['diagnostic_errors'] += 1
-        for source, target, coverage in (("dscg_layer_routing", "routing", "routing_records"),
-                                          ("dscg_input_isolation", "isolation", "isolation_records"),
-                                          ('dscg_l2', 'l2', 'l2_records')):
+        for source, target, coverage in (("baseintent_layer_routing", "routing", "routing_records"),
+                                          ("baseintent_input_isolation", "isolation", "isolation_records"),
+                                          ('baseintent_l2', 'l2', 'l2_records')):
             recorded = trace.get(source)
             if not isinstance(recorded, dict):
                 continue
