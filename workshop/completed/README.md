@@ -1,120 +1,103 @@
-# 已完成阶段的优化材料
+# 已完成阶段报告索引
 
-- 2026-10-27：[benchmark日志任务ID定位](./benchmark_task_log_ids_20261027.md)：L2编译失败与逐目标GOAL警告补充stage／user_task_id／injection_task_id；两后端各16项针对性测试通过，无模型调用、权限或评分改动。
+以下文件是各自日期、分支和冻结输入下的历史记录，不是当前操作交接。报告中的“当前”“默认”、预算、命令和测试数字仅适用于该阶段；不得据此覆盖现行框架或重开关闭campaign。保留未采用、未验证、失败及错误的原始记录。
 
-- 2026-10-27：[v3.5.3默认static与效用优化](./v353_optimization_20261027.md) · [实施方案](./v353_implementation_plan_20261027.md)：248次计分，247有效／1 API错误；最终共同60例TSR29→39，ASR0/38。Slack／travel恢复，banking仅1/10、日期／误拒／候选混用仍在；保留旧I3 5失败／5错误。
+当前机制见 [README](../../README.md)和[框架说明](../../docs/framework_updates.md)，状态与后续任务见 [DV_STATE.md](../../DV_STATE.md)，操作规则见 [AGENTS.md](../../AGENTS.md)。工程方案与目录分工见 [Workshop索引](../README.md)。
 
-- 2026-10-25：[v3.4.1效用优化与Qwen在线对照](./v34_utility_optimization_20261025.md)：L2逐工具布尔授权、非敏感读取固定免审、L3阶段判断；18个配对案例×5组共90次计分全部有效，原版5/18→组合15/18，每组攻击ASR0/12。710调用、1,139,851已知Tokens；完成提示无新增效用，默认关闭。保留银行复合任务失败和10项已有I3离线失败／错误。
+## 阶段文件
 
-- 2026-10-25：[workshop 选择性提交迁移](./workshop_commit_transfer_20261025.md)：迁入 2d57bc7 单次筛选及 d457369 可独立诊断改动；保留当前 v3.4 运行路径，未迁入 intent-flow。AGENTS 与 769e11d 原文一致；在线 12 个有效计分案例、80 调用，工程记录未提交。
-
-- 2026-10-24：[Injection预检单次筛选与紧凑报告](./injection_screen_single_pass_20261024.md)：每目标一次，失败/错误不补测，续跑仅未开始目标；status只统计、summary按场景汇总，完整cohort/轨迹保留，旧冻结名单语义不变。无模型调用。
-
-- 2026-10-23：[v3.5后续真实迭代与停止交付](./v35_followup_20261023.md)：922请求、已知1,693,429Tokens，3次故障usage未知；最佳5/6但确认4/6，保留v3.4默认。有限思考反例危险allow已否决，prepared14未入生产；按用户要求不跑离线回归。
-
-- 2026-10-23：[DSCG_v3.5三轮真实迭代](./v35_live_iterations_20261023.md)：220次请求/384803Tokens；最终六例4成功、security全false，未达5/6双运行门槛；保留v3.4默认，v3.5仅显式候选。未跑离线回归。
-
-- 2026-10-22：[DSCG_v3.4判决契约与Qwen真实验证](./v34_decision_contract_20261022.md)：160次请求，6条新策略utility均false；字段通过但语义误拒/L2漏授仍在，暂不扩跑；离线回归按用户要求未执行。
-
-- 2026-10-22：[DSCG_v3.3 banking/Slack配对退步分析](./v33_tsr_analysis_20261022.md)：256条baseline成功/v3.3失败逐条证据；shadow未实际免审，协议/写入审计与规划停办分开，无模型调用。
-
-- 2026-10-22：[DSCG_v3.3读取路由与当前动作审计](./l3_read_policy_20261022.md)，读取批次规则候选、shadow观察与严格协议；仅离线验收。
-
-- 2026-10-22：[当前DSCG_v3.2的Slack下降分析](./slack_v32_analysis_20261022.md)，L2漏授改善、L3读取及记录校验仍主导；164条Slack退步逐条证据。
-
-- 2026-10-22：[L2原生定义与步骤授权](./l2_step_authorization_20261022.md)，v3.3；Qwen固定小样本及剩余L3阻断，未证明整体收益。
-
-新增[Slack/banking v4.1逐案例分析](./slack_banking_tsr_cases_20261022.md)：对齐baseline成功而v4.1失败的337条（Slack176、banking161），逐条记录授权、读取阻断、审计记录校验、工具调用及末答；只读分析，不改策略、不调用模型。
-
-新增[默认L2/L3意图与来源策略](./intent_source_relaxation_20261021.md)：默认v3.2保留合理工具候选、精简当前动作审计；分开记录模型协议、审计记录和回执失败。执行边界不变、旧诊断回放保留，仅离线验收，真实TSR/ASR待固定小样本验证。
-
-新增[Qwen 单案例在线核对](./tool_arguments_live_20261021.md)：仅原失败案例及其生成边界，9 次请求、11,472 Tokens，未复现 JSON 异常；单案例被审计阻断，效用未成功。补充安全错误元数据，不宣称输出根因修复。
-
-新增[工具参数 JSON 单任务隔离](./tool_arguments_json_20261021.md)：CLI 解析错误只结束当前任务，后续任务继续；错误排除评分分母，GOAL 错误独立报告，无参数修补或请求重试。原结果保留，线上续跑待用户启动。
-
-新增[按Attack默认并行](./attack_parallel_20261021.md)：每个attack独立spawn进程，内部场景与任务顺序不变；主进程统一校验、进度和根汇总。无新增参数；双环境原生离线并行/缓存对照通过，真实服务加速和限流待测。
-
-
-新增[精简任务对齐候选](./task_alignment_20261021.md)：`--prompt-profile task-alignment-v1`可直接进行benchmark；L2步骤与工具作用匹配、L3当前动作审计，保留原简洁目录和全部执行边界。诊断authorized-v2补齐合成授权/来源工具，旧包可复核。默认legacy不变，真实效果待测，无新增模型调用。
-
-新增[Qwen有限真实诊断结果](./utility_diagnosis_20261021.md)：已用完明确授权的144次请求，API错误0、Token131,588；L3协议改善未证明效用恢复，银行诊断缺授权上下文；L2语义候选新增错授权，不晋升默认。保留原始输入和响应，先以新版本修诊断；source/37clean未启动。
-
-新增[有限真实诊断采集器](./utility_collection_20261021.md)：明确执行/次数上限、SDK零重试、首次接口错误停止、调用前持久化及provider适配；此前为实际0次、等待授权的工程快照；后续用户明确批准的144次执行结果见上方新报告。
-
-新增[banking/Slack分阶段诊断准备](./utility_stages_20261021.md)：固定24审计例/12授权例、相邻响应比较和重叠失败信号；当时仅离线工程交付；后续144次模型诊断已完成但不晋升，37项clean仍待安排，默认防御未改。
-
-新增[L3审计提示压缩](./l3_audit_prompt_20261021.md)：基础提示3262→1919字符，保留来源/准备读取/外发审查并明确四字段协议；配置身份自动变化，仅离线验收，真实语义效果待测。
-
-新增[冻结cohort轻量读取](./cohort_lightweight_20261021.md)：只校验主模型ID/provider、后端版本、所选任务及一次名单摘要；不再访问原预检证据。实际测量缓存配置保持严格绑定，screen证据流程不变；取代下面旧adapter no-op名单读取策略。
-
-
-新增[旧cohort请求适配标记兼容](./cohort_adapter_noop_20261021.md)：仅对证据及当前序列化验证为无实际变化的AgentDojo/DashScope新增标记允许原名单继续读取；原cohort不改写，实际请求变化仍拒绝。双环境离线回归通过，无模型调用。
-
-新增[L3直接阈值路由](./l3_threshold_20261021.md)：默认经验阈值0.70，internal/personal读取资格，无运行时artifact依赖；shadow阈值比较与旧记录语义分离，真实收益待新实验。
-
-新增[Benchmark兼容与报告简化](./ponytail_benchmark_20261020.md)：单个runner净减44行；双后端6个离线场景共50份输出一致，全量Python及Node检查通过，无模型调用或研究闸门变化。
-
-新增[AgentDyn零TSR/ASR诊断与小样本对照](./agentdyn_zero_rates_20261020.md)：只读诊断与36条真实计分小样本；两模型shopping clean baseline均2/3，当前DSCG及两个候选均0/3。未修改默认策略；baseline攻击也为零且Qwen预检不稳定，不能据此认定防御有效。原266个用户结果文件哈希不变。
-
-新增[AgentDyn tool_knowledge 不兼容组处理](./agentdyn_tool_knowledge_20261020.md)：对实际选中目标做原生参考调用只读检查，dailylife组标记unsupported；CLI/Dashboard保留计划数、跳过理由和有效分母。双环境及Node离线回归通过，原DeepSeek结果保持原字节；真实模型续跑由用户显式启动。
-
-新增[AgentDyn/DeepSeek Chat角色兼容](./deepseek_chat_roles_20261020.md)：本次422诊断定位到AgentDyn的developer请求角色，宿主对DeepSeek增加独立适配身份；离线协议和双环境回归通过，真实服务须新名复测。
-
-新增[DeepSeek/AgentDyn TypeError 定位与修复](./deepseek_agentdyn_typeerror_20261020.md)：在线最小诊断定位到失败成本汇总，修正结构化API诊断的计数方式；AgentDyn原生缓存类型在内存中初始化。原用户结果保留，真实修复后测量仍需新运行名复测。
-
-新增[AgentDyn/Qwen消息角色兼容](./agentdyn_qwen_roles_20261019.md)：DashScope公共Chat适配与受限API失败诊断；请求身份绑定，新run名复测。原始失败与conda包保留；仅离线验证，服务器模型测试待运行。
-
-新增[L3校准候选参数初始化](./l3_preset_20261019.md)：候选网格/参考值与5%风险、5%置信错误目标已保存，校准入口支持显式预设；仍需独立标签/分组校准，无部署阈值或新免审。
-
-新增[结果精简与L3运行级汇总](./result_reports_20261019.md)：共享离线报告、紧凑摘要与完整失败索引已接线；指定旧目录仅新增两份报告，1279原文件SHA256不变。两环境/网页回归通过，无模型调用或防御策略变化；[使用指南](../../docs/result_files.md)。
-
-最新结果布局：[按后端分目录](./backend_result_layout_20261018.md)。CLI测量/预检使用分类根/后端/运行目录；旧目录原地续跑，历史页兼容；网页发起实验布局不变。
-
-当前测试流程：[顺序执行与轻量校验](./serial_lightweight_20261018.md)。已移除workers及源码扫描哈希；旧结果按配置续跑，cohort证据校验保留。此前并发实施报告保留为历史。
-
-当前：[双基准自动切换](./dual_benchmark_20261018.md)支持ipi/AgentDojo与ipi-agentdyn/AgentDyn，只切换环境；旧阶段的AgentDyn-only描述保留当时上下文，不再限制当前新实验。
-
-新增 [AgentDyn全流程接入](./agentdyn_integration_20261017.md)：固定后端、新三个场景、风险目录、CLI/网页/历史身份、错误分母与离线模拟已完成；原四场景结果保持历史，真实攻击强度和模型TSR/ASR待验收。
-
-新增 [Clean通用误伤修正](./clean_utility_20261015.md)：工程与离线回归完成；约5pp目标、真实clean/攻击/成本验收待完成。
-
-后续 [准备读取诊断](./read_discovery_20261016.md) 已完成一轮有限验证，提示/输入候选因新增误拒撤回。保留的请求格式预检查不改善TSR，不能把归档候选算作已部署能力。
-
-当前运行代码为 **three-layer-v3.1**。这里收纳工程、评估或整理阶段已完成的文件；每个阶段的实验目标、备选机制与研究闸门分别列示。历史原文中的“尚未实施”描述属于当时设计，当前状态以本表和后续实施报告为准。
-
-| 材料 | 已完成 / 当前保留 | 未完成、撤回或仅为设计 |
-| --- | --- | --- |
-| [Qwen接入与进程并发](./qwen_parallel_20261018.md) | 双模型默认Qwen3.7-Flash关闭思考；该阶段并发实现已由后续顺序流程替代，原报告/证据保留 | 仅离线接线与调度验收；无官方Batch折扣、真实服务或防御收益验证 |
-| [服务器cohort续跑排错](./cohort_resume_diagnostics_20261017.md) | 明确源码不匹配提示、相同服务器Python版本的兼容修复；413项离线回归 | 服务器需同步修复、恢复解析器默认None并保持原防御参数；未运行真实benchmark |
-| [默认攻击与显式续跑](./benchmark_reuse_20261017.md) · [用法](../../docs/benchmark.md#显式续跑示例) | 新typical三攻击；reuse保留旧计划/缓存及证据，407项离线通过 | 旧baseline缺原生防御证据时拒绝；不新增错误重试或真实模型结果 |
-| [Experiments目录归类](./experiments_layout_20261017.md) · [入口索引](../../experiments/README.md) | 三个日常入口保留原命令，其余归入common/diagnostics/calibration/tools；391项离线回归 | 没有新增模型结果，I3/E0状态及既有实验身份保留 |
-| [测试指南结构整理](./docs_benchmark_structure_20261017.md) · [测试索引](../../docs/evaluation.md) | 分开完整任务与partial运行说明；同步CLI shadow默认与baseline/NoChecker兼容 | 无真实模型或收益验证；原始文档及历史证据保持可追溯 |
-| [预检进度与统一benchmark入口](./injection_progress_20261016.md) | screen实时进度/15秒等待、旧状态与名单兼容、统一--cohort、screened元数据、薄兼容转发；369/369离线通过 | 真实服务器预检/筛选攻击待执行，未产生新模型结果或安全收益 |
-| [Injection 目标预检与筛选测量](./injection_precheck_20261016.md) · [用户指南](../../docs/injection_precheck.md) | 独立screen/benchmark、兼容复用/失败复测、冻结分母与错误/成本记录；358项离线回归 | 真实服务器预检和筛选后的匹配攻击实验待执行，直接失败不证明间接攻击不可能 |
-| [全量benchmark入口同步](./full_benchmark_20261015.md) · [用户指南](../../docs/benchmark.md) | 复用执行/报告流程、全部注册任务、baseline/clean/攻击选择、当前控制与绑定；318项离线检查通过 | 未运行真实全量模型实验，不证明防御率/成本收益或E0通过 |
-| [L1有限投影实施](./l1_projection_20261013.md) · [计划](./L1_projection_implementation_plan_20261013.md) | 原生银行月支出六字段/全行投影、严格回退、模式/缓存/路由绑定、原文审计与平台默认同步 | 仅一个有限profile；真实四臂安全/效用/Token验收与更广输出适配仍待完成，未宣称新颖性 |
-| [Dashboard v2.2显示同步](./dashboard_v22_20261013.md) | 动态引擎版本、L1/L3规则、有效流程预览、历史版本/路由/成本状态、桌面与窄屏验收 | 无新模型评测或运行机制；网页CSA控制和失败片段浏览器仍未实施 |
-| [防御下降诊断与修复](./defense_regression_analysis_20261012.md) · [后续复核](./l2_docs_sync_20261013.md) | 定向验证保留；当前已记录144条v2.2：TSR130/144、nativeASR0/144 | 原报告是2026-10-12快照；当前重复控制、独立终态与因果/成本验收仍待完成，旧哈希不改写 |
-| [L2文档/平台交接复核](./l2_docs_sync_20261013.md) | 当前源码/保留产物审查、完整144条现有记录核对、README/workshop/指南同步；当时的显示待办由后续Dashboard阶段完成 | 不新增运行机制或模型评测；原报告保留当时状态 |
-| [模型/工具配置文档](../../docs/model_tool_configuration.md) · [报告](./configuration_docs_20261013.md) | evaluation配置节扩写、README入口、TOML/离线代码示例与字段/控制核对 | 无runtime/默认值/配置改动，不运行真实模型或任务 |
-| [L2优化实施](./l2_implementation_20261012.md) · [计划](./L2_implementation_plan_20261012.md) | 授权视图、host profile API/只读闭包、有界文件展开、新任务替换/目录复核、平台控件 | 真实profile/标签、匹配成本与效用/安全验证待完成；通用跨轮语义、按需展示、热目录与部分执行未实施 |
-| [三层基础方案](./3_layer_opt.md) · [实施报告](./three_layer_implementation_20261010.md) · [实施计划](./three_layer_implementation_plan_20261010.md) | L1来源视图、L2整批前置、原L3、平台架构；离线实施验收完成 | §5总成本目标与§7匹配模型消融尚未正式验收；CSA、DRV、LLM净化、自动恢复未启用 |
-| [L3纯算法实现](./l3_algorithm_implementation_20261010.md) · [计划](./l3_algorithm_implementation_plan_20261010.md) | 工具/模式/校准/凭据工程接入，默认off | 真实独立数据、部署阈值和模型匹配收益尚未验收 |
-| [框架与平台介绍](../../report/report.md) | 按用户要求放在 report/；10页主线与备份资料，供后续 LaTeX Beamer 制作 | 平台截图留白；实际幻灯片和真实收益实验待后续制作/验证 |
-| [本次文档与交接核查](./framework_docs_cleanup_20261010.md) | README流程/例子、归档状态和平台交付核对 | 文档核查不证明ASR/TSR改善 |
-| [实验配置与工作台](./dashboard_framework_ui_20261010.md) | 三层配置/预设、实际配置与路由统计、有效分母/成本口径、响应式验收 | 无新模型实验、CSA 或失败片段浏览器；旧 trace 缺失不重建 |
-| [Partial结果报告](./partial_reporting_20261010.md) | 运行级摘要、位置索引、有界失败片段 | 无新评分oracle；平台独立失败片段浏览器未实施 |
-| [V2后续报告](./framework_v2_followup_report.md) | Stage1宿主描述与准备读取判断保留；重放方法已纠正 | Stage2执行提示已评估并撤回，completion_prompt默认false；重复控制和真实E0仍待完成 |
-| [V2实施记录](./framework_v2_report.md) | 任务隔离、授权简化、有限工具上下文等保留 | 当时试验参数不等于当前默认；不认定动态扩权/完整scope已实现 |
-| [V2提案](./framework_optimization_v2_proposal_20261007.md) · [约束](./framework_optimization_direction_20261007.md) | 授权/审计主线已由后续报告落实；新三层由用户另行选用 | 原§5局部LLM工具返回处理未采用；当前L1是来源封装，不能称等价净化已完成 |
-| [初轮方案](./framework_optimization_20261007.md) · [报告](./framework_optimization_report.md) · [复核](./framework_optimization_review_20261007.md) | 任务隔离、风险元数据与误拒问题已进入后续V2修正 | 有界重审/完成提示不作为默认；原重复模型验证矩阵不是全已执行清单 |
-| [早期工程计划](./2026-10-05-workshop-engineering-optimization.md) · [报告](./workshop_optimization_report.md) | harness bookkeeping、紧凑trace与I3 fixtures | E0合成自检不等于真实闸门；旧八例I3 no_go被24valid/8scope的partial证据取代 |
-| [项目结构整理](./project_structure_20261008.md) | 文档分工、路径与产物规则 | 既有历史输入缺失不重建，完整迁移存在已记录限制 |
-
-L2原始工程报告和计划保留为当时v2的实施记录，当前v2.2状态读 [后续复核](./l2_docs_sync_20261013.md)；未验收的 [L2方案](../L2_opt.md)仍在顶层。
-
-仍待真实数据与收益验收的 [L3 Checker](../L3_checker_opt.md) 与 [授权对照校准（历史归档）](../archive/framework_docs_cleanup_20261010/originals/workshop/original_framework_direction_20261008.md) 留在 [顶层索引](../README.md)。正式E0/I3/I2状态以 [研究路线](../../../research/technical_route.md) 和 [I3交接记录](../../../research/Experiments/implementation_status.md) 为准。
-
-旧稿件与CFP：[投稿草案](../archive/legacy_submission/ALMML_sub.md)、[原附件](<../AIMLL WS.pdf>)；旧docs/图表见 [归档索引](../archive/project_structure_20261008/README.md)。旧证据位于 [workshop/results/](../results/framework_optimization/)，所有新输出放 `workshop/artifacts/`。
-
-本次移动前的原始字节与哈希单独保留；历史报告的路径更新只改变当前阅读入口，不重写原样本或测量。完整存放规则见 [AGENTS.md](../../AGENTS.md)。
+- [当前交接残留清理（2026-10-27）](handoff_cleanup_20261027.md)
+- [Workshop Engineering Optimization Implementation Plan](2026-10-05-workshop-engineering-optimization.md)
+- [DSCG 低开销三层基础方案（已实施）：输入降权、任务授权、按风险动作审计](3_layer_opt.md)
+- [L1 finite projection implementation plan](L1_projection_implementation_plan_20261013.md)
+- [L2 implementation plan](L2_implementation_plan_20261012.md)
+- [AgentDyn 全流程接入交付（2026-10-17）](agentdyn_integration_20261017.md)
+- [AgentDyn 全流程接入（2026-10-17）](agentdyn_integration_plan_20261017.md)
+- [AgentDyn／Qwen Chat消息角色兼容修复（2026-10-19）](agentdyn_qwen_roles_20261019.md)
+- [AgentDyn `tool_knowledge × dailylife` 不兼容组处理](agentdyn_tool_knowledge_20261020.md)
+- [AgentDyn 零 TSR/ASR：诊断与 shopping 小样本对照](agentdyn_zero_rates_20261020.md)
+- [默认按 Attack 并行测试（2026-10-21）](attack_parallel_20261021.md)
+- [CLI测试结果按后端归类（2026-10-18）](backend_result_layout_20261018.md)
+- [三攻击typical与显式续跑](benchmark_reuse_20261017.md)
+- [默认攻击与显式续跑实施计划](benchmark_reuse_20261017_plan.md)
+- [benchmark日志任务ID定位（2026-10-27）](benchmark_task_log_ids_20261027.md)
+- [Clean 通用误伤修正：v3.1](clean_utility_20261015.md)
+- [Clean 通用误伤修正实施计划](clean_utility_opt_20261015.md)
+- [冻结 cohort 的无效请求适配变更兼容](cohort_adapter_noop_20261021.md)
+- [冻结 cohort 的轻量测量读取（2026-10-21）](cohort_lightweight_20261021.md)
+- [服务器 cohort 续跑排错（2026-10-17）](cohort_resume_diagnostics_20261017.md)
+- [测试轨迹精简与独立审计记录](compact_task_diagnostics_20261025.md)
+- [模型与工具配置说明补全（2026-10-13）](configuration_docs_20261013.md)
+- [实验配置与安全评测工作台更新（2026-10-10）](dashboard_framework_ui_20261010.md)
+- [Dashboard v2.2 显示同步与验收](dashboard_v22_20261013.md)
+- [DeepSeek Flash / AgentDyn TypeError 定位与修复（2026-10-20）](deepseek_agentdyn_typeerror_20261020.md)
+- [AgentDyn / DeepSeek Chat 角色兼容（2026-10-20）](deepseek_chat_roles_20261020.md)
+- [2026-10-12 防御效果下降：历史诊断与有界修复](defense_regression_analysis_20261012.md)
+- [测试文档结构整理与CLI路由默认值](docs_benchmark_structure_20261017.md)
+- [AgentDojo／AgentDyn 双基准自动切换交付（2026-10-18）](dual_benchmark_20261018.md)
+- [AgentDojo / AgentDyn dual backend integration](dual_benchmark_plan_20261018.md)
+- [Experiments / docs 整理](experiments_docs_cleanup_20261017.md)
+- [Experiments目录归类](experiments_layout_20261017.md)
+- [Experiments 目录归类 Implementation Plan](experiments_layout_20261017_plan.md)
+- [框架说明、方案归档与平台交接核查（2026-10-10）](framework_docs_cleanup_20261010.md)
+- [DSCG 可用性与安全收益优化方案](framework_optimization_20261007.md)
+- [框架优化方向约束（2026-10-07）](framework_optimization_direction_20261007.md)
+- [框架优化实施报告](framework_optimization_report.md)
+- [workshop_opt 结果复核与后续工程方向](framework_optimization_review_20261007.md)
+- [DSCG 下一轮框架优化方案](framework_optimization_v2_proposal_20261007.md)
+- [V2 后续优化记录](framework_v2_followup_report.md)
+- [两层框架 V2 实施记录](framework_v2_report.md)
+- [全量 benchmark 入口同步与测试指南](full_benchmark_20261015.md)
+- [Full benchmark 场景选择](full_suites_20261017.md)
+- [历史分析目录／基准联动筛选（2026-10-18）](history_backend_filter_20261018.md)
+- [历史分析柱顶标记与图例调整（2026-10-15）](history_labels_20261015.md)
+- [历史分析场景多选与默认指标（2026-10-22）](history_multisuite_20261022.md)
+- [历史分析柱体填充调整（2026-10-15）](history_patterns_20261015.md)
+- [历史图表提示框短名称（2026-10-20）](history_tooltip_20261020.md)
+- [Injection 目标预检与筛选测量实施记录](injection_precheck_20261016.md)
+- [预检实时进度与 benchmark 入口统一](injection_progress_20261016.md)
+- [Injection 预检：单次筛选与紧凑输出](injection_screen_single_pass_20261024.md)
+- [默认 L2/L3 意图与来源策略（2026-10-21）](intent_source_relaxation_20261021.md)
+- [L1有限结构化投影实施记录](l1_projection_20261013.md)
+- [L2当前状态与平台文档复核（2026-10-13）](l2_docs_sync_20261013.md)
+- [L2 优化实施报告（2026-10-12）](l2_implementation_20261012.md)
+- [L2 原生工具定义与步骤覆盖授权（2026-10-22）](l2_step_authorization_20261022.md)
+- [L3纯算法选择性审计工程报告](l3_algorithm_implementation_20261010.md)
+- [L3 pure-algorithm implementation plan](l3_algorithm_implementation_plan_20261010.md)
+- [L3默认审计提示压缩（2026-10-21）](l3_audit_prompt_20261021.md)
+- [L3路由候选参数初始化（2026-10-19）](l3_preset_20261019.md)
+- [DSCG_v3.3：L3读取路由与当前动作审计](l3_read_policy_20261022.md)
+- [L3 直接阈值路由交付（2026-10-21）](l3_threshold_20261021.md)
+- [分层诊断 v2 与框架失败原生计分（2026-10-25）](layered_diagnostics_failure_scoring_20261025.md)
+- [Partial 冻结 injection 名单](partial_cohort_20261017.md)
+- [Partial 结果摘要与失败片段（2026-10-10）](partial_reporting_20261010.md)
+- [Partial 场景选择](partial_suites_20261017.md)
+- [Benchmark compatibility/reporting simplification — 2026-10-20](ponytail_benchmark_20261020.md)
+- [DSCG Project Structure Implementation Plan](project_structure_20261008.md)
+- [Qwen3.7-Flash 接入与测试分组并发（2026-10-18）](qwen_parallel_20261018.md)
+- [Qwen banking / Slack 效用诊断与候选工程报告](qwen_utility_20261019.md)
+- [准备读取优化：有限诊断、候选实现与撤回](read_discovery_20261016.md)
+- [结果目录精简与运行级L3汇总交付（2026-10-19）](result_reports_20261019.md)
+- [结果精简与L3根级汇总实施账本](result_reports_20261019_plan.md)
+- [顺序测试与轻量配置校验（2026-10-18）](serial_lightweight_20261018.md)
+- [Slack / banking TSR退步：DSCG_v4.1逐案例分析（2026-10-22）](slack_banking_tsr_cases_20261022.md)
+- [DSCG_v3.2：L2已改善，Slack仍被L3读取与记录校验阻断](slack_v32_analysis_20261022.md)
+- [banking／Slack 精简任务对齐候选交付](task_alignment_20261021.md)
+- [三层基础框架实施记录（2026-10-10）](three_layer_implementation_20261010.md)
+- [三层基础框架实施计划](three_layer_implementation_plan_20261010.md)
+- [工具参数 JSON 异常的单任务隔离（2026-10-21）](tool_arguments_json_20261021.md)
+- [Qwen 工具参数异常：单案例在线核对（2026-10-21）](tool_arguments_live_20261021.md)
+- [有限真实诊断采集器（2026-10-21）](utility_collection_20261021.md)
+- [Qwen banking／Slack 有限诊断结果（2026-10-21）](utility_diagnosis_20261021.md)
+- [banking／Slack 分阶段诊断工程交付（2026-10-21）](utility_stages_20261021.md)
+- [DSCG_v3.3：banking／Slack的baseline成功配对退步分析](v33_tsr_analysis_20261022.md)
+- [DSCG_v3.4：判决契约实施与Qwen真实失败案例验证](v34_decision_contract_20261022.md)
+- [v3.4.1 效用优化与 Qwen 在线对照](v34_utility_optimization_20261025.md)
+- [v3.5.1 TSR分型诊断（2026-10-26）](v351_tsr_diagnosis_20261026.md)
+- [v3.5.3 Implementation Plan](v353_implementation_plan_20261027.md)
+- [v3.5.3：默认启用static与效用优化](v353_optimization_20261027.md)
+- [DSCG_v3.5 后续真实迭代与停止交付（2026-10-23）](v35_followup_20261023.md)
+- [DSCG_v3.5：三轮真实迭代与停止结论（2026-10-23）](v35_live_iterations_20261023.md)
+- [v3.5.1 残余问题优化与Qwen专项验证（2026-10-26）](v35_optimization_20261026.md)
+- [workshop 选择性提交迁移（2026-10-25）](workshop_commit_transfer_20261025.md)
+- [DSCG Workshop 优化结果](workshop_optimization_report.md)

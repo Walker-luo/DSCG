@@ -15,7 +15,7 @@ python -m dscg.benchmark_catalog
 
 ## 2. 模型连接
 
-`main`用于规划、最终回答与L2；`security`用于L3。主模型须支持tools/function calling及JSON输出，审计模型须支持JSON。默认Qwen3.7-Flash；保留独立模型配置。
+`main`用于规划、最终回答与L2；`security`用于L3。主模型须支持tools/function calling及JSON输出，审计模型须支持JSON。在线测试两者均只允许Qwen3.7-Flash；DeepSeek等兼容代码／配置仅保留历史用途，不能作为当前在线测试选择或fallback。模型配置仍分别解析，调用前核对实际生效值；规则见 [AGENTS.md](../AGENTS.md#validation-and-model-call-budgets)。
 
 <a id="24-最小可运行配置与角色复用"></a>
 

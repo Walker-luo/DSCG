@@ -58,7 +58,7 @@ stage还有authorization／source；默认authorized-v2补齐合成授权、sche
 
 ## 真实响应采集
 
-`utility_collect`是独立在线工具，只有显式execute、次数上限和新输出目录才发送请求；诊断范围／模型需属于当前获准任务，历史阶段预算不可复用。参数先用 `--help`查看：
+`utility_collect`是独立在线工具，只有显式execute、次数上限和新输出目录才发送请求；行为验证已有免逐次确认授权，但当前在线请求仍只允许qwen3.7-flash，历史阶段预算不可复用。先核对reference manifest的实际模型／provider，DeepSeek或其他模型的记录不得用于发送请求。参数先用 `--help`查看：
 
 ```bash
 python -m experiments.diagnostics.utility_collect --execute --stage audit \
@@ -74,4 +74,4 @@ python -m experiments.diagnostics.utility_collect --execute --stage audit \
 
 审计协议失败与Monitor记录／回执失败分开；原始L3回复见.dscg.responses.jsonl，实际动作看主JSON与最终ledger。来源含注入不自动证明当前动作违规；一次allow也不证明安全。旧READ_ONLY_SOURCE_ALLOW只解释历史轨迹，不覆盖当前私人读取deny。
 
-后续任务评测应匹配baseline／legacy／候选的实际任务ID、注入内容、模型和cohort，并保留clean／攻击控制及全部错误／成本；partial前缀不能验证后续问题任务。最新失败类型见[v3.5.2分析](../analysis/v3-5-2.md)，详细文件见[结果指南](result_files.md)。
+后续任务评测应匹配baseline／legacy／候选的实际任务ID、注入内容、模型和cohort，并保留clean／攻击控制及全部错误／成本；partial前缀不能验证后续问题任务。最新失败类型见[v3.5.3分析](../analysis/v3-5-3.md)，详细文件见[结果指南](result_files.md)。

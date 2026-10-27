@@ -1,6 +1,6 @@
 # 实验工具索引
 
-从DSCG目录执行，激活`ipi`使用AgentDojo，激活`ipi-agentdyn`使用AgentDyn。主目录只保留三个日常运行入口；相同命令按实际导入路径、安装来源/版本/revision选择后端，不根据环境名称猜测或混合两套场景。模型运行由用户显式启动。
+从DSCG目录执行，激活`ipi`使用AgentDojo，激活`ipi-agentdyn`使用AgentDyn。主目录只保留三个日常运行入口；相同命令按实际导入路径、安装来源/版本/revision选择后端，不根据环境名称猜测或混合两套场景。当前默认DSCG_v3.5.3／static-task-v352；在线只用Qwen3.7-Flash，agent行为验证适用[既有授权规则](../AGENTS.md#validation-and-model-call-budgets)，完整benchmark仍需明确请求。
 
 环境配置分别为[environment.yml](../environment.yml)与[environment-agentdyn.yml](../environment-agentdyn.yml)。AgentDojo使用0.1.35发行版本，AgentDyn固定commit 5353cf7615b135cace8d07c8f12dac53a16b6db3。历史源码锁保留，当前运行只核对元数据，不扫描后端与工程源码哈希。可离线列出实际目录：
 
@@ -69,7 +69,7 @@ python -m experiments.tools.generate_tool_metadata --help
 
 旧顶层专项模块不保留转发壳；历史报告中的旧命令保留当时上下文，复跑使用上述新路径。原始字节及路径/哈希映射见 [本次归档](../workshop/archive/experiments_layout_20261017/README.md)。先前移除的专用诊断/绘图代码仍在 [早期归档](../workshop/archive/experiments_docs_cleanup_20261017/README.md)，不恢复到当前目录。
 
-full/partial/cohort按攻击、场景顺序执行，已删除workers和进程调度；准备静默核对配置，不创建pipeline。目录包含实际后端。旧运行配置一致可续跑，原manifest、attempt与cohort不改写；后端、模型、任务或有效防御配置变化仍拒绝。
+full/partial/cohort在多攻击时分独立进程并行，每个攻击内按原生顺序执行场景／GOAL／计分任务；单攻击、clean和screen顺序执行。准备阶段静默核对配置，主进程统一进度与根报告。目录包含实际后端；旧运行配置一致可续跑，原manifest、attempt与cohort不改写，后端、模型、任务或有效防御配置变化仍拒绝。
 
 用户实验仍默认写入results。Agent临时检查显式写入新的workshop/artifacts任务目录，不改写历史实验。
 

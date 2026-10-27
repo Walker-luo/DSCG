@@ -1,31 +1,16 @@
-# L3：直接阈值运行与后续扩展
+# L3 路由：当前边界与未验收项
 
-## 当前已实现：threshold-read-v1（2026-10-21）
+当前规则为`sink-free-read-v4`，实现见 [audit_router.py](../dscg/audit_router.py)与[流水线](../dscg/pipelines/defended.py)；操作见[配置指南](../docs/model_tool_configuration.md#l3读取路由)及[结果指南](../docs/result_files.md)。
 
-- 保留字符三元组和四个信号的最大值s；无需分类器、独立标签或运行时artifact。
-- 默认经验阈值0.70；合法有限数值[0,1]。满足资格且s<threshold才免审，等于阈值继续审计。
-- 资格为单个已授权、元数据有效、幂等、无sink的internal/personal读取；schema、完整性及长度检查保留。secret、写入、金融、删除、邀请、外发仍审计，风险目录不变。
-- CLI默认shadow，Python/Dashboard API默认off；shadow保留真实审计，selective才实际免审。L2、Monitor、一次性交接与执行票据保持。
-- full/partial/cohort/screen和Dashboard API使用同一阈值，公开字段audit_router_threshold；旧artifact参数非空报迁移错误。
-- 策略/资格/阈值绑定运行身份，新策略和不同阈值须新run名；历史结果不重解释。
+## 当前规则
 
-```bash
-python -m experiments.run_benchmark --suites banking slack --name threshold_shadow_new \
-  --audit-router-mode shadow --audit-router-threshold 0.70
-```
+- 已注册、已授权、schema有效的`effect=read`、public/internal、`sink=none`调用在off/shadow/selective均固定免审。外部接收方读取、personal/secret读取及效果动作仍审计；valid deny／abstain阻断。
+- 混合批次只审非免审子集，整批候选／权限检查、回执及一次性票据继续约束原调用。工具级标签不认证对象私密性、来源事实或查询参数安全。
+- CLI默认shadow，factory/API默认off；off不关闭L3。阈值和分项分数只作诊断／配置绑定，不控制当前免审范围。
+- 无需加载旧校准artifact；非空旧artifact参数仍拒绝。旧threshold-read-v1、read-purpose-v2与独立校准工具只按各自历史协议解释，不作为当前放行条件。
 
-## Shadow记录与阈值选择
+## 未验收项
 
-逐次保留四个分项、s、阈值、资格/回退原因、模拟选择、实际审计判决与协议有效性、Monitor结果、审计Token及延迟。根级l3_router_summary.md/json按攻击/场景/配置比较0.65/0.70/0.75及实际阈值，原公开读取免审单独统计。
+没有建立独立安全标签下的一般风险上界、适应性攻击安全或真实Token节省结论。任何新路由规则须先选择明确范围，保留匹配clean／攻击、错误、未知成本和原生标签；不得凭audit allow或shadow分歧替代独立验证，也不得自动把历史校准范围扩大到新工具。
 
-这些是已记录历史轨迹上的经验统计，不是误放率、风险上界或真实Token节省；未知输入/成本保留未知，不自动选阈值。0.70需要后续shadow与匹配实验验证，不承诺TSR/ASR改善。
-
-## 待扩展（当前不作为运行条件）
-
-独立标签校准、多字符长度对照和其他路由特征待单独评估。当前不更改n=3，不新增动态扩权、参数/对象机制或恢复动作。原独立校准工具与config/l3_router.calibration.json保留旧internal范围及原语义，未来应用到扩大后的范围需另行设计验证。
-
-## 0. 候选参数初始化（2026-10-19，历史）
-
-旧grid=[0.65,0.70,0.75]、epsilon/delta=.05/.05和80组算例仅属于原独立分组校准方案，不控制当前路由。原文按原字节保存在[历史方案](./archive/l3_calibration_runtime_20261021/L3_checker_opt.md)，既有实施报告与输入证据均保留。
-
-使用说明：[配置指南](../docs/model_tool_configuration.md#l3直接阈值路由) · [结果指南](../docs/result_files.md)。
+历史算法与阈值设计见 [算法实施](completed/l3_algorithm_implementation_20261010.md)、[阈值阶段](completed/l3_threshold_20261021.md)；当前后续工作以 [DV_STATE.md](../DV_STATE.md)为准。

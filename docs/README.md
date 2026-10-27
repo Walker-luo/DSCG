@@ -15,4 +15,4 @@
 | [Dashboard](dashboard.md) | 启动、配置、历史对比与下载 |
 | [当前交接](framework_updates.md) | 已实施范围、遗留问题与历史入口 |
 
-[最新结果分析](../analysis/v3-5-2.md)和[DV_STATE](../DV_STATE.md)记录当前实验与工程状态。阶段过程保留在[completed](../workshop/completed/README.md)，旧材料见[archive](../workshop/archive/project_structure_20261008/README.md)。本目录只放使用说明；计划在workshop，agent产物在新的workshop/artifacts任务目录。
+[最新结果分析](../analysis/v3-5-3.md)和[DV_STATE](../DV_STATE.md)记录当前实验与工程状态。阶段过程保留在[completed](../workshop/completed/README.md)，旧材料见[archive](../workshop/archive/project_structure_20261008/README.md)。本目录只放使用说明；计划在workshop，agent产物在新的workshop/artifacts任务目录。
