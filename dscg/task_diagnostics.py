@@ -12,6 +12,7 @@ from uuid import uuid4
 SCHEMA = 'dscg.task-diagnostics.v2'
 LEGACY_SCHEMA = 'dscg.task-diagnostics.v1'
 REQUEST_REFERENCE_SCHEMA = 'dscg.request-reference.v1'
+OUTCOME_PROJECTION_VERSION = 'native-grades-recorded-api-errors-v2'
 _current = ContextVar('dscg_task_diagnostics', default=None)
 _task_log_context = ContextVar('dscg_task_log_context', default=None)
 
@@ -420,7 +421,19 @@ def merge_task_diagnostics(path, raw):
 
 def load_task_trace(path):
     path=Path(path)
-    return merge_task_diagnostics(path,json.loads(path.read_text(encoding='utf-8')))
+    result = merge_task_diagnostics(path,json.loads(path.read_text(encoding='utf-8')))
+    # Merge the bound attempt first: earlier failed attempts must not taint a fresh run.
+    cost = result.get('dscg_cost') if isinstance(result, dict) else None
+    models = cost.get('models', []) if isinstance(cost, dict) else []
+    models = models if isinstance(models, list) else []
+    failed = sum(value['failed_calls']
+        for model in models if isinstance(model, dict)
+        for value in model.values() if isinstance(value, dict)
+        if type(value.get('failed_calls')) is int and value['failed_calls'] > 0)
+    if failed and not result.get('dscg_infrastructure_failure'):
+        result['dscg_infrastructure_failure'] = dict(module='Models', stage='request',
+            reason_code='RECORDED_API_FAILURE', failed_calls=failed)
+    return result
 
 
 def diagnostic_dependencies(path):

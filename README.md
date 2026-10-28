@@ -2,7 +2,7 @@
 
 DSCG 是工具使用型 LLM Agent 的间接提示词注入防御研究原型，支持 AgentDojo 与 AgentDyn，使用原生评分比较任务成功率（TSR）、攻击成功率（ASR）和模型开销。
 
-当前版本 **DSCG_v3.5.3**，默认 **`prompt_profile=static-task-v352`**，启用两阶段L2；显式`legacy`保留单次授权对照。运行名称不选择策略。 最新正式结果中travel恢复，banking／Slack仍低于baseline，见[结果分析](analysis/v3-5-3.md)。
+当前版本 **DSCG_v3.5.4**，默认 **`prompt_profile=static-task-v354`**：原文片段ID任务视图＋全局工具授权。显式`static-task-v352`保留v3.5.3策略，`legacy`保留单次授权。运行名称不选择策略；本轮专项结果见[分析](analysis/v3-5-4.md)，最近正式结果仍为[v3.5.3](analysis/v3-5-3.md)。
 
 ## 当前框架与工作流程
 
@@ -35,7 +35,8 @@ CLI默认router shadow，API/factory默认off；**off仍运行L3**。关闭整�
 | `prompt_profile` | L2路径 | 使用状态 |
 | --- | --- | --- |
 | `legacy` | 完整任务 → 一次全局工具授权 | 显式单次授权对照 |
-| `static-task-v352` | 完整任务 → 静态任务视图 → 全局工具授权 | v3.5.3默认；视图含原文位置、顺序／条件，供规划与审计共享 |
+| `static-task-v354` | 完整任务 → 片段ID视图 → 全局工具授权 | 当前默认；宿主映射原文位置，条件使用互斥分支 |
+| `static-task-v352` | 完整任务 → 逐字引用视图 → 全局工具授权 | v3.5.3策略对照 |
 
 静态视图是可能出错的辅助摘要，原始请求仍为依据；它不验证条件、参数或完成状态，不增加动态授权或自动恢复。2026-10-26正式v3.5.2结果使用默认legacy，**没有测试该两阶段候选**。历史profile见[候选与诊断](docs/qwen_utility.md)。
 
@@ -68,13 +69,13 @@ python -m dscg.benchmark_catalog                # 离线检查，无模型调用
 以下命令会调用真实模型，从项目根执行，使用未用过的新名称：
 
 ```bash
-# 同范围的原生baseline与默认v3.5.3
+# 同范围的原生baseline与默认v3.5.4
 python -m experiments.run_partial_benchmark --baseline --name baseline_partial_01 --progress
-python -m experiments.run_partial_benchmark --name v353_static_partial_01 --progress
+python -m experiments.run_partial_benchmark --name v354_static_partial_01 --progress
 
 # 显式选择单次授权对照；AgentDojo示例
 python -m experiments.run_partial_benchmark --suites banking slack \
-  --prompt-profile legacy --name v353_legacy_partial_01 --progress
+  --prompt-profile legacy --name v354_legacy_partial_01 --progress
 ```
 
 partial是每场景注册前3用户×前3注入目标，不能覆盖全部问题任务。正式完整范围用 `experiments.run_benchmark`；无攻击加 `--clean`；冻结注入名单加 `--cohort PATH`。具体范围、攻击与续跑见[全量指南](docs/benchmark.md)、[partial指南](docs/partial_benchmark.md)和[预检指南](docs/injection_precheck.md)。
@@ -91,9 +92,9 @@ python -m dashboard.app
 
 ## 当前限制与验证
 
-最新v3.5.3正式比较仅覆盖导出选定的banking／Slack／travel：共同有效1116例，成功727→741，ASR由2次降至0；banking少20例、Slack少5例，travel多39例。已单列新版2个API故障任务，不将原生重试后的结果当正常有效样本。详见[最新分析](analysis/v3-5-3.md)。
+本轮Qwen专项在共同60个有效样例中成功40→43；有效攻击ASR为0/37，另2例API错误保留未知。banking攻击成功4/12持平，Slack10/11→11/11，travel7/11→8/11，travel clean（含合法控制）9/10持平。它不是全量结果，不能保证所有案例不退步，见[本轮分析](analysis/v3-5-4.md)。
 
-主要遗留：银行有权限却停在日期澄清、Slack第二频道误拒、28例静态任务视图协议失败，以及推荐／最终答复仍不稳定。此前[248例专项](workshop/completed/v353_optimization_20261027.md)是单独验证，不能替代正式结果。
+银行仍会漏做已有订单更新、猜测新付款日期；Slack与travel仍有个别交付／误拒。新协议减少格式失败，不认证摘要含义。共享读取器按当前attempt的已记账API失败排除派生效用／安全分母，原始标签和历史持久汇总不回写。
 
 授权与审计约束候选工具动作，不保证任务完成、事实／日期正确或最终文本无污染。工具级标签不提供对象／参数硬授权；internal工具可能访问私密对象，URL可能携带敏感参数。离线回归仍有已知I3失败；E0 pending、I3 partial（24有效探针／8范围缺口）、I2 locked。操作与边界见[当前交接](docs/framework_updates.md)。
 

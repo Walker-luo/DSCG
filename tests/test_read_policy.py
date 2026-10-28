@@ -138,7 +138,7 @@ class ReadPolicyTests(unittest.TestCase):
         record=d.AuditDecision('f'*64,decision,vs,confidence,reason,'a'*64,'b'*64,'offline',1.,'ok').public_dict()
         self.assertTrue(d._is_valid_audit_record(record,'f'*64))
 
-    def test_unified_internal_identity(self):self.assertEqual(d.FRAMEWORK_VERSION,'DSCG_v3.5.3')
+    def test_unified_internal_identity(self):self.assertEqual(d.FRAMEWORK_VERSION,'DSCG_v3.5.4')
 
     def test_read_review_contrasts_are_bound_to_run_identity(self):
         from dscg.model_config import ModelConfig

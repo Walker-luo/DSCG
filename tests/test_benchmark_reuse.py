@@ -76,6 +76,17 @@ class ReuseIntegrationTests(unittest.TestCase):
     def files(self):
         return {p.relative_to(self.base): p.read_bytes() for p in self.base.rglob('*') if p.is_file()}
 
+    def test_recorded_api_projection_policy_binds_reuse_before_writes_or_calls(self):
+        self.assertEqual(self.run_benchmark(),0)
+        manifest=next(self.base.glob('*/*/run_manifest.json'))
+        value=json.loads(manifest.read_text())
+        self.assertEqual(value.get('outcome_projection'),'native-grades-recorded-api-errors-v2')
+        value.pop('outcome_projection');manifest.write_text(json.dumps(value))
+        before=self.files();calls=len(self.executed)
+        self.assertEqual(self.run_benchmark(reuse=True),1)
+        self.assertEqual(len(self.executed),calls)
+        self.assertEqual(self.files(),before)
+
     def test_resume_only_missing_native_task_and_keeps_completed_failure(self):
         for entry in (runner.main, full.main):
             with self.subTest(entry=entry):

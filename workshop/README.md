@@ -1,11 +1,13 @@
 # Workshop 工程索引
 
-当前代码为 **DSCG_v3.5.3 / static-task-v352**。本目录保存工程方案与阶段记录；运行方法和机制以[项目README](../README.md)、[当前框架](../docs/framework_updates.md)、[配置指南](../docs/model_tool_configuration.md)为准，进行中问题和验证状态见 [DV_STATE.md](../DV_STATE.md)。
+当前代码为 **DSCG_v3.5.4 / static-task-v354**。本目录保存工程方案与阶段记录；运行方法和机制以[项目README](../README.md)、[当前框架](../docs/framework_updates.md)、[配置指南](../docs/model_tool_configuration.md)为准，进行中问题和验证状态见 [DV_STATE.md](../DV_STATE.md)。
 
 ## 当前工作入口
 
 | 材料 | 用途 |
 | --- | --- |
+| [v3.5.4专项分析](../analysis/v3-5-4.md) | 本轮同键对照、实际收益与未解决问题 |
+| [v3.5.4优化报告](completed/v354_optimization_20261028.md)／[已执行计划](completed/v354_implementation_plan_20261028.md) | 实际调用、错误、源码与验证边界 |
 | [v3.5.3正式结果分析](../analysis/v3-5-3.md) | 当前配对结果、效用退步、错误与限制 |
 | [重点失败案例](../analysis/details.md) | 保留的逐案例证据；按其记录版本解读 |
 | [后续工作](../analysis/plan.md) | 当前未解决问题，不重开历史campaign |

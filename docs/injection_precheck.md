@@ -51,7 +51,7 @@ adapter／endpoint／凭据变量／思考设置／审计模型不作为名单�
 python -m experiments.run_benchmark --baseline --suites banking slack --attack typical \
   --cohort /absolute/path/to/cohort.json --name baseline_screened_01
 python -m experiments.run_benchmark --suites banking slack --attack typical \
-  --cohort /absolute/path/to/cohort.json --name v353_screened_01
+  --cohort /absolute/path/to/cohort.json --name v354_screened_01
 ```
 
 示例为AgentDojo，路径换为实际名单；AgentDyn用自己的场景。默认DSCG已启用static两阶段L2；单次授权对照另加`--prompt-profile legacy`。策略更新使用新名称，原cohort按既有消费规则读取。

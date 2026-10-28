@@ -13,7 +13,7 @@ python -m dashboard.app
 
 ## 防御结构
 
-当前引擎版本 **DSCG_v3.5.3**，版本来自代码常量。普通网页默认static：L1规划视图、L2静态任务视图与全局授权、L3当前动作审计与Monitor／票据。
+当前引擎版本 **DSCG_v3.5.4**，版本来自代码常量。普通网页默认static：L1规划视图、L2静态任务视图与全局授权、L3当前动作审计与Monitor／票据。
 
 **页面尚无prompt profile选择控件**。API可显式传`prompt_profile=legacy`选择单次授权对照；static的NoL2／NoChecker组合已打通（路由须off），其他历史候选仍要求L2／L3。运行名称不选择策略。见[配置](model_tool_configuration.md#3-选择默认策略或两阶段l2)。
 

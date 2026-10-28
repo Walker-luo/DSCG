@@ -1,6 +1,6 @@
 # 模型、工具与运行配置
 
-对应 **DSCG_v3.5.3**。命令从项目根执行；激活 `ipi` 或 `ipi-agentdyn` 自动识别实际后端。配置是宿主输入，模型返回不能修改它。
+对应 **DSCG_v3.5.4**。命令从项目根执行；激活 `ipi` 或 `ipi-agentdyn` 自动识别实际后端。配置是宿主输入，模型返回不能修改它。
 
 ## 1. 首次检查
 
@@ -80,13 +80,14 @@ API错误只保存受限 `api_error`：状态码、code、param和角色计数�
 | `--prompt-profile`／API `prompt_profile` | 行为 |
 | --- | --- |
 | `legacy` | 显式单次授权对照，合并自动读取 |
-| `static-task-v352`（默认） | 先抽取静态任务视图，再编译全局权限；通常比legacy多1次main调用 |
+| `static-task-v354`（默认） | 原文片段ID视图→全局权限；条件使用互斥分支，通常比legacy多1次main调用 |
+| `static-task-v352` | v3.5.3逐字引用视图对照 |
 
 静态视图保留完整原请求；视图含intent、顺序／条件与原文位置，供规划／L2／L3共享。原文匹配仅验证引用位置，不认证理解、条件、参数或完成。无动态扩权、完成闸门或自动恢复。
 
 ```bash
 python -m experiments.run_partial_benchmark --suites banking slack \
-  --prompt-profile static-task-v352 --name v353_static_01 --progress
+  --prompt-profile static-task-v354 --name v354_static_01 --progress
 ```
 
 上述为AgentDojo在线命令。本次正式v3.5.2测量使用legacy，未启用候选。`--name`仅命名；profile不是models.local.toml字段。CLI和Dashboard API已支持static的NoL2／NoChecker消融；非off路由仍要求L2／L3。baseline只用legacy，其他历史候选仍要求L2／L3。其他保留profile见[诊断指南](qwen_utility.md)。

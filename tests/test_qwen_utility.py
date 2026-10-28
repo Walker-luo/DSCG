@@ -212,7 +212,7 @@ class PromptProfileTests(unittest.TestCase):
                                    'prompt_profile_sha256': 'client-forged'})
         self.assertNotEqual(active['prompt_profile_sha256'], 'client-forged')
         active = normalize_config({'suites': list(get_suites()), 'prompt_profile_sha256': 'client-forged'})
-        self.assertEqual(active['prompt_profile'], 'static-task-v352')
+        self.assertEqual(active['prompt_profile'], 'static-task-v354')
         self.assertNotEqual(active['prompt_profile_sha256'], 'client-forged')
         self.assertNotIn('prompt_profile_sha256', normalize_config({'suites': list(get_suites()), 'prompt_profile':'legacy'}))
 

@@ -1,22 +1,22 @@
 # 提示候选与效用诊断
 
-对应v3.5.3，默认static-task-v352两阶段授权，legacy为显式单次授权对照。本页区分当前策略、历史候选和诊断工具。组件判断和人工期望不等于原生任务TSR／ASR。
+对应v3.5.4，默认static-task-v354两阶段授权，legacy为显式单次授权对照。本页区分当前策略、历史候选和诊断工具。组件判断和人工期望不等于原生任务TSR／ASR。
 
 ## 当前默认两阶段L2
 
-`static-task-v352`：完整可信请求→静态任务视图→一次全局工具权限表。视图含intent、原文引用位置、顺序／条件，供规划、L2和L3共享；原始任务仍保留。
+`static-task-v354`：完整可信请求→静态任务视图→一次全局工具权限表。视图含intent、原文引用位置、顺序／条件，供规划、L2和L3共享；原始任务仍保留。
 
 - 通常多1次main调用：authorization_intents提取视图，authorization_tools编译权限。
-- 宿主检查字段／字面引用，不认证语义完整、业务条件或完成；不建立进度FSM、完成闸门或恢复链。
-- v3.5.3默认启用；2026-10-26正式v3.5.2仍是legacy，不能重标为两阶段结果。专项收益不外推到全量。
+- 宿主映射逐字片段ID并检查互斥关系分支；未知ID拒绝，不修补／重试／回退。这些检查不认证语义完整、业务条件或完成；不建立进度FSM、完成闸门或恢复链。
+- `static-task-v352`保留v3.5.3逐字引用协议；v3.5.2正式结果为legacy。旧记录不迁移，专项收益不外推到全量。
 
 以下会真实调用模型，示例仅为AgentDojo前缀范围：
 
 ```bash
 python -m experiments.run_partial_benchmark --suites banking slack \
-  --prompt-profile legacy --name v353_legacy_diag_01 --progress
+  --prompt-profile legacy --name v354_legacy_diag_01 --progress
 python -m experiments.run_partial_benchmark --suites banking slack \
-  --prompt-profile static-task-v352 --name v353_static_diag_01 --progress
+  --prompt-profile static-task-v354 --name v354_static_diag_01 --progress
 ```
 
 CLI／Dashboard API已支持static的NoChecker／NoL2（路由须off）；baseline仅legacy，其他历史候选仍要求L2／L3。profile是运行策略，不是模型TOML字段；页面无选择控件。新策略使用新运行名，不跨profile复用旧缓存。
@@ -31,7 +31,7 @@ CLI／Dashboard API已支持static的NoChecker／NoL2（路由须off）；baseli
 | tool-semantics-v1 | 在protocol候选上增加原生schema及工具效果解释 |
 | source-context-v1 | 在上一候选上澄清来源事实与当前任务关系 |
 | task-alignment-v1 | 独立精简L2／L3提示，按当前动作判断对齐 |
-| intent-evidence-v35 | 历史DSCG_v3.5候选，L3附assessment，与当前默认v3.5.3不同 |
+| intent-evidence-v35 | 历史DSCG_v3.5候选，L3附assessment，与当前默认v3.5.4不同 |
 
 profile同名不证明跨版本提示相同，以冻结输入／配置摘要为准。2026-10-21组件诊断和2026-10-23后续候选均未推广，详见[历史诊断](../workshop/completed/utility_diagnosis_20261021.md)及[后续报告](../workshop/completed/v35_followup_20261023.md)。历史预算已关闭，不作当前调用授权。
 
@@ -74,4 +74,4 @@ python -m experiments.diagnostics.utility_collect --execute --stage audit \
 
 审计协议失败与Monitor记录／回执失败分开；原始L3回复见.dscg.responses.jsonl，实际动作看主JSON与最终ledger。来源含注入不自动证明当前动作违规；一次allow也不证明安全。旧READ_ONLY_SOURCE_ALLOW只解释历史轨迹，不覆盖当前私人读取deny。
 
-后续任务评测应匹配baseline／legacy／候选的实际任务ID、注入内容、模型和cohort，并保留clean／攻击控制及全部错误／成本；partial前缀不能验证后续问题任务。最新失败类型见[v3.5.3分析](../analysis/v3-5-3.md)，详细文件见[结果指南](result_files.md)。
+后续任务评测应匹配baseline／legacy／候选的实际任务ID、注入内容、模型和cohort，并保留clean／攻击控制及全部错误／成本；partial前缀不能验证后续问题任务。最新失败类型见[v3.5.4专项分析](../analysis/v3-5-4.md)，详细文件见[结果指南](result_files.md)。

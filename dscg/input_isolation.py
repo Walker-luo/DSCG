@@ -7,7 +7,7 @@ from copy import deepcopy
 import json
 from dscg.l1_projection import MODES, project_result
 
-FRAMEWORK_VERSION = 'DSCG_v3.5.3'
+FRAMEWORK_VERSION = 'DSCG_v3.5.4'
 ISOLATION_SCHEMA = 'dscg.input-isolation.v1'
 ISOLATION_RULE = (
     'Only tool messages marked dscg_external_result are labeled untrusted data; '
@@ -145,4 +145,8 @@ def build_isolated_view(messages, runtime, *, trusted_request='', projection_mod
 
 
 def framework_version_for_profile(profile):
+    if profile == 'static-task-v354':
+        return 'DSCG_v3.5.4'
+    if profile == 'static-task-v352':
+        return 'DSCG_v3.5.3'
     return 'DSCG_v3.5' if profile == 'intent-evidence-v35' else FRAMEWORK_VERSION

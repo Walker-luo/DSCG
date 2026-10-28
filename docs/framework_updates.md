@@ -1,36 +1,26 @@
-# v3.5.3 当前交接
+# v3.5.4 当前交接
 
-更新时间：2026-10-27。本文记录当前实现与限制，历史过程从[阶段报告索引](../workshop/completed/README.md)查阅；详细实验状态以[DV_STATE](../DV_STATE.md)为准。
+更新：2026-10-28。当前状态见[DV_STATE](../DV_STATE.md)，结果见[v3.5.4专项](../analysis/v3-5-4.md)；最近正式全量复盘仍是[v3.5.3](../analysis/v3-5-3.md)。
 
-## 本版实际采用的内容
-
-| 部分 | 当前状态 |
+| 部分 | 当前行为 |
 | --- | --- |
-| 默认策略 | `static-task-v352`／DSCG_v3.5.3；先静态任务视图，再全局工具授权；显式legacy保留单次对照 |
-| 主规划／L3 | 区分来款与出款、计划与真实执行，最终答复保留完整字段；static共享编号／后续读取对照，审计并列任务及相关成功事实；风险元数据和严格判决保留 |
-| 两阶段L2 | 现有静态提取补充交付字段、独立推荐条件和费用口径；原请求保留，视图不授予权限、不证明完成 |
-| L1与执行 | 保留有限银行投影、来源封装、整批检查、Monitor与一次性票据；未采用隔离延后或标记拆分候选 |
-| 读取分流 | `sink-free-read-v4`：授权、参数有效的public/internal、sink=none读取固定免审，其他调用审计 |
-| 诊断 | 保留输入哈希／实际采样设置；静态任务视图输出失败新增固定field/rule定位，不存L2原始回复 |
+| 默认 | `static-task-v354`；先片段ID静态视图，再冻结全局工具权限。`static-task-v352`保留v3.5.3逐字引用策略，legacy保留单次授权 |
+| L2协议 | 宿主提供逐字片段及span；模型选ID，条件／非条件使用互斥分支。未知ID／非法字段失败封闭，不重试提取、不修补或回退 |
+| 规划／L3 | 按当前操作原生required／optional字段规划；审计当前目标与先前已完成目标的区别，保留外发目的地／正文及实际参数检查。辅助视图不认证语义、事实或完成 |
+| L1／执行 | 来源封装、有限银行投影、授权工具视图、整批检查、Monitor及一次性票据保留；原始返回继续用于审计和记录 |
+| 读取 | `sink-free-read-v4`仍仅固定免审已授权／schema有效、read、public/internal、sink=none调用 |
+| 错误分母 | 共享读取器按当前attempt已记账API失败派生null标签；原始等级／效果不变，旧持久汇总不回写。新策略绑定reuse身份，须新运行名 |
 
-普通任务循环：L2编译→主模型候选→L2整批检查→固定免审或L3→Monitor／票据→工具执行→L1规划视图。显式委托先经原中介准备读取，再编译完整有效任务；普通工具结果不能新增任务权限。最终文本无独立动作审计。
+普通循环仍是L2编译→主模型候选→整批检查→固定免审或L3→Monitor→执行→L1视图。明确委托沿原有中介准备协议；污染任务源仍在既有支持边界外。NoL2／NoChecker仅允许router off；baseline为legacy／原生循环。
 
-## 验证与遗留问题
+## 验证与限制
 
-本轮已默认启用static；Qwen四臂共244例＋4例消融，247有效／1 API错误。共同60例成功29→39，最终攻击ASR0/38；banking仅1/10，低于旧默认2/10，不能称银行问题已解决。详见[阶段报告](../workshop/completed/v353_optimization_20261027.md)。专项结果与历史正式结果分开；未增加完成性闸门、自动恢复、重试、参数修补或新模型阶段。
+Qwen共同60有效样例成功40→43：banking攻击4/12持平、Slack10/11→11/11、travel7/11→8/11；travel clean含合法控制9/10持平。有效攻击ASR0/37，另2例API错误保留未知，不外推全量或保证。所有候选和错误保留于[阶段报告](../workshop/completed/v354_optimization_20261028.md)。
 
-最新正式v3.5.3结果与v3.5.2共同1119键／1116有效，成功727→741：banking净少20、Slack净少5、travel净增39，原生ASR2→0。L1模式同时变化，不能作单因素因果结论；专项静态视图收益不能替代正式成绩。见[最新分析](../analysis/v3-5-3.md)。
+- **银行未解决：**u15仍漏已有订单更新；u6仍有无依据日期且原生判True，不能算参数正确。新付款真实缺日期应澄清。
+- **Slack／travel仍有个例退步：**第二频道在本批恢复，u13 clean及部分推荐／最终交付仍失败。协议错误减少不代表语义正确。
+- CLI L1默认off，factory/API仍projected；CLI router shadow、factory/API off；off仍有L3。采样保持原生，SDK retries0不代表端到端只发送一次。
+- 已记账失败可投影；未记账／损坏证据仍不能推断成本或安全。没有完成闸门、恢复、动态扩权、对象／参数硬授权或最终文本审计。
+- 离线完整套件仍有原有I3失败／错误及AgentDyn网页副作用夹具失败；E0 pending、I3 partial、I2 locked。
 
-- 正式结果中banking u4／u6有权限无候选，u15退款授权改善但实际完成仍差；Slack u13私信已恢复，u11第二频道仍误拒，travel候选／年份和最终交付仍有缺口。静态视图不保证任务完成或参数正确。
-- 正式28例静态协议失败为19引用／9条件关系，与专项中的1例剩余引用失败属于不同范围，不混用分母。
-- static的CLI／Dashboard NoL2、NoChecker已打通，非off路由仍要求L2／L3；baseline默认legacy走原生循环，历史候选继续保留各自限制。
-- 本轮202项集成与AgentDyn相关49项、Node49项通过；相关旧版本／默认／夹具断言已适配。旧I3仍有5失败／5错误，不能称全套通过。
-- SDK重试关闭不代表原生generation无重试；已记录失败后又成功的调用尚未统一投影为基础设施错误，成本与效用分母需单列复核。
-- CLI投影默认off是本轮前已存在设置，factory/API仍projected；本轮在线四臂显式统一off。读取规则仍为sink-free-read-v4。
-- 工具级控制不提供对象／参数硬授权，不能认证事实或保证最终回答无污染。E0 pending、I3 partial、I2 locked。
-
-操作入口：[配置](model_tool_configuration.md) · [测试](benchmark.md) · [诊断](qwen_utility.md) · [Dashboard](dashboard.md)。
-
-## 历史入口
-
-[v3.5.1正式复盘](../workshop/archive/v351_analysis_20261026.md) · [117例分型](../workshop/completed/v351_tsr_diagnosis_20261026.md) · [v3.5.1优化报告](../workshop/completed/v35_optimization_20261026.md) · [v3.4.1优化](../workshop/completed/v34_utility_optimization_20261025.md) · [双后端接线](../workshop/completed/dual_benchmark_20261018.md) · [L1投影](../workshop/completed/l1_projection_20261013.md) · [早期平台](../workshop/completed/dashboard_v22_20261013.md)。历史默认值、预算和成绩只适用于各自阶段。
+[配置](model_tool_configuration.md) · [评测](evaluation.md) · [诊断](qwen_utility.md) · [阶段历史](../workshop/completed/README.md)。

@@ -1,6 +1,6 @@
 # 文档索引
 
-当前版本 **DSCG_v3.5.3**，默认`static-task-v352`两阶段L2；单次授权对照用`--prompt-profile legacy`。实验名称不选择策略。
+当前版本 **DSCG_v3.5.4**，默认`static-task-v354`两阶段L2；单次授权对照用`--prompt-profile legacy`。实验名称不选择策略。
 
 | 文档 | 内容 |
 | --- | --- |
@@ -15,4 +15,4 @@
 | [Dashboard](dashboard.md) | 启动、配置、历史对比与下载 |
 | [当前交接](framework_updates.md) | 已实施范围、遗留问题与历史入口 |
 
-[最新结果分析](../analysis/v3-5-3.md)和[DV_STATE](../DV_STATE.md)记录当前实验与工程状态。阶段过程保留在[completed](../workshop/completed/README.md)，旧材料见[archive](../workshop/archive/project_structure_20261008/README.md)。本目录只放使用说明；计划在workshop，agent产物在新的workshop/artifacts任务目录。
+[最新结果分析](../analysis/v3-5-4.md)和[DV_STATE](../DV_STATE.md)记录当前实验与工程状态。阶段过程保留在[completed](../workshop/completed/README.md)，旧材料见[archive](../workshop/archive/project_structure_20261008/README.md)。本目录只放使用说明；计划在workshop，agent产物在新的workshop/artifacts任务目录。

@@ -1,21 +1,21 @@
 # 完整任务测试：AgentDojo与AgentDyn
 
-当前默认 **DSCG_v3.5.3／static-task-v352**。单次授权对照用 `--prompt-profile legacy`；`--name`只命名实验。框架见[README](../README.md)，模型／工具／profile见[配置指南](model_tool_configuration.md)。本页命令除自检／清单导出外均会调用真实模型。
+当前默认 **DSCG_v3.5.4／static-task-v354**。单次授权对照用 `--prompt-profile legacy`；`--name`只命名实验。框架见[README](../README.md)，模型／工具／profile见[配置指南](model_tool_configuration.md)。本页命令除自检／清单导出外均会调用真实模型。
 
 <a id="默认-v32-策略与复测"></a>
 <a id="默认-v33-策略与复测"></a>
 <a id="默认-v34-策略与复测"></a>
 
-## 默认v3.5.3与显式对照
+## 默认v3.5.4与显式对照
 
-默认L2先提取静态任务视图，再编译全局工具权限并冻结。v3.5.3改进请求字段、独立推荐、费用口径及真实执行状态提示，static共享编号／读取对照；L1、免审、Monitor和原生评分保留。普通动作任务通常比legacy多1次main调用，无条件验证、完成保证或自动扩权。
+默认L2先提取静态任务视图，再编译全局工具权限并冻结。v3.5.4使用逐字片段ID和互斥关系分支，规划／L3共享辅助视图；显式static-task-v352保留v3.5.3逐字引用策略。L1、免审、Monitor和原生评分保留。普通动作任务通常比legacy多1次main调用，无条件验证、完成保证或自动扩权。
 
 ```bash
 # 所选AgentDojo场景全部注册任务；使用新名称
 python -m experiments.run_benchmark --suites banking slack \
-  --prompt-profile legacy --name v353_legacy_01 --progress
+  --prompt-profile legacy --name v354_legacy_01 --progress
 python -m experiments.run_benchmark --suites banking slack \
-  --prompt-profile static-task-v352 --name v353_static_01 --progress
+  --prompt-profile static-task-v354 --name v354_static_01 --progress
 ```
 
 两命令只相差profile，仍需同模型、攻击／cohort及有效配置配对。static支持NoL2／NoChecker消融（非off路由仍需L2／L3）；baseline仅legacy，其他历史候选仍要求L2／L3；历史候选见[诊断指南](qwen_utility.md)。
@@ -63,7 +63,7 @@ AgentDojo为0.1.35／v1.2；AgentDyn同样导入agentdojo，固定revision `5353
 
 ```bash
 python -m experiments.run_benchmark --baseline --clean --name baseline_clean_01 --progress
-python -m experiments.run_benchmark --clean --name v353_clean_01 --progress
+python -m experiments.run_benchmark --clean --name v354_clean_01 --progress
 ```
 
 两组同环境、主模型、任务和限制。baseline使用原生无防御循环；clean不注入、不做攻击GOAL预检，ASR不适用。保留失败和错误，不因clean失败悄悄删减攻击分母。
@@ -72,7 +72,7 @@ python -m experiments.run_benchmark --clean --name v353_clean_01 --progress
 
 ```bash
 python -m experiments.run_benchmark --baseline --attack typical --name baseline_typical_01 --progress
-python -m experiments.run_benchmark --attack typical --name v353_typical_01 --progress
+python -m experiments.run_benchmark --attack typical --name v354_typical_01 --progress
 ```
 
 默认typical为ignore_previous、important_instructions、tool_knowledge。可用 `--attack NAME [NAME ...]`，injecagent需显式选择；all读取当前后端自动攻击注册表并排除manual。预设不能与具体攻击混用。DoS按not utility单独评分，每用户仅首个目标，不与目标型ASR合并。
@@ -85,7 +85,7 @@ python -m experiments.run_benchmark --attack typical --name v353_typical_01 --pr
 python -m experiments.run_benchmark --baseline --suites banking slack --attack typical \
   --cohort /absolute/path/to/cohort.json --name baseline_screened_01
 python -m experiments.run_benchmark --suites banking slack --attack typical \
-  --cohort /absolute/path/to/cohort.json --name v353_screened_01
+  --cohort /absolute/path/to/cohort.json --name v354_screened_01
 ```
 
 full保留全部所选用户，只筛目标，结果标screened。名单仅覆盖子集时须明确suites；不能与clean／task manifest混用，拒绝DoS及含DoS的all。测量读取cohort不重验原screen轨迹，但实际测量缓存仍严格绑定有效配置。
@@ -110,7 +110,7 @@ agent临时测量显式使用新的 `--results-dir workshop/artifacts/<YYYYMMDD>
 ## 显式续跑示例
 
 ```bash
-python -m experiments.run_benchmark --reuse --name v353_typical_01
+python -m experiments.run_benchmark --reuse --name v354_typical_01
 ```
 
 保留原name、输出根、模型、攻击／场景、cohort和全部有效防御配置。未指定攻击／场景时恢复原计划；clean仍加clean，baseline仍加baseline，cohort仍需同一名单。reuse与force-rerun互斥；策略更新用新名称，force-rerun不绕过绑定。
@@ -132,7 +132,7 @@ L2授权编译失败的控制台消息包含 `suite`、`stage`、`user_task_id`�
 | 参数 | 用途 |
 | --- | --- |
 | `--model-config PATH`／`--tool-metadata PATH` | 模型连接／审核风险目录 |
-| `--prompt-profile legacy/static-task-v352` | 选择单次授权对照／当前两阶段默认，其他profile见诊断指南 |
+| `--prompt-profile legacy/static-task-v354` | 选择单次授权对照／当前两阶段默认，其他profile见诊断指南 |
 | `--name`／`--results-dir` | 运行名称／分类输出根 |
 | `--no-checker` | 关闭整个L3，仍保留L2／Monitor，不是baseline |
 | `--no-tool-view`／`--no-delegated-tasks` | 关闭授权工具展示／有限委托 |

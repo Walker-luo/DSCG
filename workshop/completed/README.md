@@ -6,6 +6,9 @@
 
 ## 阶段文件
 
+- [v3.5.4：片段ID协议、Slack改进及银行遗留](v354_optimization_20261028.md)
+- [v3.5.4已执行实施计划](v354_implementation_plan_20261028.md)
+
 - [当前交接残留清理（2026-10-27）](handoff_cleanup_20261027.md)
 - [Workshop Engineering Optimization Implementation Plan](2026-10-05-workshop-engineering-optimization.md)
 - [DSCG 低开销三层基础方案（已实施）：输入降权、任务授权、按风险动作审计](3_layer_opt.md)

@@ -5,7 +5,7 @@ import unittest
 from unittest.mock import Mock, patch
 
 from dscg import prompt_profiles as profiles
-from dscg import task_view
+from dscg import anchored_task_view as task_view
 from dscg.model_config import ModelConfig
 from dscg.benchmark_catalog import get_suites
 from dscg.pipelines import defended as d
@@ -14,13 +14,13 @@ from experiments import run_partial_benchmark as runner
 from test_step_authorization import runtime
 
 
-class V353DefaultsTests(unittest.TestCase):
+class CurrentStaticDefaultsTests(unittest.TestCase):
     def test_default_factory_enables_static_without_completion_retry(self):
         cfg=ModelConfig('offline','offline','https://offline.invalid','custom')
         with patch.object(d,'create_openai_client',return_value=Mock()):
             pipeline,_,_=d.make_defended_pipeline(model_config=cfg)
         self.assertEqual(pipeline.dscg_optimization_config['prompt_profile'],task_view.PROFILE)
-        self.assertEqual(pipeline.dscg_optimization_config['framework_version'],'DSCG_v3.5.3')
+        self.assertEqual(pipeline.dscg_optimization_config['framework_version'],'DSCG_v3.5.4')
         self.assertFalse(pipeline.dscg_optimization_config['completion_prompt'])
         self.assertEqual(pipeline.dscg_optimization_config['audit_retries'],0)
         self.assertIn(task_view.PLANNING_POLICY,pipeline.elements[0].system_message)
@@ -53,9 +53,9 @@ class V353DefaultsTests(unittest.TestCase):
 
     def test_static_policy_identity_binds_planning_and_audit_guidance(self):
         original=profiles.profile_binding(task_view.PROFILE)
-        with patch.object(profiles,'TASK_PLANNING_POLICY','different planning behavior'):
+        with patch.object(task_view,'PLANNING_POLICY','different planning behavior'):
             self.assertNotEqual(original,profiles.profile_binding(task_view.PROFILE))
-        with patch.object(profiles,'TASK_AUDIT_GUIDANCE','different evidence behavior'):
+        with patch.object(task_view,'AUDIT_GUIDANCE','different evidence behavior'):
             self.assertNotEqual(original,profiles.profile_binding(task_view.PROFILE))
 
 

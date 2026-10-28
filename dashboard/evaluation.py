@@ -9,6 +9,7 @@ from dscg.input_isolation import FRAMEWORK_VERSION, framework_version_for_profil
 from dscg.audit_router import DEFAULT_THRESHOLD, validate_router_options
 from dscg.l1_projection import MODES as L1_PROJECTION_MODES
 from dscg.prompt_profiles import resolve_profile, profile_binding
+from dscg.task_diagnostics import OUTCOME_PROJECTION_VERSION
 
 ROUTING_KEYS = ("candidate_batches", "precheck_allowed_batches", "precheck_rejected_batches",
                 "public_read_bypass_batches", "non_sensitive_read_bypass_batches", "semantic_audit_calls")
@@ -21,6 +22,7 @@ L2_KEYS = ('planning_requests', 'catalog_tools_total', 'visible_tools_total',
 
 def normalize_config(payload):
     config = dict(payload)
+    config['outcome_projection'] = OUTCOME_PROJECTION_VERSION
     threshold = validate_router_options(config.get('audit_router_threshold', DEFAULT_THRESHOLD),
                                         config.get('audit_router_artifact'))
     router_mode = config.get('audit_router_mode', 'off')
@@ -71,7 +73,7 @@ def normalize_config(payload):
     config['l1_projection_mode'] = mode if config['input_isolation'] else 'off'
     config["framework_version"] = None if config["origin"] else FRAMEWORK_VERSION
     profile = resolve_profile(config.get('prompt_profile'), origin=config['origin'])
-    if (config['origin'] and profile != 'legacy') or (profile not in ('legacy','static-task-v352') and (not config['use_sandbox'] or not config['use_security_checker'])):
+    if (config['origin'] and profile != 'legacy') or (profile not in ('legacy','static-task-v352','static-task-v354') and (not config['use_sandbox'] or not config['use_security_checker'])):
         raise ValueError('candidate prompt profiles require the defended pipeline with L2 and checker')
     config['prompt_profile'] = profile
     config['framework_version'] = None if config['origin'] else framework_version_for_profile(profile)

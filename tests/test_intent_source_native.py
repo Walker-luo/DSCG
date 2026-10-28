@@ -22,7 +22,7 @@ from test_request_compatibility import completion
 
 @unittest.skipUnless(get_backend().id=='agentdojo','AgentDojo native banking/slack suite')
 class NativeIntentSourceTests(unittest.TestCase):
-    def exercise(self,scene,user_id,*,progress=False,bad=None):
+    def exercise(self,scene,user_id,*,progress=False,bad=None,prompt_profile=None):
         suite=get_suite('v1.2',scene);user=suite.get_user_task_by_id(user_id)
         env=user.init_environment(suite.load_and_inject_default_environment({}))
         actions=[(c.function,dict(c.args)) for c in user.ground_truth(env)]
@@ -35,7 +35,11 @@ class NativeIntentSourceTests(unittest.TestCase):
             body=json.loads(request.content);requests.append(body)
             if body.get('response_format'):
                 packet=json.loads(body['messages'][-1]['content'])
-                if set(packet) == {'user_request'}:
+                if 'request_anchors' in packet:
+                    value={'tasks':[{'intent':'Complete the requested task',
+                        'anchor_id':packet['request_anchors'][0]['id'],
+                        'relation':{'kind':'independent'}}]}
+                elif set(packet) == {'user_request'}:
                     value={'tasks':[{'intent':'Complete the requested task','quote':packet['user_request'],
                                      'relation':'independent','condition':''}]}
                 elif 'available_tools' in packet or 'action_tools' in packet:
@@ -65,7 +69,8 @@ class NativeIntentSourceTests(unittest.TestCase):
         try:
             with TemporaryDirectory(dir=root) as temp,patch.object(d,'create_openai_client',side_effect=client),redirect_stdout(StringIO()):
                 pipe,main,audit=d.make_defended_pipeline(model_config=config,sec_model_config=config,
-                    tool_metadata=load_tool_metadata(resolve_tool_metadata(backend=get_backend()).path),audit_router_mode='shadow')
+                    tool_metadata=load_tool_metadata(resolve_tool_metadata(backend=get_backend()).path),
+                    audit_router_mode='shadow',prompt_profile=prompt_profile)
                 pipe.name='none';ensure_native_cache_model_ready();steps=[]
                 with logging.OutputLogger(temp):
                     result=run_native_suite(pipe,suite,None,Path(temp),False,user_tasks=[user_id],injection_tasks=[],
@@ -97,3 +102,9 @@ class NativeIntentSourceTests(unittest.TestCase):
     def test_broad_native_grants_cannot_execute_wrong_destination_or_source_command(self):
         for bad in ('destination','source'):
             with self.subTest(bad=bad):self.exercise('slack','user_task_3',progress=True,bad=bad)
+
+    def test_anchored_protocol_uses_native_scoring_and_preserves_negative_effect_controls(self):
+        # Authored transport verifies integration only, never real L2/L3 quality.
+        self.exercise('banking','user_task_6',prompt_profile='static-task-v354')
+        self.exercise('slack','user_task_3',prompt_profile='static-task-v354')
+        self.exercise('slack','user_task_3',bad='destination',prompt_profile='static-task-v354')

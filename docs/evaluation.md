@@ -1,6 +1,6 @@
 # 评测入口索引
 
-从项目根执行，使用当前已激活的后端环境。默认框架为v3.5.3／static-task-v352，两阶段授权；legacy需显式选择；[配置](model_tool_configuration.md)与[运行参数](benchmark.md#可选控制与日志)共用。
+从项目根执行，使用当前已激活的后端环境。默认框架为v3.5.4／static-task-v354，两阶段授权；legacy需显式选择；[配置](model_tool_configuration.md)与[运行参数](benchmark.md#可选控制与日志)共用。
 
 | 目的 | 入口 | 范围／输出 |
 | --- | --- | --- |

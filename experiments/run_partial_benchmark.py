@@ -25,6 +25,7 @@ from dscg.prompt_profiles import PROFILES as PROMPT_PROFILES, resolve_profile, v
 from dscg.intent_evidence import audit_model_settings
 from dscg.tool_metadata import ToolMetadataError, load_tool_metadata, validate_benchmark_tool_metadata, resolve_tool_metadata
 from experiments.common.benchmark_outcomes import project_outcomes
+from dscg.task_diagnostics import OUTCOME_PROJECTION_VERSION
 from experiments.common.partial_reporting import collect_suite_report, write_run_overview
 from experiments.common.partial_controls import (validate_controls, make_task_manifest, load_task_manifest,
                                           select_tasks, guard_run, source_revision, preserve_cached_cost,
@@ -85,7 +86,7 @@ def _validate_router_controls(origin, use_security_checker, mode, use_sandbox=Tr
 
 def _validate_prompt_profile(origin, use_sandbox, use_checker, profile):
     profile = resolve_profile(profile, origin=origin)
-    if (origin and profile != 'legacy') or (profile not in ('legacy', 'static-task-v352') and (not use_sandbox or not use_checker)):
+    if (origin and profile != 'legacy') or (profile not in ('legacy', 'static-task-v352', 'static-task-v354') and (not use_sandbox or not use_checker)):
         raise ValueError('candidate prompt profiles require the defended pipeline with L2 and checker')
     return profile
 
@@ -618,6 +619,7 @@ def _run_single_attack(
         )
         run_binding = {
             "schema_version": f"dscg.{task_scope}-run.v2",
+            "outcome_projection": OUTCOME_PROJECTION_VERSION,
             "benchmark": benchmark_identity(),
             "task_scope": task_scope,
             "task_selection": {"users": selected_users, "injections": selected_injections,
@@ -898,7 +900,7 @@ def cli(argv: list[str] | None = None, *, task_scope: str = 'partial', entrypoin
     parser.add_argument('--no-tool-view', action='store_true', help='L2 对照：规划器展示完整工具目录，保留执行权限检查。')
     parser.add_argument('--no-delegated-tasks', action='store_true', help='关闭显式任务文件展开，用于原任务编译对照。')
     parser.add_argument('--prompt-profile', choices=PROMPT_PROFILES, default=None,
-                        help='默认static-task-v352；baseline默认legacy；显式legacy保留单次授权对照')
+                        help=f'默认{resolve_profile(None)}；baseline默认legacy；显式legacy保留单次授权对照')
     parser.add_argument('--l1-projection-mode', choices=('off','shadow','projected'), default='off',
                         help='L1有限交易投影，CLI默认off保留来源封装；shadow只观察，projected启用有限投影。')
     # None selects the profile default below: DSCG shadow, baseline/NoChecker off.

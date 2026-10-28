@@ -1,6 +1,6 @@
 # 结果文件与诊断
 
-对应v3.5.3。历史结果保留各自配置和标签，不按当前版本重标。CLI默认目录：
+对应v3.5.4。历史结果保留各自配置和标签，不按当前版本重标。CLI默认目录：
 
 ```text
 results/{benchmarks,partial_benchmark}/<backend>/<model>_<name>/
@@ -48,7 +48,7 @@ trace = load_task_trace('/absolute/path/to/task.json')
 
 ## 如何确认使用了两阶段L2
 
-历史正式v3.5.2为legacy：单次`authorization`。v3.5.3默认static-task-v352通常先记 `authorization_intents`，再记 `authorization_tools`，授权记录含static_task_view／protocol；规划与审计共享辅助视图。
+历史正式v3.5.2为legacy：单次`authorization`。v3.5.3为static-task-v352，v3.5.4默认static-task-v354（视图协议v2）；均通常先记 `authorization_intents`，再记 `authorization_tools`，授权记录含static_task_view／protocol；规划与审计共享辅助视图。
 
 legacy的profile绑定可能为空，须联合版本、配置及实际调用核对；不要从目录名判断。纯读零调用或受限host路径可有例外，缺失诊断也不能当作零调用。
 
@@ -74,7 +74,7 @@ would_bypass／actual_bypass及审计分歧不是安全标签；已知候选审�
 
 TSR／ASR以原生标签的有效分母计算，错误／缺失／unsupported另列，clean ASR不适用。分别核对main（含L2）、security、计分与GOAL、invocation与缓存／整轮成本；不能重复累加路由Token或将未知usage补零。cost_comparison_ready=false时不算节省比例。
 
-API／超时／输入和内部错误按基础设施错误处理；共享评分对原生重试中已记账失败的投影尚不完整，见[已知问题](framework_updates.md)。协议阻断也不能仅凭“框架失败”删出TSR；保留原评分及实际效果。
+API／超时／输入和内部错误按基础设施错误处理；共享读取器合并当前attempt后，若已记账`failed_calls>0`，派生效用／安全标签为null，保留原生等级、实际效果与未知usage；旧attempt不污染新attempt。旧持久汇总不自动回写，未记账的失败无法推断。新投影策略绑定reuse身份，须使用新名称。协议阻断也不能仅凭“框架失败”删出TSR；保留原评分及实际效果。
 
 ## 工具参数错误记录
 
