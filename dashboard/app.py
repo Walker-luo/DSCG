@@ -692,6 +692,61 @@ def _history_int(value) -> int:
     return int(number) if number is not None else 0
 
 
+def _history_count(value):
+    number = _history_number(value)
+    return int(number) if number is not None and number >= 0 and number.is_integer() else None
+
+
+def _history_overview(metrics, counts, overhead, security, summary, is_fraction):
+    utility_valid = _history_count(counts.get("utility_valid"))
+    utility_passed = _history_count(counts.get("utility_passed"))
+    if utility_valid is None or utility_passed is None or utility_passed > utility_valid:
+        utility_passed = None
+    security_valid = _history_count(counts.get("security_valid"))
+    if security_valid is None and _history_count(counts.get("security_missing")) is not None:
+        security_valid = _history_count(counts.get("attacked_tasks"))
+    successes = _history_count(counts.get("attack_successes"))
+    derived = False
+    raw_rate = _history_number(metrics.get("attack_success_rate"))
+    if successes is None and security_valid and raw_rate is not None:
+        percent = raw_rate * 100 if is_fraction and 0 <= raw_rate <= 1 else raw_rate
+        tolerance = 1e-8 if is_fraction else 0.005000001
+        lower = max(0, math.ceil((percent - tolerance) * security_valid / 100))
+        upper = min(security_valid, math.floor((percent + tolerance) * security_valid / 100))
+        if 0 <= percent <= 100 and lower == upper:
+            successes, derived = lower, True
+    if security_valid is None or successes is None or successes > security_valid:
+        successes, derived = None, False
+
+    def tokens(values):
+        total = _history_count(values.get("total_tokens"))
+        if total is not None:
+            return total
+        prompt = _history_count(values.get("prompt_tokens"))
+        completion = _history_count(values.get("completion_tokens"))
+        return prompt + completion if prompt is not None and completion is not None else None
+
+    main, audit = tokens(overhead), tokens(security)
+    no_audit = "defense" in summary and summary["defense"] is None
+    accounting = summary.get("api_accounting")
+    incomplete_usage = False
+    if isinstance(accounting, dict):
+        for tracker in accounting.values():
+            if not isinstance(tracker, dict):
+                continue
+            for phase in tracker.values():
+                if isinstance(phase, dict) and _history_count(phase.get("api_calls")):
+                    failed = _history_count(phase.get("failed_calls"))
+                    missing = _history_count(phase.get("missing_usage_calls"))
+                    incomplete_usage |= failed is None or missing is None or failed > 0 or missing > 0
+    return {
+        "tsr": {"numerator": utility_passed, "denominator": utility_valid},
+        "asr": {"numerator": successes, "denominator": security_valid, "derived": derived},
+        "tokens": {"value": (main or 0) + (audit or 0) if main is not None or audit is not None else None,
+                   "complete": main is not None and (audit is not None or no_audit) and not incomplete_usage},
+    }
+
+
 def _normalize_history_suite(summary: dict, suite_name: str, is_fraction: bool) -> dict:
     metrics = summary.get("metrics")
     task_counts = summary.get("task_counts")
@@ -713,6 +768,7 @@ def _normalize_history_suite(summary: dict, suite_name: str, is_fraction: bool) 
         "main_overhead": {"prompt_tokens": prompt_tokens, "completion_tokens": completion_tokens, "total_tokens": total_tokens},
         "sec_overhead": {"prompt_tokens": sec_prompt, "completion_tokens": sec_completion, "total_tokens": sec_total},
         "security_usage_recorded": bool(security),
+        "overview": _history_overview(metrics, task_counts, overhead, security, summary, is_fraction),
         "suite_name": suite_name,
         "benchmark": _recorded_benchmark(summary.get("benchmark")),
         "task_selection": summary.get("task_selection") if isinstance(summary.get("task_selection"), dict) else None,

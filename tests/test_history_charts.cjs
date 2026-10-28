@@ -14,6 +14,34 @@ const experiments = [
 
 const selection = { metrics: ["utility_rate", "attack_success_rate"], view: "line", suite: "all" };
 
+test('overview groups attacks with a stable run order, chart colors and weighted valid counts', () => {
+  const overview = (a,b,c,d,t) => ({tsr:{numerator:a,denominator:b},asr:{numerator:c,denominator:d,derived:false},tokens:{value:t,complete:true}});
+  const suite = (name, values) => ({suite_name:name, overview:values});
+  const run = (id, model, attack, suites) => ({id, model_group:model, model_suffix:model, source:id,
+    attack_name:attack, benchmark:{id:'agentdojo',revision:'v1',suite_version:'v1.2'}, benchmark_id:'agentdojo', suites});
+  const a1=run('a1','m_A','ignore_previous',[suite('banking',overview(2,4,1,4,20)),suite('slack',overview(3,8,0,8,30))]);
+  const b1=run('b1','m_B','ignore_previous',[suite('banking',overview(1,4,0,4,10))]);
+  const a2=run('a2','m_A','tool_knowledge',[suite('banking',overview(2,4,0,4,20))]);
+  const b2=run('b2','m_B','tool_knowledge',[suite('banking',overview(1,4,1,4,10))]);
+  const catalog=[a1,b1,a2,b2], styles=charts.createExperimentStyles(catalog,['#123456','#abcdef']);
+  const groups=charts.buildOverview([b2,a2,b1,a1],catalog,styles);
+  assert.deepEqual(groups.map(g=>g.attack),['ignore_previous','tool_knowledge']);
+  assert.notEqual(groups[0].fill,groups[1].fill);
+  assert.equal(charts.buildOverview([a2],catalog,styles)[0].fill,groups[1].fill);
+  assert.deepEqual(groups.map(g=>g.cards.map(c=>c.run.id)),[['a1','b1'],['a2','b2']]);
+  assert.equal(groups[0].cards[0].color,'#123456');
+  assert.deepEqual(groups[0].cards[0].total.tsr,{numerator:5,denominator:12});
+  assert.deepEqual(groups[0].cards[0].total.asr,{numerator:1,denominator:12,derived:false});
+  assert.deepEqual(groups[0].cards[0].total.tokens,{value:50,complete:true});
+  const incomplete=structuredClone(a1);incomplete.suites[1].overview.asr.numerator=null;
+  const partial=charts.buildOverview([incomplete],catalog,styles)[0].cards[0];
+  assert.equal(partial.total.asr.numerator,null);
+  const mixed=structuredClone(a1);mixed.benchmark_id='mixed';mixed.benchmark=null;
+  assert.equal(charts.buildOverview([mixed],catalog,styles)[0].cards[0].total,null);
+  const unknown=structuredClone(a1);unknown.benchmark={id:'agentdojo'};
+  assert.equal(charts.buildOverview([unknown],catalog,styles)[0].cards[0].total,null);
+});
+
 test("each selected metric gets its own chart with only that metric's data", () => {
   const panels = charts.metricConfigs(experiments, selection);
   assert.deepEqual(panels.map((panel) => panel.metric), ["utility_rate", "attack_success_rate"]);

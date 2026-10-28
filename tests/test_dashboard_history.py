@@ -30,6 +30,33 @@ def summary(suite, utility, attack, defense):
 
 
 class DashboardHistoryTests(unittest.TestCase):
+    def test_overview_uses_recorded_valid_counts_and_preserves_missing_values(self):
+        from dashboard.app import _normalize_history_suite
+        data = summary('workspace', .75, 1 / 3, 2 / 3)
+        data['task_counts'] = {'total_tasks': 5, 'utility_passed': 3, 'utility_valid': 4,
+                               'attacked_tasks': 3, 'security_missing': 1, 'execution_errors': 1}
+        data['overhead'] = {'total_tokens': 10}
+        data['sec_overhead'] = {'total_tokens': 4}
+        overview = _normalize_history_suite(data, 'workspace', True)['overview']
+        self.assertEqual(overview['tsr'], {'numerator': 3, 'denominator': 4})
+        self.assertEqual(overview['asr'], {'numerator': 1, 'denominator': 3, 'derived': True})
+        self.assertEqual(overview['tokens'], {'value': 14, 'complete': True})
+        data['api_accounting'] = {'main': {'generation': {'api_calls': 2, 'failed_calls': 1, 'missing_usage_calls': 0}}}
+        self.assertEqual(_normalize_history_suite(data, 'workspace', True)['overview']['tokens'], {'value': 14, 'complete': False})
+        missing = _normalize_history_suite({'metrics': {'attack_success_rate': None}, 'task_counts': {}}, 'travel', True)['overview']
+        self.assertEqual(missing['tsr'], {'numerator': None, 'denominator': None})
+        self.assertEqual(missing['asr'], {'numerator': None, 'denominator': None, 'derived': False})
+        self.assertEqual(missing['tokens'], {'value': None, 'complete': False})
+        baseline = _normalize_history_suite({'defense': None, 'overhead': {'total_tokens': 9}}, 'banking', True)['overview']
+        self.assertEqual(baseline['tokens'], {'value': 9, 'complete': True})
+
+    def test_overview_does_not_guess_ambiguous_attack_counts(self):
+        from dashboard.app import _normalize_history_suite
+        data = {'metrics': {'attack_success_rate': 12.34}, 'task_counts': {'security_valid': 50000}}
+        asr = _normalize_history_suite(data, 'workspace', False)['overview']['asr']
+        self.assertIsNone(asr['numerator'])
+        self.assertEqual(asr['denominator'], 50000)
+
     def test_history_metric_defaults_are_three_checked_options(self):
         from html.parser import HTMLParser
 

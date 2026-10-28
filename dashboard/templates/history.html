@@ -79,6 +79,12 @@
             <p id="history-analysis-status" class="history-analysis-status" role="status" aria-live="polite"></p>
           </section>
 
+        <section class="history-overview-section" aria-labelledby="history-overview-title">
+          <h2 id="history-overview-title">整体测试数据</h2>
+          <p class="history-overview-hint">底色区分攻击，侧边色对应图表中的运行；数字以蓝色、粉色、黄色分别标识 TSR、ASR、Token。分母为有效任务数。</p>
+          <div id="history-overview"><p class="history-overview-empty">选择结果并生成分析后查看。</p></div>
+        </section>
+
         <section class="history-visual-section" aria-labelledby="history-chart-title">
           <div class="history-chart-heading">
             <div><span class="section-kicker">Historical results</span><h2 id="history-chart-title">历史结果分析</h2></div>
@@ -97,7 +103,7 @@
           <h3 id="history-summary-title">指标明细</h3>
           <div class="table-responsive">
             <table class="table table-dark table-hover table-sm" id="history-summary-table">
-              <thead><tr><th>模型 / 运行</th><th>攻击</th><th>场景</th><th>TSR (%)</th><th>ASR (%)</th><th>防御率 (%)</th><th>Tokens</th><th>任务数</th></tr></thead>
+              <thead><tr><th>模型 / 运行</th><th>攻击</th><th>场景</th><th>TSR (%)</th><th>ASR (%)</th><th>防御率 (%)</th><th>已记录 Token</th><th>成功 / 总任务</th></tr></thead>
               <tbody><tr><td colspan="8">尚无分析数据</td></tr></tbody>
             </table>
           </div>

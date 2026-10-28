@@ -9,7 +9,7 @@ const historyCharts = require("../dashboard/static/js/history_charts.js");
 function historyUI(catalog, filters) {
   const source = fs.readFileSync(path.join(__dirname, "../dashboard/static/js/history.js"), "utf8");
   class Element {
-    constructor() { this.children = []; this.handlers = {}; this.style = {}; this.value = "all";
+    constructor() { this.children = []; this.handlers = {}; this.style = {setProperty(key,value) { this[key]=value; }}; this.value = "all";
       this.classList = {add() {}, toggle() {}}; }
     append(...children) { this.children.push(...children); }
     replaceChildren(...children) { this.children = children; }
@@ -35,6 +35,7 @@ function historyUI(catalog, filters) {
       return selector.includes(":checked") ? elements.filter(item => item.checked) : elements;
     },
     createElement() { return new Element(); },
+    createTextNode(text) { const node = new Element(); node.textContent = text; return node; },
     body: new Element(),
   };
   const gate = selection.createRequestGate();
@@ -42,7 +43,7 @@ function historyUI(catalog, filters) {
     document, window: {setInterval() {}, setTimeout() {}}, historySelection: selection, historyCharts, analysisRequests: gate,
     catalog, filters, suiteSelection: null,
     experimentStyles: historyCharts.createExperimentStyles(catalog), exporting: false,
-    updateControls() {}, loadCatalog() {}, clearCharts() {}, renderSummaryTable() {}, showEmpty() {}, analyze() {}, exportAnalysis() {},
+    updateControls() {}, loadCatalog() {}, clearCharts() {}, renderSummaryTable() {}, renderOverview() {}, showEmpty() {}, analyze() {}, exportAnalysis() {},
     addOption(select, value, text) { const node = new Element(); node.value = value; node.textContent = text; select.append(node); },
   };
   vm.createContext(context);
@@ -195,4 +196,34 @@ test('multi-suite charts keep separate scenario values while one selected scene 
   ui.context.renderAnalysis({experiments:[{...run,suites:[run.suites[0]]}]}, {view:'bar',metrics:['utility_rate'],suites:['travel']});
   assert.deepEqual(Array.from(configs[0].data.labels),['v1']);
   assert.deepEqual(Array.from(configs[0].data.datasets[0].data),[50]);
+});
+
+test('overview renders colored cards with weighted counts and clears when selection changes', () => {
+  const run = {id:'test', model_group:'model_test', model_suffix:'model_test', source:'benchmarks/model_test',
+    result_folder:'benchmarks', attack_name:'tool_knowledge', benchmark:{id:'agentdojo',revision:'v1',suite_version:'v1.2'}, benchmark_id:'agentdojo',
+    suites:[{suite_name:'banking', overview:{tsr:{numerator:3,denominator:4},asr:{numerator:1,denominator:4,derived:true},
+      tokens:{value:1234,complete:true}}},
+      {suite_name:'slack', overview:{tsr:{numerator:2,denominator:6},asr:{numerator:0,denominator:6,derived:false},
+        tokens:{value:2000,complete:true}}}]};
+  const ui=historyUI([run],{});
+  vm.runInContext(ui.source.slice(ui.source.indexOf('  function renderOverview('),ui.source.indexOf('  function renderSummaryTable('))
+    +ui.source.slice(ui.source.indexOf('  function addCell('),ui.source.indexOf('  function formatRate(')),ui.context);
+  ui.context.renderOverview([run]);
+  const flatten = element => [element, ...element.children.flatMap(flatten)];
+  const all=flatten(ui.nodes.get('#history-overview'));
+  const card=all.find(el=>el.className==='history-overview-card');
+  assert.equal(card.style.borderLeftColor,ui.context.experimentStyles.test.color);
+  const group=all.find(el=>el.className==='history-overview-group');
+  assert.ok(group.style['--history-attack-fill']);
+  for (const key of ['tsr','asr','tokens']) {
+    assert.equal(all.filter(el=>el.className==='history-overview-'+key).length,3);
+  }
+  const text=all.map(el=>el.textContent).filter(Boolean);
+  assert.ok(text.includes('攻击：tool_knowledge'));
+  assert.ok(text.includes('5 / 10 · 50.00%'));
+  assert.ok(text.includes('1 / 10 · 10.00%*'));
+  assert.ok(text.includes('3,234'));
+  assert.ok(text.some(value=>value.includes('唯一还原')));
+  ui.context.renderOverview([]);
+  assert.ok(flatten(ui.nodes.get('#history-overview')).some(el=>el.textContent==='选择结果并生成分析后查看。'));
 });

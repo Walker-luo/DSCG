@@ -77,6 +77,46 @@
     };
   }
 
+  function buildOverview(experiments, catalog, styles) {
+    const order = new Map();
+    const attacks = Array.from(new Set([...catalog, ...experiments].map(run => run.attack_name || "unknown")))
+      .sort((a, b) => a.localeCompare(b));
+    catalog.forEach(run => {
+      const key = run.model_group || run.model_suffix || experimentKey(run);
+      if (!order.has(key)) order.set(key, order.size);
+    });
+    const sorted = [...experiments].sort((a, b) =>
+      (a.attack_name || "unknown").localeCompare(b.attack_name || "unknown") ||
+      (order.get(a.model_group || a.model_suffix || experimentKey(a)) ?? Infinity) -
+        (order.get(b.model_group || b.model_suffix || experimentKey(b)) ?? Infinity) ||
+      (a.source || "").localeCompare(b.source || ""));
+    const groups = [];
+    sorted.forEach(run => {
+      const attack = run.attack_name || "unknown";
+      if (!groups.length || groups[groups.length - 1].attack !== attack) {
+        const hue = (198 + attacks.indexOf(attack) * 137.508) % 360;
+        groups.push({attack, fill: `hsla(${hue.toFixed(1)}, 65%, 42%, 0.23)`, cards: []});
+      }
+      const rows = (run.suites || []).map(suite => ({suite: suite.suite_name, metrics: suite.metrics, ...suite.overview}));
+      const identity = run.benchmark;
+      const canPool = rows.length === 1 || (rows.length > 1 && run.benchmark_id !== "mixed" &&
+        identity?.id && identity?.revision && identity?.suite_version);
+      const sumMetric = key => {
+        const complete = rows.every(row => Number.isInteger(row[key]?.numerator) && Number.isInteger(row[key]?.denominator));
+        const total = {numerator: complete ? rows.reduce((sum, row) => sum + row[key].numerator, 0) : null,
+          denominator: complete ? rows.reduce((sum, row) => sum + row[key].denominator, 0) : null};
+        if (key === "asr") total.derived = rows.some(row => row.asr?.derived);
+        return total;
+      };
+      const tokenRows = rows.filter(row => Number.isFinite(row.tokens?.value));
+      const total = canPool ? {tsr: sumMetric("tsr"), asr: sumMetric("asr"),
+        tokens: {value: tokenRows.length ? tokenRows.reduce((sum, row) => sum + row.tokens.value, 0) : null,
+          complete: rows.every(row => row.tokens?.complete)}} : null;
+      groups[groups.length - 1].cards.push({run, rows, total, color: styles[experimentKey(run)]?.color || defaultTheme.colors[0]});
+    });
+    return groups;
+  }
+
   const patternCache = new WeakMap();
   const patternKinds = ["diagonal", "dots", "horizontal", "crosshatch", "vertical", "reverse-diagonal"];
 
@@ -339,7 +379,7 @@
     return { type: "scatter", data: { datasets }, options: chartOptions };
   }
 
-  const api = { metricInfo, metricConfigs, scatterConfig, canUseRadar, createExperimentStyles, describeExperiment, createBarFill };
+  const api = { metricInfo, metricConfigs, scatterConfig, canUseRadar, createExperimentStyles, describeExperiment, createBarFill, buildOverview };
   if (typeof module === "object" && module.exports) module.exports = api;
   else root.DSCGHistoryCharts = api;
 })(typeof window === "undefined" ? globalThis : window);

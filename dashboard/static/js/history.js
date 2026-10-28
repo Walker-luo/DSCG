@@ -88,6 +88,7 @@
     renderCatalog(new Set(selectedRunIds()), true, selectAllVisible);
     clearCharts();
     renderSummaryTable([]);
+    renderOverview([]);
     document.querySelector("#history-source-caption").textContent = "";
     showEmpty("筛选已更新", "勾选当前列表中的结果，生成分析或下载数据。");
   }
@@ -369,6 +370,7 @@
     const experiments = result.experiments || [];
     const rows = experiments.flatMap((run) => run.suites || []);
     renderSummaryTable(experiments);
+    renderOverview(experiments);
     if (!rows.length) {
       showEmpty("没有可绘制的指标", "所选结果中没有与当前场景匹配的汇总数据。");
       return;
@@ -598,6 +600,104 @@
       (truncated ? " 部分任务记录受接口上限截断。" : "");
   }
 
+  function renderOverview(experiments) {
+    const target = document.querySelector("#history-overview");
+    target.replaceChildren();
+    const groups = historyCharts.buildOverview(experiments, catalog, experimentStyles);
+    if (!groups.length) {
+      const empty = document.createElement("p");
+      empty.className = "history-overview-empty";
+      empty.textContent = "选择结果并生成分析后查看。";
+      target.append(empty);
+      return;
+    }
+    groups.forEach(group => {
+      const section = document.createElement("section");
+      section.className = "history-overview-group";
+      section.style.setProperty("--history-attack-fill", group.fill);
+      const heading = document.createElement("h3");
+      heading.textContent = "攻击：" + historySelection.attackLabel(group.attack);
+      const grid = document.createElement("div");
+      grid.className = "history-overview-grid";
+      group.cards.forEach(card => {
+        const article = document.createElement("article");
+        article.className = "history-overview-card";
+        article.style.borderLeftColor = card.color;
+        const name = document.createElement("h4");
+        name.title = card.run.source || card.run.label || "";
+        name.append(versionBadge(experimentStyles[card.run.id]),
+          document.createTextNode(" " + historyCharts.describeExperiment(card.run).label));
+        article.append(name);
+        if (!card.rows.length) {
+          const empty = document.createElement("p");
+          empty.textContent = "所选场景无数据";
+          article.append(empty);
+        } else {
+          const table = document.createElement("table");
+          table.className = "history-overview-table";
+          const header = document.createElement("thead");
+          const headerRow = document.createElement("tr");
+          ["场景", "TSR", "ASR", "已记录 Token"].forEach(text => {
+            const cell = document.createElement("th");
+            cell.scope = "col";
+            cell.textContent = text;
+            headerRow.append(cell);
+          });
+          header.append(headerRow);
+          const body = document.createElement("tbody");
+          const showRow = (label, row, overall = false) => {
+            const tr = document.createElement("tr");
+            if (overall) tr.className = "history-overview-total";
+            const title = document.createElement("th");
+            title.scope = "row";
+            title.textContent = label;
+            tr.append(title);
+            addCell(tr, overviewRate(row?.tsr, row?.metrics?.utility_rate)).className = "history-overview-tsr";
+            addCell(tr, overviewRate(row?.asr, row?.metrics?.attack_success_rate)).className = "history-overview-asr";
+            const tokens = row?.tokens;
+            addCell(tr, Number.isFinite(tokens?.value)
+              ? tokens.value.toLocaleString("en-US") + (tokens.complete ? "" : "（部分已记录）") : "—").className = "history-overview-tokens";
+            body.append(tr);
+          };
+          if (card.total) showRow("合计", card.total, true);
+          card.rows.forEach(row => showRow(row.suite, row));
+          table.append(header, body);
+          const scroll = document.createElement("div");
+          scroll.className = "history-overview-table-scroll";
+          scroll.tabIndex = 0;
+          scroll.setAttribute("role", "region");
+          scroll.setAttribute("aria-label", historyCharts.describeExperiment(card.run).label + " 数据表，可横向滚动");
+          scroll.append(table);
+          article.append(scroll);
+          if (!card.total && card.rows.length > 1) {
+            const note = document.createElement("p");
+            note.className = "history-overview-note";
+            note.textContent = "基准身份不完整或不一致，按场景展示。";
+            article.append(note);
+          }
+          if (card.rows.some(row => row.asr?.derived)) {
+            const note = document.createElement("p");
+            note.className = "history-overview-note";
+            note.textContent = "* ASR 成功数由已记录比率和有效数唯一还原。";
+            article.append(note);
+          }
+        }
+        grid.append(article);
+      });
+      section.append(heading, grid);
+      target.append(section);
+    });
+  }
+
+  function overviewRate(metric, reported) {
+    const numerator = Number.isInteger(metric?.numerator) ? metric.numerator.toLocaleString("en-US") : "—";
+    const denominator = Number.isInteger(metric?.denominator) ? metric.denominator.toLocaleString("en-US") : "—";
+    const percent = metric?.denominator === 0 ? null : Number.isInteger(metric?.numerator) && metric.denominator > 0
+      ? metric.numerator * 100 / metric.denominator : reported;
+    const rate = Number.isFinite(percent) ? percent.toFixed(2) + "%" : "N/A";
+    return numerator + " / " + denominator + " · " + rate + (metric?.derived ? "*" : "");
+  }
+
   function renderSummaryTable(experiments) {
     const body = document.querySelector("#history-summary-table tbody");
     body.replaceChildren();
@@ -638,6 +738,7 @@
     const cell = document.createElement("td");
     cell.textContent = text;
     row.append(cell);
+    return cell;
   }
 
   function formatRate(value) {
