@@ -2,7 +2,9 @@
 
 DSCG 是工具使用型 LLM Agent 的间接提示词注入防御研究原型，支持 AgentDojo 与 AgentDyn，使用原生评分比较任务成功率（TSR）、攻击成功率（ASR）和模型开销。
 
-当前版本 **DSCG_v3.5.4**，默认 **`prompt_profile=static-task-v354`**：原文片段ID任务视图＋全局工具授权。显式`static-task-v352`保留v3.5.3策略，`legacy`保留单次授权。运行名称不选择策略；本轮专项结果见[分析](analysis/v3-5-4.md)，最近正式结果仍为[v3.5.3](analysis/v3-5-3.md)。
+当前代码标识为 **DSCG_v3.5.4**，默认 **`prompt_profile=static-task-v354`**。**后续将当前工作区保存为v3.6，并以v3.6为后续改进基线**；归档包含本次筛选、可选GOAL和结果存储改动，L1/L2/L3策略沿用v3.5.4。本次仅更新说明，代码版本与profile名称尚未切换；运行名不选择策略。
+
+显式`static-task-v352`保留v3.5.3策略，`legacy`为单次授权对照。既有正式结果见[v3.5.4分析](analysis/v3-5-4.md)，本次入口与存储验证见[实施记录](workshop/completed/fliter_goal_20261030.md)。历史结果保留原版本名，不重标为v3.6。
 
 ## 当前框架与工作流程
 
@@ -69,18 +71,20 @@ python -m dscg.benchmark_catalog                # 离线检查，无模型调用
 以下命令会调用真实模型，从项目根执行，使用未用过的新名称：
 
 ```bash
-# 同范围的原生baseline与默认v3.5.4
+# 同范围的原生baseline与当前策略；v36仅为预定归档版本的运行名
 python -m experiments.run_partial_benchmark --baseline --name baseline_partial_01 --progress
-python -m experiments.run_partial_benchmark --name v354_static_partial_01 --progress
+python -m experiments.run_partial_benchmark --name v36_static_partial_01 --progress
 
 # 显式选择单次授权对照；AgentDojo示例
 python -m experiments.run_partial_benchmark --suites banking slack \
-  --prompt-profile legacy --name v354_legacy_partial_01 --progress
+  --prompt-profile legacy --name v36_legacy_partial_01 --progress
 ```
 
-partial是每场景注册前3用户×前3注入目标，不能覆盖全部问题任务。正式完整范围用 `experiments.run_benchmark`；无攻击加 `--clean`；冻结注入名单加 `--cohort PATH`。具体范围、攻击与续跑见[全量指南](docs/benchmark.md)、[partial指南](docs/partial_benchmark.md)和[预检指南](docs/injection_precheck.md)。
+partial是每场景注册前3用户×前3注入目标，不能覆盖全部问题任务。正式完整范围用 `experiments.run_benchmark`；无攻击加 `--clean`；排除注入目标加 `--fliter PATH`，需要按当前测量pipeline检查目标时加 `--goal`（默认关闭）。具体范围、攻击与续跑见[全量指南](docs/benchmark.md)、[partial指南](docs/partial_benchmark.md)和[预检指南](docs/injection_precheck.md)。
 
-结果位于 `results/{benchmarks,partial_benchmark}/<backend>/<model>_<name>/`。先看 `summary.md`，再通过 `failure_cases.jsonl` 定位原始轨迹；主JSON保留原生交互／评分，防御诊断和原始审计回复存同名JSONL。详见[结果文件](docs/result_files.md)。
+独立生成名单使用`python -m experiments.run_injection_precheck screen --suites banking slack --name v36_screen_01`：每个GOAL仅跑一次完整轨迹，成功保留，失败或错误直接列入`fliter.json`，续跑不重测已开始目标。测量只加`--fliter`时直接消费排除表，不重复预检；仅在需要当前框架重新判断时加`--goal`。clean／DoS不接受这两个参数。
+
+结果位于 `results/{benchmarks,partial_benchmark}/<backend>/<model>_<name>/`。根 `run_manifest.json`绑定配置，`summary.json`记录筛选与GOAL checkpoint。任务使用 `<attack>/<suite>/<user>/<injection>.json`；先看 `summary.md`，再通过 `failure_cases.jsonl` 定位原始轨迹；主JSON保留原生交互／评分，防御诊断和原始审计回复存同名JSONL。详见[结果文件](docs/result_files.md)。
 
 ## Dashboard
 
@@ -92,9 +96,9 @@ python -m dashboard.app
 
 ## 当前限制与验证
 
-本轮Qwen专项在共同60个有效样例中成功40→43；有效攻击ASR为0/37，另2例API错误保留未知。banking攻击成功4/12持平，Slack10/11→11/11，travel7/11→8/11，travel clean（含合法控制）9/10持平。它不是全量结果，不能保证所有案例不退步，见[本轮分析](analysis/v3-5-4.md)。
+本次筛选与存储验证：Qwen在线13个有效计分键、0计分错误；另3个GOAL中1通过、1有效失败、1连接错误。错误目标已跳过、未重试，材料保留。两后端相关离线合并回归各298项无失败（含既有跳过），只验证入口、目录与统计，不证明TSR提升或完整安全性。
 
-银行仍会漏做已有订单更新、猜测新付款日期；Slack与travel仍有个别交付／误拒。新协议减少格式失败，不认证摘要含义。共享读取器按当前attempt的已记账API失败排除派生效用／安全分母，原始标签和历史持久汇总不回写。
+既有v3.5.4正式结果仍存在银行漏做／日期错误、合法动作误拒和部分最终交付问题，见[结果分析](analysis/v3-5-4.md)与[具体案例](analysis/details.md)。这些问题作为后续v3.6优化起点，不能因版本归档视为已解决。
 
 授权与审计约束候选工具动作，不保证任务完成、事实／日期正确或最终文本无污染。工具级标签不提供对象／参数硬授权；internal工具可能访问私密对象，URL可能携带敏感参数。离线回归仍有已知I3失败；E0 pending、I3 partial（24有效探针／8范围缺口）、I2 locked。操作与边界见[当前交接](docs/framework_updates.md)。
 

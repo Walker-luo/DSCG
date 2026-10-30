@@ -744,7 +744,12 @@ def _trace_artifact_path(logger) -> Path | None:
     user_task_id = str(context["user_task_id"])
     attack_type = str(context["attack_type"])
     injection_task_id = str(context.get("injection_task_id") or "none")
-    directory = Path(dirpath) / pipeline_name / suite_name / user_task_id / attack_type
+    task_directory = getattr(logger, "task_directory", None)
+    task_stem = getattr(logger, "task_stem", None)
+    if callable(task_stem):
+        injection_task_id = task_stem()
+    directory = (task_directory() if callable(task_directory) else
+        Path(dirpath) / pipeline_name / suite_name / user_task_id / attack_type)
     directory.mkdir(parents=True, exist_ok=True)
     return directory / f"{injection_task_id}.dscg_trace.jsonl.gz"
 

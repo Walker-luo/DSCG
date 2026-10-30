@@ -112,7 +112,8 @@ def iter_attack_results(jobs, *, on_event, execute=None):
                 continue
             # Do not serialize descriptors, clients or live native suite objects.
             indexed = [(i, {**j, 'resources': {k: v for k, v in j.get('resources', {}).items()
-                                             if k in {'task_manifest', 'metadata'}}}) for i, j in indexed]
+                                             if k in {'task_manifest', 'metadata', 'selections',
+                                                      'selection_options', 'goal_retained'}}}) for i, j in indexed]
             receiver, sender = context.Pipe(duplex=False)
             process = context.Process(target=_attack_worker, args=(sender, indexed, execute), name=f'dscg-{attack}')
             try:

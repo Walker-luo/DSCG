@@ -15,6 +15,8 @@ from agentdojo.task_suite import get_suite
 
 from experiments import run_partial_benchmark as runner
 from dscg.pipelines.defended import _append_full_trace
+from experiments.common.benchmark_tasks import run_native_suite
+from experiments.common.task_storage import load_task_results
 
 
 def fake_pipeline(*args, **kwargs):
@@ -121,10 +123,10 @@ class PartialAttackTests(unittest.TestCase):
                                              results_dir=directory, force_rerun=True,
                                              **({"attack": "all"} if preset == "all" else {})), 0)
                 base = Path(directory) / f"agentdojo/offline-model_{mode}"
-                manifest = json.loads((base / "attack_manifest.json").read_text())
+                manifest = json.loads((base / "summary.json").read_text())
                 self.assertEqual(manifest["attacks"], selected_attacks)
-                self.assertEqual(manifest["excluded_from_all"], {"manual": "requires interactive input"})
-                self.assertEqual(len(manifest["runs"]), len(selected_attacks))
+                self.assertNotIn("manual", manifest["attacks"])
+                self.assertEqual(len(manifest["run_records"]), len(selected_attacks))
                 combined = (base / "summary.md").read_text()
                 self.assertFalse(list(base.rglob('all_report.txt')))
                 self.assertFalse(list(base.rglob('report.txt')))
@@ -141,8 +143,8 @@ class PartialAttackTests(unittest.TestCase):
                     self.assertEqual(report["task_counts"]["total_tasks"], 3 if is_dos else 9)
                     self.assertIn(attack_name, (output / "detailed_results.csv").read_text())
                     self.assertIn(attack_name, combined)
-                    self.assertEqual(Path(manifest["runs"][selected_attacks.index(attack_name)]["output_dir"]), base / attack_name)
-                self.assertTrue(all(run["status"] == "completed" for run in manifest["runs"]))
+                    self.assertEqual(Path(manifest["run_records"][selected_attacks.index(attack_name)]["output_dir"]), base / attack_name)
+                self.assertTrue(all(run["status"] == "completed" for run in manifest["run_records"]))
             self.assertEqual(load.call_count, 2 * sum(len(names) for names in selections.values()))
             self.assertEqual(benchmark.call_count, load.call_count)
             self.assertTrue(all(call.kwargs["force_rerun"] for call in benchmark.call_args_list))
@@ -160,12 +162,13 @@ class PartialAttackTests(unittest.TestCase):
         ):
             self.assertEqual(runner.main(origin=True, suites=["workspace"], run_name="partial",
                                          results_dir=directory, attack=["tool_knowledge", "injecagent"]), 1)
-            manifest = json.loads((Path(directory) / "agentdojo/offline-model_partial" / "attack_manifest.json").read_text())
-            self.assertEqual([run["status"] for run in manifest["runs"]], ["error", "completed"])
-            self.assertEqual(manifest["runs"][0]["error_type"], "ValueError")
+            manifest = json.loads((Path(directory) / "agentdojo/offline-model_partial" / "summary.json").read_text())
+            self.assertEqual([run["status"] for run in manifest["run_records"]], ["error", "completed"])
+            self.assertEqual(manifest["run_records"][0]["error_type"], "ValueError")
             self.assertTrue((Path(directory) / "agentdojo/offline-model_partial/injecagent/workspace/summary.json").exists())
 
-    def test_native_traces_sidecars_and_cache_use_the_nested_attack_directory(self):
+    @patch.object(runner, 'run_suite_with_progress', side_effect=run_native_suite)
+    def test_native_traces_sidecars_and_cache_use_the_flat_attack_directory(self, _execute):
         # Real AgentDojo logger/cache, with task execution replaced by an offline oracle.
         suite = get_suite("v1.2", "workspace")
         model_id = "gpt-4o-2024-05-13"
@@ -190,18 +193,20 @@ class PartialAttackTests(unittest.TestCase):
             options = dict(model_id=model_id, origin=True, suites=["workspace"], run_name="baseline",
                            results_dir=directory, attack=attack_name)
             self.assertEqual(runner.main(**options), 0)
-            self.assertEqual(task.call_count, 12)  # 3 prechecks + 9 attacked tasks.
+            self.assertEqual(task.call_count, 9)  # Scored tasks only; GOAL is independent.
             root = Path(directory) / f"agentdojo/{model_id}_baseline"
             result = root / attack_name / "workspace"
             injection = next(iter(suite.injection_tasks))
-            trace = result / "user_task_0" / attack_name / f"{injection}.json"
+            trace = result / "user_task_0" / f"{injection}.json"
             self.assertTrue(trace.exists())
             raw = json.loads(trace.read_text())
             self.assertEqual(raw["attack_type"], attack_name)
             self.assertEqual(raw["benchmark_version"], "v1.2")
-            self.assertIn("GPT-4", "\n".join(raw["injections"].values()))
+            expected = attacks.load_attack(attack_name, suite, SimpleNamespace(name=model_id)).attack(
+                suite.user_tasks["user_task_0"], suite.injection_tasks[injection])
+            self.assertEqual(raw["injections"], expected)
             self.assertTrue(raw["utility"])
-            cached = runner.benchmark.load_task_results(attack_name, "workspace", "user_task_0",
+            cached = load_task_results(attack_name, "workspace", "user_task_0",
                                                         attack_name, injection, root)
             self.assertTrue(cached.utility)
             with gzip.open(trace.with_suffix(".dscg_trace.jsonl.gz"), "rt") as stream:
@@ -214,10 +219,10 @@ class PartialAttackTests(unittest.TestCase):
             before = trace.read_bytes()
             self.assertEqual(runner.main(**options), 0)
             self.assertEqual(legacy_report.read_text(), 'Historical report: preserve original bytes.')
-            self.assertEqual(task.call_count, 12)  # All raw results reused from the new path.
+            self.assertEqual(task.call_count, 9)  # All raw results reused from the new path.
             self.assertEqual(trace.read_bytes(), before)
             self.assertEqual(runner.main(**options, force_rerun=True), 0)
-            self.assertEqual(task.call_count, 24)
+            self.assertEqual(task.call_count, 18)
 
     def test_cli_returns_nonzero_for_partial_attack_failure(self):
         with patch.object(runner, "main", return_value=1):

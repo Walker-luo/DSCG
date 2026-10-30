@@ -1,11 +1,14 @@
 """Compact run reports and bounded failure excerpts; no model calls or rescoring."""
 
 import json
+import os
+from tempfile import NamedTemporaryFile
 from pathlib import Path
 from urllib.parse import quote
 
 from dscg.benchmark_catalog import benchmark_identity, get_backend, get_suites
 from dscg.task_diagnostics import load_task_trace
+from experiments.common.task_paths import trace_path
 
 
 MAX_EXCERPTS = 6
@@ -104,7 +107,7 @@ def collect_suite_report(base_dir: Path, suite_dir: Path, summary: dict, records
     preflight_errors = [e for e in summary.get('task_error_diagnostics', []) if e['stage'] == 'goal_preflight']
 
     def add_case(user, injection, utility, security, status, failure_types):
-        trace = suite_dir / str(user) / attack / f"{injection if attacked else 'none'}.json"
+        trace = trace_path(suite_dir, str(user), attack, injection if attacked else None)
         case = {
             "attack": attack, "suite": summary["suite_name"], "model_id": summary["model_id"],
             "user_task_id": user, "injection_task_id": injection if attacked else None,
@@ -156,7 +159,7 @@ def collect_suite_report(base_dir: Path, suite_dir: Path, summary: dict, records
                 add_case(user, injection, None, None, "infrastructure_error", ["result_missing"])
 
     for error in preflight_errors:
-        trace = suite_dir / error['user_task_id'] / 'none' / 'none.json'
+        trace = trace_path(suite_dir, error['user_task_id'], 'none', None, goal=True)
         cases.append({'attack': attack, 'suite': summary['suite_name'], 'model_id': summary['model_id'],
                       'user_task_id': None, 'injection_task_id': error['user_task_id'], 'phase': 'goal_preflight',
                       'failure_types': ['goal_preflight_error'], 'sample_status': 'infrastructure_error',
@@ -196,12 +199,13 @@ def _rate(passed: int, denominator: int, *, enabled: bool = True) -> str:
 
 def write_run_overview(base_dir: Path, attack_names: list[str], suites: list[str],
                        run_records: list[dict], suite_reports: list[dict], *, model_id=None,
-                       task_scope='partial', routing_summary=None) -> tuple[Path, Path]:
-    """Write two additive run artifacts. Native traces and metrics stay untouched."""
+                       task_scope='partial', routing_summary=None, selection_report=None) -> tuple[Path, Path]:
+    """Write run summaries and failure index without altering native metrics."""
     backend = get_backend()
     summary_path = base_dir / "summary.md"
     detail_path = base_dir / "failure_cases.jsonl"
     metadata = ('overall_results.json' if task_scope == 'dashboard' else
+                'run_manifest.json' if (base_dir/'run_manifest.json').exists() else
                 'attack_manifest.json' if (base_dir/'attack_manifest.json').exists() else
                 'screened_run_manifest.json' if (base_dir/'screened_run_manifest.json').exists() else
                 'benchmark_plan.json')
@@ -237,6 +241,31 @@ def write_run_overview(base_dir: Path, attack_names: list[str], suites: list[str
              "TSR/ASR 分母分别是已返回效用结果数/有效布尔安全结果数；预检不计入这些分母。Token 含主模型和审计模型，沿用各场景 cost_scope。", "",
              "| Attack | 场景 | 状态 | 完成/计划 | TSR | ASR | 防御成功率 | Token 主/审计/合计 | TSR失败 | ASR成功 | 指标缺失 | 任务错误 | 框架失败 | 场景数据 |",
              "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |"]
+    if selection_report is not None:
+        exclusions = selection_report.get('fliter_excluded', [])
+        checks = selection_report.get('goal_checks', [])
+        failures = [item for item in checks if item.get('status') == 'failed']
+        errors = [item for item in checks if item.get('status') == 'error']
+        selection_lines = ['',
+            f"筛选：原有目标 {selection_report.get('targets_before', 0)}，fliter 排除 {len(exclusions)}，"
+            f"GOAL 失败 {len(failures)}、错误 {len(errors)}，保留 {selection_report.get('targets_retained', 0)}，"
+            f"移除任务对 {selection_report.get('removed_pairs', 0)}；GOAL {'开启' if selection_report.get('goal_enabled') else '关闭'}"
+            f"（{_cell(selection_report.get('goal_pipeline') or 'none')}）。", '']
+        excluded = [(item, 'fliter 排除') for item in exclusions]
+        excluded += [(item, 'GOAL 失败（不计分）') for item in failures]
+        excluded += [(item, 'GOAL预检错误跳过（不计分）') for item in errors]
+        if selection_report.get('goal_enabled'):
+            selection_lines += ['当前框架参与GOAL筛选，不同框架可能产生不同测试集合，不能直接比较不同分母原始成功率。', '']
+        if excluded:
+            selection_lines += ['| 场景 | 注入目标 | 排除原因 | 移除任务对 |', '| --- | --- | --- | --- |']
+            for item, reason in excluded:
+                if item.get('error_code'):
+                    reason += ' / ' + str(item['error_code'])
+                selection_lines.append('| ' + ' | '.join('**' + _cell(value) + '**' for value in
+                    (item['suite'], item['injection_task_id'], reason, item.get('removed_pairs', '—'))) + ' |')
+            selection_lines.append('')
+        table_index = next(i for i, line in enumerate(lines) if line.startswith('| Attack |'))
+        lines[table_index:table_index] = selection_lines
     for attack in attack_names:
         for suite in suites:
             report = reports.get((attack, suite))
@@ -307,5 +336,93 @@ def write_run_overview(base_dir: Path, attack_names: list[str], suites: list[str
         savings = t['shadow_would_save_tokens']
         lines.extend(['', f"实际模式：{', '.join(modes) or '未知'}；已记录候选批次{t['candidate_batches']}，适用{t['eligible_batches']}，原公开免审{t['original_public_bypass_batches']}，新增实际免审{t['actual_bypass_batches']}；shadow有效模拟节省Token：{savings if savings is not None else '未知'}。"])
     lines.extend(['', f'完整运行配置与范围见 {_link(metadata)}；保留场景summary.json、CSV和原始任务JSON用于核查。'])
+    goal_tokens = 0
+    goal_unknown = 0
+    for check in (selection_report or {}).get('goal_checks', []):
+        cost = check.get('cost')
+        models = cost.get('models') if isinstance(cost, dict) else None
+        if not isinstance(models, list) or not models:
+            goal_unknown += 1
+            continue
+        for phases in models:
+            if not isinstance(phases, dict):
+                goal_unknown += 1
+                continue
+            for counters in phases.values():
+                if not isinstance(counters, dict):
+                    goal_unknown += 1
+                    continue
+                tokens = counters.get('total_tokens')
+                if type(tokens) is int:
+                    goal_tokens += tokens
+                else:
+                    goal_unknown += 1
+                if counters.get('missing_usage_calls') or counters.get('failed_calls'):
+                    goal_unknown += 1
+    scored_tokens = 0
+    scored_unknown = 0
+    for report in suite_reports:
+        cost = report['summary']
+        if not isinstance(cost, dict):
+            scored_unknown += 1
+            continue
+        if not any(isinstance(cost.get(name), dict) and 'total_tokens' in cost[name]
+                   for name in ('overhead', 'sec_overhead')):
+            scored_unknown += 1
+        for name in ('overhead', 'sec_overhead'):
+            counters = cost.get(name, {})
+            if not isinstance(counters, dict):
+                scored_unknown += 1
+                continue
+            tokens = counters.get('total_tokens')
+            if type(tokens) is int:
+                scored_tokens += tokens
+            elif counters:
+                scored_unknown += 1
+        for phases in cost.get('api_accounting', {}).values():
+            if not isinstance(phases, dict):
+                scored_unknown += 1
+                continue
+            for counters in phases.values():
+                if not isinstance(counters, dict):
+                    scored_unknown += 1
+                    continue
+                if counters.get('missing_usage_calls') or counters.get('failed_calls'):
+                    scored_unknown += 1
+    aborted_groups = {(run['attack'], run.get('failed_suite')) for run in run_records
+                      if run.get('status') == 'error' and (run['attack'], run.get('failed_suite')) not in reports}
+    scored_unknown += len(aborted_groups)
+    cost_summary = dict(scope='recorded scored costs (per-suite cost_scope) plus all GOAL checkpoint costs', scored={'known_total_tokens': scored_tokens, 'unknown_usage_records': scored_unknown},
+                        goal={'known_total_tokens': goal_tokens, 'unknown_usage_records': goal_unknown},
+                        combined={'known_total_tokens': scored_tokens + goal_tokens,
+                                  'unknown_usage_records': scored_unknown + goal_unknown})
+    if (selection_report or {}).get('goal_enabled'):
+        lines.extend(['', f'GOAL检查成本（不计分）：已知Token={goal_tokens}；未知usage记录={goal_unknown}。',
+                      f'计分＋GOAL记录成本合计已知Token={scored_tokens + goal_tokens}；未知usage记录={scored_unknown + goal_unknown}。',
+                      '计分成本沿用各场景cost_scope；GOAL包含已有checkpoint记录，续跑缓存与本次新增成本须分别核对。'])
+    structured_path = base_dir / 'summary.json'
+    # The GOAL stage checkpoints into this file before measurement begins.
+    structured = json.loads(structured_path.read_text()) if structured_path.exists() else {}
+    structured.update(schema_version='dscg.run-summary.v1', benchmark=benchmark_identity(),
+                      model_id=model_id, task_scope=task_scope, attacks=list(attack_names), suites=list(suites),
+                      run_records=run_records, suite_reports=[{k: v for k, v in report.items() if k != 'cases'}
+                                                            for report in suite_reports],
+                      configuration_path=metadata, failure_cases_path='failure_cases.jsonl', cost_summary=cost_summary,
+                      routing_summary_path='l3_router_summary.json' if routing_summary is not None else None)
+    if selection_report is not None:
+        structured['selection_report'] = {**structured.get('selection_report', {}), **selection_report}
+    temporary = None
+    try:
+        with NamedTemporaryFile(mode='w', encoding='utf-8', dir=base_dir,
+                                prefix='.run-summary-', delete=False) as stream:
+            temporary = Path(stream.name)
+            json.dump(structured, stream, ensure_ascii=False, indent=2)
+            stream.write('\n')
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.replace(temporary, structured_path)
+    finally:
+        if temporary is not None:
+            temporary.unlink(missing_ok=True)
     summary_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
     return summary_path, detail_path

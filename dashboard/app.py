@@ -22,7 +22,7 @@ from flask import (
     send_file, stream_with_context
 )
 
-from agentdojo import logging as ad_logging, benchmark, attacks
+from agentdojo import logging as ad_logging, attacks
 from agentdojo.attacks.attack_registry import ATTACKS
 from dscg.benchmark_catalog import (SUITE_VERSION, get_backend, get_suite, suite_catalog, validate_backend)
 from dscg.model_config import DEEPSEEK_MODEL_IDS
@@ -34,6 +34,7 @@ from dscg.audit_router import DEFAULT_THRESHOLD
 from dscg.tool_metadata import resolve_tool_metadata, validate_benchmark_tool_metadata
 from experiments.diagnostics.harness_audit import rank_ids, security_result_fields
 from experiments.common.benchmark_outcomes import project_outcomes
+from experiments.common.benchmark_tasks import run_native_suite
 from experiments.common.attack_compatibility import check_attack_compatibility
 from dashboard.history_export import build_history_export
 from dashboard.evaluation import FRAMEWORK_VERSION, aggregate, display_metrics, normalize_config, trace_stats
@@ -358,21 +359,11 @@ def run_test_thread(run_id: str, config: dict):
                 })
 
                 with ad_logging.OutputLogger(str(run_dir)):
-                    if run_attack:
-                        results = benchmark.benchmark_suite_with_injections(
-                            pipeline, suite, attack, run_dir,
-                            force_rerun=True,
-                            user_tasks=selected_users,
-                            injection_tasks=selected_injections,
-                            verbose=True, benchmark_version=SUITE_VERSION
-                        )
-                    else:
-                        results = benchmark.benchmark_suite_without_injections(
-                            pipeline, suite, run_dir,
-                            force_rerun=True,
-                            user_tasks=selected_users,
-                            benchmark_version=SUITE_VERSION
-                        )
+                    results = run_native_suite(
+                        pipeline, suite, attack, run_dir, force_rerun=True,
+                        user_tasks=selected_users, injection_tasks=selected_injections,
+                        benchmark_version=SUITE_VERSION,
+                    )
 
                 # ---- 结果分析 ----
                 utility_results = results["utility_results"]
@@ -380,7 +371,8 @@ def run_test_thread(run_id: str, config: dict):
 
                 outcomes = project_outcomes(utility_results, security_results,
                     run_dir / pipeline.name.replace("/", "_") / suite_name,
-                    attack_name if run_attack else "none", run_attack=run_attack)
+                    attack_name if run_attack else "none", run_attack=run_attack,
+                    task_errors=results.get('task_errors', []))
 
                 # 结构化记录
                 for task_key, util_status in utility_results.items():

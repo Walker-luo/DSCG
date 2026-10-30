@@ -6,6 +6,7 @@ import gzip
 import hashlib
 import json
 import math
+import os
 from pathlib import Path
 from uuid import uuid4
 
@@ -70,11 +71,15 @@ class DiagnosticSession:
             context = getattr(self.logger, 'context', {})
             root = getattr(self.logger, 'dirpath', None)
             if root and all(context.get(k) is not None for k in ('pipeline_name','suite_name','user_task_id','attack_type')):
-                directory = Path(root)/str(context['pipeline_name']).replace('/', '_')/str(context['suite_name'])
-                group = _within(Path(root), directory)
-                directory = _within(group, group/str(context['user_task_id'])/str(context['attack_type']))
+                group_path = getattr(self.logger, 'group_directory', None)
+                task_path = getattr(self.logger, 'task_directory', None)
+                group = _within(Path(root), group_path() if callable(group_path) else
+                    Path(root)/str(context['pipeline_name']).replace('/', '_')/str(context['suite_name']))
+                directory = _within(group, task_path() if callable(task_path) else
+                    group/str(context['user_task_id'])/str(context['attack_type']))
                 directory.mkdir(parents=True, exist_ok=True)
-                stem = str(context.get('injection_task_id') or 'none')
+                task_stem = getattr(self.logger, 'task_stem', None)
+                stem = task_stem() if callable(task_stem) else str(context.get('injection_task_id') or 'none')
                 self.path = _within(directory, directory/(stem+'.dscg.jsonl'))
                 self.response_path = _within(directory, directory/(stem+'.dscg.responses.jsonl'))
                 config_ref = self._configuration(group)
@@ -86,7 +91,7 @@ class DiagnosticSession:
                     offset = stream.tell()
                 self.logger.context['dscg_diagnostics'] = dict(path=self.path.name,
                     attempt_id=self.attempt_id, offset=offset)
-                self.emit('task_start', {'config_ref': '../../'+config_ref, 'trace_level':self.level,
+                self.emit('task_start', {'config_ref': os.path.relpath(group/config_ref, directory), 'trace_level':self.level,
                     'responses_path': self.response_path.name})
             return self
         except Exception as exc:

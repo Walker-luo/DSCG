@@ -9,6 +9,7 @@ from unittest.mock import patch
 from experiments import run_partial_benchmark as runner
 from experiments.common import partial_controls as controls, benchmark_reuse as reuse
 from experiments.common import injection_cohort as cohort
+from experiments.common.run_bindings import load_run_bindings
 
 IDENTITY = {'id': 'agentdyn', 'repository': 'https://github.com/SaFo-Lab/AgentDyn',
             'revision': 'a' * 40, 'suite_version': 'v1.2',
@@ -17,7 +18,7 @@ IDENTITY = {'id': 'agentdyn', 'repository': 'https://github.com/SaFo-Lab/AgentDy
 
 def TemporaryDirectory(*args, **kwargs):
     """Keep generated offline fixtures within this task's artifact root."""
-    root = Path(__file__).resolve().parents[1] / 'workshop/artifacts/20261018_dual_benchmark/runner/test_runs'
+    root = Path(__file__).resolve().parents[1] / 'workshop/artifacts/20261030_fliter_goal_impl/offline'
     root.mkdir(parents=True, exist_ok=True)
     kwargs.setdefault('dir', root)
     return _TemporaryDirectory(*args, **kwargs)
@@ -193,7 +194,9 @@ class AgentDynOfflineExecution(unittest.TestCase):
                 patch.object(runner.benchmark, 'benchmark_suite_without_injections', side_effect=results):
             self.assertEqual(runner.main(run_attack=False, results_dir=root, run_name='metadata', suites=['shopping']), 0)
             summary = json.loads((Path(root) / 'agentdyn/provider-model_metadata/none/shopping/summary.json').read_text())
-            self.assertEqual(summary['run_manifest'].get('tool_metadata_selection'), record)
+            bindings = load_run_bindings(Path(root) / 'agentdyn/provider-model_metadata')
+            self.assertEqual(bindings['none/shopping/run_manifest.json'].get('tool_metadata_selection'), record)
+            self.assertEqual(summary['run_manifest'], '../../run_manifest.json')
             self.assertEqual(summary.get('tool_metadata_selection'), record)
             self.assertIn(record['path'], output.getvalue())
             self.assertIn(record['warning'], output.getvalue())
@@ -206,7 +209,7 @@ class AgentDynOfflineExecution(unittest.TestCase):
         from contextlib import redirect_stdout
         from io import StringIO
         from experiments import run_benchmark as full
-        root = Path(__file__).resolve().parents[1] / 'workshop/artifacts/20261018_dual_benchmark/runner/test_runs'
+        root = Path(__file__).resolve().parents[1] / 'workshop/artifacts/20261030_fliter_goal_impl/offline'
         root.mkdir(parents=True, exist_ok=True)
         def results(pipeline, suite, *args, **kwargs):
             keys = [(u, i) for u in kwargs['user_tasks'] for i in kwargs.get('injection_tasks', [None])]
@@ -224,19 +227,23 @@ class AgentDynOfflineExecution(unittest.TestCase):
                             name = f'{scope}_{attacked}'
                             self.assertEqual(entry(origin=True, run_attack=attacked, run_name=name, results_dir=directory), 0)
                             base = Path(directory) / (identity['id'] + '/provider-model_' + name)
-                            manifest = json.loads((base / 'attack_manifest.json').read_text())
+                            manifest = json.loads((base / 'summary.json').read_text())
+                            bindings = load_run_bindings(base)
                             self.assertEqual(manifest['benchmark'], identity)
                             self.assertEqual(manifest['suites'], list(profile(identity).suites))
-                            self.assertEqual(manifest['attacks'], list(runner.TYPICAL_ATTACKS) if attacked else [])
+                            self.assertEqual(manifest['attacks'], list(runner.TYPICAL_ATTACKS) if attacked else ['none'])
                             for summary_path in base.glob('*/*/summary.json'):
                                 summary = json.loads(summary_path.read_text())
                                 self.assertEqual(summary['benchmark'], identity)
-                                self.assertEqual(summary['run_manifest']['benchmark'], identity)
-                                self.assertEqual(summary['run_manifest']['source']['benchmark'], identity)
+                                binding = bindings[summary_path.parent.relative_to(base).as_posix() + '/run_manifest.json']
+                                self.assertEqual(summary['run_manifest'], '../../run_manifest.json')
+                                self.assertEqual(binding['benchmark'], identity)
+                                self.assertEqual(binding['source']['benchmark'], identity)
                                 self.assertEqual(summary['task_counts']['planned_tasks'], size * size if attacked else size)
                                 self.assertEqual(summary['task_counts']['utility_passed'], (size * size if attacked else size) - 1)
                                 self.assertEqual(summary['metrics']['attack_success_rate'], 1 / (size * size) if attacked else None)
-                            plan = json.loads((base / 'benchmark_plan.json').read_text())
+                            plan = bindings['benchmark_plan.json']
+                            self.assertFalse((base / 'benchmark_plan.json').exists())
                             self.assertEqual(plan['benchmark'], identity)
                             self.assertEqual(plan['schema_version'], 'dscg.benchmark-plan.v2')
 

@@ -4,9 +4,9 @@ from io import StringIO
 from types import SimpleNamespace
 from unittest import TestCase
 from unittest.mock import patch
-import warnings
 
 from agentdojo import benchmark
+from experiments.common import task_storage
 
 from experiments.common.benchmark_progress import GroupProgress, run_suite_with_progress
 
@@ -26,25 +26,24 @@ class FakeSuite:
 
 
 class ProgressAdapterTests(TestCase):
-    def test_second_goal_failure_identifies_phase_without_changing_exception(self):
+    def test_second_scored_failure_identifies_phase_without_changing_exception(self):
         suite = FakeSuite()
         calls = []
-        def preflight(_suite, _pipeline, task, *_args):
-            calls.append(task.ID)
-            if task.ID == 'i1':
+        def scored(_suite, _pipeline, task, _attack, _logdir, _force, targets, _version):
+            calls.append((task.ID, targets[0]))
+            if targets[0] == 'i1':
                 raise TypeError('sensitive-prompt-text')
-            return True, True
-
-        with patch.object(benchmark, 'run_task_without_injection_tasks', side_effect=preflight), \
-             patch.object(benchmark, 'run_task_with_injection_tasks') as scored:
+            return {(task.ID, targets[0]): True}, {(task.ID, targets[0]): False}
+        with patch.object(task_storage, 'run_task_without_injection_tasks') as goals, \
+             patch.object(task_storage, 'run_task_with_injection_tasks', side_effect=scored):
             with self.assertRaises(TypeError) as caught:
                 run_suite_with_progress(None, suite, SimpleNamespace(is_dos_attack=False), None, False,
                     user_tasks=['u0'], injection_tasks=['i0', 'i1'], benchmark_version='v1.2',
                     on_step=lambda _phase: None)
-        self.assertEqual(calls, ['i0', 'i1'])
-        scored.assert_not_called()
-        self.assertEqual(caught.exception._dscg_execution_stage, 'goal_preflight')
-        self.assertEqual(caught.exception._dscg_task_id, 'i1')
+        self.assertEqual(calls, [('u0', 'i0'), ('u0', 'i1')])
+        goals.assert_not_called()
+        self.assertEqual(caught.exception._dscg_execution_stage, 'scored_task')
+        self.assertEqual(caught.exception._dscg_task_id, 'u0/i1')
 
     def test_readonly_native_exception_is_not_replaced_by_progress_annotation(self):
         class ReadonlyError(RuntimeError):
@@ -53,13 +52,13 @@ class ProgressAdapterTests(TestCase):
                     raise TypeError('readonly')
                 super().__setattr__(name, value)
         suite = FakeSuite()
-        with patch.object(benchmark, 'run_task_without_injection_tasks', side_effect=ReadonlyError('native')):
+        with patch.object(task_storage, 'run_task_with_injection_tasks', side_effect=ReadonlyError('native')):
             with self.assertRaises(ReadonlyError):
                 run_suite_with_progress(None, suite, SimpleNamespace(is_dos_attack=False), None, False,
                     user_tasks=['u0'], injection_tasks=['i0'], benchmark_version='v1.2',
                     on_step=lambda _phase: None)
 
-    def test_targeted_reports_preflight_then_each_scored_pair(self):
+    def test_targeted_reports_only_each_scored_pair(self):
         suite = FakeSuite()
         attack = SimpleNamespace(is_dos_attack=False)
         calls = []
@@ -75,27 +74,25 @@ class ProgressAdapterTests(TestCase):
             calls.append(("score", task.ID, target))
             return {(task.ID, target): True}, {(task.ID, target): False}
 
-        with patch.object(benchmark, "run_task_without_injection_tasks", side_effect=preflight), patch.object(
-            benchmark, "run_task_with_injection_tasks", side_effect=scored
-        ), warnings.catch_warnings(record=True) as notices:
+        with patch.object(task_storage, "run_task_without_injection_tasks", side_effect=preflight), patch.object(
+            task_storage, "run_task_with_injection_tasks", side_effect=scored
+        ):
             result = run_suite_with_progress(None, suite, attack, None, False,
                 user_tasks=["u0", "u1"], injection_tasks=["i0", "i1"],
                 benchmark_version="v1.2", on_step=lambda phase: events.append(phase))
 
         self.assertEqual(calls, [
-            ("goal", "i0"), ("goal", "i1"),
             ("score", "u0", "i0"), ("score", "u0", "i1"),
             ("score", "u1", "i0"), ("score", "u1", "i1"),
         ])
-        self.assertEqual(events, ["goal", "goal", "score", "score", "score", "score"])
-        self.assertEqual(result["injection_tasks_utility_results"], {"i0": True, "i1": False})
+        self.assertEqual(events, ["score", "score", "score", "score"])
+        self.assertEqual(result["injection_tasks_utility_results"], {})
         self.assertEqual(len(result["utility_results"]), 4)
-        self.assertEqual(len(notices), 1)
 
     def test_clean_counts_users_and_dos_skips_goal_preflight(self):
         suite = FakeSuite()
         events = []
-        with patch.object(benchmark, "run_task_without_injection_tasks", return_value=(False, True)) as native:
+        with patch.object(task_storage, "run_task_without_injection_tasks", return_value=(False, True)) as native:
             clean = run_suite_with_progress(None, suite, None, None, False,
                 user_tasks=["u0", "u1"], injection_tasks=[], benchmark_version="v1.2",
                 on_step=lambda phase: events.append(phase))
@@ -104,8 +101,8 @@ class ProgressAdapterTests(TestCase):
         self.assertEqual(clean["utility_results"], {("u0", ""): False, ("u1", ""): False})
 
         events.clear()
-        with patch.object(benchmark, "run_task_without_injection_tasks") as native, patch.object(
-            benchmark, "run_task_with_injection_tasks",
+        with patch.object(task_storage, "run_task_without_injection_tasks") as native, patch.object(
+            task_storage, "run_task_with_injection_tasks",
             side_effect=lambda _s, _p, user, _a, _l, _f, ids, _v: (
                 {(user.ID, ids[0]): True}, {(user.ID, ids[0]): False})) as attacked:
             result = run_suite_with_progress(None, suite, SimpleNamespace(is_dos_attack=True), None, False,
@@ -157,7 +154,7 @@ class InstalledNativeProgressParityTests(TestCase):
         suite = get_suite('v1.2', suite_name)
         users = list(suite.user_tasks)[:1]
         targets = list(suite.injection_tasks)[:2]
-        artifact_root = Path(__file__).resolve().parents[1] / 'workshop/artifacts/20261020_deepseek_agentdyn_typeerror/test_runs'
+        artifact_root = Path(__file__).resolve().parents[1] / 'workshop/artifacts/20261030_fliter_goal_impl/offline/progress'
         artifact_root.mkdir(parents=True, exist_ok=True)
 
         def run(root, with_progress):
@@ -180,9 +177,13 @@ class InstalledNativeProgressParityTests(TestCase):
                         user_tasks=users, injection_tasks=targets, benchmark_version='v1.2',
                         on_step=events.append)
                 else:
-                    result = benchmark.benchmark_suite_with_injections(pipeline, suite, attack, root,
-                        force_rerun=False, user_tasks=users, injection_tasks=targets,
-                        verbose=False, benchmark_version='v1.2')
+                    result = {'utility_results': {}, 'security_results': {},
+                              'injection_tasks_utility_results': {}}
+                    for user_id in users:
+                        utility, security = benchmark.run_task_with_injection_tasks(suite, pipeline,
+                            suite.get_user_task_by_id(user_id), attack, root, False, targets, 'v1.2')
+                        result['utility_results'].update(utility)
+                        result['security_results'].update(security)
                     events = None
             return result, calls, events
 
@@ -193,7 +194,7 @@ class InstalledNativeProgressParityTests(TestCase):
             for field in ('utility_results', 'security_results', 'injection_tasks_utility_results'):
                 self.assertEqual(native[field], shown[field])
             self.assertEqual(native_calls, shown_calls)
-            self.assertEqual(events, ['goal'] * len(targets) + ['score'] * len(targets))
+            self.assertEqual(events, ['score'] * len(targets))
             cached, cached_calls, cached_events = run(progress_dir, True)
             self.assertEqual(cached_calls, [])
             self.assertEqual(cached_events, events)

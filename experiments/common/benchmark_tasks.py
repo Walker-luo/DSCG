@@ -3,9 +3,8 @@ from contextlib import contextmanager
 import json
 from pathlib import Path
 from uuid import uuid4
-import warnings
 
-from agentdojo import benchmark
+from experiments.common import task_storage
 from agentdojo.agent_pipeline.llms.openai_llm import _openai_to_tool_call
 from experiments.common.error_diagnostics import execution_error_diagnostics
 from dscg.task_diagnostics import task_log_context
@@ -128,7 +127,7 @@ class _TaskPipelineProbe:
 
 def run_native_suite(pipeline, suite, attack, logdir, force_rerun, *,
                      user_tasks, injection_tasks, benchmark_version, on_step=None):
-    """Call native single-task functions; only malformed model JSON is isolated."""
+    """Run scored native tasks; independent goal_stage owns capability checks."""
     users = [suite.get_user_task_by_id(task_id) for task_id in user_tasks]
     probe = _TaskPipelineProbe(pipeline)
     errors = []
@@ -176,7 +175,7 @@ def run_native_suite(pipeline, suite, attack, logdir, force_rerun, *,
     if attack is None:
         for user in users:
             utility, security = completed('clean_task', user.ID, None,
-                lambda: benchmark.run_task_without_injection_tasks(
+                lambda: task_storage.run_task_without_injection_tasks(
                     suite, probe, user, logdir, force_rerun, benchmark_version), 'score')
             utility_results[(user.ID, '')] = utility
             security_results[(user.ID, '')] = security
@@ -184,22 +183,10 @@ def run_native_suite(pipeline, suite, attack, logdir, force_rerun, *,
         target_tasks = (suite.injection_tasks if injection_tasks is None else {
             task_id: suite.get_injection_task_by_id(task_id) for task_id in injection_tasks})
         targets = [next(iter(suite.injection_tasks))] if attack.is_dos_attack else list(target_tasks)
-        if not attack.is_dos_attack:
-            for task_id, task in target_tasks.items():
-                goal_results[task_id], _ = completed('goal_preflight', task_id, None,
-                    lambda: benchmark.run_task_without_injection_tasks(
-                        suite, probe, task, logdir, force_rerun, benchmark_version), 'goal')
-            for task_id, success in goal_results.items():
-                label = (f'suite={suite.name} stage=goal_preflight '
-                         f'user_task_id=none injection_task_id={task_id}')
-                if success is False:
-                    warnings.warn(f'[{label}] Injection GOAL was not solved as a user task.')
-                elif success is None:
-                    warnings.warn(f'[{label}] GOAL preflight tool-JSON errors are unresolved, not capability failures.')
         for user in users:
             for task_id in targets:
                 utility, security = completed('scored_task', user.ID, task_id,
-                    lambda: benchmark.run_task_with_injection_tasks(
+                    lambda: task_storage.run_task_with_injection_tasks(
                         suite, probe, user, attack, logdir, force_rerun, [task_id], benchmark_version), 'score')
                 utility_results.update(utility)
                 security_results.update(security)

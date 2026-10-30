@@ -1,6 +1,6 @@
 # 小批量测试
 
-对应v3.5.4，使用 `experiments.run_partial_benchmark`。安装、模型连接和公共参数见[完整指南](benchmark.md)及[配置](model_tool_configuration.md)。以下运行命令会调用真实模型。
+当前代码为v3.5.4，后续保存为v3.6并作为优化基线；使用 `experiments.run_partial_benchmark`。安装、模型连接和公共参数见[完整指南](benchmark.md)及[配置](model_tool_configuration.md)。以下运行命令会调用真实模型。
 
 ## 默认任务范围
 
@@ -13,11 +13,11 @@
 ```bash
 # 同一环境／主模型／范围，新名称
 python -m experiments.run_partial_benchmark --baseline --name baseline_partial_01 --progress
-python -m experiments.run_partial_benchmark --name v354_static_partial_01 --progress
+python -m experiments.run_partial_benchmark --name v36_static_partial_01 --progress
 
 # 显式单次授权对照；AgentDojo示例
 python -m experiments.run_partial_benchmark --suites banking slack \
-  --prompt-profile legacy --name v354_legacy_bs_01 --progress
+  --prompt-profile legacy --name v36_legacy_bs_01 --progress
 ```
 
 默认static先抽任务视图再编译权限；单次授权用显式legacy。运行名不选择策略。static支持NoL2／NoChecker消融（路由设off），baseline仍原生legacy；其他历史候选要求L2／L3；详见[profile说明](qwen_utility.md)。
@@ -28,23 +28,23 @@ python -m experiments.run_partial_benchmark --suites banking slack \
 
 ```bash
 python -m experiments.run_partial_benchmark --baseline --clean --name baseline_partial_clean_01
-python -m experiments.run_partial_benchmark --clean --name v354_partial_clean_01
+python -m experiments.run_partial_benchmark --clean --name v36_partial_clean_01
 ```
 
 无攻击／GOAL预检，ASR不适用；范围仍是前3用户，不代表全部97／60任务。
 
 ## 筛选injection目标
 
-按[预检指南](injection_precheck.md)取得冻结名单，两臂用相同cohort：
+使用最小排除文件（格式见[预检指南](injection_precheck.md)）：
 
 ```bash
 python -m experiments.run_partial_benchmark --baseline --suites banking slack \
-  --cohort /absolute/path/to/cohort.json --name baseline_partial_screened_01
+  --fliter /absolute/path/to/fliter.json --name baseline_partial_filtered_01
 python -m experiments.run_partial_benchmark --suites banking slack \
-  --cohort /absolute/path/to/cohort.json --name v354_partial_screened_01
+  --fliter /absolute/path/to/fliter.json --goal --name v36_partial_goal_01
 ```
 
-用户仍是原前3，目标为**原前3目标∩cohort**，不补位；范围标partial_screened。空场景跳过，全空拒绝；不能与clean／task manifest／DoS混用。名单兼容与测量缓存兼容分别检查，不因cohort可读就允许跨策略reuse。
+先取原前3用户×原前3目标，再应用排除表；不补位。`--goal`默认关闭；开启后，每个保留目标按当前测量pipeline运行一次直接GOAL，跨攻击共享结果，只有通过目标进入计分。失败排除，错误单独跳过并退出1；均不计TSR／ASR，已开始GOAL不重试。全部剔除时不计分、指标N/A；baseline与DSCG的GOAL可能保留不同集合，配对比较须使用实际共同任务键。旧`--cohort`已拒绝，历史结果仍可读取，不迁移。
 
 <a id="并发运行"></a>
 
@@ -55,10 +55,10 @@ python -m experiments.run_partial_benchmark --suites banking slack \
 ## 中断续跑
 
 ```bash
-python -m experiments.run_partial_benchmark --reuse --name v354_static_partial_01
+python -m experiments.run_partial_benchmark --reuse --name v36_static_partial_01
 ```
 
-保留模型／profile／name／输出根及有效配置；未给攻击／场景恢复原计划，baseline／clean／cohort仍需保留对应开关。reuse与force-rerun互斥，完整错误缓存不自动重试；策略变更使用新名称。详情见[续跑](benchmark.md#显式续跑示例)。
+保留模型／profile／name／输出根及有效配置；未给攻击／场景恢复原计划，baseline／clean及fliter／goal仍需保留对应选项。reuse与force-rerun互斥，完整错误缓存不自动重试；策略变更使用新名称。详情见[续跑](benchmark.md#显式续跑示例)。
 
 ## AgentDyn低TSR／ASR只读诊断
 

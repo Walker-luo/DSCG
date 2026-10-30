@@ -173,7 +173,7 @@ class PartialReportingTests(unittest.TestCase):
             self.assertIn("66.67% (2/3)", summary)
             self.assertEqual(len(cases), 1)
             self.assertEqual(cases[0]["failure_types"], ["tsr_failure"])
-            self.assertEqual(cases[0]["trace_path"], "none/workspace/user_task_0/none/none.json")
+            self.assertEqual(cases[0]["trace_path"], "none/workspace/user_task_0/none.json")
             self.assertIsNone(cases[0]["attack_success"])
 
     def test_tsr_and_asr_failures_are_not_assumed_to_coincide(self):

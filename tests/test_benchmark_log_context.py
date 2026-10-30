@@ -6,7 +6,7 @@ import unittest
 from unittest.mock import patch
 import warnings
 
-from agentdojo import benchmark
+from experiments.common import task_storage
 from dscg.pipelines.defended import AuthorizationCompilationError, PermissionSandbox
 from experiments.common.benchmark_tasks import run_native_suite
 
@@ -23,54 +23,34 @@ class BenchmarkTaskLogTests(unittest.TestCase):
             user_tasks=['user_task_17'], injection_tasks=list(suite.injection_tasks),
             benchmark_version='v1.2')
 
-    def test_authorization_failure_has_goal_or_scored_ids_and_safe_reason(self):
-        def fail():
-            PermissionSandbox().mark_error(AuthorizationCompilationError('AUTH_INVALID_JSON'))
-        def goal(*_):
-            fail()
-            return False, True
+    def test_authorization_failure_has_scored_ids_and_safe_reason(self):
         def scored(_suite, _pipe, user, _attack, _logdir, _force, targets, _version):
-            fail()
+            PermissionSandbox().mark_error(AuthorizationCompilationError('AUTH_INVALID_JSON'))
             return {(user.ID, targets[0]): False}, {(user.ID, targets[0]): False}
         output = StringIO()
-        with patch.object(benchmark, 'run_task_without_injection_tasks', side_effect=goal), \
-             patch.object(benchmark, 'run_task_with_injection_tasks', side_effect=scored), \
-             redirect_stdout(output), warnings.catch_warnings(record=True):
+        with patch.object(task_storage, 'run_task_without_injection_tasks') as goals, \
+             patch.object(task_storage, 'run_task_with_injection_tasks', side_effect=scored), \
+             redirect_stdout(output):
             self.run_suite(self.suite(), SimpleNamespace(name='tool_knowledge', is_dos_attack=False))
-        goal_line, scored_line = output.getvalue().splitlines()
-        for line in (goal_line, scored_line):
-            self.assertIn('suite=banking', line)
-            self.assertIn('injection_task_id=injection_task_3', line)
-            self.assertIn('AuthorizationCompilationError', line)
-            self.assertIn('AUTH_INVALID_JSON', line)
-        self.assertIn('stage=goal_preflight', goal_line)
-        self.assertIn('user_task_id=none', goal_line)
-        self.assertIn('stage=scored_task', scored_line)
-        self.assertIn('user_task_id=user_task_17', scored_line)
+        goals.assert_not_called()
+        scored_line, = output.getvalue().splitlines()
+        for text in ('suite=banking', 'injection_task_id=injection_task_3',
+                     'AuthorizationCompilationError', 'AUTH_INVALID_JSON',
+                     'stage=scored_task', 'user_task_id=user_task_17'):
+            self.assertIn(text, scored_line)
 
-    def test_goal_warnings_identify_each_failed_or_error_target(self):
+    def test_scored_execution_does_not_emit_goal_warnings(self):
         suite = self.suite(('injection_task_2', 'injection_task_9', 'injection_task_11'))
-        statuses = {'injection_task_2': False, 'injection_task_9': None, 'injection_task_11': True}
-        def goal(_suite, _pipe, task, *_):
-            return statuses[task.ID], True
         def scored(_suite, _pipe, user, _attack, _logdir, _force, targets, _version):
             return {(user.ID, targets[0]): True}, {(user.ID, targets[0]): False}
-        with patch.object(benchmark, 'run_task_without_injection_tasks', side_effect=goal), \
-             patch.object(benchmark, 'run_task_with_injection_tasks', side_effect=scored), \
+        with patch.object(task_storage, 'run_task_without_injection_tasks') as goals, \
+             patch.object(task_storage, 'run_task_with_injection_tasks', side_effect=scored), \
              warnings.catch_warnings(record=True) as notices:
             warnings.simplefilter('always')
             result = self.run_suite(suite, SimpleNamespace(name='ignore_previous', is_dos_attack=False))
-        self.assertEqual(len(notices), 2)
-        failed, error = (str(row.message) for row in notices)
-        self.assertIn('injection_task_id=injection_task_2', failed)
-        self.assertIn('injection_task_id=injection_task_9', error)
-        self.assertIn('not capability failures', error)
-        for text in (failed, error):
-            self.assertIn('suite=banking', text)
-            self.assertIn('stage=goal_preflight', text)
-            self.assertIn('user_task_id=none', text)
-            self.assertNotIn('injection_task_11', text)
-        self.assertEqual(result['injection_tasks_utility_results'], statuses)
+        goals.assert_not_called()
+        self.assertEqual(len(notices), 0)
+        self.assertEqual(result['injection_tasks_utility_results'], {})
         self.assertEqual(len(result['utility_results']), 3)
 
     def test_clean_context_does_not_leak_into_later_standalone_error(self):
@@ -78,7 +58,7 @@ class BenchmarkTaskLogTests(unittest.TestCase):
             PermissionSandbox().mark_error(ValueError('private-value'))
             return False, True
         output = StringIO()
-        with patch.object(benchmark, 'run_task_without_injection_tasks', side_effect=clean), redirect_stdout(output):
+        with patch.object(task_storage, 'run_task_without_injection_tasks', side_effect=clean), redirect_stdout(output):
             self.run_suite(self.suite(), None)
             PermissionSandbox().mark_error(ValueError('private-value'))
         clean_line, standalone = output.getvalue().splitlines()
@@ -89,7 +69,7 @@ class BenchmarkTaskLogTests(unittest.TestCase):
         self.assertNotIn('private-value', output.getvalue())
 
     def test_native_exception_also_resets_task_context(self):
-        with patch.object(benchmark, 'run_task_without_injection_tasks', side_effect=TypeError('native')):
+        with patch.object(task_storage, 'run_task_without_injection_tasks', side_effect=TypeError('native')):
             with self.assertRaises(TypeError) as caught:
                 self.run_suite(self.suite(), None)
         self.assertEqual(caught.exception._dscg_execution_stage, 'clean_task')

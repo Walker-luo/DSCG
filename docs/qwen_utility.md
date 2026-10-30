@@ -1,6 +1,6 @@
 # 提示候选与效用诊断
 
-对应v3.5.4，默认static-task-v354两阶段授权，legacy为显式单次授权对照。本页区分当前策略、历史候选和诊断工具。组件判断和人工期望不等于原生任务TSR／ASR。
+对应当前v3.5.4策略，后续作为v3.6优化基线保存；默认static-task-v354两阶段授权，legacy为显式单次授权对照。本页区分当前策略、历史候选和诊断工具。组件判断和人工期望不等于原生任务TSR／ASR。
 
 ## 当前默认两阶段L2
 
@@ -14,9 +14,9 @@
 
 ```bash
 python -m experiments.run_partial_benchmark --suites banking slack \
-  --prompt-profile legacy --name v354_legacy_diag_01 --progress
+  --prompt-profile legacy --name v36_legacy_diag_01 --progress
 python -m experiments.run_partial_benchmark --suites banking slack \
-  --prompt-profile static-task-v354 --name v354_static_diag_01 --progress
+  --prompt-profile static-task-v354 --name v36_static_diag_01 --progress
 ```
 
 CLI／Dashboard API已支持static的NoChecker／NoL2（路由须off）；baseline仅legacy，其他历史候选仍要求L2／L3。profile是运行策略，不是模型TOML字段；页面无选择控件。新策略使用新运行名，不跨profile复用旧缓存。
@@ -74,4 +74,4 @@ python -m experiments.diagnostics.utility_collect --execute --stage audit \
 
 审计协议失败与Monitor记录／回执失败分开；原始L3回复见.dscg.responses.jsonl，实际动作看主JSON与最终ledger。来源含注入不自动证明当前动作违规；一次allow也不证明安全。旧READ_ONLY_SOURCE_ALLOW只解释历史轨迹，不覆盖当前私人读取deny。
 
-后续任务评测应匹配baseline／legacy／候选的实际任务ID、注入内容、模型和cohort，并保留clean／攻击控制及全部错误／成本；partial前缀不能验证后续问题任务。最新失败类型见[v3.5.4专项分析](../analysis/v3-5-4.md)，详细文件见[结果指南](result_files.md)。
+后续任务评测应匹配baseline／legacy／候选的实际任务ID、注入内容、模型、fliter范围及实际保留任务键，并保留clean／攻击控制及全部错误／成本；partial前缀不能验证后续问题任务。最新失败类型见[v3.5.4结果分析](../analysis/v3-5-4.md)，详细文件见[结果指南](result_files.md)。

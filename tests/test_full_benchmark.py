@@ -4,7 +4,7 @@ from io import StringIO
 import json
 import os
 from pathlib import Path
-from test_partial_agentdyn import TemporaryDirectory
+from tempfile import TemporaryDirectory as _TemporaryDirectory
 from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
@@ -17,8 +17,16 @@ from experiments import run_benchmark as full
 from experiments import run_partial_benchmark as shared
 from experiments.common.partial_controls import make_task_manifest, select_tasks, source_revision
 from dscg.pipelines.defended import _append_full_trace
+from experiments.common.benchmark_tasks import run_native_suite
 
 SUITES = ('workspace', 'travel', 'banking', 'slack')
+
+def TemporaryDirectory(*args, **kwargs):
+    root = Path(__file__).resolve().parents[1] / "workshop/artifacts/20261030_fliter_goal_impl/offline"
+    root.mkdir(parents=True, exist_ok=True)
+    kwargs.setdefault("dir", root)
+    return _TemporaryDirectory(*args, **kwargs)
+
 
 
 def fake_pipeline(*args, **kwargs):
@@ -152,7 +160,7 @@ class FullCliTests(unittest.TestCase):
 
 
 class FullExecutionTests(unittest.TestCase):
-    def test_baseline_and_current_framework_score_all_catalog_ids_with_nested_reports(self):
+    def test_baseline_and_current_framework_score_all_catalog_ids_with_root_configuration(self):
         with TemporaryDirectory() as directory, redirect_stdout(StringIO()), patch.object(
             shared, 'make_openai_compatible_pipeline', side_effect=fake_pipeline,
         ) as native, patch.object(shared, 'make_defended_pipeline', side_effect=lambda *a, **k: (*fake_pipeline(), None)) as defended, patch.object(
@@ -164,7 +172,7 @@ class FullExecutionTests(unittest.TestCase):
                 self.assertEqual(full.main(origin=origin, suites=list(SUITES), run_name=name,
                                            results_dir=directory, attack='injecagent', force_rerun=True), 0)
                 base = Path(directory) / f'agentdojo/offline-model_{name}'
-                self.assertEqual(json.loads((base / 'attack_manifest.json').read_text())['task_scope'], 'full')
+                self.assertEqual(json.loads((base / 'run_manifest.json').read_text())['common']['task_scope'], 'full')
                 self.assertTrue((base / 'summary.md').exists())
                 self.assertTrue((base / 'failure_cases.jsonl').exists())
                 for suite_name in SUITES:
@@ -176,7 +184,9 @@ class FullExecutionTests(unittest.TestCase):
                     self.assertEqual(summary['task_counts']['planned_tasks'], len(suite.user_tasks) * len(suite.injection_tasks))
                     self.assertEqual(summary['task_scope'], 'full')
                     self.assertEqual(summary['defense'], None if origin else 'dscg')
-                    self.assertTrue((output / 'run_manifest.json').exists())
+                    self.assertEqual(summary['run_manifest'], '../../run_manifest.json')
+                    self.assertTrue((base / 'run_manifest.json').is_file())
+                    self.assertFalse((output / 'run_manifest.json').exists())
                     if origin:
                         self.assertNotIn('sec_overhead', summary)
             self.assertEqual(benchmark.call_count, 8)
@@ -201,7 +211,7 @@ class FullExecutionTests(unittest.TestCase):
             metadata.assert_not_called()
             self.assertEqual(sum(len(call.kwargs['user_tasks']) for call in benchmark.call_args_list),
                              sum(len(get_suite('v1.2', name).user_tasks) for name in SUITES))
-            for path in Path(directory).rglob('summary.json'):
+            for path in Path(directory).glob('*/*/*/*/summary.json'):
                 summary = json.loads(path.read_text())
                 self.assertIsNone(summary['metrics']['attack_success_rate'])
                 self.assertEqual(summary['task_counts']['attacked_tasks'], 0)
@@ -222,7 +232,7 @@ class FullExecutionTests(unittest.TestCase):
             self.assertEqual(full.main(origin=True, suites=['slack'], results_dir=directory, run_name='mixed',
                                        attack=['injecagent', 'dos']), 1)
             base = Path(directory) / 'agentdojo/offline-model_mixed'
-            statuses = json.loads((base / 'attack_manifest.json').read_text())['runs']
+            statuses = json.loads((base / 'summary.json').read_text())['run_records']
             self.assertEqual([run['status'] for run in statuses], ['error', 'completed'])
             summary = json.loads((base / 'dos/slack/summary.json').read_text())
             self.assertEqual(summary['attack_kind'], 'dos')
@@ -241,12 +251,13 @@ class FullExecutionTests(unittest.TestCase):
         ):
             self.assertEqual(full.main(origin=True, suites=['slack'], results_dir=directory,
                                        run_name='unknown', attack='injecagent'), 0)
-            summary = json.loads(next(Path(directory).rglob('summary.json')).read_text())
+            summary = json.loads(next(Path(directory).glob('*/*/*/*/summary.json')).read_text())
             self.assertIsNone(summary['metrics']['attack_success_rate'])
             self.assertIsNone(summary['metrics']['defense_success_rate'])
             self.assertEqual(summary['task_counts']['attacked_tasks'], 0)
 
-    def test_native_full_logging_sidecars_and_resume_use_every_task_in_nested_layout(self):
+    @patch.object(shared, 'run_suite_with_progress', side_effect=run_native_suite)
+    def test_native_full_logging_sidecars_and_resume_use_every_task_in_flat_layout(self, _execute):
         suite = get_suite('v1.2', 'slack')
         model = 'gpt-4o-2024-05-13'
 
@@ -270,13 +281,13 @@ class FullExecutionTests(unittest.TestCase):
             options = dict(model_id=model, origin=True, suites=['slack'], results_dir=directory, run_name='native',
                            attack='tool_knowledge')
             self.assertEqual(full.main(**options), 0)
-            expected = len(suite.injection_tasks) * (len(suite.user_tasks) + 1)
-            self.assertEqual(task.call_count, expected)  # Includes unscored injection-task preflights.
+            expected = len(suite.injection_tasks) * len(suite.user_tasks)
+            self.assertEqual(task.call_count, expected)  # Independent GOAL checks are not part of scored execution.
             base = Path(directory) / f'agentdojo/{model}_native'
             output = base / 'tool_knowledge/slack'
-            scored = list(output.glob('user_task_*/tool_knowledge/injection_task_*.json'))
+            scored = list(output.glob('user_task_*/injection_task_*.json'))
             self.assertEqual(len(scored), len(suite.user_tasks) * len(suite.injection_tasks))
-            last = output / list(suite.user_tasks)[-1] / 'tool_knowledge' / f'{list(suite.injection_tasks)[-1]}.json'
+            last = output / list(suite.user_tasks)[-1] / f'{list(suite.injection_tasks)[-1]}.json'
             self.assertTrue(last.with_suffix('.dscg_trace.jsonl.gz').exists())
             original = last.read_bytes()
             self.assertEqual(full.main(**options), 0)
@@ -305,7 +316,7 @@ class FullExecutionTests(unittest.TestCase):
         ) as benchmark:
             options = dict(origin=True, suites=['slack'], results_dir=directory, run_name='same', attack='injecagent')
             self.assertEqual(shared.main(**options), 0)
-            path = Path(directory) / 'agentdojo/offline-model_same/injecagent/slack/run_manifest.json'
+            path = Path(directory) / 'agentdojo/offline-model_same/run_manifest.json'
             original = path.read_bytes()
             root = Path(directory) / 'agentdojo/offline-model_same'
             previous_reports = {p: p.read_bytes() for p in root.rglob('*') if p.is_file()}

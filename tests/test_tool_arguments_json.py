@@ -97,12 +97,12 @@ class ToolArgumentsJSONTests(unittest.TestCase):
 
     def test_corrupt_native_cache_does_not_call_model_or_become_tool_json_error(self):
         first=list(self.suite.user_tasks)[0]
-        path=self.root/'ignore_previous'/self.suite.name/first/'none/none.json'
+        path=self.root/'ignore_previous'/self.suite.name/first/'none.json'
         path.parent.mkdir(parents=True);path.write_text('{corrupt-cache')
         pipe,tracker,calls=self.pipeline([None,None])
         with self.assertRaises(json.JSONDecodeError):self.clean(pipe)
         self.assertEqual(calls,[])
-        self.assertFalse((path.parents[2]/'task_errors.jsonl').exists())
+        self.assertFalse((path.parents[1]/'task_errors.jsonl').exists())
 
     def test_valid_arguments_and_model_client_are_preserved(self):
         from agentdojo.functions_runtime import FunctionsRuntime
@@ -127,5 +127,5 @@ class ToolArgumentsJSONTests(unittest.TestCase):
         with logging.OutputLogger(str(self.root)),self.assertRaises(json.JSONDecodeError):
             run_suite_with_progress(pipe,self.suite,attack,self.root,False,
                 user_tasks=list(self.suite.user_tasks)[:1],injection_tasks=list(self.suite.injection_tasks)[:1],benchmark_version='v1.2')
-        self.assertEqual(len(calls),1)
+        self.assertEqual(len(calls),0)
         self.assertFalse(list(self.root.rglob('task_errors.jsonl')))

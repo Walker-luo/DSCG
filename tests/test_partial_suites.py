@@ -14,7 +14,7 @@ from experiments import run_partial_benchmark as runner
 
 class PartialSuiteTests(unittest.TestCase):
     def setUp(self):
-        self.artifacts = Path(__file__).resolve().parents[1] / 'workshop/artifacts/20261018_dual_benchmark/runner/test_runs'
+        self.artifacts = Path(__file__).resolve().parents[1] / 'workshop/artifacts/20261030_fliter_goal_impl/offline'
         self.artifacts.mkdir(parents=True, exist_ok=True)
 
     def offline(self, stack):
@@ -41,7 +41,7 @@ class PartialSuiteTests(unittest.TestCase):
                        '--suites', 'travel', 'banking', 'slack']
             self.assertEqual(runner.cli(options), 0)
             base = Path(directory) / 'agentdojo/offline_three'
-            manifest = json.loads((base / 'attack_manifest.json').read_text())
+            manifest = json.loads((base / 'summary.json').read_text())
             self.assertEqual(manifest['suites'], ['travel', 'banking', 'slack'])
             self.assertEqual(manifest['task_scope'], 'partial')
             total = 0

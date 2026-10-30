@@ -15,6 +15,8 @@ from pathlib import Path
 import re
 import tempfile
 
+from experiments.common.task_paths import trace_path
+
 SCHEMA = 'dscg.l3-router-summary.v2'
 THRESHOLD_POLICY = 'threshold-read-v1'
 READ_POLICY = 'read-purpose-v2'
@@ -202,8 +204,59 @@ def _ids(value):
     return [_component(v) for v in value]
 
 
+def _goal_selection(root, suite, selection):
+    """Derive scored targets from the durable terminal GOAL checkpoint."""
+    checkpoint = _read(root, root / 'summary.json')
+    checks = checkpoint.get('selection_report', {}).get('goal_checks')
+    if not isinstance(checks, list):
+        raise ValueError('missing GOAL checkpoint')
+    targets = _ids(selection.get('injections', selection.get('injection_task_ids')))
+    statuses = {}
+    for check in checks:
+        if not isinstance(check, dict):
+            raise ValueError('invalid GOAL checkpoint entry')
+        if check.get('suite') != suite:
+            continue
+        target = _component(check.get('injection_task_id'))
+        if target in statuses or check.get('status') not in {'passed', 'failed', 'error'}:
+            raise ValueError('duplicate or unfinished GOAL checkpoint')
+        statuses[target] = check['status']
+    if set(statuses) != set(targets):
+        raise ValueError('GOAL checkpoint differs from bound targets')
+    retained = [target for target in targets if statuses[target] == 'passed']
+    key = 'injections' if 'injections' in selection else 'injection_task_ids'
+    return {**selection, key: retained}
+
+
 def _descriptors(root):
     """Use declared CLI groups or Dashboard summaries, never the active registry."""
+    if (root / 'run_manifest.json').exists():
+        raw = _read(root, root / 'run_manifest.json')
+        # Expand consolidated group bindings without importing any live backend.
+        if raw.get('schema_version') != 'dscg.run.v3':
+            raise ValueError('unsupported root run manifest')
+        groups = []
+        for key, fields in raw.get('groups', {}).items():
+            attack, suite = [_component(part) for part in key.split('/')]
+            binding = {**raw.get('common', {}), **fields}
+            directory = root / attack / suite
+            errors = []
+            try:
+                summary = _read(root, directory / 'summary.json') if (directory / 'summary.json').exists() else {}
+            except (OSError, ValueError):
+                errors.append('summary.json')
+                summary = {}
+            selection = binding.get('task_selection') or summary.get('task_selection', {})
+            if binding.get('selection_options', {}).get('goal') is True and attack != 'none':
+                try:
+                    selection = _goal_selection(root, suite, selection)
+                except (OSError, ValueError, TypeError, AttributeError):
+                    errors.append('../../summary.json')
+                    selection = {}  # An unfinished checkpoint cannot establish scored scope.
+            groups.append(dict(attack=attack, suite=suite, directory=directory, binding=binding,
+                summary=summary, selection=selection,
+                baseline=binding.get('profile') == 'baseline', metadata_errors=errors))
+        return {**raw, 'benchmark': raw.get('common', {}).get('benchmark')}, groups
     plan_path = (root/'attack_manifest.json' if (root/'attack_manifest.json').exists() else
                  root/'benchmark_plan.json' if (root/'benchmark_plan.json').exists() else
                  root/'screened_run_manifest.json')
@@ -224,6 +277,8 @@ def _descriptors(root):
                         return {}
                 binding, summary = optional('run_manifest.json'), optional('summary.json')
                 binding = binding or summary.get('run_manifest', {})
+                if not isinstance(binding, dict):
+                    binding = {}  # A relative config reference requires its root manifest.
                 selection = (binding.get('task_selection') or summary.get('task_selection')
                              or manifest.get('selected_tasks', {}).get(suite, {}))
                 groups.append(dict(attack=attack, suite=suite, directory=directory, binding=binding,
@@ -253,6 +308,8 @@ def _descriptors(root):
         if not summary.get('suite_name'):
             continue
         binding = summary.get('run_manifest') or {}
+        if not isinstance(binding, dict):
+            binding = {}
         selection = binding.get('task_selection') or summary.get('task_selection', {})
         attack = binding.get('attack', selection.get('attack'))
         if attack is None and summary.get('attack_kind') == 'none':
@@ -330,7 +387,7 @@ def collect_routing_summary(run_dir):
             continue
         for user in users:
             for injection in injections:
-                path = descriptor['directory']/user/attack/(injection+'.json')
+                path = trace_path(descriptor['directory'], user, attack, injection)
                 key = (attack, suite, user, injection)
                 if key in seen:
                     raise ValueError('duplicate declared task scope')

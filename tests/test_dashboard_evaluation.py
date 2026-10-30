@@ -9,7 +9,7 @@ from dashboard import evaluation
 from dashboard.app import app, runs_store, run_test_thread
 
 
-ARTIFACT_ROOT = Path(__file__).resolve().parents[1] / "workshop/artifacts/20261018_dual_benchmark/dashboard"
+ARTIFACT_ROOT = Path(__file__).resolve().parents[1] / "workshop/artifacts/20261030_fliter_goal_impl/offline/dashboard"
 
 
 class DashboardEvaluationTests(unittest.TestCase):
@@ -166,7 +166,8 @@ class DashboardEvaluationTests(unittest.TestCase):
             main = SimpleNamespace(total_prompt_tokens=80, total_completion_tokens=20, get_total_tokens=lambda:100)
             sec = SimpleNamespace(total_prompt_tokens=30, total_completion_tokens=10, get_total_tokens=lambda:40)
             return pipeline, main, sec
-        def native_clean(pipeline, suite, logdir, force_rerun=False, user_tasks=None, benchmark_version=None):
+        def native_clean(pipeline, suite, attack, logdir, force_rerun=False, user_tasks=None, injection_tasks=None, benchmark_version=None):
+            self.assertIsNone(attack)
             self.assertEqual(benchmark_version, "v1.2")
             return {"utility_results":{("u1",None):True}}
         with tempfile.TemporaryDirectory(dir=ARTIFACT_ROOT) as directory, \
@@ -174,7 +175,7 @@ class DashboardEvaluationTests(unittest.TestCase):
              patch("dashboard.app.make_defended_pipeline", side_effect=factory), \
              patch("dashboard.app.validate_backend", return_value={"id": "agentdyn", "catalog_sha256": "test"}), \
              patch("dashboard.app.get_suite", return_value=SimpleNamespace(user_tasks={"u1":None}, injection_tasks={"i1":None})), \
-             patch("dashboard.app.benchmark.benchmark_suite_without_injections", side_effect=native_clean), \
+             patch("dashboard.app.run_native_suite", side_effect=native_clean), \
              patch("dashboard.app.threading.Thread"):
             try:
                 run_test_thread("worker-test", config)
@@ -186,6 +187,59 @@ class DashboardEvaluationTests(unittest.TestCase):
                 self.assertFalse(saved["suites"][0]["framework"]["input_isolation"])
             finally:
                 runs_store.pop("worker-test", None)
+
+    def test_flat_layout_is_part_of_effective_config_identity(self):
+        for supplied in ({}, {'task_layout': 'legacy'}):
+            config = evaluation.normalize_config({'suites': ['shopping'], **supplied})
+            self.assertEqual(config['task_layout'], 'flat-v1')
+
+    def test_worker_native_clean_and_attack_write_flat_scored_traces_without_goal(self):
+        from agentdojo import logging
+        users = {'user_task_0': SimpleNamespace(ID='user_task_0')}
+        targets = {'injection_task_0': SimpleNamespace(ID='injection_task_0')}
+        calls = []
+        def execute(pipeline, task, injection_task=None, injections=None):
+            calls.append((task.ID, getattr(injection_task, 'ID', None)))
+            logging.Logger.get().log([
+                {'role': 'user', 'content': [{'type': 'text', 'content': 'fixture'}]},
+                {'role': 'assistant', 'tool_calls': None, 'content': [{'type': 'text', 'content': 'done'}]}])
+            return True, False
+        suite = SimpleNamespace(name='shopping', user_tasks=users, injection_tasks=targets,
+            get_user_task_by_id=users.__getitem__, get_injection_task_by_id=targets.__getitem__,
+            run_task_with_pipeline=execute)
+        tracker = SimpleNamespace(total_prompt_tokens=0, total_completion_tokens=0, get_total_tokens=lambda: 0)
+        pipeline = SimpleNamespace(name='offline', dscg_model_config={'model_id': 'offline'})
+        attack = SimpleNamespace(name='important_instructions', is_dos_attack=False, attack=lambda *_: {})
+        ARTIFACT_ROOT.mkdir(parents=True, exist_ok=True)
+        with tempfile.TemporaryDirectory(dir=ARTIFACT_ROOT) as directory, \
+             patch('dashboard.app.DASHBOARD_RESULTS_DIR', Path(directory)), \
+             patch('dashboard.app.make_openai_compatible_pipeline', return_value=(pipeline, tracker)), \
+             patch('dashboard.app.validate_backend', return_value={'id': 'agentdyn'}), \
+             patch('dashboard.app.get_suite', return_value=suite), \
+             patch('dashboard.app.check_attack_compatibility', return_value=None), \
+             patch('dashboard.app.attacks.load_attack', return_value=attack), \
+             patch('agentdojo.benchmark.benchmark_suite_with_injections', side_effect=AssertionError('suite runner bypass')), \
+             patch('agentdojo.benchmark.benchmark_suite_without_injections', side_effect=AssertionError('suite runner bypass')), \
+             patch('dashboard.app.threading.Thread'):
+            for attacked in (False, True):
+                run_id = 'native-attack' if attacked else 'native-clean'
+                config = evaluation.normalize_config({'suites': ['shopping'], 'origin': True,
+                    'run_attack': attacked, 'attack_name': attack.name})
+                try:
+                    run_test_thread(run_id, config)
+                    run_dir = Path(directory)/run_id
+                    saved = json.loads((run_dir/'overall_results.json').read_text())
+                    self.assertEqual(saved['config']['task_layout'], 'flat-v1')
+                    self.assertEqual(saved['suites'][0]['task_counts']['total_tasks'], 1)
+                    self.assertEqual(saved['suites'][0]['metrics']['utility_rate'], 100)
+                    self.assertEqual(saved['suites'][0]['metrics']['attack_success_rate'], 0 if attacked else None)
+                    trace = run_dir/'offline/shopping/user_task_0'/('injection_task_0.json' if attacked else 'none.json')
+                    self.assertTrue(trace.is_file())
+                    self.assertEqual(len(list(run_dir.rglob('user_task_0/*.json'))), 1)
+                    self.assertFalse((run_dir/'offline/shopping/injection_task_0').exists())
+                finally:
+                    runs_store.pop(run_id, None)
+        self.assertEqual(calls, [('user_task_0', None), ('user_task_0', 'injection_task_0')])
 
     def test_trace_stats_exclude_preflights_and_report_missing_coverage(self):
         ARTIFACT_ROOT.mkdir(parents=True, exist_ok=True)

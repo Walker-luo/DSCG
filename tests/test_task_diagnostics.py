@@ -290,15 +290,18 @@ class TaskDiagnosticsTests(unittest.TestCase):
         fixture=ReuseIntegrationTests();fixture.setUp()
         try:
             self.assertEqual(fixture.run_benchmark(),0)
-            p=next(fixture.base.glob('tool_knowledge/workspace/user_task_*/*/*.json'))
+            p=next(fixture.base.glob('tool_knowledge/workspace/user_task_*/*.json'))
             value=json.loads(p.read_text());value.pop('utility')
             logger=SimpleNamespace(dirpath=str(fixture.base),context=dict(pipeline_name='tool_knowledge',suite_name='workspace',
-                user_task_id=value['user_task_id'],attack_type='tool_knowledge',injection_task_id=value['injection_task_id']))
+                user_task_id=value['user_task_id'],attack_type='tool_knowledge',injection_task_id=value['injection_task_id']),
+                group_directory=lambda: p.parent.parent, task_directory=lambda: p.parent, task_stem=lambda: p.stem)
             with DiagnosticSession(logger,'one',{}) as session:session.finish({})
             value.update(logger.context);p.write_text(json.dumps(value))
             side=p.with_suffix('.dscg.jsonl');cfg=next((fixture.base/'tool_knowledge/workspace').glob('dscg_config.*.json'))
-            before={q:q.read_bytes() for q in (p,side,cfg,cfg.parent/'run_manifest.json')}
+            before={q:q.read_bytes() for q in (p,side,cfg)}
+            binding=fixture.base/'run_manifest.json'; original_binding=binding.read_bytes()
             self.assertEqual(fixture.run_benchmark(reuse=True),0)
+            self.assertEqual(binding.read_bytes(), original_binding)
             snap=next((fixture.base/'reuse').glob('*/snapshot'))
             for q,data in before.items():self.assertEqual((snap/q.relative_to(fixture.base)).read_bytes(),data)
         finally:

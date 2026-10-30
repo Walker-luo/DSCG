@@ -1,6 +1,6 @@
 # 模型、工具与运行配置
 
-对应 **DSCG_v3.5.4**。命令从项目根执行；激活 `ipi` 或 `ipi-agentdyn` 自动识别实际后端。配置是宿主输入，模型返回不能修改它。
+当前代码为 **DSCG_v3.5.4**，后续保存为v3.6并在此基础上优化；现有`static-task-v354`名称保持可用，当前没有`static-task-v36`选项。命令从项目根执行；激活 `ipi` 或 `ipi-agentdyn` 自动识别实际后端。配置是宿主输入，模型返回不能修改它。
 
 ## 1. 首次检查
 
@@ -87,7 +87,7 @@ API错误只保存受限 `api_error`：状态码、code、param和角色计数�
 
 ```bash
 python -m experiments.run_partial_benchmark --suites banking slack \
-  --prompt-profile static-task-v354 --name v354_static_01 --progress
+  --prompt-profile static-task-v354 --name v36_static_01 --progress
 ```
 
 上述为AgentDojo在线命令。本次正式v3.5.2测量使用legacy，未启用候选。`--name`仅命名；profile不是models.local.toml字段。CLI和Dashboard API已支持static的NoL2／NoChecker消融；非off路由仍要求L2／L3。baseline只用legacy，其他历史候选仍要求L2／L3。其他保留profile见[诊断指南](qwen_utility.md)。
@@ -169,7 +169,7 @@ NoL2关闭前置、工具视图和委托；L2／L3均关时L1关闭。非off路�
 | 400／422 | 角色、system正文、tools及JSON格式；保留api_error，不自动换模型／删工具 |
 | 元数据缺项／通用local无法归属 | 选中目录是否覆盖当前后端，是否被旧local遮蔽 |
 | AUTH_CATALOG_CHANGED／DELEGATED_* | 目录是否变更，委托语法／长度／中介读取是否符合边界 |
-| reuse／cohort拒绝 | 测量缓存匹配完整配置；cohort仅匹配名单消费条件，见[预检](injection_precheck.md) |
+| reuse／fliter拒绝 | reuse匹配完整配置与布局；fliter校验后端、版本和目标ID，旧cohort拒绝输入，见[预检](injection_precheck.md) |
 | router off仍有审计 | off不关闭L3，使用NoChecker对照；候选CLI仍受上述限制 |
 
 运行、缓存和输出细则见[完整指南](benchmark.md)，诊断字段见[结果文件](result_files.md)。

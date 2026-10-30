@@ -1,28 +1,34 @@
 # 结果文件与诊断
 
-对应v3.5.4。历史结果保留各自配置和标签，不按当前版本重标。CLI默认目录：
+适用于当前工作区，后续随v3.6保存；当前代码版本仍为v3.5.4，布局为`flat-v1`。运行名可用v36，但实际`defense_version`／profile以文件记录为准。历史结果保留各自配置和标签，不重标。CLI默认目录：
 
 ```text
 results/{benchmarks,partial_benchmark}/<backend>/<model>_<name>/
-  benchmark_plan.json 或 screened_run_manifest.json
-  attack_manifest.json
-  summary.json / summary.md
+  run_manifest.json       # 单一根配置绑定（common/groups、任务范围与筛选设置）
+  summary.json / summary.md  # GOAL checkpoint／筛选与测量汇总
+  fliter.json             # 仅复制输入排除名单，不合并GOAL新增排除
   failure_cases.jsonl
   l3_router_summary.md / l3_router_summary.json
+  goal/<suite>/<injection>.json  # 仅启用--goal时
   <attack>/<suite>/
-    run_manifest.json / summary.json / detailed_results.csv
+    summary.json / detailed_results.csv
     dscg_config.<摘要>.json
-    <user>/<attack>/<injection>.json
-    <user>/<attack>/<injection>.dscg.jsonl
-    <user>/<attack>/<injection>.dscg.responses.jsonl
+    <user>/<injection>.json
+    <user>/<injection>.dscg.jsonl
+    <user>/<injection>.dscg.responses.jsonl
 ```
 
-clean使用 `none/<suite>/<user>/none/none.json`；GOAL预检独立保存。Dashboard目录结构保留，历史读取器按声明范围找轨迹，不搬移文件。
+clean使用 `none/<suite>/<user>/none.json`。GOAL原生JSON也保留同名诊断sidecar；结果逐目标写入根summary.json的selection_report.goal_checks，续跑不重试已开始目标。筛选与GOAL排除不算任务缺失、失败或已计分样本。
+
+独立`screen`同样只生成根`run_manifest.json`（`dscg.fliter-screen.v1`）和`summary.json`／`summary.md`，另有最小`fliter.json`与`goal/<suite>/<injection>.json`。`summary.json.selection_report.goal_checks`使用`passed`／`failed`／`error`状态、GOAL相对路径和`cost.models`；usage未知时成本为null。`attempts/`只承载一次执行与恢复必需的状态、证据引用和记账，不重复轨迹或完整配置。旧`screen_manifest.json`／`status.json`只读复用，不在原目录迁移／写入续跑。
+
+旧`benchmark_plan.json`／`attack_manifest.json`／`screened_run_manifest.json`、场景run_manifest与`<user>/<attack>/<injection>.json`继续可读；Dashboard／历史导出兼容两种布局。新运行不生成这些重复绑定，不迁移旧文件。
 
 ## 从哪里开始看
 
 | 文件 | 用途 |
 | --- | --- |
+| 根summary.json | 结构化筛选报告、GOAL checkpoint、测量状态与场景汇总／配置引用 |
 | 根summary.md | 实际配置、每攻击／场景指标、有效分母、错误、已知Token，最多10个失败入口 |
 | failure_cases.jsonl | 完整失败／攻击成功／错误／缺失索引，片段仅作定位线索 |
 | run_manifest.json与公共配置 | 实际模型、defense_version、profile绑定、任务ID、风险目录和执行控制 |
@@ -78,7 +84,7 @@ API／超时／输入和内部错误按基础设施错误处理；共享读取�
 
 ## 工具参数错误记录
 
-CLI full／partial／cohort的 `task_errors.jsonl`追加主模型工具参数JSON错误：调用／任务ID、阶段、错误码、位置、长度、结束原因和有限堆栈，不存参数正文。当前任务整批不执行、不修补／重发；派生标签为空，计分与GOAL错误分开，有错误退出1。
+CLI full／partial的 `task_errors.jsonl`追加主模型工具参数JSON错误：调用／任务ID、阶段、错误码、位置、长度、结束原因和有限堆栈，不存参数正文。当前任务整批不执行、不修补／重发；派生标签为空，计分与GOAL错误分开，有错误退出1。
 
 历史错误文件不反推覆盖当前成功结果，旧完整错误缓存不自动重跑。该隔离不适用于screen／Dashboard及其他JSON异常，详见[运行指南](benchmark.md#工具参数-json-解析错误)。
 

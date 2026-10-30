@@ -3,6 +3,7 @@ from pathlib import Path
 
 from experiments.diagnostics.harness_audit import security_result_fields
 from dscg.task_diagnostics import load_task_trace
+from experiments.common.task_paths import trace_path
 
 
 def project_outcomes(utility_results, security_results, suite_dir, attack, *, run_attack, task_errors=()):
@@ -12,7 +13,7 @@ def project_outcomes(utility_results, security_results, suite_dir, attack, *, ru
                       if e["stage"] != "goal_preflight"}
     for key, utility in utility_results.items():
         injection = key[1] if run_attack and len(key) > 1 else None
-        trace = root / str(key[0]) / attack / f'{injection or "none"}.json'
+        trace = trace_path(root, str(key[0]), attack, injection)
         error = False
         termination = None
         if not trace.resolve().is_relative_to(root):

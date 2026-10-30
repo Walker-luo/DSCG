@@ -23,6 +23,7 @@ L2_KEYS = ('planning_requests', 'catalog_tools_total', 'visible_tools_total',
 def normalize_config(payload):
     config = dict(payload)
     config['outcome_projection'] = OUTCOME_PROJECTION_VERSION
+    config['task_layout'] = 'flat-v1'
     threshold = validate_router_options(config.get('audit_router_threshold', DEFAULT_THRESHOLD),
                                         config.get('audit_router_artifact'))
     router_mode = config.get('audit_router_mode', 'off')
@@ -152,6 +153,7 @@ def display_metrics(run):
 def trace_stats(root, pipeline_name, suite, attack, task_keys):
     """Read only scored native task traces, excluding attack-generation preflights."""
     from dscg.task_diagnostics import load_task_trace
+    from experiments.common.task_paths import trace_path
     root = Path(root).resolve()
     stats = {"expected_records": len(task_keys), "trace_records": 0, "routing_records": 0,
              "isolation_records": 0, "routing": dict.fromkeys(ROUTING_KEYS, 0),
@@ -159,7 +161,7 @@ def trace_stats(root, pipeline_name, suite, attack, task_keys):
              'l2': dict.fromkeys(L2_KEYS, 0), 'diagnostic_errors':0}
     for task_key in task_keys:
         injection = task_key[1] if len(task_key) > 1 else None
-        path = root / pipeline_name.replace("/", "_") / suite / task_key[0] / attack / f"{injection or 'none'}.json"
+        path = trace_path(root / pipeline_name.replace("/", "_") / suite, task_key[0], attack, injection)
         try:
             path.resolve().relative_to(root)
             trace = load_task_trace(path)

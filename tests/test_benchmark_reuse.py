@@ -4,7 +4,7 @@ from io import StringIO
 import json
 import os
 from pathlib import Path
-from test_partial_agentdyn import TemporaryDirectory
+from tempfile import TemporaryDirectory as _TemporaryDirectory
 from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
@@ -12,6 +12,13 @@ from unittest.mock import patch
 from agentdojo.task_suite import get_suite
 from experiments import run_benchmark as full, run_partial_benchmark as runner
 from test_partial_attacks import fake_pipeline
+
+def TemporaryDirectory(*args, **kwargs):
+    root = Path(__file__).resolve().parents[1] / "workshop/artifacts/20261030_fliter_goal_impl/offline"
+    root.mkdir(parents=True, exist_ok=True)
+    kwargs.setdefault("dir", root)
+    return _TemporaryDirectory(*args, **kwargs)
+
 
 
 OLD_ATTACKS = ['ignore_previous', 'injecagent', 'important_instructions', 'tool_knowledge']
@@ -42,7 +49,7 @@ class ReuseCliTests(unittest.TestCase):
 
 class ReuseIntegrationTests(unittest.TestCase):
     def setUp(self):
-        artifacts = Path(__file__).resolve().parents[1] / 'workshop/artifacts/20261018_dual_benchmark/runner/test_runs'
+        artifacts = Path(__file__).resolve().parents[1] / 'workshop/artifacts/20261030_fliter_goal_impl/offline'
         artifacts.mkdir(parents=True, exist_ok=True)
         temp = TemporaryDirectory(dir=artifacts); self.addCleanup(temp.cleanup)
         self.root = Path(temp.name); self.executed = []
@@ -54,7 +61,9 @@ class ReuseIntegrationTests(unittest.TestCase):
             ])
             return task.ID != 'user_task_0', False
         suite = get_suite('v1.2', 'workspace')
-        for p in [patch.object(runner, 'make_openai_compatible_pipeline', side_effect=fake_pipeline),
+        from experiments.common.benchmark_tasks import run_native_suite
+        for p in [patch.object(runner, 'run_suite_with_progress', side_effect=run_native_suite),
+                  patch.object(runner, 'make_openai_compatible_pipeline', side_effect=fake_pipeline),
                   patch.object(runner, 'resolve_model_config', create=True,
                                return_value=SimpleNamespace(model_id='offline-model')),
                   patch.object(runner.attacks, 'load_attack', side_effect=lambda name, *_: SimpleNamespace(
@@ -78,10 +87,10 @@ class ReuseIntegrationTests(unittest.TestCase):
 
     def test_recorded_api_projection_policy_binds_reuse_before_writes_or_calls(self):
         self.assertEqual(self.run_benchmark(),0)
-        manifest=next(self.base.glob('*/*/run_manifest.json'))
+        manifest=self.base / 'run_manifest.json'
         value=json.loads(manifest.read_text())
-        self.assertEqual(value.get('outcome_projection'),'native-grades-recorded-api-errors-v2')
-        value.pop('outcome_projection');manifest.write_text(json.dumps(value))
+        self.assertEqual(value['common'].get('outcome_projection'),'native-grades-recorded-api-errors-v2')
+        value['common'].pop('outcome_projection');manifest.write_text(json.dumps(value))
         before=self.files();calls=len(self.executed)
         self.assertEqual(self.run_benchmark(reuse=True),1)
         self.assertEqual(len(self.executed),calls)
@@ -91,7 +100,7 @@ class ReuseIntegrationTests(unittest.TestCase):
         for entry in (runner.main, full.main):
             with self.subTest(entry=entry):
                 self.assertEqual(self.run_benchmark(entry), 0)
-                paths = sorted(self.base.glob('tool_knowledge/workspace/user_task_*/tool_knowledge/*.json'))
+                paths = sorted(self.base.glob('tool_knowledge/workspace/user_task_*/injection_task_*.json'))
                 removed = paths[-1]; original = {p: p.read_bytes() for p in paths[:-1]}
                 removed.unlink(); calls = len(self.executed)
                 self.assertEqual(self.run_benchmark(entry, reuse=True), 0)
@@ -107,9 +116,9 @@ class ReuseIntegrationTests(unittest.TestCase):
         previous = self.files(); calls = len(self.executed)
         self.assertEqual(self.run_benchmark(reuse=True, attack=None, suites=None), 0)
         self.assertEqual(len(self.executed), calls)
-        manifest = json.loads((self.base / 'attack_manifest.json').read_text())
+        manifest = json.loads((self.base / 'summary.json').read_text())
         self.assertEqual(manifest['attacks'], OLD_ATTACKS)
-        self.assertTrue(list((self.base / 'reuse').glob('*/snapshot/attack_manifest.json')))
+        self.assertTrue(list((self.base / 'reuse').glob('*/snapshot/summary.json')))
         current = self.files()
         self.assertEqual(self.run_benchmark(reuse=True, attack='typical'), 1)
         self.assertEqual(self.files(), current)
@@ -118,49 +127,47 @@ class ReuseIntegrationTests(unittest.TestCase):
 
     def test_later_suite_configuration_conflict_precedes_all_task_calls_and_writes(self):
         self.assertEqual(self.run_benchmark(suites=['workspace', 'travel']), 0)
-        path = self.base / 'tool_knowledge/travel/run_manifest.json'
-        value = json.loads(path.read_text()); value['profile'] = 'no-checker'
+        path = self.base / 'run_manifest.json'
+        value = json.loads(path.read_text()); value['groups']['tool_knowledge/travel']['profile'] = 'no-checker'
         path.write_text(json.dumps(value)); before = self.files(); calls = len(self.executed)
         self.assertEqual(self.run_benchmark(reuse=True, suites=['workspace', 'travel']), 1)
         self.assertEqual(len(self.executed), calls)
         self.assertEqual(self.files(), before)
 
-    def test_missing_root_plan_requires_explicit_attack_and_suites(self):
+    def test_root_manifest_restores_omitted_plan_without_duplicate_plan_files(self):
         self.assertEqual(self.run_benchmark(), 0)
-        for name in ('benchmark_plan.json', 'attack_manifest.json', 'suite_manifest.json'):
-            path = self.base / name
-            if path.exists(): path.unlink()
-        before = self.files(); calls = len(self.executed)
-        self.assertEqual(self.run_benchmark(reuse=True, attack=None, suites=None), 1)
-        self.assertEqual(self.files(), before)
-        self.assertEqual(self.run_benchmark(reuse=True), 0)
+        path = self.base / 'run_manifest.json'
+        original = path.read_bytes(); calls = len(self.executed)
+        for name in ('benchmark_plan.json', 'screened_run_manifest.json', 'suite_manifest.json'):
+            self.assertFalse((self.base / name).exists())
+        self.assertEqual(self.run_benchmark(reuse=True, attack=None, suites=None), 0)
+        self.assertEqual(path.read_bytes(), original)
         self.assertEqual(len(self.executed), calls)
-        self.assertTrue((self.base / 'benchmark_plan.json').exists())
 
     def test_source_changes_resume_without_changing_manifest(self):
         self.assertEqual(self.run_benchmark(), 0)
         fixture = json.loads((Path(__file__).with_name('fixtures') / 'benchmark_reuse_source_20261017.json').read_text())
-        path = self.base / 'tool_knowledge/workspace/run_manifest.json'
-        binding = json.loads(path.read_text()); binding['source'] = fixture
+        path = self.base / 'run_manifest.json'
+        binding = json.loads(path.read_text()); binding['common']['source'] = fixture
         path.write_text(json.dumps(binding)); original = path.read_bytes(); calls = len(self.executed)
         self.assertEqual(self.run_benchmark(reuse=True), 0)
         self.assertEqual(path.read_bytes(), original)
         self.assertEqual(len(self.executed), calls)
-        binding['source']['source_sha256']['dscg/pipelines/defended.py'] = '0' * 64
+        binding['common']['source']['source_sha256']['dscg/pipelines/defended.py'] = '0' * 64
         path.write_text(json.dumps(binding)); before = self.files()
         self.assertEqual(self.run_benchmark(reuse=True), 0)
         self.assertEqual(path.read_bytes(), before[path.relative_to(self.base)])
 
     def test_clean_reuse_rebuilds_missing_user_only(self):
         self.assertEqual(self.run_benchmark(run_attack=False), 0)
-        path = sorted(self.base.glob('none/workspace/user_task_*/none/none.json'))[-1]
+        path = sorted(self.base.glob('none/workspace/user_task_*/none.json'))[-1]
         path.unlink(); calls = len(self.executed)
         self.assertEqual(self.run_benchmark(reuse=True, run_attack=False, attack=None), 0)
         self.assertEqual(len(self.executed), calls + 1)
 
     def test_native_accepted_error_cache_is_not_automatically_retried(self):
         self.assertEqual(self.run_benchmark(), 0)
-        path = next(self.base.glob('tool_knowledge/workspace/user_task_*/tool_knowledge/*.json'))
+        path = next(self.base.glob('tool_knowledge/workspace/user_task_*/injection_task_*.json'))
         value = json.loads(path.read_text()); value['error'] = 'offline provider error'
         path.write_text(json.dumps(value)); before = path.read_bytes(); calls = len(self.executed)
         self.assertEqual(self.run_benchmark(reuse=True), 1)
@@ -172,7 +179,7 @@ class ReuseIntegrationTests(unittest.TestCase):
 
     def test_native_incomplete_cache_is_preserved_before_task_reruns(self):
         self.assertEqual(self.run_benchmark(), 0)
-        path = next(self.base.glob('tool_knowledge/workspace/user_task_*/tool_knowledge/*.json'))
+        path = next(self.base.glob('tool_knowledge/workspace/user_task_*/injection_task_*.json'))
         value = json.loads(path.read_text()); del value['utility']
         path.write_text(json.dumps(value)); before = path.read_bytes(); calls = len(self.executed)
         self.assertEqual(self.run_benchmark(reuse=True), 0)
@@ -182,7 +189,7 @@ class ReuseIntegrationTests(unittest.TestCase):
 
     def test_corrupt_native_json_is_reported_without_retrying_or_replacing_it(self):
         self.assertEqual(self.run_benchmark(), 0)
-        path = next(self.base.glob('tool_knowledge/workspace/user_task_*/tool_knowledge/*.json'))
+        path = next(self.base.glob('tool_knowledge/workspace/user_task_*/injection_task_*.json'))
         path.write_text('{'); calls = len(self.executed)
         self.assertEqual(self.run_benchmark(reuse=True), 1)
         self.assertEqual(path.read_text(), '{')
@@ -201,16 +208,16 @@ class ReuseIntegrationTests(unittest.TestCase):
         self.assertEqual(self.executed.__len__(), calls)
         self.assertEqual(self.files(), before)
 
-    def test_legacy_missing_defense_requires_explicit_existing_evidence(self):
+    def test_missing_native_defense_binding_rejects_even_matching_summary_evidence(self):
         self.assertEqual(self.run_benchmark(), 0)
-        path = self.base / 'tool_knowledge/workspace/run_manifest.json'
-        binding = json.loads(path.read_text()); binding.pop('agentdojo_defense', None)
-        path.write_text(json.dumps(binding)); summary_path = path.with_name('summary.json')
-        summary = json.loads(summary_path.read_text()); summary['run_manifest'] = binding
-        summary_path.write_text(json.dumps(summary)); original = path.read_bytes()
-        self.assertEqual(self.run_benchmark(reuse=True), 0)
-        self.assertEqual(path.read_bytes(), original)
-        summary_path.unlink(); before = self.files(); calls = len(self.executed)
+        path = self.base / 'run_manifest.json'
+        binding = json.loads(path.read_text()); binding['common'].pop('agentdojo_defense', None)
+        for group in binding['groups'].values(): group.pop('agentdojo_defense', None)
+        path.write_text(json.dumps(binding))
+        summary_path = self.base / 'tool_knowledge/workspace/summary.json'
+        summary = json.loads(summary_path.read_text()); summary['defense'] = None
+        summary_path.write_text(json.dumps(summary))
+        before = self.files(); calls = len(self.executed)
         self.assertEqual(self.run_benchmark(reuse=True), 1)
         self.assertEqual(len(self.executed), calls)
         self.assertEqual(self.files(), before)

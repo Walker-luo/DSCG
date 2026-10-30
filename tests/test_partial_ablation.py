@@ -66,7 +66,7 @@ class CleanDenominatorTests(unittest.TestCase):
         results={'utility_results':{('user_task_0','none'):True},'security_results':{('user_task_0','none'):True}}
         with TemporaryDirectory() as directory,redirect_stdout(StringIO()),patch.object(runner,'make_openai_compatible_pipeline',return_value=(pipeline,tracker)),patch.object(runner.benchmark,'benchmark_suite_without_injections',return_value=results):
             runner.main(origin=True,run_attack=False,suites=['workspace'],run_name='clean',results_dir=directory)
-            path=next(Path(directory).rglob('summary.json'))
+            path=next(p for p in Path(directory).rglob('summary.json') if p.parent.name == 'workspace')
             summary=json.loads(path.read_text())
             self.assertEqual(summary['task_counts']['attacked_tasks'],0)
             self.assertIsNone(summary['metrics']['attack_success_rate'])
@@ -80,7 +80,7 @@ class MissingSecuritySummaryTests(unittest.TestCase):
         results={'utility_results':{('user_task_0','injection_task_0'):True},'security_results':{}}
         with TemporaryDirectory() as directory,redirect_stdout(StringIO()),patch.object(runner,'make_openai_compatible_pipeline',return_value=(pipeline,tracker)),patch.object(runner.attacks,'load_attack',return_value=SimpleNamespace(is_dos_attack=False)),patch.object(runner.benchmark,'benchmark_suite_with_injections',return_value=results):
             runner.main(origin=True,suites=['workspace'],run_name='missing',results_dir=directory)
-            summary=json.loads(next(Path(directory).rglob('summary.json')).read_text())
+            summary=json.loads(next(p for p in Path(directory).rglob('summary.json') if p.parent.name == 'workspace').read_text())
             report=next(Path(directory).rglob('summary.md')).read_text()
             self.assertIsNone(summary['metrics']['attack_success_rate'])
             self.assertNotIn('ASR): 0.00%',report)
