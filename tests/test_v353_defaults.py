@@ -20,7 +20,9 @@ class CurrentStaticDefaultsTests(unittest.TestCase):
         with patch.object(d,'create_openai_client',return_value=Mock()):
             pipeline,_,_=d.make_defended_pipeline(model_config=cfg)
         self.assertEqual(pipeline.dscg_optimization_config['prompt_profile'],profiles.DEFAULT_PROFILE)
-        self.assertEqual(pipeline.dscg_optimization_config['framework_version'],'DSCG_v3.6.1')
+        from dscg.input_isolation import framework_version_for_profile
+        self.assertEqual(pipeline.dscg_optimization_config['framework_version'],
+                         framework_version_for_profile(profiles.DEFAULT_PROFILE))
         self.assertFalse(pipeline.dscg_optimization_config['completion_prompt'])
         self.assertEqual(pipeline.dscg_optimization_config['audit_retries'],0)
         self.assertIn(task_view.planning_policy(profiles.DEFAULT_PROFILE),pipeline.elements[0].system_message)

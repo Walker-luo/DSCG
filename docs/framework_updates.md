@@ -1,8 +1,9 @@
-# v3.6.1 当前交接
+# v3.6 当前交接（v3.6.1 已回退）
 
-更新：2026-10-31。当前默认 **`static-task-v361`／`DSCG_v3.6.1`**，建立在 v3.6（= v3.5.4 策略 + 筛选／GOAL／存储改动）之上。`static-task-v354` 保留为冻结对照（`a70ca4ab…` 未变）。状态见[DV_STATE](../DV_STATE.md)，本轮实现与验证见[阶段报告](../workshop/completed/v361_optimization_20261031.md)，基线结果见[v3.6分析](../analysis/v3-6.md)。
+更新：2026-10-31。当前默认 **`static-task-v354`／`DSCG_v3.5.4`**，即 v3.6 基线（v3.5.4 策略 + 筛选／GOAL／存储改动）。
+`static-task-v361`（v3.6.1）在 834 配对键上与 v3.6 持平（−0.34pp，p=0.91），单项收益约 +0.4pp，**已回退，保留为显式候选**；`routing_reports` 的固定免审修复保留（不影响执行规则）。状态见[DV_STATE](../DV_STATE.md)，本轮实现与验证见[阶段报告](../workshop/completed/v361_optimization_20261031.md)，基线结果见[v3.6分析](../analysis/v3-6.md)。
 
-## v3.6.1 三项改动
+## v3.6.1 三项改动（未采用，候选仍可选）
 
 | 层 | 改动 |
 | --- | --- |

@@ -2,7 +2,7 @@
 
 DSCG 是工具使用型 LLM Agent 的间接提示词注入防御研究原型，支持 AgentDojo 与 AgentDyn，使用原生评分比较任务成功率（TSR）、攻击成功率（ASR）和模型开销。
 
-当前代码标识为 **DSCG_v3.6.1**，默认 **`prompt_profile=static-task-v361`**（v3.6 基线 + 本轮三项改动）。`static-task-v354` 保留为冻结对照（字节与哈希均未变），`legacy` 为单次授权对照；运行名不选择策略。测试直接运行 benchmark 即可，不需要 `--prompt-profile`。本轮实现与验证见[v3.6.1阶段报告](workshop/completed/v361_optimization_20261031.md)，基线结果与逐例交接见[v3.6分析](analysis/v3-6.md)、[details](analysis/details.md)。
+当前代码标识为 **DSCG_v3.6**，默认 **`prompt_profile=static-task-v354`**。`static-task-v361`（v3.6.1）在 834 配对键上与 v3.6 持平（−0.34pp，p=0.91）、单项收益仅约 +0.4pp，**已评估后回退，保留为显式候选**；`legacy` 为单次授权对照；运行名不选择策略。测试直接运行 benchmark 即可，不需要 `--prompt-profile`。见[v3.6.1逐例分析与回退建议](analysis/details.md)、[阶段报告](workshop/completed/v361_optimization_20261031.md)。
 
 显式`static-task-v352`保留v3.5.3策略，`legacy`为单次授权对照。既有正式结果见[v3.5.4分析](analysis/v3-5-4.md)，本次入口与存储验证见[实施记录](workshop/completed/fliter_goal_20261030.md)。历史结果保留原版本名，不重标为v3.6。
 

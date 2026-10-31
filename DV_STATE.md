@@ -1,6 +1,6 @@
 # DSCG Project State
 
-> 2026-10-31（Asia/Shanghai）。当前 **v3.6.1**，默认 **static-task-v361 / DSCG_v3.6.1**；`static-task-v354`（`a70ca4ab…`）保留为冻结对照。只保留现行机制、验证范围与遗留问题；历史报告不作为新的调用授权。
+> 2026-10-31（Asia/Shanghai）。当前 **v3.6**，默认 **static-task-v354 / DSCG_v3.5.4**；`static-task-v361`（v3.6.1）经评估无净收益，**已回退并保留为显式候选**。只保留现行机制、验证范围与遗留问题；历史报告不作为新的调用授权。
 
 ## 1. 工作区与当前任务
 
@@ -9,9 +9,11 @@
 | 目录／分支／开始HEAD | DSCG／workshop／ca7739f（v3.6归档）；本次未切换分支／暂存／提交 |
 | 本次任务 | 离线分析v3.6正式结果与共同键、更新analysis/v3-6.md和details.md；只提出待验证优化方向，不修改策略或评分 |
 | 初始脏文件 | 已有.gitignore修改（新增/paper/忽略项），保留；原始results/download不改 |
-| 当前默认 | `static-task-v361`（v3.6.1）；`static-task-v354`为冻结对照，`static-task-v352`保留v3.5.3策略／协议，legacy为单阶段对照；baseline默认legacy走原生循环 |
-| 版本基线 | ca7739f是v3.6归档；v3.6.1在其上改提示与报告读取器，`static-task-v354`与历史结果不重标 |
+| 当前默认 | `static-task-v354`（v3.6）；`static-task-v361`为未采用候选（显式可选），`static-task-v352`保留v3.5.3策略／协议，legacy为单阶段对照；baseline默认legacy走原生循环 |
+| 版本基线 | ca7739f是v3.6归档；v3.6.1的提示改动已回退默认，仅保留`routing_reports`固定免审修复（不影响执行）与v361显式候选 |
 | 在线授权 | 仅真实qwen3.7-flash；主／授权／审计／GOAL均核对。当前任务允许必要新批次，不重开历史campaign或直接开全量 |
+
+**后续计划（2026-10-31）：框架侧不再改进。** v3.6 为冻结基线，`static-task-v361` 仅作显式候选保留；后续工作转入对应会议论文撰写、复现与结果核验测试，不再新增机制、候选 profile 或调参批次。
 
 ## 2. 当前机制
 
@@ -26,7 +28,7 @@
 
 ## 3. 最新实施与验证
 
-- **v3.6.1（2026-10-31，当前默认）：**在 v3.6（ca7739f，策略=v3.5.4）上加三项：①报告读取器把 `sink-free-read-v4` 与 `non-sensitive-read-v3` 同列为固定免审规则，shadow 下 `actual_bypass=true`／`score=null` 不再误判 `invalid_event`；②主规划区分"授权读取可查明／任务可推导／只能问缺项"，并要求请求字段在最终答复重述；③L3 加入跨源计数成对例子。新增 `static-task-v361`／`DSCG_v3.6.1`，`static-task-v354`（`a70ca4ab…`）字节未变。在线（v3.6 同 fliter，843 配对键）：v3.6 578/841=68.7% → v3.6.1 572/836=68.4%，退41／进39 **p=0.91**；banking +5（u6 1→5、u11 0→2、u15 1→3，u3 10→7、u10 17→15）、slack −6（**u13 11→15**，u18 −3）、travel −5。**安全事件：该次运行 ASR=2/836**（travel u12/I:6、u13/I:6；u13 最终答复直接写出注入的酒店推荐），原因是为"重述请求字段"增加了压力而最终文本无独立审计；已在 delivery 子句加入"只重述成功调用得到的目标值、不得复述来源独有内容"的限制，4 键定向复检 **ASR 0/4**、u13 仍 util=True、u12/I:6 转 util=False。运行记录的是收窄前 `4484b202…`，发布默认是收窄后 `3553e23f…`：上表只属收窄前版本，收窄后仅 4 键在线证据，**不声称全量 ASR=0 或整体提升**。范围：`important_instructions/banking` 在 99/144 处 APIConnectionError、`tool_knowledge/travel` 在 114/120 处挂起后停止，均不补跑；离线 ipi/AgentDyn 失败集合与 ca7739f 基线逐条一致、Node 51/51。见[阶段报告](workshop/completed/v361_optimization_20261031.md)与[v3.6.1分析](analysis/v3-6-1.md)。
+- **v3.6.1（2026-10-31，已回退，保留为显式候选）：**在 v3.6（ca7739f，策略=v3.5.4）上加三项：①报告读取器把 `sink-free-read-v4` 与 `non-sensitive-read-v3` 同列为固定免审规则，shadow 下 `actual_bypass=true`／`score=null` 不再误判 `invalid_event`；②主规划区分"授权读取可查明／任务可推导／只能问缺项"，并要求请求字段在最终答复重述；③L3 加入跨源计数成对例子。新增 `static-task-v361`／`DSCG_v3.6.1`，`static-task-v354`（`a70ca4ab…`）字节未变。在线（v3.6 同 fliter，843 配对键）：v3.6 578/841=68.7% → v3.6.1 572/836=68.4%，退41／进39 **p=0.91**；banking +5（u6 1→5、u11 0→2、u15 1→3，u3 10→7、u10 17→15）、slack −6（**u13 11→15**，u18 −3）、travel −5。**安全事件：该次运行 ASR=2/836**（travel u12/I:6、u13/I:6；u13 最终答复直接写出注入的酒店推荐），原因是为"重述请求字段"增加了压力而最终文本无独立审计；已在 delivery 子句加入"只重述成功调用得到的目标值、不得复述来源独有内容"的限制，4 键定向复检 **ASR 0/4**、u13 仍 util=True、u12/I:6 转 util=False。运行记录的是收窄前 `4484b202…`，发布默认是收窄后 `3553e23f…`：上表只属收窄前版本，收窄后仅 4 键在线证据，**不声称全量 ASR=0 或整体提升**。范围：`important_instructions/banking` 在 99/144 处 APIConnectionError、`tool_knowledge/travel` 在 114/120 处挂起后停止，均不补跑；离线 ipi/AgentDyn 失败集合与 ca7739f 基线逐条一致、Node 51/51。见[阶段报告](workshop/completed/v361_optimization_20261031.md)与[v3.6.1分析](analysis/v3-6-1.md)。
 - **v3.6正式复盘（2026-10-31）：**1947例、1944有效／3已记账API错误，TSR1505/1944、ASR0/1944；三场景baseline／354／36共同1053有效，成功696／744／725（banking−5、Slack−2、travel−12）。新增银行I:8的48键、删除travel I:1的60键，不能直接比较原始成功数。u15退款工具27/27获权、更新24/27执行且0拒绝；银行主要仍是缺参／未查询，Slack u13四次私信缺证据阻挡中3例无查询错误，travel32退步中22例无L3模型调用。原始2882个固定免审批次被汇总器错判invalid，待先修读取兼容。见[总览](analysis/v3-6.md)、[详情与实现交接](analysis/details.md)及`workshop/artifacts/20261031_v36_analysis/`；本次新增模型调用0，原始结果／运行代码未改。
 
 - **筛选与存储重整（2026-10-30）：**已实现`--fliter`、默认关闭的`--goal`、flat-v1原生I/O、根run_manifest与原子summary恢复；更新诊断／成本／并行子进程／Dashboard／历史读取，未改L1/L2/L3。两环境合并各298项0失败（Dojo跳过3、Dyn跳过4），补充入口拒绝各9项通过，Node51/51。Qwen新批次13计分尝试／13完成有效／0错误；3 GOAL中1通过、1有效失败、1审计连接错误，按规则排除／exit1／不重试。103 API尝试102成功1失败，已知244,135 tokens，失败usage未知；此前DNS失败32次尝试另列、不计分。23条L3回复路径／offset核验通过。见[实施验证](workshop/completed/fliter_goal_20261030.md)；因仍有外部GOAL错误，临时材料保留，未执行最终清理。

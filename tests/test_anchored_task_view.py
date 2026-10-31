@@ -165,7 +165,11 @@ class V361IdentityTests(unittest.TestCase):
         self.assertEqual(frozen, 'a70ca4ab6a5dab5a2be6324c946da175cc21c1d9ac7c4719c8c8c7e1d7a0d820')
         candidate = profiles.profile_binding(view.CANDIDATE)['prompt_profile_sha256']
         self.assertNotEqual(candidate, frozen)
-        self.assertEqual(profiles.DEFAULT_PROFILE, view.CANDIDATE)
+        # v3.6.1 was measured as no better than v3.6, so the default stays on the frozen profile
+        # while the candidate remains selectable for single-mechanism experiments.
+        self.assertEqual(profiles.DEFAULT_PROFILE, view.PROFILE)
+        self.assertIn(view.CANDIDATE, profiles.PROFILES)
+        self.assertEqual(profiles.resolve_profile(view.CANDIDATE), view.CANDIDATE)
         self.assertEqual(framework_version_for_profile(view.CANDIDATE), 'DSCG_v3.6.1')
         self.assertEqual(framework_version_for_profile('static-task-v354'), 'DSCG_v3.5.4')
 
