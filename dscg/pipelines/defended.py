@@ -1134,7 +1134,7 @@ class ToolAuthorizationCompiler:
         self.prompt_profile = validate_profile(prompt_profile)
 
     def _catalog(self, runtime, metadata):
-        if self.prompt_profile in ('legacy', V35_PROFILE, TASK_VIEW_PROFILE, anchored_view.PROFILE) and self.authorization_profile is None:
+        if self.prompt_profile in ('legacy', V35_PROFILE, TASK_VIEW_PROFILE, *anchored_view.PROFILES) and self.authorization_profile is None:
             return native_catalog(runtime, metadata)
         if not semantic_catalog(self.prompt_profile):
             return {name: str(getattr(runtime.functions[name], 'description', 'No description')).strip()
@@ -1158,7 +1158,7 @@ class ToolAuthorizationCompiler:
         return result
 
     def _extract_task_view(self, request):
-        anchored = self.prompt_profile == anchored_view.PROFILE
+        anchored = self.prompt_profile in anchored_view.PROFILES
         policy = anchored_view.POLICY if anchored else TASK_VIEW_POLICY
         schema = anchored_view.schema(request) if anchored else TASK_VIEW_SCHEMA
         packet = {'user_request':request}
@@ -1252,7 +1252,7 @@ class ToolAuthorizationCompiler:
         prohibited, prepared, evidence_refs = frozenset(), frozenset(), ()
         step_mode = self.prompt_profile == 'legacy' and self.authorization_profile is None and getattr(self, '_legacy_audit_input', False)
         action_step_mode = step_mode and not getattr(self, '_legacy_audit_input', False)
-        permission_mode = self.prompt_profile in ('legacy', V35_PROFILE, TASK_VIEW_PROFILE, anchored_view.PROFILE) and self.authorization_profile is None and not step_mode
+        permission_mode = self.prompt_profile in ('legacy', V35_PROFILE, TASK_VIEW_PROFILE, *anchored_view.PROFILES) and self.authorization_profile is None and not step_mode
         static_task_view = ()
         permissions = ()
         decision_format = response_format(getattr(self.llm, 'dscg_model_config', None),
@@ -1263,7 +1263,7 @@ class ToolAuthorizationCompiler:
         steps = ()
         base_policy = self.SYSTEM_POLICY if permission_mode else STEP_POLICY if step_mode else self.CLASSIC_POLICY
         policy = authorization_policy(self.PROFILE_POLICY if profile is not None else base_policy,
-                                      'legacy' if self.prompt_profile in (V35_PROFILE, TASK_VIEW_PROFILE, anchored_view.PROFILE) and self.authorization_profile is not None else self.prompt_profile, bounded=profile is not None)
+                                      'legacy' if self.prompt_profile in (V35_PROFILE, TASK_VIEW_PROFILE, *anchored_view.PROFILES) and self.authorization_profile is not None else self.prompt_profile, bounded=profile is not None)
         authorization_mode = 'bounded-profile-v1' if profile is not None else 'legacy'
         if profile is not None:
             if not requires_model:
@@ -1300,7 +1300,7 @@ class ToolAuthorizationCompiler:
                     "temperature": 0.0,
                     **({"decision_contract": decision_format} if action_step_mode or permission_mode else {}),
                     **({'task_view_contract': {'policy':anchored_view.POLICY,'schema':anchored_view.schema(request.text)}
-                        if self.prompt_profile == anchored_view.PROFILE else {'policy':TASK_VIEW_POLICY,'schema':TASK_VIEW_SCHEMA}}
+                        if self.prompt_profile in anchored_view.PROFILES else {'policy':TASK_VIEW_POLICY,'schema':TASK_VIEW_SCHEMA}}
                        if static_task_view else {}),
                 }),
                 compiler_model=self.llm.name,
@@ -1313,7 +1313,7 @@ class ToolAuthorizationCompiler:
                 )),
                 runtime_catalog_sha256=catalog_fingerprint(runtime),
                 static_task_view=static_task_view,
-                static_task_view_protocol=anchored_view.PROTOCOL if self.prompt_profile == anchored_view.PROFILE else TASK_VIEW_PROTOCOL,
+                static_task_view_protocol=anchored_view.PROTOCOL if self.prompt_profile in anchored_view.PROFILES else TASK_VIEW_PROTOCOL,
                 authorization_steps=steps, authorization_permissions=permissions,
                 authorization_protocol=V35_AUTH_PROTOCOL if permission_mode else (STEP_PROTOCOL if action_step_mode else LEGACY_STEP_PROTOCOL) if step_mode else '',
                 authorization_mode=authorization_mode, profile_status=profile_status,
@@ -1325,7 +1325,7 @@ class ToolAuthorizationCompiler:
         if not requires_model:
             return contract()
 
-        if self.prompt_profile in (TASK_VIEW_PROFILE, anchored_view.PROFILE) and self.authorization_profile is None:
+        if self.prompt_profile in (TASK_VIEW_PROFILE, *anchored_view.PROFILES) and self.authorization_profile is None:
             if len(_normalise_text(request.text, AUDIT_MAX_REQUEST_LENGTH)) > AUDIT_MAX_REQUEST_LENGTH:
                 raise AuthorizationCompilationError('AUTH_TASK_VIEW_REQUEST_TOO_LONG')
             static_task_view = self._extract_task_view(request.text)
@@ -1694,7 +1694,7 @@ class OurFrameExecutor(agent_pipeline.BasePipelineElement):
                             {'auxiliary_task_view':auxiliary_view(grant.static_task_view)},ensure_ascii=False)}]
                         break
         if (self.sandbox is not None and self.sandbox.policy_state == SandboxPolicyState.ERROR
-                and self.authorization_compiler.prompt_profile == anchored_view.PROFILE):
+                and self.authorization_compiler.prompt_profile in anchored_view.PROFILES):
             model_messages = deepcopy(model_messages)
             for message in reversed(model_messages):
                 if message.get('role') == 'user':
@@ -2592,10 +2592,10 @@ class ActionSecurityChecker(agent_pipeline.BasePipelineElement):
         self.audit_router = audit_router
         self.router_verifier = router_verifier
         self.prompt_profile = validate_profile(prompt_profile)
-        self.SYSTEM_POLICY = audit_policy(type(self).SYSTEM_POLICY if self.prompt_profile in ('legacy', TASK_VIEW_PROFILE, anchored_view.PROFILE) else type(self).CLASSIC_POLICY, self.prompt_profile)
+        self.SYSTEM_POLICY = audit_policy(type(self).SYSTEM_POLICY if self.prompt_profile in ('legacy', TASK_VIEW_PROFILE, *anchored_view.PROFILES) else type(self).CLASSIC_POLICY, self.prompt_profile)
 
     def _handoff_record(self,query,runtime,calls,messages,extra_args,record):
-        record['audit_model_view_version'] = ('dscg.audit-input.v4.2' if self.prompt_profile in ('legacy', TASK_VIEW_PROFILE, anchored_view.PROFILE)
+        record['audit_model_view_version'] = ('dscg.audit-input.v4.2' if self.prompt_profile in ('legacy', TASK_VIEW_PROFILE, *anchored_view.PROFILES)
             and not getattr(self, '_legacy_audit_input', False) else
             'dscg.audit-input.v5.10' if self.prompt_profile == V35_PROFILE else AUDIT_INPUT_SCHEMA_VERSION)
         # Active routing authenticates every checker outcome, so a public
@@ -2664,7 +2664,7 @@ class ActionSecurityChecker(agent_pipeline.BasePipelineElement):
                 "arguments_sha256": _hash_json(raw_args),
                 "source_ids": _source_ids_for_call(call, extra_args),
             })
-        current_context = self.prompt_profile in ('legacy', V35_PROFILE, TASK_VIEW_PROFILE, anchored_view.PROFILE) and not getattr(self, '_legacy_audit_input', False)
+        current_context = self.prompt_profile in ('legacy', V35_PROFILE, TASK_VIEW_PROFILE, *anchored_view.PROFILES) and not getattr(self, '_legacy_audit_input', False)
         if current_context:
             statuses = metadata_for_runtime(runtime)
             for action in current_actions:
@@ -2734,7 +2734,7 @@ class ActionSecurityChecker(agent_pipeline.BasePipelineElement):
                 action.pop('arguments_sha256', None)
             for result in tool_results:
                 result['return_status'] = 'blocked' if is_blocked_error(result.get('error')) else 'error' if result.get('error') else 'success'
-        elif self.prompt_profile in ('legacy', TASK_VIEW_PROFILE, anchored_view.PROFILE) and current_context:
+        elif self.prompt_profile in ('legacy', TASK_VIEW_PROFILE, *anchored_view.PROFILES) and current_context:
             packet['schema_version'] = 'dscg.audit-input.v4.2'
             effects = [action['operation_effect'] for action in current_actions]
             stage = 'read' if effects and all(effect == 'read' for effect in effects) else 'mixed' if 'read' in effects else 'effect'
@@ -2766,7 +2766,7 @@ class ActionSecurityChecker(agent_pipeline.BasePipelineElement):
         return response_messages[-1] if response_messages else None
 
     def _model_audit_packet(self, packet):
-        if self.prompt_profile in ('legacy', TASK_VIEW_PROFILE, anchored_view.PROFILE) and 'current_review' in packet:
+        if self.prompt_profile in ('legacy', TASK_VIEW_PROFILE, *anchored_view.PROFILES) and 'current_review' in packet:
             # Put the present operation before historical/risk diagnostics.
             first = ('trusted_user_request', 'auxiliary_task_view', 'current_review', 'current_actions', 'recent_tool_results')
             view = {**{key: packet[key] for key in first if key in packet}, **{key: value for key, value in packet.items() if key not in first}}
@@ -2794,7 +2794,7 @@ class ActionSecurityChecker(agent_pipeline.BasePipelineElement):
     def _decision_format(self):
         if self.prompt_profile == V35_PROFILE:
             return {'type': AUDIT_FORMAT}
-        if self.prompt_profile not in ('legacy', TASK_VIEW_PROFILE, anchored_view.PROFILE) or getattr(self, '_legacy_audit_input', False):
+        if self.prompt_profile not in ('legacy', TASK_VIEW_PROFILE, *anchored_view.PROFILES) or getattr(self, '_legacy_audit_input', False):
             return {'type': 'json_object'}
         return response_format(getattr(self.small_llm, 'dscg_model_config', None),
                                AUDIT_SCHEMA, 'dscg_audit_v2')
@@ -2808,7 +2808,7 @@ class ActionSecurityChecker(agent_pipeline.BasePipelineElement):
             raise AuditSchemaError("JSON mode requires an explicit JSON instruction")
         prompt = json.dumps(self._model_audit_packet(packet), ensure_ascii=False,
                             sort_keys=(self.prompt_profile != V35_PROFILE and
-                                       (self.prompt_profile not in ('legacy', TASK_VIEW_PROFILE, anchored_view.PROFILE) or getattr(self, '_legacy_audit_input', False))),
+                                       (self.prompt_profile not in ('legacy', TASK_VIEW_PROFILE, *anchored_view.PROFILES) or getattr(self, '_legacy_audit_input', False))),
                             separators=(",", ":"))
         request_kwargs = {
             "model": getattr(self.small_llm, "name", "unknown-model"),
@@ -2989,7 +2989,7 @@ class ActionSecurityChecker(agent_pipeline.BasePipelineElement):
                 raw_hash = _hash_json(content if content is not None else "missing-audit-response")
                 validation = 'failed'
                 decision_value, violations, confidence, reason_code = _parse_audit_payload(content, legacy=getattr(self, '_legacy_audit_input', False),
-                    finite_codes=self.prompt_profile in ('legacy', TASK_VIEW_PROFILE, anchored_view.PROFILE) and not getattr(self, '_legacy_audit_input', False),
+                    finite_codes=self.prompt_profile in ('legacy', TASK_VIEW_PROFILE, *anchored_view.PROFILES) and not getattr(self, '_legacy_audit_input', False),
                     intent_evidence=self.prompt_profile == V35_PROFILE)
                 validation = 'passed'
                 decision = AuditDecision(
@@ -3038,7 +3038,7 @@ class ActionSecurityChecker(agent_pipeline.BasePipelineElement):
                 'field_validation': validation,
                 **({'output_contract': V35_AUDIT_PROTOCOL if self.prompt_profile == V35_PROFILE else AUDIT_PROTOCOL, 'response_format': self._decision_format()['type'],
                     'response_length': len(content) if isinstance(content, str) else None,
-                    **field_diagnostics} if self.prompt_profile in ('legacy', V35_PROFILE, TASK_VIEW_PROFILE, anchored_view.PROFILE) and not getattr(self, '_legacy_audit_input', False) else {}),
+                    **field_diagnostics} if self.prompt_profile in ('legacy', V35_PROFILE, TASK_VIEW_PROFILE, *anchored_view.PROFILES) and not getattr(self, '_legacy_audit_input', False) else {}),
             }
             if failure_type and isinstance(content, str) and _trace_level(extra_args) == 'full':
                 _append_full_trace(extra_args, 'audit_protocol_response', {
@@ -3104,7 +3104,7 @@ def router_configuration_hash(main_config, sec_config, *, input_isolation, autho
                                'response_format': response_format(main_config, {}, 'dscg_tool_permissions_v1')['type']}
                                if use_sandbox and profile_hash is None else
                                {'protocol': 'configured-profile-json-object', 'response_format': 'json_object'} if use_sandbox else None}
-                          if prompt_profile in ('legacy', TASK_VIEW_PROFILE, anchored_view.PROFILE) else {})
+                          if prompt_profile in ('legacy', TASK_VIEW_PROFILE, *anchored_view.PROFILES) else {})
     if prompt_profile == V35_PROFILE:
         decision_contracts = {'audit': audit_contract_identity(sec_config),
                               'authorization': {'protocol': V35_AUTH_PROTOCOL, 'response_format': response_format(main_config, {}, 'dscg_tool_permissions_v1')['type']} if profile_hash is None else {'protocol': 'configured-profile-json-object', 'response_format': 'json_object'}}
@@ -3116,8 +3116,8 @@ def router_configuration_hash(main_config, sec_config, *, input_isolation, autho
                                            "temperature": 0.0,
                                            "reasoning_effort": [reasoning_effort_for_config(main_config),audit_model_settings(sec_config, prompt_profile).get('reasoning_effort')],
                                            "main_system_prompt_sha256": _hash_json(load_system_message(None)),
-                                           "audit_policy_sha256": _hash_json(audit_policy(ActionSecurityChecker.SYSTEM_POLICY if prompt_profile in ('legacy', TASK_VIEW_PROFILE, anchored_view.PROFILE) else ActionSecurityChecker.CLASSIC_POLICY, prompt_profile)),
-                                           "authorization_policy_sha256": _hash_json(authorization_policy(ToolAuthorizationCompiler.SYSTEM_POLICY if prompt_profile in ('legacy', TASK_VIEW_PROFILE, anchored_view.PROFILE) and profile_hash is None else ToolAuthorizationCompiler.CLASSIC_POLICY, prompt_profile)),
+                                           "audit_policy_sha256": _hash_json(audit_policy(ActionSecurityChecker.SYSTEM_POLICY if prompt_profile in ('legacy', TASK_VIEW_PROFILE, *anchored_view.PROFILES) else ActionSecurityChecker.CLASSIC_POLICY, prompt_profile)),
+                                           "authorization_policy_sha256": _hash_json(authorization_policy(ToolAuthorizationCompiler.SYSTEM_POLICY if prompt_profile in ('legacy', TASK_VIEW_PROFILE, *anchored_view.PROFILES) and profile_hash is None else ToolAuthorizationCompiler.CLASSIC_POLICY, prompt_profile)),
                                            "isolation_rule_sha256": _hash_json(ISOLATION_POLICY if prompt_profile == V35_PROFILE else ISOLATION_RULE),
                                            "completion_rule_sha256": _hash_json(TASK_COMPLETION_PROMPT),
                                            "framework_version": framework_version_for_profile(prompt_profile),
@@ -3132,9 +3132,9 @@ def router_configuration_hash(main_config, sec_config, *, input_isolation, autho
                                            'delegated_task_protocol': DELEGATION_VERSION,
                                            "audit_retries": audit_retries,"completion_prompt": completion_prompt,
                                            "audit_timeout_seconds": AUDIT_TIMEOUT_SECONDS,
-                                           'audit_input_schema': 'dscg.audit-input.v5.10' if prompt_profile == V35_PROFILE else 'dscg.audit-input.v4.2' if prompt_profile in ('legacy', TASK_VIEW_PROFILE, anchored_view.PROFILE) else AUDIT_INPUT_SCHEMA_VERSION,
+                                           'audit_input_schema': 'dscg.audit-input.v5.10' if prompt_profile == V35_PROFILE else 'dscg.audit-input.v4.2' if prompt_profile in ('legacy', TASK_VIEW_PROFILE, *anchored_view.PROFILES) else AUDIT_INPUT_SCHEMA_VERSION,
                                            'audit_review_rules_sha256': _hash_json(REVIEW_RULES),
-                                           'audit_review_examples_sha256': _hash_json([ActionSecurityChecker.TASK_READ_DECISION_EXAMPLES if prompt_profile in ('legacy', TASK_VIEW_PROFILE, anchored_view.PROFILE) else ActionSecurityChecker.READ_DECISION_EXAMPLES, ActionSecurityChecker.EFFECT_DECISION_EXAMPLES]),
+                                           'audit_review_examples_sha256': _hash_json([ActionSecurityChecker.TASK_READ_DECISION_EXAMPLES if prompt_profile in ('legacy', TASK_VIEW_PROFILE, *anchored_view.PROFILES) else ActionSecurityChecker.READ_DECISION_EXAMPLES, ActionSecurityChecker.EFFECT_DECISION_EXAMPLES]),
                                            'audit_evidence_version': EVIDENCE_VERSION,
                                            'audit_evidence_bounds': [FACT_BUDGET, MAX_RESULTS, MAX_CALL_ARGUMENTS],
                                            "input_bounds": [AUDIT_MAX_REQUEST_LENGTH,AUDIT_MAX_TOOL_DESCRIPTION_LENGTH,
@@ -3223,7 +3223,7 @@ def make_qwen_newFrame_pipeline(
     """
     audit_router_threshold = validate_router_options(audit_router_threshold, audit_router_artifact)
     prompt_profile = resolve_profile(prompt_profile)
-    if prompt_profile not in ('legacy', TASK_VIEW_PROFILE, anchored_view.PROFILE) and (not use_sandbox or not use_security_checker):
+    if prompt_profile not in ('legacy', TASK_VIEW_PROFILE, *anchored_view.PROFILES) and (not use_sandbox or not use_security_checker):
         raise ValueError('candidate prompt profiles require L2 and checker')
     if audit_router_mode not in {"off", "shadow", "selective"}:
         raise ValueError("audit_router_mode must be off/shadow/selective")
@@ -3360,8 +3360,8 @@ def make_qwen_newFrame_pipeline(
     pipeline = TaskIsolatedPipeline([
         agent_pipeline.SystemMessage(load_system_message(None)
             + ("\n\n" + MAIN_TASK_POLICY if prompt_profile == V35_PROFILE else "")
-            + ("\n\n" + (anchored_view.PLANNING_POLICY if prompt_profile == anchored_view.PROFILE else STATIC_PLANNING_POLICY)
-               if prompt_profile in (TASK_VIEW_PROFILE, anchored_view.PROFILE) else "")
+            + ("\n\n" + (anchored_view.planning_policy(prompt_profile) if prompt_profile in anchored_view.PROFILES else STATIC_PLANNING_POLICY)
+               if prompt_profile in (TASK_VIEW_PROFILE, *anchored_view.PROFILES) else "")
             + ("\n\n" + TASK_COMPLETION_PROMPT if completion_prompt else "")),
         agent_pipeline.InitQuery(),
         new_executor,
@@ -3383,7 +3383,7 @@ def make_qwen_newFrame_pipeline(
         **({'decision_contracts': {'audit': contract_identity(sec_config, AUDIT_SCHEMA, 'dscg_audit_v2') if use_security_checker else None,
                                   'authorization_protocol': (V35_AUTH_PROTOCOL if profile_hash is None else 'configured-profile-json-object') if use_sandbox else None,
                                   'authorization_format': (response_format(main_config, {}, 'dscg_tool_permissions_v1')['type'] if profile_hash is None else 'json_object') if use_sandbox else None}}
-           if prompt_profile in ('legacy', TASK_VIEW_PROFILE, anchored_view.PROFILE) else {}),
+           if prompt_profile in ('legacy', TASK_VIEW_PROFILE, *anchored_view.PROFILES) else {}),
         "input_isolation": input_isolation, "authorization_precheck": authorization_precheck,
         'l1_projection_mode': l1_projection_mode, 'l1_projection_profile_sha256': L1_PROFILE_SHA256,
         'planning_tool_view': planning_tool_view, 'delegated_tasks': delegated_tasks,

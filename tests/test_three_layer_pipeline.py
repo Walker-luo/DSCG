@@ -4,7 +4,9 @@ import unittest
 from unittest.mock import Mock, patch
 from agentdojo.functions_runtime import FunctionsRuntime, FunctionCall
 from dscg.model_config import ModelConfig
-from dscg.input_isolation import FRAMEWORK_VERSION
+from dscg.input_isolation import framework_version_for_profile
+from dscg.prompt_profiles import DEFAULT_PROFILE
+FRAMEWORK_VERSION = framework_version_for_profile(DEFAULT_PROFILE)
 from dscg.pipelines.defended import make_defended_pipeline
 
 

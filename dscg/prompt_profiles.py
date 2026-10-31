@@ -10,8 +10,8 @@ from dscg import anchored_task_view as anchored_view
 from dscg.intent_evidence import (PROFILE as V35_PROFILE, AUTH_POLICY as V35_AUTH_POLICY,
     AUDIT_POLICY as V35_AUDIT_POLICY, MAIN_TASK_POLICY, ISOLATION_POLICY, REVIEW_RULES, DECISION_GUIDE, AUDIT_THINKING, AUDIT_FORMAT, AUDIT_PROTOCOL as V35_OUTPUT_PROTOCOL, ENVELOPE_SCHEMA, permission_schema)
 
-PROFILES = ('legacy', 'protocol-v1', 'tool-semantics-v1', 'source-context-v1', 'task-alignment-v1', V35_PROFILE, TASK_VIEW_PROFILE, anchored_view.PROFILE)
-DEFAULT_PROFILE = anchored_view.PROFILE
+PROFILES = ('legacy', 'protocol-v1', 'tool-semantics-v1', 'source-context-v1', 'task-alignment-v1', V35_PROFILE, TASK_VIEW_PROFILE, *anchored_view.PROFILES)
+DEFAULT_PROFILE = anchored_view.CANDIDATE
 CATALOG_SCHEMA = 'dscg.authorization-tool-semantics.v1'
 
 TASK_ALIGNMENT_RULE = (
@@ -119,8 +119,8 @@ def semantic_catalog(profile):
 
 def audit_policy(legacy, profile):
     validate_profile(profile)
-    if profile == anchored_view.PROFILE:
-        return legacy + '\n' + anchored_view.GUIDANCE + '\n' + anchored_view.AUDIT_GUIDANCE
+    if profile in anchored_view.PROFILES:
+        return legacy + '\n' + anchored_view.GUIDANCE + '\n' + anchored_view.audit_guidance(profile)
     if profile == TASK_VIEW_PROFILE:
         return legacy + '\n' + TASK_VIEW_GUIDANCE + '\n' + TASK_AUDIT_GUIDANCE
     if profile == V35_PROFILE:
@@ -133,7 +133,7 @@ def audit_policy(legacy, profile):
 
 def authorization_policy(legacy, profile, *, bounded=False):
     validate_profile(profile)
-    if profile in (TASK_VIEW_PROFILE, anchored_view.PROFILE):
+    if profile in (TASK_VIEW_PROFILE, *anchored_view.PROFILES):
         return legacy if bounded else legacy + '\n' + TASK_VIEW_GUIDANCE
     if profile == V35_PROFILE:
         return legacy if bounded else V35_AUTH_POLICY
@@ -147,13 +147,13 @@ def profile_binding(profile):
     validate_profile(profile)
     if profile == 'legacy':
         return {}
-    if profile == anchored_view.PROFILE:
+    if profile in anchored_view.PROFILES:
         value = {'profile':profile,'protocol':anchored_view.PROTOCOL,
             'policy':anchored_view.POLICY,'schema':anchored_view.schema('Anchor.'),
             'anchor_mapping':'literal-lines-grouped-at-most64-v1',
-            'guidance':anchored_view.GUIDANCE,'planning_policy':anchored_view.PLANNING_POLICY,
+            'guidance':anchored_view.GUIDANCE,'planning_policy':anchored_view.planning_policy(profile),
             'error_guidance':anchored_view.ERROR_GUIDANCE,
-            'audit_guidance':anchored_view.AUDIT_GUIDANCE,'original_request_max_characters':2048,
+            'audit_guidance':anchored_view.audit_guidance(profile),'original_request_max_characters':2048,
             'global_tool_permissions':'tool-permissions-v1','progress_state':False}
         return {'prompt_profile':profile,'prompt_profile_sha256':hashlib.sha256(
             json.dumps(value,sort_keys=True,ensure_ascii=False).encode()).hexdigest()}

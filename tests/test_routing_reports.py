@@ -69,6 +69,28 @@ class RoutingReportTests(unittest.TestCase):
         self.assertEqual(report['totals']['actual_bypass_batches'],1)
         self.assertEqual(report['configurations'][0]['calibration_status'],'rule_based_unvalidated')
 
+    def test_sink_free_read_v4_shadow_bypass_is_valid_without_a_score(self):
+        from experiments.common.routing_reports import collect_routing_summary
+        row = trace([event(policy_version='sink-free-read-v4', actual_bypass=True,
+            artifact_sha256='a' * 64, semantic_audit_calls=0, semantic_audit_tokens=0,
+            raw_audit_decision=None, score=None, threshold_applied=False)])
+        row['dscg_framework'].update(audit_router_policy_version='sink-free-read-v4')
+        self.fixture({'u0': row})
+        report = collect_routing_summary(self.root)
+        self.assertEqual(report['totals']['invalid_event_records'], 0)
+        self.assertEqual(report['totals']['actual_bypass_batches'], 1)
+        self.assertEqual(report['configurations'][0]['calibration_status'], 'rule_based_unvalidated')
+
+    def test_sink_free_read_v4_event_with_inconsistent_bypass_stays_invalid(self):
+        from experiments.common.routing_reports import collect_routing_summary
+        row = trace([event(policy_version='sink-free-read-v4', actual_bypass=True, would_bypass=False,
+            artifact_sha256='a' * 64, semantic_audit_calls=0, semantic_audit_tokens=0,
+            raw_audit_decision=None, score=None, threshold_applied=False)])
+        row['dscg_framework'].update(audit_router_policy_version='sink-free-read-v4')
+        self.fixture({'u0': row})
+        report = collect_routing_summary(self.root)
+        self.assertEqual(report['totals']['invalid_event_records'], 1)
+
     def test_rule_shadow_has_no_threshold_sweep_and_retains_disagreement_cost(self):
         from experiments.common.routing_reports import collect_routing_summary
         row=trace([event(policy_version='read-purpose-v2',eligible=True,would_bypass=True,

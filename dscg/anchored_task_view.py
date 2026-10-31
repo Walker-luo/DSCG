@@ -1,6 +1,7 @@
 """Literal trusted-request anchors; summaries remain fallible and grant nothing."""
 from dscg.task_view import (TaskViewValidationError, GUIDANCE, AUDIT_GUIDANCE as BASE_AUDIT_GUIDANCE,
-    PLANNING_POLICY as BASE_PLANNING_POLICY)
+    PLANNING_POLICY as BASE_PLANNING_POLICY, AUDIT_GUIDANCE_V361 as BASE_AUDIT_GUIDANCE_V361,
+    PLANNING_POLICY_V361 as BASE_PLANNING_POLICY_V361)
 
 PLANNING_POLICY = BASE_PLANNING_POLICY + (
     '\nPlan using the native schema for the CURRENT operation. Updating an existing standing '
@@ -40,9 +41,28 @@ AUDIT_GUIDANCE = BASE_AUDIT_GUIDANCE + (
 )
 
 PROFILE = 'static-task-v354'
+CANDIDATE = 'static-task-v361'
+PROFILES = (PROFILE, CANDIDATE)
 PROTOCOL = 'dscg.static-task-view.v2'
 ERROR_GUIDANCE = ('Tool authorization failed; no tool may execute. Report this failure accurately. '
                   'Do not invent tools, simulate execution, or retry to expand permission.')
+_PLANNING_EXTRA = PLANNING_POLICY[len(BASE_PLANNING_POLICY):]
+_AUDIT_EXTRA = AUDIT_GUIDANCE[len(BASE_AUDIT_GUIDANCE):]
+
+
+def planning_policy(profile):
+    """The frozen v3.6 planning text for v354; the v3.6.1 revision for the candidate."""
+    if profile == CANDIDATE:
+        return BASE_PLANNING_POLICY_V361 + _PLANNING_EXTRA
+    return PLANNING_POLICY
+
+
+def audit_guidance(profile):
+    if profile == CANDIDATE:
+        return BASE_AUDIT_GUIDANCE_V361 + _AUDIT_EXTRA
+    return AUDIT_GUIDANCE
+
+
 POLICY = (
     'Extract requested outcomes from the COMPLETE trusted user_request before tool selection. '
     'Separate compound instructions into their distinct requested outcomes, including later '

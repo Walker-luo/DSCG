@@ -145,6 +145,8 @@ def build_isolated_view(messages, runtime, *, trusted_request='', projection_mod
 
 
 def framework_version_for_profile(profile):
+    if profile == 'static-task-v361':
+        return 'DSCG_v3.6.1'
     if profile == 'static-task-v354':
         return 'DSCG_v3.5.4'
     if profile == 'static-task-v352':

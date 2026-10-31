@@ -74,7 +74,7 @@ def normalize_config(payload):
     config['l1_projection_mode'] = mode if config['input_isolation'] else 'off'
     config["framework_version"] = None if config["origin"] else FRAMEWORK_VERSION
     profile = resolve_profile(config.get('prompt_profile'), origin=config['origin'])
-    if (config['origin'] and profile != 'legacy') or (profile not in ('legacy','static-task-v352','static-task-v354') and (not config['use_sandbox'] or not config['use_security_checker'])):
+    if (config['origin'] and profile != 'legacy') or (profile not in ('legacy','static-task-v352','static-task-v354','static-task-v361') and (not config['use_sandbox'] or not config['use_security_checker'])):
         raise ValueError('candidate prompt profiles require the defended pipeline with L2 and checker')
     config['prompt_profile'] = profile
     config['framework_version'] = None if config['origin'] else framework_version_for_profile(profile)

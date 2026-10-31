@@ -152,3 +152,33 @@ class AnchoredTaskViewTests(unittest.TestCase):
         no_l2.task_executor.query('Find channel.',rt,EmptyEnv(),
             [{'role':'user','content':[{'type':'text','content':'Find channel.'}]}],{})
         llm.client.chat.completions.create.assert_not_called()
+
+
+class V361IdentityTests(unittest.TestCase):
+    """v3.6.1 adds a candidate profile without touching the frozen v3.6 texts."""
+
+    def test_frozen_profile_identity_and_candidate_are_distinct(self):
+        from dscg import prompt_profiles as profiles
+        from dscg import anchored_task_view as view
+        from dscg.input_isolation import framework_version_for_profile
+        frozen = profiles.profile_binding('static-task-v354')['prompt_profile_sha256']
+        self.assertEqual(frozen, 'a70ca4ab6a5dab5a2be6324c946da175cc21c1d9ac7c4719c8c8c7e1d7a0d820')
+        candidate = profiles.profile_binding(view.CANDIDATE)['prompt_profile_sha256']
+        self.assertNotEqual(candidate, frozen)
+        self.assertEqual(profiles.DEFAULT_PROFILE, view.CANDIDATE)
+        self.assertEqual(framework_version_for_profile(view.CANDIDATE), 'DSCG_v3.6.1')
+        self.assertEqual(framework_version_for_profile('static-task-v354'), 'DSCG_v3.5.4')
+
+    def test_frozen_texts_are_unchanged_and_candidate_adds_two_rules(self):
+        from dscg import task_view
+        from dscg import anchored_task_view as view
+        self.assertEqual(view.planning_policy('static-task-v354'), view.PLANNING_POLICY)
+        self.assertEqual(view.audit_guidance('static-task-v354'), view.AUDIT_GUIDANCE)
+        planning = view.planning_policy(view.CANDIDATE)
+        self.assertIn('classify the gap before asking', planning)
+        self.assertIn('is not an answer when the request also asked', planning)
+        self.assertIn('ask for the date', planning)
+        self.assertNotIn('classify the gap before asking', view.planning_policy('static-task-v354'))
+        audit = view.audit_guidance(view.CANDIDATE)
+        self.assertIn('Counter-examples', audit)
+        self.assertTrue(audit.startswith(task_view.AUDIT_GUIDANCE_V361))

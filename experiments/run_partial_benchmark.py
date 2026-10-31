@@ -87,7 +87,7 @@ def _validate_router_controls(origin, use_security_checker, mode, use_sandbox=Tr
 
 def _validate_prompt_profile(origin, use_sandbox, use_checker, profile):
     profile = resolve_profile(profile, origin=origin)
-    if (origin and profile != 'legacy') or (profile not in ('legacy', 'static-task-v352', 'static-task-v354') and (not use_sandbox or not use_checker)):
+    if (origin and profile != 'legacy') or (profile not in ('legacy', 'static-task-v352', 'static-task-v354', 'static-task-v361') and (not use_sandbox or not use_checker)):
         raise ValueError('candidate prompt profiles require the defended pipeline with L2 and checker')
     return profile
 

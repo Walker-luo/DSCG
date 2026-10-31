@@ -19,14 +19,14 @@ class CurrentStaticDefaultsTests(unittest.TestCase):
         cfg=ModelConfig('offline','offline','https://offline.invalid','custom')
         with patch.object(d,'create_openai_client',return_value=Mock()):
             pipeline,_,_=d.make_defended_pipeline(model_config=cfg)
-        self.assertEqual(pipeline.dscg_optimization_config['prompt_profile'],task_view.PROFILE)
-        self.assertEqual(pipeline.dscg_optimization_config['framework_version'],'DSCG_v3.5.4')
+        self.assertEqual(pipeline.dscg_optimization_config['prompt_profile'],profiles.DEFAULT_PROFILE)
+        self.assertEqual(pipeline.dscg_optimization_config['framework_version'],'DSCG_v3.6.1')
         self.assertFalse(pipeline.dscg_optimization_config['completion_prompt'])
         self.assertEqual(pipeline.dscg_optimization_config['audit_retries'],0)
-        self.assertIn(task_view.PLANNING_POLICY,pipeline.elements[0].system_message)
+        self.assertIn(task_view.planning_policy(profiles.DEFAULT_PROFILE),pipeline.elements[0].system_message)
 
     def test_shared_runner_resolves_native_baseline_and_static_ablations(self):
-        self.assertEqual(runner._validate_prompt_profile(False,True,True,None),task_view.PROFILE)
+        self.assertEqual(runner._validate_prompt_profile(False,True,True,None),profiles.DEFAULT_PROFILE)
         self.assertEqual(runner._validate_prompt_profile(True,False,False,None),'legacy')
         for sandbox,checker in [(False,True),(True,False),(False,False)]:
             self.assertEqual(runner._validate_prompt_profile(False,sandbox,checker,task_view.PROFILE),task_view.PROFILE)
@@ -36,10 +36,10 @@ class CurrentStaticDefaultsTests(unittest.TestCase):
 
     def test_dashboard_default_and_native_baseline_match_runner(self):
         suites=[get_suites()[0]]
-        self.assertEqual(normalize_config({'suites':suites})['prompt_profile'],task_view.PROFILE)
+        self.assertEqual(normalize_config({'suites':suites})['prompt_profile'],profiles.DEFAULT_PROFILE)
         self.assertEqual(normalize_config({'suites':suites,'origin':True})['prompt_profile'],'legacy')
         config=normalize_config({'suites':suites,'use_security_checker':False})
-        self.assertEqual(config['prompt_profile'],task_view.PROFILE)
+        self.assertEqual(config['prompt_profile'],profiles.DEFAULT_PROFILE)
         self.assertFalse(config['use_security_checker'])
 
     def test_static_audit_keeps_numbered_original_and_later_read_examples(self):
