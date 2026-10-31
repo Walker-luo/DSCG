@@ -1,0 +1,27 @@
+{
+  "schema_version": "dscg.router-calibration-preset.v1",
+  "status": "development_candidate",
+  "grid": [0.65, 0.70, 0.75],
+  "reference_threshold": 0.70,
+  "epsilon": 0.05,
+  "delta": 0.05,
+  "provenance": {
+    "date": "2026-10-19",
+    "benchmark": "agentdojo",
+    "runs": ["qwen3.7-flash_DSCG", "qwen3.7-flash_DSCG_v1"],
+    "read_scored_traces": [1167, 1147],
+    "planned_scored_traces_per_run": 1167,
+    "missing_scored_traces": [0, 20],
+    "eligible_events": [429, 407],
+    "eligible_suites": ["slack"],
+    "eligible_user_tasks_per_run": 16,
+    "observed_below_reference": [178, 179]
+  },
+  "limitations": [
+    "Exploratory grid selected after observing historical shadow runs; validate on new independent labeled groups.",
+    "The two runs repeat correlated user tasks, not independent calibration/test splits.",
+    "Reference threshold is explanatory only; this preset is not a deployment artifact.",
+    "No independent safety labels or certified threshold exist in these observations.",
+    "No observed eligible events in banking or travel; do not infer savings for those suites."
+  ]
+}

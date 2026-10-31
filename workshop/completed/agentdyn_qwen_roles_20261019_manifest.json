@@ -1,0 +1,99 @@
+{
+  "task": "agentdyn_qwen_roles_20261019",
+  "status": "implemented_offline_verified",
+  "revision": "45b4acd1e8b9427978371da830b8f794ed6a1fb7",
+  "working_tree": "Started clean; uncommitted implementation/docs/tests; no automatic commit.",
+  "adapter": "dashscope-system-v1",
+  "files": {
+    "dscg/request_compatibility.py": "fa6f50190df036dcc60dcc289c4467167ed9beb27df718434070e3844b8066b6",
+    "dscg/model_config.py": "7bac918e8e7700e660fd1d543c416fbc5af3653bc27b155e1e249c6aa60ed133",
+    "dscg/token_tracking.py": "e425e8069e05f242bbb5ef06fc96f35e61efc1a98d7e940fc3821c6c4177b6f2",
+    "experiments/run_partial_benchmark.py": "068bc44a7fbe86574da55aba6f4442a473efe11a2e55913490ba563d923a3b23",
+    "experiments/run_injection_precheck.py": "98b1daa0128ca30ecea41a006bf93002d4a8b9fb5ca3f718ed948aefe9ce6e9d",
+    "experiments/common/partial_reporting.py": "35b80abf9629f86c33c6131a54fa0a9022a98b477e2ddb0e6e96f317b9873a66",
+    "dashboard/app.py": "def53f5c69122b0f3434b2abdd6a08675849399cb5963e6c325540c6cfefb1e1",
+    "tests/test_request_compatibility.py": "b113c5780c9294483051b5c10a1ba8169b787d7e748174435e5adf47269b641f",
+    "README.md": "9748ee3ea20cfc1bf05a24a3d39f3f3a48b25540bcca1e63ffe74b8b96cd7f08",
+    "docs/model_tool_configuration.md": "a9e87d2ff72acec718921580e096de6750df4f71f97b2a61ce28bf1857dea5cf",
+    "docs/benchmark.md": "41c2a1f446b15cc546d841d7d0d2823e935c9d41c15a8a44d5f96fbb0cf080d1",
+    "docs/partial_benchmark.md": "9a0b29588463bf8bc216970cd90d3276be6879eea8e2d55f78340b08a3c89f04",
+    "docs/framework_updates.md": "68e777dc2093df62bff10e96687ac4addad74d7b22ad006209d9486d6af60fac",
+    "AGENTS.md": "e1531f077ec98056d69cb54ac8f4e0a11ae63dad0b846d1a743d06b0141be3a1",
+    "workshop/README.md": "f95f33bbe9b614f21388e0f1a425f2ed6eaf6b0f92a7848629b0a316f190b2a0",
+    "workshop/completed/README.md": "6066f9eefcff5a617e56b254682d1795f24d98c2d83b7bfdda11790042568526",
+    "workshop/completed/agentdyn_qwen_roles_20261019.md": "5e82d80b7448367595077de682259bbb4e262c699fddecaf429dbc77f69f654d"
+  },
+  "artifacts": {
+    "workshop/artifacts/20261019_agentdyn_qwen_roles/start.json": "18b840c67112278c7299bc90374e099df506b5c5141e7e5626cbbedddb5b7d13",
+    "workshop/artifacts/20261019_agentdyn_qwen_roles/red.log": "b8250601f6129646204c8427b1b243f4ff188a9c84357d138b0ec2e11f5cc644",
+    "workshop/artifacts/20261019_agentdyn_qwen_roles/green.log": "58f5d9d343e632be03bfdeea050c17dacd00ca5a6a5475726a76c0ac3b700980",
+    "workshop/artifacts/20261019_agentdyn_qwen_roles/transport_green.log": "8516f396b8b37208fd498c77c415481f012b04b4456f72bcfac8fb28521d02d9",
+    "workshop/artifacts/20261019_agentdyn_qwen_roles/report_red.log": "7121bfdca588ea644c7a0297d6f4343755a92a6f3d4b520dca862180ec841fc7",
+    "workshop/artifacts/20261019_agentdyn_qwen_roles/wiring_red.log": "9267baa30136a0df49750d7bc924d26fd7d16c6234283e0edaed9e5cc3bef2ad",
+    "workshop/artifacts/20261019_agentdyn_qwen_roles/wiring_green.log": "7cb9f81241bfe08741374650a90aec3a5d9d08a50ed6881f8a11858b7175698f",
+    "workshop/artifacts/20261019_agentdyn_qwen_roles/dashboard_red.log": "e93967023e31a675bc49c709a916d29775412df115ddce4b690c1369a03180b7",
+    "workshop/artifacts/20261019_agentdyn_qwen_roles/screen_red.log": "da2a76b496041c25453e550cf67aea957ae614b228c8f62056422e6b4d0eb475",
+    "workshop/artifacts/20261019_agentdyn_qwen_roles/diagnostics_green.log": "a3d94d625b5a05aef37113325f84eab261db10701f4361b2bc4f6e1726c2e45b",
+    "workshop/artifacts/20261019_agentdyn_qwen_roles/targeted_final.log": "a9d3e553f5b676a7d1ba072caa9023151040f5e59456ba62ac77f3d2251193ba",
+    "workshop/artifacts/20261019_agentdyn_qwen_roles/review_red.log": "540c6208495ff303eacccb3d8793f73389207b48fcfcc4723d1f41005decf2ac",
+    "workshop/artifacts/20261019_agentdyn_qwen_roles/review_green.log": "6c1cb86ae807db8a77acca74eff855e3d321ffb06012a9c702eee3d71e3f003f",
+    "workshop/artifacts/20261019_agentdyn_qwen_roles/reviewer_agentdojo_tests.log": "d3a563222d1857ed9bc39f0b6365af3e5b71e70b35634d66a670f92a41a29c74",
+    "workshop/artifacts/20261019_agentdyn_qwen_roles/reviewer_agentdyn_tests.log": "677aab51c3892295b775350967e508b89986344c2b4a80818ea60eb3130fefb1",
+    "workshop/artifacts/20261019_agentdyn_qwen_roles/reviewer_agentdyn_recheck.log": "78ff2772caa12a713f571ae035b19869b2a25c4e8895edeaf8f4381964774783",
+    "workshop/artifacts/20261019_agentdyn_qwen_roles/ipi_final.log": "b956837ddd2d750591ec0405d06870574024d57593fcb5fd860ecd25cb0ae876",
+    "workshop/artifacts/20261019_agentdyn_qwen_roles/agentdyn_final.log": "ea7aad9092b8a0defb5fdc05c43abff43fbaeccb4da08e0f58ca3cdd227bf449",
+    "workshop/artifacts/20261019_agentdyn_qwen_roles/node_final.log": "4bf4325bd81fd656c6a7613b9d63a8dc787c1ae93b53fa5ac2ff9eb83e93a686",
+    "workshop/artifacts/20261019_agentdyn_qwen_roles/node_path_missing.log": "3a9d0367e5fa698ee9fa6eb4c4cec41b38bd7550df50ae70421ab3302efb8995",
+    "workshop/artifacts/20261019_agentdyn_qwen_roles/preservation.json": "86f4a410779f87a9f2b277a009aa7329ba49352d3574c68e7f68d539b3f3e8a4",
+    "workshop/artifacts/20261019_agentdyn_qwen_roles/verify_delivery.py": "95c86e718d04910397cfbc1ea1967725dd8b999f18d7647be89e80c84bf5cb40",
+    "workshop/artifacts/20261019_agentdyn_qwen_roles/validation.json": "27f984d3c66f6ba79b098d429e4eb9883923fb04c44f1406f26467a17fac0bad",
+    "workshop/artifacts/20261019_agentdyn_qwen_roles/ledger.md": "a853fbc8c9bb6c714477e6b25bfb2999af084a140f190f7e636c9aa8b55d8f80"
+  },
+  "tests": {
+    "ipi": {
+      "command": "conda run -n ipi python -B -m unittest discover -s tests -v",
+      "exit_code": 0,
+      "total": 557,
+      "passed": 556,
+      "skipped": 1
+    },
+    "ipi-agentdyn": {
+      "command": "conda run -n ipi-agentdyn python -B -m unittest discover -s tests -v",
+      "exit_code": 0,
+      "total": 561,
+      "passed": 560,
+      "skipped": 1
+    },
+    "node": {
+      "command": "/Users/luo/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node --test tests/*.cjs",
+      "exit_code": 0,
+      "passed": 45,
+      "version": "v24.19.0",
+      "initial_PATH_node_exit_code": 127
+    }
+  },
+  "preservation": {
+    "protected_files": 29,
+    "changed_files": [],
+    "protected_failure_files": 27,
+    "protected_conda_native_adapters": 2
+  },
+  "sample_denominators": {
+    "new_contract_tests": 13,
+    "original_failed_groups": 9,
+    "original_effective_scored_tasks": 0,
+    "original_planned_scored_tasks": 81,
+    "real_model_calls": 0,
+    "real_rollouts": 0,
+    "new_efficacy_samples": 0
+  },
+  "review": "P2 Dashboard persistence masking terminal event fixed via RED→GREEN; independent recheck13/13, no remaining Important.",
+  "limitations": [
+    "Original provider400 response body was not recorded; role incompatibility is a reproducible defect, not confirmation that all remote errors are resolved.",
+    "Validation uses HTTP MockTransport; no real service behavior/TSR/ASR claim.",
+    "Only synchronous Chat Completions create path validated; no Responses/async compatibility claim.",
+    "Adapter is effective public request identity; old incompatible caches/cohorts/calibration artifacts require new correctly bound preparation."
+  ],
+  "research_gates": "E0 pending; I3 partial24valid/8scope; I2 locked",
+  "next_action": "On server, use new names for AgentDyn baseline/DSCG partial clean (9 tasks each); confirm no request400 before attack measurement."
+}

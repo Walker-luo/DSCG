@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DSCG · 历史分析</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
+  <link href="/static/css/style.css" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+</head>
+<body class="history-page">
+  {% include '_header.html' %}
+  <main id="history-analysis-page" class="history-page-content">
+    <div class="history-page-heading"><div><span class="section-kicker">Historical analysis</span><h1>历史分析</h1></div><p>比较不同框架版本在同一攻击与场景下的任务效用、攻击成功率和开销。</p></div>
+        <div class="history-layout">
+          <fieldset class="history-run-selection">
+            <div class="history-list-heading">
+              <legend>历史实验结果</legend>
+              <span id="history-selection-count" aria-live="polite">0 项已选</span>
+            </div>
+            <div class="history-filter-grid">
+              <div class="field-group history-directory-filters">
+                <div class="field-group"><label class="form-label" for="history-folder-select">结果目录</label><select id="history-folder-select" class="form-select form-select-sm"><option value="all">全部目录</option></select></div>
+                <div class="field-group"><label class="form-label" for="history-backend-select">基准</label><select id="history-backend-select" class="form-select form-select-sm"><option value="all">全部基准</option></select></div>
+              </div>
+              <fieldset class="field-group history-model-filter" aria-describedby="history-model-hint">
+                <legend class="form-label">模型 / 运行名称（可多选）</legend>
+                <div class="history-model-actions"><button type="button" class="btn btn-sm btn-outline-secondary" id="history-model-select-all">全选模型</button><button type="button" class="btn btn-sm btn-outline-secondary" id="history-model-clear">清空模型</button><span id="history-model-count" aria-live="polite"></span></div>
+                <div id="history-model-options" class="history-model-options" role="group" aria-label="模型 / 运行名称（可多选）"></div>
+                <p id="history-model-hint" class="history-metric-hint">勾选要比较的框架版本，再按攻击和场景对齐结果。</p>
+              </fieldset>
+              <div class="field-group"><label class="form-label" for="history-attack-select">攻击名称（attack_name）</label><select id="history-attack-select" class="form-select form-select-sm"><option value="all">全部攻击</option></select></div>
+            </div>
+            <div class="history-select-actions">
+              <button type="button" class="btn btn-sm btn-outline-secondary" id="history-select-all">全选当前结果</button>
+              <button type="button" class="btn btn-sm btn-outline-secondary" id="history-clear-selection">清空</button>
+              <span id="history-catalog-count" class="history-catalog-count" aria-live="polite"></span>
+            </div>
+            <div id="history-run-list" class="history-run-list" role="group" aria-label="选择历史实验结果">
+              <div class="empty-state"><strong>正在读取 results/</strong></div>
+            </div>
+          </fieldset>
+
+          <div class="history-analysis-main">
+          <section class="history-view-controls" aria-label="分析视图设置">
+            <fieldset class="field-group history-metric-field">
+              <legend class="form-label">场景（可多选）</legend>
+              <div id="history-suite-options" class="history-metric-options"></div>
+            </fieldset>
+            <fieldset class="field-group history-metric-field" id="history-metric-select" aria-describedby="history-metric-hint">
+              <legend class="form-label">指标（可多选）</legend>
+              <div class="history-metric-options">
+                <label><input type="checkbox" class="form-check-input history-metric-cb" value="utility_rate" checked><span>任务效用率 TSR</span></label>
+                <label><input type="checkbox" class="form-check-input history-metric-cb" value="attack_success_rate" checked><span>攻击成功率 ASR</span></label>
+                <label><input type="checkbox" class="form-check-input history-metric-cb" value="total_tokens" checked><span>Token 消耗</span></label>
+              </div>
+              <p id="history-metric-hint" class="history-metric-hint" aria-live="polite"></p>
+            </fieldset>
+            <div class="field-group">
+              <label class="form-label" for="history-chart-type">图表形式</label>
+              <select id="history-chart-type" class="form-select form-select-sm">
+                <option value="line">折线图</option>
+                <option value="bar" selected>分组柱状</option>
+                <option value="radar">雷达对比</option>
+                <option value="scatter">TSR-ASR 散点</option>
+                <option value="heatmap">任务结果热图</option>
+              </select>
+            </div>
+            <div class="history-analysis-actions">
+              <button type="button" class="btn btn-primary history-analyze-button" id="history-analyze">
+                <i class="bi bi-graph-up-arrow" aria-hidden="true"></i>生成分析
+              </button>
+              <button type="button" class="btn btn-outline-secondary history-analyze-button" id="history-export" disabled aria-describedby="history-export-hint">
+                <i class="bi bi-download" aria-hidden="true"></i>下载分析数据
+              </button>
+            </div>
+            <p id="history-export-hint" class="history-analysis-status">下载所选实验与场景的 ZIP，包含 ASR / TSR 汇总、任务明细和 agent 可读 JSON。</p>
+            <p id="history-analysis-status" class="history-analysis-status" role="status" aria-live="polite"></p>
+          </section>
+
+        <section class="history-overview-section" aria-labelledby="history-overview-title">
+          <h2 id="history-overview-title">整体测试数据</h2>
+          <p class="history-overview-hint">底色区分攻击，侧边色对应图表中的运行；数字以蓝色、粉色、黄色分别标识 TSR、ASR、Token。分母为有效任务数。</p>
+          <div id="history-overview"><p class="history-overview-empty">选择结果并生成分析后查看。</p></div>
+        </section>
+
+        <section class="history-visual-section" aria-labelledby="history-chart-title">
+          <div class="history-chart-heading">
+            <div><span class="section-kicker">Historical results</span><h2 id="history-chart-title">历史结果分析</h2></div>
+            <span id="history-source-caption" class="history-source-caption"></span>
+          </div>
+          <div class="chart-container history-chart-container">
+            <div id="history-canvas-wrap" class="history-canvas-wrap" hidden></div>
+            <div id="history-heatmap-container" class="history-heatmap-container" hidden></div>
+            <div id="history-chart-empty" class="empty-state history-chart-empty">
+              <i class="bi bi-graph-up"></i><strong>选择结果并生成分析</strong><span>可比较不同优化版本及其各场景表现</span>
+            </div>
+          </div>
+        </section>
+
+        <section class="history-table-section" aria-labelledby="history-summary-title">
+          <h3 id="history-summary-title">指标明细</h3>
+          <div class="table-responsive">
+            <table class="table table-dark table-hover table-sm" id="history-summary-table">
+              <thead><tr><th>模型 / 运行</th><th>攻击</th><th>场景</th><th>TSR (%)</th><th>ASR (%)</th><th>防御率 (%)</th><th>已记录 Token</th><th>成功 / 总任务</th></tr></thead>
+              <tbody><tr><td colspan="8">尚无分析数据</td></tr></tbody>
+            </table>
+          </div>
+        </section>
+          </div>
+        </div>
+  </main>
+  <script src="/static/js/history_charts.js"></script>
+  <script src="/static/js/history_selection.js"></script>
+  <script src="/static/js/history.js"></script>
+</body>
+</html>

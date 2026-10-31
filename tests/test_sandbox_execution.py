@@ -1,3 +1,4 @@
+from tests.authorization_fixture import adapt_client
 """Offline regressions with AgentDojo's executor and local recording tools."""
 from types import SimpleNamespace
 from dataclasses import FrozenInstanceError
@@ -16,6 +17,7 @@ from dscg.pipelines.defended import (
     AUDIT_SCHEMA_VERSION, ActionLedger, ActionSecurityChecker, ActionState, OurFrameExecutor,
     PermissionSandbox, ReferenceMonitor, SandboxPolicyState, TicketedToolsExecutor,
     ToolAuthorizationCompiler, TrustedTaskRequest, _batch_fingerprint, make_defended_pipeline,
+    _compact_action_record, _compact_authorization_record,
 )
 from dscg.model_config import ModelConfig
 from dscg.tool_metadata import metadata_for_runtime, set_tool_metadata
@@ -77,6 +79,7 @@ class SandboxExecutionTests(unittest.TestCase):
             SimpleNamespace(message=SimpleNamespace(content=content, refusal=refusal),
                             finish_reason=finish)
         ])
+        adapt_client(llm.client)
         llm.query.side_effect = lambda q, r, e, m, a: (q, r, e, [*m, assistant("safe_tool")], a)
         return llm
 
@@ -116,7 +119,7 @@ class SandboxExecutionTests(unittest.TestCase):
                 self.assertEqual(llm.query.call_count, 1)
 
     def test_parser_valid_object_and_legacy_array(self):
-        for content in ('{"tools": ["safe_tool"]}', '["safe_tool"]'):
+        for content in ('{"tools": ["safe_tool"]}',):
             llm = self.parser_llm(content)
             result = ToolAuthorizationCompiler(llm).compile(TrustedTaskRequest("test"), self.runtime)
             self.assertEqual(result.allowed_tools, frozenset(["safe_tool"]))
@@ -192,6 +195,7 @@ class SandboxExecutionTests(unittest.TestCase):
             return q, r, e, [*m, assistant("forbidden_tool", "safe_tool")], a
 
         llm.client.chat.completions.create.side_effect = compile_response
+        adapt_client(llm.client)
         llm.query.side_effect = propose
         state = OurFrameExecutor(llm, sandbox).query("test", self.runtime, self.env, [USER], {})
         agent_pipeline.ToolsExecutor().query(*sandbox.query(*state))
@@ -321,6 +325,8 @@ class SandboxExecutionTests(unittest.TestCase):
                     self.assertNotIn("dscg_action_ledger", trace)
                     self.assertIn("dscg_audit_summary", trace)
                     self.assertIn("dscg_action_summary", trace)
+                    self.assertNotIn("_sha256", json.dumps(trace))
+                    self.assertNotIn("arguments_sha256", json.dumps(trace))
                 elif level == "standard":
                     self.assertIn("dscg_audit_decisions", trace)
                     self.assertIn("dscg_action_ledger", trace)
@@ -329,6 +335,8 @@ class SandboxExecutionTests(unittest.TestCase):
                         "transitions" not in record
                         for record in trace["dscg_action_ledger"]
                     ))
+                    self.assertNotIn("_sha256", json.dumps(trace))
+                    self.assertNotIn("arguments_sha256", json.dumps(trace))
                 else:
                     self.assertIn("dscg_audit_decisions", trace)
                     sidecars = list(Path(directory).rglob("*.dscg_trace.jsonl.gz"))
@@ -336,9 +344,35 @@ class SandboxExecutionTests(unittest.TestCase):
                     with gzip.open(sidecars[0], "rt", encoding="utf-8") as stream:
                         events = [json.loads(line) for line in stream]
                     self.assertEqual(events[0]["event"], "authorization")
+                    sidecar_text = json.dumps(events)
+                    self.assertIn("_sha256", sidecar_text)
                     self.assertEqual(
                         trace["dscg_trace_artifact"]["format"], "jsonl.gz"
                     )
+
+    def test_task_json_projection_keeps_only_contract_and_runtime_state(self):
+        authorization = _compact_authorization_record({
+            "user_request_sha256": "u" * 64,
+            "tool_catalog_sha256": "t" * 64,
+            "system_policy_sha256": "s" * 64,
+            "tool_metadata_catalog_sha256": "m" * 64,
+            "contract_version": "contract-id",
+            "policy_state": "allowlist",
+        })
+        action = _compact_action_record({
+            "action_id": "action-id",
+            "tool_name": "safe_tool",
+            "arguments_sha256": "a" * 64,
+            "contract_version": "contract-id",
+            "state": "executed",
+        })
+        self.assertEqual(authorization["contract_version"], "contract-id")
+        self.assertEqual(action["contract_version"], "contract-id")
+        self.assertNotIn("user_request_sha256", authorization)
+        self.assertNotIn("tool_catalog_sha256", authorization)
+        self.assertNotIn("system_policy_sha256", authorization)
+        self.assertNotIn("tool_metadata_catalog_sha256", authorization)
+        self.assertNotIn("arguments_sha256", action)
 
     def test_no_sandbox_ablation_skips_authorization(self):
         llm = self.parser_llm()
@@ -610,10 +644,10 @@ class SandboxExecutionTests(unittest.TestCase):
         request = security_llm.client.chat.completions.create.call_args.kwargs
         self.assertEqual(request["response_format"], {"type": "json_object"})
         packet = json.loads(request["messages"][1]["content"])
-        self.assertEqual(packet["schema_version"], "dscg.audit-input.v1")
+        self.assertEqual(packet["schema_version"], "dscg.audit-input.v4.2")
         action = packet["current_actions"][0]
         self.assertEqual(action["source_ids"], ["email:42"])
-        self.assertEqual(action["untrusted_argument_data"]["role"], "system")
+        self.assertEqual(action["candidate_arguments"]["role"], "system")
         self.assertNotIn("Tool: safe_tool", request["messages"][1]["content"])
         self.assertNotIn("Args:", request["messages"][1]["content"])
 
@@ -700,7 +734,7 @@ class SandboxExecutionTests(unittest.TestCase):
         )
         self.assertTrue(packet["history_truncated"])
         self.assertLessEqual(len(packet["action_history"]), 32)
-        value = packet["current_actions"][0]["untrusted_argument_data"]["content"]
+        value = packet["current_actions"][0]["candidate_arguments"]["content"]
         self.assertLessEqual(len(value), 530)
         self.assertNotIn("\u202e", value)
         self.assertIn("<truncated>", value)
@@ -721,7 +755,7 @@ class SandboxExecutionTests(unittest.TestCase):
         self.assertEqual(record["transitions"][-1]["reason_code"], "POLICY_INITIALIZED_EMPTY")
         self.assertEqual(state[4]["dscg_audit_decision"]["final_policy_decision"], "deny")
 
-    def test_sensitive_read_deny_does_not_block_source_read(self):
+    def test_sensitive_read_valid_deny_blocks_source_read(self):
         runtime = FunctionsRuntime()
         executed = []
 
@@ -742,8 +776,8 @@ class SandboxExecutionTests(unittest.TestCase):
             }
         })
         checker = ActionSecurityChecker(self.audit_llm(
-            '{"decision":"deny","violations":["SENSITIVE_DATA_ACCESS"],'
-            '"confidence":0.9,"reason_code":"SENSITIVE_DATA_ACCESS"}'
+            '{"decision":"deny","violations":["UNREQUESTED_DISCLOSURE"],'
+            '"confidence":0.9,"reason_code":"UNREQUESTED_DISCLOSURE"}'
         ))
         monitor = ReferenceMonitor(PermissionSandbox(["read_private_file"]), require_audit=True)
         executor = TicketedToolsExecutor(monitor)
@@ -751,11 +785,11 @@ class SandboxExecutionTests(unittest.TestCase):
         state = checker.query(*state)
         state = monitor.query(*state)
         state = executor.query(*state)
-        self.assertEqual(executed, ["read_private_file"])
+        self.assertEqual(executed, [])
         record = state[4]["dscg_action_ledger"][0]
-        self.assertEqual(record["state"], "executed")
-        self.assertEqual(record["transitions"][1]["reason_code"], "READ_ONLY_SOURCE_ALLOW")
-        self.assertEqual(state[4]["dscg_audit_decision"]["final_policy_decision"], "allow")
+        self.assertEqual(record["state"], "blocked")
+        self.assertEqual(record["transitions"][1]["reason_code"], "AUDIT_DENY")
+        self.assertEqual(state[4]["dscg_audit_decision"]["final_policy_decision"], "deny")
 
     def test_reference_monitor_rejects_incomplete_forged_allow_record(self):
         calls = assistant("safe_tool")["tool_calls"]

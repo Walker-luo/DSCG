@@ -1,0 +1,13 @@
+test_denial_control_rejects_retargeted_actions (test_evidence_scoring.EvidenceScoringTests) ... ok
+test_legitimate_examples_still_pass (test_evidence_scoring.EvidenceScoringTests) ... ok
+test_missing_email_cannot_allow_other_side_effects (test_evidence_scoring.EvidenceScoringTests) ... ok
+test_missing_email_cannot_claim_success (test_evidence_scoring.EvidenceScoringTests) ... ok
+test_native_predicate_stack_includes_denied_and_failed_calls (test_evidence_scoring.EvidenceScoringTests) ... ok
+test_unknown_case_fails_closed (test_evidence_scoring.EvidenceScoringTests) ... ok
+test_unrequested_subject_change_is_rejected (test_evidence_scoring.EvidenceScoringTests) ... ok
+test_wrong_invitee_is_rejected (test_evidence_scoring.EvidenceScoringTests) ... ok
+
+----------------------------------------------------------------------
+Ran 8 tests in 0.001s
+
+OK

@@ -1,36 +1,60 @@
 (() => {
-  const suites = ["workspace", "travel", "banking", "slack"];
-  const colors = ["--blue", "--green", "--amber", "--red", "--purple"];
-  const shapes = ["circle", "rect", "triangle", "cross", "star"];
-  const metricInfo = {
-    utility_rate: ["任务效用率 TSR", "%"],
-    attack_success_rate: ["攻击成功率 ASR", "%"],
-    defense_success_rate: ["防御成功率", "%"],
-    total_tokens: ["Token 消耗", "Tokens (K)"],
-  };
+  const colors = ["--blue", "--amber", "--purple", "--green", "--red"];
+  const historyCharts = window.DSCGHistoryCharts;
+  const historySelection = window.DSCGHistorySelection;
+  const analysisRequests = historySelection.createRequestGate();
+  let filters = { folder: "all", backend: "all", models: null, attack: "all" };
+  let suiteSelection = null;
   let catalog = [];
   let loaded = false;
-  let chart = null;
+  let charts = [];
+  let experimentStyles = {};
+  let exporting = false;
 
   document.addEventListener("DOMContentLoaded", () => {
+    document.querySelector("#history-analysis-page").addEventListener("change", () => analysisRequests.invalidate());
     document.querySelector("#history-select-all").addEventListener("click", () => {
+      analysisRequests.invalidate();
       document.querySelectorAll(".history-run-cb").forEach((item) => { item.checked = true; });
       updateSelection();
     });
     document.querySelector("#history-clear-selection").addEventListener("click", () => {
+      analysisRequests.invalidate();
       document.querySelectorAll(".history-run-cb").forEach((item) => { item.checked = false; });
       updateSelection();
     });
     document.querySelector("#history-run-list").addEventListener("change", updateSelection);
-    document.querySelector("#history-suite-select").addEventListener("change", updateControls);
+    ["folder", "backend", "attack"].forEach((key) => {
+      document.querySelector("#history-" + key + "-select").addEventListener("change", () => {
+        filters[key] = document.querySelector("#history-" + key + "-select").value;
+        refreshFilterResults(true);
+      });
+    });
+    document.querySelector("#history-model-options").addEventListener("change", () => {
+      const options = Array.from(document.querySelectorAll(".history-model-cb"));
+      const chosen = options.filter(item => item.checked).map(item => item.value);
+      filters.models = chosen.length === options.length ? null : chosen;
+      refreshFilterResults(true);
+    });
+    document.querySelector("#history-model-select-all").addEventListener("click", () => {
+      filters.models = null;
+      refreshFilterResults(true);
+    });
+    document.querySelector("#history-model-clear").addEventListener("click", () => {
+      filters.models = [];
+      refreshFilterResults(true);
+    });
+    document.querySelector("#history-suite-options").addEventListener("change", () => {
+      analysisRequests.invalidate();
+      const chosen = selectedSuiteNames();
+      suiteSelection = chosen.length === document.querySelectorAll(".history-suite-cb").length ? null : chosen;
+      updateExportButton();
+      updateControls();
+    });
     document.querySelector("#history-chart-type").addEventListener("change", updateControls);
     document.querySelector("#history-metric-select").addEventListener("change", updateControls);
     document.querySelector("#history-analyze").addEventListener("click", analyze);
-    document.querySelector("#btn-history-analysis").addEventListener("click", loadCatalog);
-    document.querySelector("#history-analysis-modal").addEventListener("shown.bs.modal", () => {
-      loadCatalog();
-      if (chart) chart.resize();
-    });
+    document.querySelector("#history-export").addEventListener("click", exportAnalysis);
     loadCatalog();
     updateControls();
     window.setInterval(loadCatalog, 30000);
@@ -47,6 +71,7 @@
       );
       const chooseLatest = !loaded && incoming.length > 0;
       catalog = Array.isArray(incoming) ? incoming : [];
+      experimentStyles = historyCharts.createExperimentStyles(catalog, colors.map(css), experimentStyles);
       renderCatalog(selected, chooseLatest);
       loaded = true;
       if (!catalog.length) status.textContent = "results/ 中尚未找到可识别的实验汇总文件。";
@@ -58,35 +83,108 @@
     }
   }
 
-  function renderCatalog(selected, chooseLatest) {
+  function refreshFilterResults(selectAllVisible) {
+    analysisRequests.invalidate();
+    renderCatalog(new Set(selectedRunIds()), true, selectAllVisible);
+    clearCharts();
+    renderSummaryTable([]);
+    renderOverview([]);
+    document.querySelector("#history-source-caption").textContent = "";
+    showEmpty("筛选已更新", "勾选当前列表中的结果，生成分析或下载数据。");
+  }
+
+  function versionBadge(style) {
+    const badge = document.createElement("i");
+    badge.className = "history-version-badge";
+    badge.textContent = style.badge;
+    badge.style.backgroundColor = style.color;
+    badge.setAttribute("aria-hidden", "true");
+    return badge;
+  }
+
+  function renderModelChoices(models) {
+    const target = document.querySelector("#history-model-options");
+    target.replaceChildren();
+    models.forEach(model => {
+      const label = document.createElement("label");
+      label.className = "history-model-option";
+      const checkbox = document.createElement("input");
+      checkbox.type = "checkbox";
+      checkbox.className = "form-check-input history-model-cb";
+      checkbox.value = model;
+      checkbox.setAttribute("aria-label", model);
+      checkbox.checked = filters.models === null || filters.models.includes(model);
+      const run = catalog.find(item => item.model_group === model);
+      const text = document.createElement("span");
+      const title = document.createElement("strong");
+      title.textContent = historyCharts.describeExperiment(run).label;
+      const detail = document.createElement("small");
+      detail.textContent = model;
+      text.append(title, detail);
+      label.append(checkbox, versionBadge(experimentStyles[run.id]), text);
+      target.append(label);
+    });
+    const count = filters.models === null ? models.length : filters.models.length;
+    document.querySelector("#history-model-count").textContent = count + " / " + models.length + " 项";
+  }
+
+  function renderCatalog(selected, chooseLatest, selectAllVisible = false) {
+    const resolved = historySelection.resolveFilters(catalog, filters);
+    filters = resolved.filters;
+    [["folder", resolved.folders, "全部目录"],
+      ["backend", resolved.backends, "全部基准"],
+      ["attack", resolved.attacks, "全部攻击"]].forEach(([key, values, allLabel]) => {
+      const select = document.querySelector("#history-" + key + "-select");
+      select.replaceChildren();
+      addOption(select, "all", allLabel);
+      values.forEach(value => addOption(select, value, key === "attack" ? historySelection.attackLabel(value)
+        : key === "backend" ? historySelection.backendLabel(value) : value));
+      select.value = filters[key];
+    });
+    renderModelChoices(resolved.models);
+    const visible = historySelection.filterRuns(catalog, filters);
+    selected = new Set(historySelection.visibleSelection(visible, Array.from(selected), selectAllVisible));
+    if (chooseLatest && !selected.size && visible.length) selected.add(visible[0].id);
     const list = document.querySelector("#history-run-list");
     list.replaceChildren();
-    document.querySelector("#history-catalog-count").textContent = catalog.length + " 项结果";
-    if (!catalog.length) {
+    document.querySelector("#history-catalog-count").textContent = visible.length + " / " + catalog.length + " 项";
+    if (!visible.length) {
       const empty = document.createElement("div");
       empty.className = "empty-state history-list-empty";
-      empty.textContent = "尚无可分析的结果";
+      empty.textContent = "当前筛选下没有结果";
       list.append(empty);
       updateSelection();
       return;
     }
-    catalog.forEach((run, index) => {
+    const groups = new Map();
+    visible.forEach(run => {
+      const key = run.result_folder + "/" + run.model_group;
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key).push(run);
+    });
+    groups.forEach((runs, group) => {
+      const heading = document.createElement("div");
+      heading.className = "history-run-group-title";
+      heading.textContent = group;
+      list.append(heading);
+      runs.forEach((run) => {
       const label = document.createElement("label");
       label.className = "history-run-option";
       const checkbox = document.createElement("input");
       checkbox.type = "checkbox";
       checkbox.className = "form-check-input history-run-cb";
       checkbox.value = run.id;
-      checkbox.checked = selected.has(run.id) || (chooseLatest && index === 0);
+      checkbox.checked = selected.has(run.id);
       const text = document.createElement("span");
       const title = document.createElement("strong");
-      title.textContent = run.label || run.source;
+      title.textContent = historySelection.attackLabel(run.attack_name);
+      label.title = (run.label || "") + " · " + run.source;
       const detail = document.createElement("small");
-      detail.textContent = (run.result_type || "results") + " · " + run.source + " · " +
-        (run.suites || []).map((item) => item.suite_name).join(", ");
+      detail.textContent = (run.benchmark_id || "历史 / unknown") + " · " + (run.suites || []).map((item) => item.suite_name).join(", ");
       text.append(title, detail);
-      label.append(checkbox, text);
+      label.append(checkbox, versionBadge(experimentStyles[run.id]), text);
       list.append(label);
+      });
     });
     updateSelection();
   }
@@ -100,15 +198,91 @@
     catalog.forEach((run) => {
       if (selected.has(run.id)) (run.suites || []).forEach((item) => available.add(item.suite_name));
     });
-    const select = document.querySelector("#history-suite-select");
-    const previous = select.value;
-    select.replaceChildren();
-    addOption(select, "all", "全部场景");
-    suites.forEach((suite) => {
-      if (available.has(suite)) addOption(select, suite, suite);
+    if (suiteSelection?.length) {
+      suiteSelection = suiteSelection.filter(suite => available.has(suite));
+      if (!suiteSelection.length) suiteSelection = null;
+    }
+    const options = document.querySelector("#history-suite-options");
+    options.replaceChildren();
+    Array.from(available).sort().forEach(suite => {
+      const label = document.createElement("label");
+      const checkbox = document.createElement("input");
+      checkbox.type = "checkbox";
+      checkbox.className = "form-check-input history-suite-cb";
+      checkbox.value = suite;
+      checkbox.checked = suiteSelection === null || suiteSelection.includes(suite);
+      const text = document.createElement("span");
+      text.textContent = suite;
+      label.append(checkbox, text);
+      options.append(label);
     });
-    select.value = available.has(previous) ? previous : "all";
+    if (!available.size) options.textContent = "请先勾选实验结果。";
+    updateExportButton();
     updateControls();
+  }
+
+  function selectedSuiteNames() {
+    return Array.from(document.querySelectorAll(".history-suite-cb:checked"), item => item.value);
+  }
+
+  function selectedRunIds() {
+    return Array.from(document.querySelectorAll(".history-run-cb:checked"), (item) => item.value);
+  }
+
+  function updateExportButton() {
+    document.querySelector("#history-export").disabled = exporting || !selectedRunIds().length || !selectedSuiteNames().length;
+  }
+
+  async function exportAnalysis() {
+    if (exporting) return;
+    const status = document.querySelector("#history-analysis-status");
+    const ids = selectedRunIds();
+    if (!ids.length) {
+      status.textContent = "请先选择至少一项历史实验结果。";
+      return;
+    }
+    const suites = selectedSuiteNames();
+    if (!suites.length) {
+      status.textContent = "请至少选择一个场景。";
+      return;
+    }
+    const button = document.querySelector("#history-export");
+    const originalLabel = button.innerHTML;
+    exporting = true;
+    updateExportButton();
+    button.setAttribute("aria-busy", "true");
+    button.textContent = "正在打包…";
+    status.textContent = "正在打包所选实验的 ASR / TSR 和任务明细…";
+    try {
+      const response = await fetch("/api/history/export", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ run_ids: ids, suites }),
+      });
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({}));
+        throw new Error(error.error || "分析数据导出失败");
+      }
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      const disposition = response.headers.get("Content-Disposition") || "";
+      const filename = disposition.match(/filename="?([a-zA-Z0-9_.-]+\.zip)"?/);
+      link.href = url;
+      link.download = filename ? filename[1] : "dscg-history-analysis.zip";
+      document.body.append(link);
+      link.click();
+      link.remove();
+      window.setTimeout(() => URL.revokeObjectURL(url), 10000);
+      status.textContent = "已生成 " + ids.length + " 项实验的分析数据，已开始下载 ZIP。解压后可将 analysis.json 交给 agent。";
+    } catch (error) {
+      status.textContent = error.message || "分析数据导出失败，请重试。";
+    } finally {
+      exporting = false;
+      button.innerHTML = originalLabel;
+      button.removeAttribute("aria-busy");
+      updateExportButton();
+    }
   }
 
   function addOption(select, value, text) {
@@ -120,26 +294,51 @@
 
   function updateControls() {
     const view = document.querySelector("#history-chart-type");
-    const metric = document.querySelector("#history-metric-select");
-    metric.disabled = view.value === "scatter" || view.value === "heatmap";
+    const metrics = selectedMetricKeys();
+    const suites = selectedSuiteNames();
+    const fixedMetrics = view.value === "scatter" || view.value === "heatmap";
+    document.querySelector("#history-metric-select").disabled = fixedMetrics;
     const radar = view.querySelector('option[value="radar"]');
-    radar.disabled = metric.value === "total_tokens" ||
-      document.querySelector("#history-suite-select").value !== "all";
+    radar.disabled = !historyCharts.canUseRadar(metrics, suites.length > 1 ? "all" : suites[0]);
     if (radar.disabled && view.value === "radar") view.value = "bar";
+    document.querySelector("#history-analyze").disabled = !selectedRunIds().length || !suites.length || (!fixedMetrics && !metrics.length);
+    document.querySelector("#history-metric-hint").textContent = fixedMetrics
+      ? (view.value === "scatter" ? "散点图固定比较 ASR 与 TSR。" : "热图固定展示逐任务效用结果。")
+      : !metrics.length ? "请至少选择一个指标。"
+        : view.value === "bar" ? "颜色区分版本，填充纹理区分攻击；点击图例可隐藏单项，悬停查看数值。"
+        : "同一模型 / 运行名称共用颜色与字母标记；点击图例可隐藏单项。雷达图仅支持多个场景的百分比指标。";
+  }
+
+  function selectedMetricKeys() {
+    return Array.from(document.querySelectorAll(".history-metric-cb:checked"), (item) => item.value);
+  }
+
+  function analysisSelectionKey() {
+    return JSON.stringify({
+      ids: selectedRunIds().sort(), filters,
+      suites: selectedSuiteNames(),
+      view: document.querySelector("#history-chart-type").value,
+      metrics: selectedMetricKeys(),
+    });
   }
 
   async function analyze() {
     const status = document.querySelector("#history-analysis-status");
-    const ids = Array.from(
-      document.querySelectorAll(".history-run-cb:checked"),
-      (item) => item.value
-    );
+    const ids = selectedRunIds();
     if (!ids.length) {
       status.textContent = "请先选择至少一项历史实验结果。";
       return;
     }
-    const suite = document.querySelector("#history-suite-select").value;
+    const suites = selectedSuiteNames();
+    if (!suites.length) {
+      status.textContent = "请至少选择一个场景。";
+      return;
+    }
     const view = document.querySelector("#history-chart-type").value;
+    const settings = { suites, view, metrics: selectedMetricKeys() };
+    const request = analysisRequests.start();
+    const selectionKey = analysisSelectionKey();
+    const isCurrent = () => analysisRequests.isCurrent(request) && selectionKey === analysisSelectionKey();
     status.textContent = "正在汇总所选结果…";
     try {
       const response = await fetch("/api/history/analyze", {
@@ -147,37 +346,43 @@
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           run_ids: ids,
-          suites: suite === "all" ? [] : [suite],
+          suites,
           include_task_records: view === "heatmap",
         }),
       });
       const data = await response.json();
+      if (!isCurrent()) return;
       if (!response.ok) throw new Error(data.error || "历史结果分析失败");
-      renderAnalysis(data);
+      renderAnalysis(data, settings);
     } catch (error) {
-      status.textContent = error.message || "历史结果分析失败。";
+      if (isCurrent()) status.textContent = error.message || "历史结果分析失败。";
     }
   }
 
-  function renderAnalysis(result) {
-    if (chart) {
-      chart.destroy();
-      chart = null;
-    }
+  function clearCharts() {
+    charts.forEach((chart) => chart.destroy());
+    charts = [];
+    document.querySelector("#history-canvas-wrap").replaceChildren();
+  }
+
+  function renderAnalysis(result, settings) {
+    clearCharts();
     const experiments = result.experiments || [];
     const rows = experiments.flatMap((run) => run.suites || []);
     renderSummaryTable(experiments);
+    renderOverview(experiments);
     if (!rows.length) {
       showEmpty("没有可绘制的指标", "所选结果中没有与当前场景匹配的汇总数据。");
       return;
     }
-    const view = document.querySelector("#history-chart-type").value;
-    const selectedSuite = document.querySelector("#history-suite-select").value;
-    const suiteTitle = selectedSuite === "all" ? "全部场景" : selectedSuite;
+    const { view, metrics, suites } = settings;
+    const selectedSuite = suites.length === 1 ? suites[0] : "all";
+    const suiteTitle = suites.length === document.querySelectorAll(".history-suite-cb").length ? "全部场景" : suites.join("、");
     const status = document.querySelector("#history-analysis-status");
     document.querySelector("#history-source-caption").textContent =
       experiments.length + " 项实验 · " + rows.length + " 个场景结果";
-    status.textContent = "已载入 " + experiments.length + " 项实验、" + rows.length + " 个场景结果。";
+    status.textContent = "已载入 " + experiments.length + " 项实验、" + rows.length + " 个场景结果。" +
+      (result.paired_comparison_ready === false ? " 基准身份或任务选择未对齐：各运行独立展示，不能合并分母或据此作配对比较。" : "");
     if (view === "heatmap") {
       renderHeatmap(experiments, suiteTitle);
       return;
@@ -187,200 +392,123 @@
     const heatmap = document.querySelector("#history-heatmap-container");
     const chartContainer = document.querySelector(".history-chart-container");
     wrap.hidden = false;
+    wrap.classList.toggle("is-dense", experiments.length > 6);
     heatmap.hidden = true;
     chartContainer.classList.add("is-ready");
-    const canvas = document.querySelector("#history-chart");
     if (view === "scatter") {
       document.querySelector("#history-chart-title").textContent = "任务效用率与攻击成功率";
-      canvas.setAttribute("aria-label", "TSR-ASR 散点图，横轴为攻击成功率，纵轴为任务效用率");
-      chart = new Chart(canvas, scatterConfig(experiments));
+      renderChartPanel(wrap, "scatter", "TSR-ASR 散点", "横轴为攻击成功率，纵轴为任务效用率", historyCharts.scatterConfig(experiments, chartTheme()));
       return;
     }
 
-    const metricKey = document.querySelector("#history-metric-select").value;
-    const [metricTitle, unit] = metricInfo[metricKey];
-    const byScenario = selectedSuite === "all";
-    const labels = byScenario
-      ? suites.filter((name) => rows.some((item) => item.suite_name === name))
-      : experiments.map((run) => run.label);
+    if (!metrics.length) {
+      showEmpty("尚未选择指标", "请至少选择一个指标，再生成分析。");
+      return;
+    }
     const chartName = { line: "折线图", bar: "分组柱状", radar: "雷达对比" }[view];
     document.querySelector("#history-chart-title").textContent =
-      metricTitle + " · " + suiteTitle + " · " + chartName;
-    canvas.setAttribute("aria-label", metricTitle + "，按场景比较 " +
-      experiments.map((run) => run.label).join("、"));
-    const readMetric = (run, name) => {
-      const item = (run.suites || []).find((entry) => entry.suite_name === name);
-      if (!item) return null;
-      return metricKey === "total_tokens"
-        ? item.overhead.total_tokens / 1000
-        : item.metrics[metricKey];
-    };
-    const datasets = byScenario
-      ? experiments.map((run, index) =>
-        makeMetricDataset(run.label, labels.map((name) => readMetric(run, name)), colorAt(index), view)
-      )
-      : [makeMetricDataset(
-        metricTitle,
-        experiments.map((run) => readMetric(run, selectedSuite)),
-        colorAt(0),
-        view
-      )];
-    chart = new Chart(canvas, {
-      type: view,
-      data: { labels, datasets },
-      options: view === "radar" ? radarOptions() : cartesianOptions(unit, metricKey !== "total_tokens"),
+      "指标对比 · " + suiteTitle + " · " + chartName + " · " + metrics.length + " 个指标";
+    const panels = historyCharts.metricConfigs(experiments, {
+      metrics, view, suite: selectedSuite, theme: chartTheme(),
+    });
+    panels.forEach((panel) => renderChartPanel(wrap, panel.metric, panel.title,
+      panel.title + "，" + suiteTitle + "，比较 " + experiments.map((run) => run.label).join("、"), panel.config));
+  }
+
+  function renderChartPanel(wrap, key, title, description, config) {
+    const panel = document.createElement("section");
+    panel.className = "history-chart-card";
+    panel.dataset.metric = key;
+    const heading = document.createElement("h3");
+    heading.id = "history-chart-title-" + key;
+    heading.textContent = title;
+    panel.setAttribute("aria-labelledby", heading.id);
+    const plot = document.createElement("div");
+    plot.className = "history-chart-plot";
+    const scroll = document.createElement("div");
+    scroll.className = "history-chart-scroll";
+    if (config.type === "bar") {
+      const grouped = config.data.datasets.some(dataset => dataset.grouped);
+      const slots = config.data.labels.length * (grouped ? config.data.datasets.length : 1);
+      // Keep enough bar width to read textures, with scrolling inside the card.
+      const width = Math.ceil(80 + slots * 14 / (grouped ? 0.66 : 1));
+      plot.style.minWidth = width + "px";
+      scroll.tabIndex = 0;
+      scroll.setAttribute("role", "region");
+      scroll.setAttribute("aria-label", title + "；密集柱状图可横向滚动");
+    }
+    const canvas = document.createElement("canvas");
+    canvas.id = "history-chart-" + key;
+    canvas.setAttribute("role", "img");
+    canvas.setAttribute("aria-label", description);
+    plot.append(canvas);
+    scroll.append(plot);
+    const legend = document.createElement("div");
+    legend.className = "history-chart-legend";
+    legend.setAttribute("aria-label", "实验图例；点击显示或隐藏对应实验");
+    panel.append(heading, legend, scroll);
+    if (config.type === "bar") {
+      const hint = document.createElement("p");
+      hint.className = "history-fill-hint";
+      hint.textContent = "颜色区分版本，填充区分攻击；零值显示细基线，精确值见悬停。";
+      panel.append(hint);
+    }
+    wrap.append(panel);
+    config.options.plugins.legend.display = false;
+    const chart = new Chart(canvas, config);
+    charts.push(chart);
+    config.data.datasets.forEach((dataset, index) => {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "history-legend-item";
+      button.title = dataset.fullLabel;
+      button.setAttribute("aria-label", dataset.identityBadge + " · " + dataset.fullLabel);
+      button.setAttribute("aria-pressed", "true");
+      const text = document.createElement("span");
+      const name = document.createElement("strong");
+      name.textContent = dataset.legendLabel;
+      const detail = document.createElement("small");
+      detail.textContent = dataset.legendSubtitle;
+      text.append(name, detail);
+      button.style.borderLeftColor = dataset.borderColor;
+      if (config.type === "bar") {
+        const swatch = document.createElement("canvas");
+        swatch.className = "history-fill-swatch";
+        swatch.setAttribute("aria-hidden", "true");
+        const ratio = window.devicePixelRatio || 1;
+        swatch.width = swatch.height = 28 * ratio;
+        const ctx = swatch.getContext("2d");
+        ctx.scale(ratio, ratio);
+        ctx.fillStyle = historyCharts.createBarFill(ctx, dataset.fillPattern, dataset.borderColor, css("--surface"));
+        ctx.fillRect(0, 0, 28, 28);
+        ctx.strokeStyle = dataset.borderColor;
+        ctx.lineWidth = 1;
+        ctx.strokeRect(0.5, 0.5, 27, 27);
+        button.append(swatch, text);
+      } else {
+        button.append(versionBadge({badge: dataset.identityBadge, color: dataset.borderColor}), text);
+      }
+      button.addEventListener("click", () => {
+        const visible = !chart.isDatasetVisible(index);
+        chart.setDatasetVisibility(index, visible);
+        button.setAttribute("aria-pressed", String(visible));
+        chart.update();
+      });
+      legend.append(button);
     });
   }
 
-  function makeMetricDataset(label, data, color, view) {
-    const dataset = {
-      label,
-      data,
-      borderColor: color,
-      backgroundColor: alpha(color, view === "radar" ? 0.16 : 0.64),
-      borderWidth: view === "line" ? 2 : 1,
-      spanGaps: false,
-    };
-    if (view === "line") {
-      Object.assign(dataset, {
-        tension: 0.28, pointRadius: 3, pointHoverRadius: 5,
-        pointBackgroundColor: color, fill: false,
-      });
-    } else if (view === "bar") {
-      Object.assign(dataset, { borderWidth: 0, borderRadius: 2, maxBarThickness: 24 });
-    } else {
-      Object.assign(dataset, { pointRadius: 3, pointHoverRadius: 5, pointBackgroundColor: color });
-    }
-    return dataset;
-  }
-
-  function scatterConfig(experiments) {
-    const datasets = experiments.map((run, index) => ({
-      label: run.label,
-      data: (run.suites || []).flatMap((item) => {
-        const xRaw = item.metrics?.attack_success_rate;
-        const yRaw = item.metrics?.utility_rate;
-        const x = Number(xRaw);
-        const y = Number(yRaw);
-        return xRaw !== null && xRaw !== undefined &&
-          yRaw !== null && yRaw !== undefined &&
-          Number.isFinite(x) && Number.isFinite(y)
-          ? [{ x, y, suite: item.suite_name }]
-          : [];
-      }),
-      backgroundColor: colorAt(index),
-      borderColor: colorAt(index),
-      pointStyle: shapes[index % shapes.length],
-      pointRadius: 5,
-      pointHoverRadius: 7,
-    }));
-    const points = datasets.flatMap((dataset) => dataset.data);
-
+  function chartTheme() {
     return {
-      type: "scatter",
-      data: {
-        datasets,
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: {
-          legend: legendOptions(),
-          tooltip: {
-            callbacks: {
-              label(context) {
-                const point = context.raw;
-                return context.dataset.label + " · " + point.suite +
-                  " · ASR " + point.x + "% / TSR " + point.y + "%";
-              },
-            },
-          },
-        },
-        scales: {
-          x: scatterScale("ASR (%)", points.map((point) => point.x)),
-          y: scatterScale("TSR (%)", points.map((point) => point.y)),
-        },
-      },
-    };
-  }
-
-  function scatterScale(title, values) {
-    const finiteValues = values.filter((value) => Number.isFinite(value));
-    const dataMin = finiteValues.length ? Math.min(...finiteValues) : 0;
-    const dataMax = finiteValues.length ? Math.max(...finiteValues) : 100;
-    const lower = Math.min(0, dataMin);
-    const upper = Math.max(100, dataMax);
-    const padding = Math.max(2, (upper - lower) * 0.05);
-
-    return {
-      type: "linear", min: lower - padding, max: upper + padding,
-      title: { display: true, text: title, color: css("--text-muted") },
-      ticks: { color: css("--text-secondary"), callback: (value) => value + "%" },
-      grid: { color: css("--border") },
-    };
-  }
-
-  function cartesianOptions(unit, isRate) {
-    return {
-      responsive: true,
-      maintainAspectRatio: false,
-      interaction: { mode: "index", intersect: false },
-      plugins: { legend: legendOptions(), tooltip: { padding: 10 } },
-      datasets: { bar: { categoryPercentage: 0.66, barPercentage: 0.58, maxBarThickness: 24 } },
-      scales: {
-        x: {
-          ticks: { color: css("--text-secondary"), maxRotation: 0, autoSkip: false },
-          grid: { display: false },
-        },
-        y: {
-          beginAtZero: true,
-          max: isRate ? 100 : undefined,
-          ticks: {
-            color: css("--text-secondary"), maxTicksLimit: 6,
-            callback: isRate ? (value) => value + "%" : undefined,
-          },
-          grid: { color: css("--border") },
-          title: { display: true, text: unit, color: css("--text-muted") },
-        },
-      },
-    };
-  }
-
-  function radarOptions() {
-    return {
-      responsive: true,
-      maintainAspectRatio: false,
-      plugins: { legend: legendOptions(), tooltip: { padding: 10 } },
-      scales: {
-        r: {
-          min: 0, max: 100,
-          angleLines: { color: css("--border") },
-          grid: { color: css("--border") },
-          pointLabels: { color: css("--text-secondary"), font: { size: 11 } },
-          ticks: {
-            stepSize: 25, color: css("--text-muted"), backdropColor: "transparent",
-            callback: (value) => value + "%",
-          },
-        },
-      },
-    };
-  }
-
-  function legendOptions() {
-    return {
-      position: "bottom",
-      labels: {
-        color: css("--text-secondary"), boxWidth: 10, boxHeight: 10,
-        padding: 14, usePointStyle: true,
-      },
+      colors: colors.map(css),
+      experimentStyles,
+      attackNames: catalog.map(run => run.attack_name),
+      text: css("--text-secondary"), muted: css("--text-muted"), border: css("--border"),
+      background: css("--surface"),
     };
   }
 
   function renderHeatmap(experiments, suiteTitle) {
-    if (chart) {
-      chart.destroy();
-      chart = null;
-    }
     const wrap = document.querySelector("#history-canvas-wrap");
     const container = document.querySelector(".history-chart-container");
     const target = document.querySelector("#history-heatmap-container");
@@ -395,10 +523,14 @@
     experiments.forEach((run) => {
       (run.suites || []).forEach((item) => {
         (item.task_records || []).forEach((record) => {
-          const key = JSON.stringify([item.suite_name, record.user_task_id, record.injection_task_id]);
+          const identity = item.benchmark;
+          const complete = identity && ["id", "repository", "revision", "suite_version", "implementation_sha256", "catalog_sha256"].every(key => identity[key]);
+          const group = complete ? JSON.stringify(Object.keys(identity).sort().map(key => [key, identity[key]])) : run.id;
+          const selection = item.task_selection ? JSON.stringify(Object.keys(item.task_selection).sort().map(key => [key, item.task_selection[key]])) : run.id;
+          const key = JSON.stringify([group, selection, item.suite_name, record.user_task_id, record.injection_task_id]);
           if (!matrix.has(key)) {
             matrix.set(key, {
-              suite: item.suite_name, user: record.user_task_id,
+              benchmark: run.benchmark_id || "unknown", suite: item.suite_name, user: record.user_task_id,
               injection: record.injection_task_id, values: new Map(),
             });
           }
@@ -424,7 +556,11 @@
     experiments.forEach((run) => {
       const cell = document.createElement("th");
       cell.scope = "col";
-      cell.textContent = run.label;
+      cell.append(versionBadge(experimentStyles[run.id]), document.createTextNode(" " + historyCharts.describeExperiment(run).label));
+      const detail = document.createElement("small");
+      detail.className = "history-table-source";
+      detail.textContent = historyCharts.describeExperiment(run).subtitle;
+      cell.append(detail);
       cell.setAttribute("aria-label", run.label + " · " + run.source);
       heading.append(cell);
     });
@@ -432,7 +568,7 @@
     table.append(head);
     const body = document.createElement("tbody");
     const sorted = Array.from(matrix.values()).sort((left, right) =>
-      suites.indexOf(left.suite) - suites.indexOf(right.suite) ||
+      left.suite.localeCompare(right.suite) ||
       left.user.localeCompare(right.user, undefined, { numeric: true }) ||
       left.injection.localeCompare(right.injection, undefined, { numeric: true })
     );
@@ -440,7 +576,7 @@
       const row = document.createElement("tr");
       const name = document.createElement("th");
       name.scope = "row";
-      name.textContent = task.suite + " / " + task.user + " / " + task.injection;
+      name.textContent = task.benchmark + " / " + task.suite + " / " + task.user + " / " + task.injection;
       row.append(name);
       experiments.forEach((run) => {
         const value = task.values.get(run.id);
@@ -460,8 +596,106 @@
     legend.textContent = "成功：效用任务通过　失败：效用任务未通过　无数据：该实验未覆盖此任务";
     target.append(legend);
     document.querySelector("#history-analysis-status").textContent =
-      "热图包含 " + matrix.size + " 个任务组合。" +
+      "热图包含 " + matrix.size + " 个任务组合；仅相同已记录基准、目录与任务选择的行对齐，身份缺失时独立展示。" +
       (truncated ? " 部分任务记录受接口上限截断。" : "");
+  }
+
+  function renderOverview(experiments) {
+    const target = document.querySelector("#history-overview");
+    target.replaceChildren();
+    const groups = historyCharts.buildOverview(experiments, catalog, experimentStyles);
+    if (!groups.length) {
+      const empty = document.createElement("p");
+      empty.className = "history-overview-empty";
+      empty.textContent = "选择结果并生成分析后查看。";
+      target.append(empty);
+      return;
+    }
+    groups.forEach(group => {
+      const section = document.createElement("section");
+      section.className = "history-overview-group";
+      section.style.setProperty("--history-attack-fill", group.fill);
+      const heading = document.createElement("h3");
+      heading.textContent = "攻击：" + historySelection.attackLabel(group.attack);
+      const grid = document.createElement("div");
+      grid.className = "history-overview-grid";
+      group.cards.forEach(card => {
+        const article = document.createElement("article");
+        article.className = "history-overview-card";
+        article.style.borderLeftColor = card.color;
+        const name = document.createElement("h4");
+        name.title = card.run.source || card.run.label || "";
+        name.append(versionBadge(experimentStyles[card.run.id]),
+          document.createTextNode(" " + historyCharts.describeExperiment(card.run).label));
+        article.append(name);
+        if (!card.rows.length) {
+          const empty = document.createElement("p");
+          empty.textContent = "所选场景无数据";
+          article.append(empty);
+        } else {
+          const table = document.createElement("table");
+          table.className = "history-overview-table";
+          const header = document.createElement("thead");
+          const headerRow = document.createElement("tr");
+          ["场景", "TSR", "ASR", "已记录 Token"].forEach(text => {
+            const cell = document.createElement("th");
+            cell.scope = "col";
+            cell.textContent = text;
+            headerRow.append(cell);
+          });
+          header.append(headerRow);
+          const body = document.createElement("tbody");
+          const showRow = (label, row, overall = false) => {
+            const tr = document.createElement("tr");
+            if (overall) tr.className = "history-overview-total";
+            const title = document.createElement("th");
+            title.scope = "row";
+            title.textContent = label;
+            tr.append(title);
+            addCell(tr, overviewRate(row?.tsr, row?.metrics?.utility_rate)).className = "history-overview-tsr";
+            addCell(tr, overviewRate(row?.asr, row?.metrics?.attack_success_rate)).className = "history-overview-asr";
+            const tokens = row?.tokens;
+            addCell(tr, Number.isFinite(tokens?.value)
+              ? tokens.value.toLocaleString("en-US") + (tokens.complete ? "" : "（部分已记录）") : "—").className = "history-overview-tokens";
+            body.append(tr);
+          };
+          if (card.total) showRow("合计", card.total, true);
+          card.rows.forEach(row => showRow(row.suite, row));
+          table.append(header, body);
+          const scroll = document.createElement("div");
+          scroll.className = "history-overview-table-scroll";
+          scroll.tabIndex = 0;
+          scroll.setAttribute("role", "region");
+          scroll.setAttribute("aria-label", historyCharts.describeExperiment(card.run).label + " 数据表，可横向滚动");
+          scroll.append(table);
+          article.append(scroll);
+          if (!card.total && card.rows.length > 1) {
+            const note = document.createElement("p");
+            note.className = "history-overview-note";
+            note.textContent = "基准身份不完整或不一致，按场景展示。";
+            article.append(note);
+          }
+          if (card.rows.some(row => row.asr?.derived)) {
+            const note = document.createElement("p");
+            note.className = "history-overview-note";
+            note.textContent = "* ASR 成功数由已记录比率和有效数唯一还原。";
+            article.append(note);
+          }
+        }
+        grid.append(article);
+      });
+      section.append(heading, grid);
+      target.append(section);
+    });
+  }
+
+  function overviewRate(metric, reported) {
+    const numerator = Number.isInteger(metric?.numerator) ? metric.numerator.toLocaleString("en-US") : "—";
+    const denominator = Number.isInteger(metric?.denominator) ? metric.denominator.toLocaleString("en-US") : "—";
+    const percent = metric?.denominator === 0 ? null : Number.isInteger(metric?.numerator) && metric.denominator > 0
+      ? metric.numerator * 100 / metric.denominator : reported;
+    const rate = Number.isFinite(percent) ? percent.toFixed(2) + "%" : "N/A";
+    return numerator + " / " + denominator + " · " + rate + (metric?.derived ? "*" : "");
   }
 
   function renderSummaryTable(experiments) {
@@ -473,7 +707,7 @@
     if (!rows.length) {
       const row = document.createElement("tr");
       const cell = document.createElement("td");
-      cell.colSpan = 7;
+      cell.colSpan = 8;
       cell.textContent = "尚无分析数据";
       row.append(cell);
       body.append(row);
@@ -483,12 +717,13 @@
       const row = document.createElement("tr");
       const nameCell = document.createElement("td");
       const name = document.createElement("strong");
-      name.textContent = run.label;
+      name.textContent = historyCharts.describeExperiment(run).label;
       const source = document.createElement("small");
       source.className = "history-table-source";
-      source.textContent = run.source;
-      nameCell.append(name, source);
+      source.textContent = (run.benchmark_id || "unknown") + " · " + run.source;
+      nameCell.append(versionBadge(experimentStyles[run.id]), name, source);
       row.append(nameCell);
+      addCell(row, historySelection.attackLabel(run.attack_name));
       addCell(row, item.suite_name);
       addCell(row, formatRate(item.metrics.utility_rate));
       addCell(row, formatRate(item.metrics.attack_success_rate));
@@ -503,6 +738,7 @@
     const cell = document.createElement("td");
     cell.textContent = text;
     row.append(cell);
+    return cell;
   }
 
   function formatRate(value) {
@@ -510,6 +746,7 @@
   }
 
   function showEmpty(title, description) {
+    clearCharts();
     document.querySelector("#history-canvas-wrap").hidden = true;
     document.querySelector("#history-heatmap-container").hidden = true;
     document.querySelector(".history-chart-container").classList.remove("is-ready");
@@ -523,17 +760,4 @@
     return getComputedStyle(document.documentElement).getPropertyValue(token).trim() || "#74817d";
   }
 
-  function colorAt(index) {
-    return css(colors[index % colors.length]);
-  }
-
-  function alpha(color, value) {
-    const match = color.match(/^#([0-9a-f]{6})$/i);
-    if (!match) return color;
-    const hex = match[1];
-    const red = parseInt(hex.slice(0, 2), 16);
-    const green = parseInt(hex.slice(2, 4), 16);
-    const blue = parseInt(hex.slice(4, 6), 16);
-    return "rgba(" + red + ", " + green + ", " + blue + ", " + value + ")";
-  }
 })();

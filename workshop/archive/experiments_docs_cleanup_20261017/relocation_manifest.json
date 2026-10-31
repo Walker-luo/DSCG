@@ -1,0 +1,158 @@
+{
+  "schema_version": "dscg.experiments-docs-cleanup.v1",
+  "base_revision": "9f385a3433f6d09bb7c9b278258ecc43f34e62c8",
+  "initial_working_tree": " M AGENTS.md\n M docs/evaluation.md\n M docs/full_benchmark.md\n M docs/injection_precheck.md\n M docs/model_tool_configuration.md\n M experiments/injection_cohort.py\n M experiments/injection_cohort_compatibility.json\n M experiments/partial_controls.py\n M experiments/partial_reporting.py\n M experiments/run_partial_benchmark.py\n M tests/test_injection_precheck.py\n M workshop/README.md\n?? tests/test_partial_cohort.py\n?? tests/test_partial_suites.py\n?? workshop/completed/partial_cohort_20261017.md\n?? workshop/completed/partial_suites_20261017.md\n",
+  "scope": "retire dated helpers; organize current guides; no runner, model or scoring changes",
+  "entries": [
+    {
+      "path": "experiments/plots/__init__.py",
+      "original_storage": "workshop/archive/experiments_docs_cleanup_20261017/originals/experiments/plots/__init__.py",
+      "sha256_before": "cf937b9fed7f8e322194830917413d8f90d12152e47f350bdcb8e63c8da01749",
+      "action": "retire",
+      "reason": "Retired package for fixed historical plots; no live imports."
+    },
+    {
+      "path": "experiments/plots/draw_ablation.py",
+      "original_storage": "workshop/archive/experiments_docs_cleanup_20261017/originals/experiments/plots/draw_ablation.py",
+      "sha256_before": "a242f195c910c499b5bf212fd3f19276a59c99faab1350fb01a8e14fdcbcb313",
+      "action": "retire",
+      "reason": "Hardcoded historical ablation numbers; no result ingestion or explicit output override."
+    },
+    {
+      "path": "experiments/plots/draw_combined.py",
+      "original_storage": "workshop/archive/experiments_docs_cleanup_20261017/originals/experiments/plots/draw_combined.py",
+      "sha256_before": "d946471b27550fcbbfad35cb8c72c2d5b0bf59bc2e5a6a5ab2fa849023de8f06",
+      "action": "retire",
+      "reason": "Hardcoded old comparison numbers; duplicate combined rendering, no result ingestion."
+    },
+    {
+      "path": "experiments/plots/draw_comparison.py",
+      "original_storage": "workshop/archive/experiments_docs_cleanup_20261017/originals/experiments/plots/draw_comparison.py",
+      "sha256_before": "4fb2b854fa88c112ae3451cbdf2cf7b9549637a618b4106286325f53eecee0f5",
+      "action": "retire",
+      "reason": "Hardcoded old comparison numbers; no current result binding."
+    },
+    {
+      "path": "experiments/plots/draw_cost.py",
+      "original_storage": "workshop/archive/experiments_docs_cleanup_20261017/originals/experiments/plots/draw_cost.py",
+      "sha256_before": "d44def8fb4324fef01292ed8c631a4292ddd8edd74f0767782a98a16183e4ebf",
+      "action": "retire",
+      "reason": "Hardcoded old token/currency arrays; not current cost measurement."
+    },
+    {
+      "path": "experiments/payload_reporting_probe.py",
+      "original_storage": "workshop/archive/experiments_docs_cleanup_20261017/originals/experiments/payload_reporting_probe.py",
+      "sha256_before": "cfe5b33eaef71e789804326175c1d314205c1742db15cdeca7bd441932d555d7",
+      "action": "retire",
+      "reason": "2026-10-12 stage-specific model probe using fixed historical fixture/trace paths."
+    },
+    {
+      "path": "experiments/payload_reporting_frozen_cases.py",
+      "original_storage": "workshop/archive/experiments_docs_cleanup_20261017/originals/experiments/payload_reporting_frozen_cases.py",
+      "sha256_before": "8fa65316051340e6b3df02f328327b9861ccc18d0234deb92107d3aefdf9e43f",
+      "action": "retire",
+      "reason": "2026-10-12 replay tied to dated diagnostic outputs and historical run names."
+    },
+    {
+      "path": "docs/figures/README.md",
+      "original_storage": "workshop/archive/experiments_docs_cleanup_20261017/originals/docs/figures/README.md",
+      "sha256_before": "6b4f3953b2c4f11904e372e1f0c49b6351192d4217d435a347a3933f0fbe818d",
+      "action": "retire",
+      "reason": "Obsolete current plotting entry; original charts already separately archived."
+    },
+    {
+      "path": "docs/README.md",
+      "original_storage": "workshop/archive/experiments_docs_cleanup_20261017/originals/docs/README.md",
+      "sha256_before": "2e601888a526d7b18335ca653201a3c0ac2650af6e70801f008557d2930ea054",
+      "action": "edit_current_document",
+      "reason": "Current index/guide link organization; preserve original bytes.",
+      "sha256_after": "9e5e6ded5a60a98cb58196619562b8be71ec44dc7440631f34d9aee82a4b378d"
+    },
+    {
+      "path": "docs/evaluation.md",
+      "original_storage": "workshop/archive/experiments_docs_cleanup_20261017/originals/docs/evaluation.md",
+      "sha256_before": "bc7960b70f1bb0e64800588aea4b807530cb1be3c2533e886a0d73f64bf6ee30",
+      "action": "edit_current_document",
+      "reason": "Current index/guide link organization; preserve original bytes.",
+      "sha256_after": "28e5e398b6da99bd3732730d28a4151d73cd7dfacaf75f45ce58b59273383315"
+    },
+    {
+      "path": "docs/framework_updates.md",
+      "original_storage": "workshop/archive/experiments_docs_cleanup_20261017/originals/docs/framework_updates.md",
+      "sha256_before": "14168b0aa5d5cf6e493f5e8190d45ee1bd85104ad595c700c86a8bd7f510b0b0",
+      "action": "edit_current_document",
+      "reason": "Current index/guide link organization; preserve original bytes.",
+      "sha256_after": "2d76f6a265f2bad61326ab5f1ce71dcdb86b956666c5f9120f623f6cda333fab"
+    },
+    {
+      "path": "workshop/completed/defense_regression_analysis_20261012.md",
+      "original_storage": "workshop/archive/experiments_docs_cleanup_20261017/originals/workshop/completed/defense_regression_analysis_20261012.md",
+      "sha256_before": "3b18565bba4de2433dc5538cab3678c56ea2f6e2631f40e7c373bead7488d1d0",
+      "action": "edit_current_document",
+      "reason": "Current index/guide link organization; preserve original bytes.",
+      "sha256_after": "a5618635376a14b3e12701f8d6879abd8cc74958fcd2b0fb383d88242f244888"
+    },
+    {
+      "path": "AGENTS.md",
+      "original_storage": "workshop/archive/experiments_docs_cleanup_20261017/originals/AGENTS.md",
+      "sha256_before": "df71e47ff261cced5379922e20f05f79435ecbaf37bd3cd5a06c92914580bfc2",
+      "action": "edit_current_document",
+      "reason": "Current index/guide link organization; preserve original bytes.",
+      "sha256_after": "4fc35c039598fb334b50f060f5c8c0a967a18520a2bcad20391e81036e6a783e"
+    },
+    {
+      "path": "workshop/README.md",
+      "original_storage": "workshop/archive/experiments_docs_cleanup_20261017/originals/workshop/README.md",
+      "sha256_before": "23f0e8eb59767396434a6b7daf830811a0d436f5197e6c52dac8ef795e6772a9",
+      "action": "edit_current_document",
+      "reason": "Current index/guide link organization; preserve original bytes.",
+      "sha256_after": "e8ec790d4b139d669d1ca1b9378daa363a0cf52055093a0206b2475246384927"
+    }
+  ],
+  "retained_experiments_sha256": {
+    "experiments/__init__.py": "b7a9a305f5ad494cf8aa9d34b3c797b02fd3c5b8e1d692aa440132c6c787695d",
+    "experiments/calibrate_l3_router.py": "f53ab2a8ba450e6c7b10714880adcb98cbed53639aa69cc94764f9bdf470af7c",
+    "experiments/generate_tool_metadata.py": "efb9c73b8d5f0d7fb3d8789414c9127588e01a5b75c2c70f4d56d8b2424ce181",
+    "experiments/harness_audit.py": "1ca4b7a26e0855cb466ea908a363c790ab46a6de9c9af49bd1d95e1a75e7b534",
+    "experiments/i3_p0_stress.py": "cbd7d126dafc2246353fd841a11fd7596301a0d89efc2adbc5df7af64f5d2945",
+    "experiments/injection_cohort.py": "c9c0de37d9fce44fbb4bc026e68073c17d9093f84bf67673a7a7242bd33e9b23",
+    "experiments/injection_cohort_compatibility.json": "64a08563df91e629528817839947dc50e3db5b85c783fffbcdc6fc22081b255f",
+    "experiments/l3_router_dataset.py": "6e5bd43e8e4d28f8d4436f60dcbd23d2c1a6a6f79025023b05d737f9f41c7463",
+    "experiments/partial_controls.py": "4a5b8264ae1b906d621730b78a329c583f36cfd05226040280c6786939dc4bde",
+    "experiments/partial_reporting.py": "f6a95be8adb6db1ff586312b78debe5f60790ee961cde4c3ae3eb68c48fc4a95",
+    "experiments/run_benchmark.py": "a932b1a149791dd350770437dcb36e6ff5228cce786ba2c991ced27b9661dd14",
+    "experiments/run_injection_precheck.py": "f045f75aeb39ca922e8098c38057aeb1b72ab74cd99e907d6e2072589d842488",
+    "experiments/run_partial_benchmark.py": "133198cbdd80af7cd408b0ed635b32f703920f01b92b890c038fe35d2ec0efca",
+    "experiments/trace_diagnostics.py": "dd6da037739ea0c016a33cf007c7fc97a0ad5c680e02d20a162d4c3bec954994"
+  },
+  "protected_dscg_sha256": {
+    "dscg/audit_router.py": "750c718ad0bc951b291113a8da795e44a73fd6d23abb658c0b0bac53b718aa98",
+    "dscg/harness_records.py": "679c446a89d2e668145ece1d7d5b82ac268580f9004e71c43b7bdbfc0fa405a7",
+    "dscg/audit_context.py": "1a8cb9dd553963734dfba41cd8054cf0b0e1a0f8a6500ab0753694a306dd538b",
+    "dscg/model_config.py": "fb2d7bf48d6507dbcbb15ffc15f3f05582ceefd6e376a4e0d2d7b37f4f83f620",
+    "dscg/paths.py": "be9445576a972e722be89834b72b0717f4e1475adf12fd601803f8660187ae13",
+    "dscg/tool_metadata.py": "9802d5af6f1882b81ba747583fc612959fb5e68e89182ab24c4ecb51b9d441f1",
+    "dscg/l1_projection.py": "abec0602e5813443b90ceef9fea456ba8dc2e8efdb4bbf2b658db8aadc29239c",
+    "dscg/__init__.py": "ac228319829d4f1c4b9e32d904efaa78065f7f7fd6da1086a5a181c7515bd961",
+    "dscg/token_tracking.py": "6518055d80f31145f539360c61ef403b55515cdd0832df01f8e56042dc604728",
+    "dscg/l2_authorization.py": "f1d11ce9abddd765bd76812904ccbc1e328604e13a356844400c75823b50686b",
+    "dscg/input_isolation.py": "3bfdd29882b7eb45f77705c0e68db653fae5b45914a3b89135a1c8af81b663e0",
+    "dscg/pipelines/defended.py": "e0eec15ba00c96f85fcc0c1ab7b603ee47562e3e7e4d986843708d1a8bfe3d8c",
+    "dscg/pipelines/baseline.py": "253d8b1581749a30dec0c953e5f4bdafdf9693a5d5e42b291b1c2f2bc321cfcd",
+    "dscg/pipelines/__init__.py": "35dca586fe37f5229ec2c13805a2b46b46d342a272ed24ffde7df2cafc0b2209"
+  },
+  "preserved_legacy_symlinks": [
+    {
+      "path": "docs/framework_v2_followup_report.md",
+      "sha256": "a4dfca808d7ebc9b6e95527e64232d5ed3bec966cce1a560605063f3e315168a",
+      "symlink": "../workshop/archive/original_documents/DSCG/docs/framework_v2_followup_report.md"
+    }
+  ],
+  "generated_bytecode_removed": 28,
+  "new_documents": {
+    "experiments/README.md": "ac3e85c979013f4d7c9e360af0a1ea20b436720b84fb759bea064d90ca336939",
+    "workshop/archive/experiments_docs_cleanup_20261017/README.md": "7c2a104972c94c2592f39bc924bfd5a94498d8a3289c916fae5b97c22b3c7745",
+    "workshop/completed/experiments_docs_cleanup_20261017.md": "2116125f0eac6bf9cc927864a4c923ec09d586fd5027da5a089185829d632fda"
+  },
+  "historical_verifier": "Existing README.md hash failure both before and after; old manifests and validator preserved."
+}

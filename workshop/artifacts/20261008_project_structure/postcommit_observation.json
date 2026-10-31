@@ -1,0 +1,67 @@
+{
+  "recorded_at": "2026-10-08T08:52:49.548707+00:00",
+  "status": "documentation_checks_pass_with_external_result_snapshot_drift",
+  "scope": "Postcommit observation; not a mechanism or benchmark validation",
+  "cleanup_commit": "359a0376268e311b8d51ce58646a5a7d94dc3738",
+  "last_successful_structure_check_utc": "2026-10-08T08:42:57.095796+00:00",
+  "commands": [
+    {
+      "command": "/opt/miniconda3/envs/ipi/bin/python workshop/verify_migration.py",
+      "exit_code": 0,
+      "expected_current_exit": 0,
+      "output": "{\"status\": \"pass\", \"document_count\": 11, \"artifact_count\": 282, \"moved_file_hashes_checked\": 293, \"retired_legacy_aliases_checked\": 4, \"historical_documents_archived\": 3, \"local_links_checked\": 93, \"python_artifact_syntax_checked\": 41, \"script_root_depths_checked\": 22, \"runtime_changed\": false, \"raw_result_roots_moved\": 0}\n"
+    },
+    {
+      "command": "/opt/miniconda3/envs/ipi/bin/python workshop/artifacts/20261008_project_structure/verify_structure.py",
+      "exit_code": 1,
+      "expected_current_exit": 1,
+      "output": "Traceback (most recent call last):\n  File \"/Users/luo/Desktop/AgentDefence/DSCG/workshop/artifacts/20261008_project_structure/verify_structure.py\", line 47, in <module>\n    assert inventory(ROOT/name) == expected, name\nAssertionError: results\n"
+    }
+  ],
+  "current_inventories": {
+    "results": {
+      "files": 913,
+      "size_mtime_sha256": "eb9f11980dde4b26b73909cb1c9982da16535cb7184f9cdef2b7e355d842ab58",
+      "matches_initial": false
+    },
+    "download": {
+      "files": 13,
+      "size_mtime_sha256": "9a3117d157121b823ec758a4cc5924af96916c5b67f6157b25620f80986bad72",
+      "matches_initial": true
+    }
+  },
+  "paths_with_new_ctime": [
+    {
+      "path": "results/partial_benchmark",
+      "kind": "directory",
+      "ctime_utc": "2026-10-08T08:44:01.735152+00:00",
+      "mtime_utc": "2026-10-08T08:44:01.735152+00:00"
+    },
+    {
+      "path": "results/partial_benchmark/deepseek-flash_workshop_3.0(2layer)",
+      "kind": "directory",
+      "ctime_utc": "2026-10-08T08:44:01.735152+00:00",
+      "mtime_utc": "2026-10-07T13:46:05.780844+00:00"
+    },
+    {
+      "path": "results/partial_benchmark/deepseek-flash_workshop_2.0",
+      "kind": "directory",
+      "ctime_utc": "2026-10-08T08:43:51.779689+00:00",
+      "mtime_utc": "2026-10-07T04:03:09.732089+00:00"
+    }
+  ],
+  "protected_tracked_hashes_passed": 67,
+  "archived_material_hashes_passed": 21,
+  "baseline_snapshot_hashes_passed": 6,
+  "prior_migration_evidence_hashes_passed": 5,
+  "original_migration_hashes_passed": 293,
+  "new_model_calls": 0,
+  "new_benchmark_samples": 0,
+  "interpretation": "Two result run-directory ctimes changed after the last successful check. Current names are workshop_2.0 and workshop_3.0(2layer);913file count is retained, no file ctimes after that check observed. This is consistent with outside-task directory renames; agent calls did not rename/write result roots. Strict initial results metadata digest no longer matches and remains a recorded failure rather than being reset.",
+  "limitations": [
+    "No complete initial per-file list was stored, only digest; exact inverse rename mapping was not established.",
+    "No full raw result content hash check; unchanged file count/old file ctimes do not establish complete content identity.",
+    "The frozen one-time structure verifier intentionally remains strict and exits1 after external result-root drift; current docs/archive checks pass separately.",
+    "No root result data is restored, overwritten or renamed by this follow-up."
+  ]
+}

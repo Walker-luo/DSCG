@@ -1,0 +1,418 @@
+{
+  "status": "pass",
+  "scope": "Documentation/layout and validation CLI; no framework change",
+  "archived_files_checked": 21,
+  "baseline_snapshots_checked": 6,
+  "retired_aliases_checked": 4,
+  "protected_tracked_file_hashes_checked": 67,
+  "previous_migration_evidence_hashes_checked": 5,
+  "original_relocated_hashes_checked": 293,
+  "new_local_links_checked": 89,
+  "active_docs_entries": [
+    "README.md",
+    "dashboard.md",
+    "evaluation.md",
+    "figures/README.md",
+    "framework_v2_followup_report.md",
+    "i3_p0_stress_report.md"
+  ],
+  "raw_result_inventories_unchanged": {
+    "results": {
+      "files": 913,
+      "size_mtime_sha256": "7132669037ff4e1fb96b068444272f8b07ba425d564ce66f58e5c02c6dac0298"
+    },
+    "download": {
+      "files": 13,
+      "size_mtime_sha256": "9a3117d157121b823ec758a4cc5924af96916c5b67f6157b25620f80986bad72"
+    }
+  },
+  "new_model_calls": 0,
+  "new_benchmark_samples": 0,
+  "runtime_tests_run": 0,
+  "validation_cli_controls": [
+    {
+      "command": "/opt/miniconda3/envs/ipi/bin/python workshop/verify_migration.py",
+      "exit_code": 0,
+      "expected_exit_code": 0,
+      "output": "{\"status\": \"pass\", \"document_count\": 11, \"artifact_count\": 282, \"moved_file_hashes_checked\": 293, \"retired_legacy_aliases_checked\": 4, \"historical_documents_archived\": 3, \"local_links_checked\": 93, \"python_artifact_syntax_checked\": 41, \"script_root_depths_checked\": 22, \"runtime_changed\": false, \"raw_result_roots_moved\": 0}\n"
+    },
+    {
+      "command": "/opt/miniconda3/envs/ipi/bin/python workshop/verify_migration.py --output /Users/luo/Desktop/AgentDefence/DSCG/workshop/artifacts/20261008_project_structure/migration_validation.json",
+      "exit_code": 2,
+      "expected_exit_code": 2,
+      "output": "usage: verify_migration.py [-h] [--output OUTPUT]\nverify_migration.py: error: --output must be a new file under workshop/artifacts/; historical reports cannot be overwritten\n"
+    },
+    {
+      "command": "/opt/miniconda3/envs/ipi/bin/python workshop/verify_migration.py --output results/forbidden_migration.json",
+      "exit_code": 2,
+      "expected_exit_code": 2,
+      "output": "usage: verify_migration.py [-h] [--output OUTPUT]\nverify_migration.py: error: --output must be a new file under workshop/artifacts/; historical reports cannot be overwritten\n"
+    }
+  ],
+  "checked_links": [
+    {
+      "document": "README.md",
+      "target": "./dscg/pipelines/defended.py"
+    },
+    {
+      "document": "README.md",
+      "target": "./workshop/README.md"
+    },
+    {
+      "document": "README.md",
+      "target": "./docs/i3_p0_stress_report.md"
+    },
+    {
+      "document": "README.md",
+      "target": "../research/technical_route.md"
+    },
+    {
+      "document": "README.md",
+      "target": "./config/models.example.toml"
+    },
+    {
+      "document": "README.md",
+      "target": "./docs/evaluation.md"
+    },
+    {
+      "document": "README.md",
+      "target": "./docs/evaluation.md"
+    },
+    {
+      "document": "README.md",
+      "target": "./docs/dashboard.md"
+    },
+    {
+      "document": "README.md",
+      "target": "./docs/README.md"
+    },
+    {
+      "document": "README.md",
+      "target": "./workshop/README.md"
+    },
+    {
+      "document": "README.md",
+      "target": "./AGENTS.md"
+    },
+    {
+      "document": "README.md",
+      "target": "../research/technical_route.md"
+    },
+    {
+      "document": "README.md",
+      "target": "../research/paper/implementation_status.md"
+    },
+    {
+      "document": "AGENTS.md",
+      "target": "../research/technical_route.md"
+    },
+    {
+      "document": "AGENTS.md",
+      "target": "../research/paper/implementation_status.md"
+    },
+    {
+      "document": "AGENTS.md",
+      "target": "./docs/README.md"
+    },
+    {
+      "document": "AGENTS.md",
+      "target": "./workshop/README.md"
+    },
+    {
+      "document": "AGENTS.md",
+      "target": "./workshop/3_layer_opt.md"
+    },
+    {
+      "document": "AGENTS.md",
+      "target": "./workshop/3_layer_sources_20261008.json"
+    },
+    {
+      "document": "AGENTS.md",
+      "target": "./workshop/README.md"
+    },
+    {
+      "document": "RESEARCH_STATUS.md",
+      "target": "../research/"
+    },
+    {
+      "document": "RESEARCH_STATUS.md",
+      "target": "../research/technical_route.md"
+    },
+    {
+      "document": "RESEARCH_STATUS.md",
+      "target": "../research/paper/implementation_status.md"
+    },
+    {
+      "document": "RESEARCH_STATUS.md",
+      "target": "./workshop/README.md"
+    },
+    {
+      "document": "RESEARCH_STATUS.md",
+      "target": "./AGENTS.md"
+    },
+    {
+      "document": "RESEARCH_STATUS.md",
+      "target": "../research/paper/Paper_TODO.md"
+    },
+    {
+      "document": "workshop/README.md",
+      "target": "../../research/technical_route.md"
+    },
+    {
+      "document": "workshop/README.md",
+      "target": "./framework_v2_followup_report.md"
+    },
+    {
+      "document": "workshop/README.md",
+      "target": "./framework_v2_report.md"
+    },
+    {
+      "document": "workshop/README.md",
+      "target": "./3_layer_opt.md"
+    },
+    {
+      "document": "workshop/README.md",
+      "target": "./3_layer_sources_20261008.json"
+    },
+    {
+      "document": "workshop/README.md",
+      "target": "./project_structure_20261008.md"
+    },
+    {
+      "document": "workshop/README.md",
+      "target": "../results/"
+    },
+    {
+      "document": "workshop/README.md",
+      "target": "../download/"
+    },
+    {
+      "document": "workshop/README.md",
+      "target": "../AGENTS.md"
+    },
+    {
+      "document": "workshop/README.md",
+      "target": "./framework_optimization_report.md"
+    },
+    {
+      "document": "workshop/README.md",
+      "target": "./framework_optimization_20261007.md"
+    },
+    {
+      "document": "workshop/README.md",
+      "target": "./framework_optimization_review_20261007.md"
+    },
+    {
+      "document": "workshop/README.md",
+      "target": "./framework_optimization_direction_20261007.md"
+    },
+    {
+      "document": "workshop/README.md",
+      "target": "./framework_optimization_v2_proposal_20261007.md"
+    },
+    {
+      "document": "workshop/README.md",
+      "target": "./workshop_optimization_report.md"
+    },
+    {
+      "document": "workshop/README.md",
+      "target": "./2026-10-05-workshop-engineering-optimization.md"
+    },
+    {
+      "document": "workshop/README.md",
+      "target": "./ALMML_sub.md"
+    },
+    {
+      "document": "workshop/README.md",
+      "target": "./references/AIMLL WS.pdf"
+    },
+    {
+      "document": "workshop/README.md",
+      "target": "./archive/project_structure_20261008/README.md"
+    },
+    {
+      "document": "workshop/README.md",
+      "target": "./results/framework_optimization/"
+    },
+    {
+      "document": "workshop/README.md",
+      "target": "./results/materials_migration_20261008/migration_manifest.json"
+    },
+    {
+      "document": "workshop/README.md",
+      "target": "./artifacts/20261008_project_structure/structure_manifest.json"
+    },
+    {
+      "document": "workshop/project_structure_20261008.md",
+      "target": "../AGENTS.md"
+    },
+    {
+      "document": "workshop/project_structure_20261008.md",
+      "target": "../../research/technical_route.md"
+    },
+    {
+      "document": "workshop/archive/project_structure_20261008/README.md",
+      "target": "./docs/history_version_identity_report.md"
+    },
+    {
+      "document": "workshop/archive/project_structure_20261008/README.md",
+      "target": "./docs/history_multiselect_page_report.md"
+    },
+    {
+      "document": "workshop/archive/project_structure_20261008/README.md",
+      "target": "./docs/history_attack_filter_report.md"
+    },
+    {
+      "document": "workshop/archive/project_structure_20261008/README.md",
+      "target": "./docs/history_export_report.md"
+    },
+    {
+      "document": "workshop/archive/project_structure_20261008/README.md",
+      "target": "./docs/history_separate_report.md"
+    },
+    {
+      "document": "workshop/archive/project_structure_20261008/README.md",
+      "target": "./docs/history_metrics_report.md"
+    },
+    {
+      "document": "workshop/archive/project_structure_20261008/README.md",
+      "target": "./docs/partial_attack_report.md"
+    },
+    {
+      "document": "workshop/archive/project_structure_20261008/README.md",
+      "target": "./docs/DSCG项目介绍.md"
+    },
+    {
+      "document": "workshop/archive/project_structure_20261008/README.md",
+      "target": "./docs/DSCG项目介绍.docx"
+    },
+    {
+      "document": "workshop/archive/project_structure_20261008/README.md",
+      "target": "./docs/notes/提示词草稿.txt"
+    },
+    {
+      "document": "workshop/archive/project_structure_20261008/README.md",
+      "target": "./docs/figures/"
+    },
+    {
+      "document": "workshop/archive/project_structure_20261008/README.md",
+      "target": "./Paper_TODO.md"
+    },
+    {
+      "document": "workshop/archive/project_structure_20261008/README.md",
+      "target": "./before/"
+    },
+    {
+      "document": "workshop/archive/project_structure_20261008/README.md",
+      "target": "../../ALMML_sub.md"
+    },
+    {
+      "document": "workshop/archive/project_structure_20261008/README.md",
+      "target": "../../references/"
+    },
+    {
+      "document": "workshop/archive/project_structure_20261008/README.md",
+      "target": "../../artifacts/20261008_project_structure/structure_manifest.json"
+    },
+    {
+      "document": "workshop/archive/project_structure_20261008/README.md",
+      "target": "../../../docs/README.md"
+    },
+    {
+      "document": "workshop/archive/project_structure_20261008/README.md",
+      "target": "../../README.md"
+    },
+    {
+      "document": "docs/README.md",
+      "target": "../README.md"
+    },
+    {
+      "document": "docs/README.md",
+      "target": "./evaluation.md"
+    },
+    {
+      "document": "docs/README.md",
+      "target": "./dashboard.md"
+    },
+    {
+      "document": "docs/README.md",
+      "target": "./i3_p0_stress_report.md"
+    },
+    {
+      "document": "docs/README.md",
+      "target": "./figures/README.md"
+    },
+    {
+      "document": "docs/README.md",
+      "target": "../workshop/README.md"
+    },
+    {
+      "document": "docs/README.md",
+      "target": "../workshop/archive/project_structure_20261008/README.md"
+    },
+    {
+      "document": "docs/README.md",
+      "target": "../workshop/framework_v2_followup_report.md"
+    },
+    {
+      "document": "docs/README.md",
+      "target": "../workshop/artifacts/20261008_project_structure/structure_manifest.json"
+    },
+    {
+      "document": "docs/dashboard.md",
+      "target": "../workshop/archive/project_structure_20261008/README.md"
+    },
+    {
+      "document": "docs/dashboard.md",
+      "target": "../dashboard/"
+    },
+    {
+      "document": "docs/evaluation.md",
+      "target": "../config/models.example.toml"
+    },
+    {
+      "document": "docs/evaluation.md",
+      "target": "../dscg/model_config.py"
+    },
+    {
+      "document": "docs/evaluation.md",
+      "target": "../config/tools.agentdojo-v1.2.toml"
+    },
+    {
+      "document": "docs/evaluation.md",
+      "target": "../README.md"
+    },
+    {
+      "document": "docs/evaluation.md",
+      "target": "./i3_p0_stress_report.md"
+    },
+    {
+      "document": "docs/evaluation.md",
+      "target": "../workshop/framework_v2_followup_report.md"
+    },
+    {
+      "document": "docs/figures/README.md",
+      "target": "../../experiments/plots/"
+    },
+    {
+      "document": "docs/figures/README.md",
+      "target": "../../workshop/archive/project_structure_20261008/docs/figures/"
+    },
+    {
+      "document": "docs/i3_p0_stress_report.md",
+      "target": "../tests/fixtures/i3_p0_stress_cases.json"
+    },
+    {
+      "document": "docs/i3_p0_stress_report.md",
+      "target": "../examples/results/i3_p0_stress/20261006_01a10fca/"
+    }
+  ],
+  "structure_manifest_sha256": "5177cc942528dd69a330bd2d7f7148502b7056c964c1f1ed7afbd24161aff884",
+  "limitations": [
+    "No live model, benchmark or security gate validation; current I3 partial and E0 pending remain unchanged.",
+    "Historical text is archived unchanged and may contain stale references/commands; current guides are separate.",
+    "Raw result tree checks compare file names, sizes and mtimes; they do not rehash every large result file.",
+    "Historical relocation hash check relies on retained local ignored evidence; fresh Git clones lack some of those inputs.",
+    "New output routing is an agent instruction; existing user runner/plot defaults are unchanged."
+  ]
+}

@@ -1,0 +1,286 @@
+{
+  "schema_version": 1,
+  "dscg_base_revision": "45583495382fe218b5911d477ea897082ed6175f",
+  "scope": "Documentation/layout only; archived originals are historical, not current instructions",
+  "artifact_policy": "workshop/artifacts/<YYYYMMDD>_<task>/",
+  "protected_tracked_files": {
+    "assets/fonts/SimHei.ttf": "336a838f4a78e150826be608dae69de59d50948c3d2b71760e096ae764154bdc",
+    "config/models.example.toml": "1c09c8db44cef88da0443b5bfe019a2d946365cae4df6fed94ace9f88433a0cf",
+    "config/paper/baseline.yaml": "35cf390be816d609c556154c1960b527155b6b6d92aa44450ee3bdbb027dc897",
+    "config/paper/protocol.yaml": "14237ad41d87ec2b28081c8339487cbdab0f5a92f23dbdf01505d611f927a4ff",
+    "config/paper/run_metadata.schema.yaml": "83fb7e2b590134c11a064ef7ba2e64a2a39ae03e80b2e953aac5b5d0fdcda182",
+    "config/paper/task_manifest.yaml": "fd5284c5e2497fe151a0b30670524c0c8f1670ee909bff07079a04937c33edbe",
+    "config/tools.agentdojo-v1.2.toml": "c9e955264de67c78fd15293883c232b46bc2664e7cd019020911dead7ca143e2",
+    "config/tools.example.toml": "709bed5fec7b83955b5eb76005245587f16f3ab12637ccd4fbfc17cca70a90af",
+    "dashboard/__init__.py": "fec27e47326f11c94b3da47952a2f46a7612e7502426b7f18b2d80aa475e2dd1",
+    "dashboard/app.py": "662819b0589c66c2ffd9808d8fc0b8c51a82acbe815f790f1614d1d1acf60716",
+    "dashboard/history_export.py": "5fdb5b664e8b7c007d7272c768507a3cb1e13a2f7f7f646d239372680f939f92",
+    "dashboard/static/css/style.css": "ea2dcbcd0644af774092c588f3b1a574f1e5959061bff8bb691ae58ab849d5e6",
+    "dashboard/static/js/app.js": "c5ebd1fca4572177f1f3d07c560073ae4d42c0c836c5784842ad491b93f47438",
+    "dashboard/static/js/history.js": "c97309d7cf57ba6a55cd263069540105f82986be17193b080f36972f18606eaf",
+    "dashboard/static/js/history_charts.js": "f76c3df6d45605b959c55f126f460eabb5f35f29ed179b577000ff8196180e40",
+    "dashboard/static/js/history_selection.js": "f262ee6abba33432b24658c83b666eadd738b0625f9573aecd6e0c4b27bb90d1",
+    "dashboard/templates/_header.html": "ee05984ac76cf3a77a86874ae675346c3bbdedad20a17900b6b6cfe0e93ff39c",
+    "dashboard/templates/history.html": "0765e5991fb08275e109d3fe31caec645a9be43fd8a663fc5f8923b8de7bac40",
+    "dashboard/templates/index.html": "0a39110d3ca6f0cfcf0c392c15105774ae19dbdde776f6830b90810b253a7682",
+    "dscg/__init__.py": "ac228319829d4f1c4b9e32d904efaa78065f7f7fd6da1086a5a181c7515bd961",
+    "dscg/harness_records.py": "679c446a89d2e668145ece1d7d5b82ac268580f9004e71c43b7bdbfc0fa405a7",
+    "dscg/model_config.py": "fb2d7bf48d6507dbcbb15ffc15f3f05582ceefd6e376a4e0d2d7b37f4f83f620",
+    "dscg/paths.py": "be9445576a972e722be89834b72b0717f4e1475adf12fd601803f8660187ae13",
+    "dscg/pipelines/__init__.py": "35dca586fe37f5229ec2c13805a2b46b46d342a272ed24ffde7df2cafc0b2209",
+    "dscg/pipelines/baseline.py": "253d8b1581749a30dec0c953e5f4bdafdf9693a5d5e42b291b1c2f2bc321cfcd",
+    "dscg/pipelines/defended.py": "75583be0d62b2a478f9d070f79b7aa84dffd71b12a21931e60c696273163f7b0",
+    "dscg/token_tracking.py": "6518055d80f31145f539360c61ef403b55515cdd0832df01f8e56042dc604728",
+    "dscg/tool_metadata.py": "9802d5af6f1882b81ba747583fc612959fb5e68e89182ab24c4ecb51b9d441f1",
+    "environment.yml": "2aecee4678e2e8aa94d0a2f6b0cc72c83b17a26bdc191f4f0d6178b9ae8226af",
+    "experiments/__init__.py": "b7a9a305f5ad494cf8aa9d34b3c797b02fd3c5b8e1d692aa440132c6c787695d",
+    "experiments/generate_tool_metadata.py": "efb9c73b8d5f0d7fb3d8789414c9127588e01a5b75c2c70f4d56d8b2424ce181",
+    "experiments/harness_audit.py": "1ca4b7a26e0855cb466ea908a363c790ab46a6de9c9af49bd1d95e1a75e7b534",
+    "experiments/i3_p0_stress.py": "cbd7d126dafc2246353fd841a11fd7596301a0d89efc2adbc5df7af64f5d2945",
+    "experiments/partial_controls.py": "9cd1ad321543082d807c4e4d41728f51db629f5a90d8c7f690879f1913fd1788",
+    "experiments/plots/__init__.py": "cf937b9fed7f8e322194830917413d8f90d12152e47f350bdcb8e63c8da01749",
+    "experiments/plots/draw_ablation.py": "a242f195c910c499b5bf212fd3f19276a59c99faab1350fb01a8e14fdcbcb313",
+    "experiments/plots/draw_combined.py": "d946471b27550fcbbfad35cb8c72c2d5b0bf59bc2e5a6a5ab2fa849023de8f06",
+    "experiments/plots/draw_comparison.py": "4fb2b854fa88c112ae3451cbdf2cf7b9549637a618b4106286325f53eecee0f5",
+    "experiments/plots/draw_cost.py": "d44def8fb4324fef01292ed8c631a4292ddd8edd74f0767782a98a16183e4ebf",
+    "experiments/run_benchmark.py": "3951b5325d593275b4a5397a92c538c5c52f0928a6e0aaa3a9ad76f570a1c693",
+    "experiments/run_partial_benchmark.py": "ae27dfd700737cdf1fb509174f86bcd2e54aacae73fb836026150ded2a5f8025",
+    "experiments/trace_diagnostics.py": "dd6da037739ea0c016a33cf007c7fc97a0ad5c680e02d20a162d4c3bec954994",
+    "tests/fixtures/harness_audit_cases.json": "c2e4bd65fa031fe47c59a077014f3ae037476be1f4580c981faa027fc73ce037",
+    "tests/fixtures/i3_p0_stress_cases.json": "f50a804e0438fce50f634ff763d2da949e0bc6719d210ad96f491ab700c8e4be",
+    "tests/test_audit_tool_context.py": "cafdd4599dfc7f6099edcb9092caad41a2fb7adab6aea9705c371902e380bdcd",
+    "tests/test_authorization_defaults.py": "715d536a3869e1542546f58724dcecbb81740a795afe03ed372d96790ee50350",
+    "tests/test_bounded_reaudit.py": "858447308f1e1068716a3f6d1ff48c820fded3874fde994cf2ff631285a3c5d4",
+    "tests/test_completion_prompt.py": "c53450f902bb27b2e6e6040eddae4fcce1c758677accdda8489ad6b50c4a24f8",
+    "tests/test_dashboard_config.py": "c73d7ea2c6b5c31cee9ed2eb210d897f6edac362dd065575985dad84095d7ba7",
+    "tests/test_dashboard_history.py": "a7b7f529f93007d1fbb92850d0fbcd4db54567f855bc1ff48ce71e3fe7cc03d5",
+    "tests/test_harness_audit.py": "3eaee4fda57e631001d031134b61689253d9dd076ab0946d56fb05758ebd5934",
+    "tests/test_harness_audit_replay.py": "13e607b2e66461f86dc3e271ab2ed59e246d39a118fd7c4f9fbc08cffc30901e",
+    "tests/test_harness_records.py": "5dcdb296d0c15e255d4a90b1a4fb7f220e7f819a19cf695ed3274949b3168adb",
+    "tests/test_history_charts.cjs": "754654093098768c251d5f6e9450f1505fcc394f6a225a4b59269ea608aba56b",
+    "tests/test_history_selection.cjs": "69ed483d0d90bc4e890735c374deb5dfb6268961c4337c987f950fc147cad920",
+    "tests/test_history_ui_selection.cjs": "bbd20e44af46af01cdb0deeccc392d851730e220f4777302e163d40a866ac429",
+    "tests/test_i3_p0_stress.py": "d65b9c389e109f1c6fa74db3a31700543a9d5c8dba6ceee7cb3e5fcdde1f5fd7",
+    "tests/test_model_config.py": "e614876684d94662931785dd85bc92f63e4b629a62034fed8e10c018b86cafef",
+    "tests/test_optimization_costs.py": "d472962e9c0d63ee7fc9b051044b15586a0f6d7c13b722e54b99486e7c740d1b",
+    "tests/test_partial_ablation.py": "a86c5c36c285e58f75c83e14ab3f829d36f5c7c947fb6a4f01dbb4384ace17fe",
+    "tests/test_partial_attacks.py": "0659d3da8f4c9372bc615fbc0300a0fd74245b1e0187d17cf277548b9b4b94dd",
+    "tests/test_partial_baseline.py": "3e427cc9128dd2a006f830d6ba626c41afaf42b6de3036adbc49ad50a0503fca",
+    "tests/test_permission_sandbox.py": "563364a4bf597430e7b2c7cc6a4461048c88288582e67674ee99f7e7422468c6",
+    "tests/test_sandbox_execution.py": "9da28377ce062c80495631040e5aefc57c3b7bc235f89d65cf8fb729cc84bf3a",
+    "tests/test_task_isolation.py": "e179c5c5df14cf02b84fa6593e04ae34cc07cdb8e20903928e8afeb8f9b7c390",
+    "tests/test_tool_metadata.py": "9b62b2618fae65b84bfc341c17e2ca58789229c3d989b992ccbbce2313631f77",
+    "tests/test_web_request_routing.py": "4c4f665f5adedc2562386075f3763d2512f9ce87ee62fd1ee37291cbb2ead276"
+  },
+  "research_route_sha256": "952705e7c89e1fa96803fe0b51d784cde7165644eeceac995eafca907bead59c",
+  "raw_result_inventories": {
+    "results": {
+      "files": 913,
+      "size_mtime_sha256": "7132669037ff4e1fb96b068444272f8b07ba425d564ce66f58e5c02c6dac0298"
+    },
+    "download": {
+      "files": 13,
+      "size_mtime_sha256": "9a3117d157121b823ec758a4cc5924af96916c5b67f6157b25620f80986bad72"
+    }
+  },
+  "baseline_snapshots": [
+    {
+      "old_path": "README.md",
+      "archive_path": "workshop/archive/project_structure_20261008/before/README.md",
+      "sha256": "d00c7ecfeadcfc362272caec9b07ef7b890dd9e600be0bcf32e05a4175887854"
+    },
+    {
+      "old_path": "AGENTS.md",
+      "archive_path": "workshop/archive/project_structure_20261008/before/AGENTS.md",
+      "sha256": "ae8d02902096446c46fa98f411678f354667621976d535af4bb9806b397b9c68"
+    },
+    {
+      "old_path": "RESEARCH_STATUS.md",
+      "archive_path": "workshop/archive/project_structure_20261008/before/RESEARCH_STATUS.md",
+      "sha256": "4f4f73acb0798186301ce28d80c19563ea3e9471f300fe3a8c9a1bd1cb7d9bbf"
+    },
+    {
+      "old_path": ".gitignore",
+      "archive_path": "workshop/archive/project_structure_20261008/before/.gitignore",
+      "sha256": "254668eab415103033e4daf78d1238477a15218ef0859ae479cbbceb87d61313"
+    },
+    {
+      "old_path": "workshop/README.md",
+      "archive_path": "workshop/archive/project_structure_20261008/before/workshop/README.md",
+      "sha256": "52ae4d67d0909fd19c1f56b5f98dc5389f61db5168052fbaa99593fabe2a8b63"
+    },
+    {
+      "old_path": "workshop/verify_migration.py",
+      "archive_path": "workshop/archive/project_structure_20261008/before/workshop/verify_migration.py",
+      "sha256": "6ca67c3625e68ab70c3ad94447090eb33036e500da67d023fe87026b3ae935b7"
+    }
+  ],
+  "archived_files": [
+    {
+      "old_path": "docs/DSCG项目介绍.docx",
+      "new_path": "workshop/archive/project_structure_20261008/docs/DSCG项目介绍.docx",
+      "sha256": "c091fafb8c3c2dff1d24c85e1f97b98161a9ad50526852a6ef2f986999dd83fb",
+      "reason": "Historical report/introduction/figure/prompt; removed from current docs entry"
+    },
+    {
+      "old_path": "docs/DSCG项目介绍.md",
+      "new_path": "workshop/archive/project_structure_20261008/docs/DSCG项目介绍.md",
+      "sha256": "8822e6ab69954f6b442dbf482d07008f8d85a8b7e97e7fae1b21df77b6af8996",
+      "reason": "Historical report/introduction/figure/prompt; removed from current docs entry"
+    },
+    {
+      "old_path": "docs/figures/benchmarks/ASR_comparison.png",
+      "new_path": "workshop/archive/project_structure_20261008/docs/figures/benchmarks/ASR_comparison.png",
+      "sha256": "307a8c41c4da6c8613dcfab57615ea731a8c09eefab776c50c70567c42f8b2d2",
+      "reason": "Historical report/introduction/figure/prompt; removed from current docs entry"
+    },
+    {
+      "old_path": "docs/figures/benchmarks/Cost_Analysis_Combo.png",
+      "new_path": "workshop/archive/project_structure_20261008/docs/figures/benchmarks/Cost_Analysis_Combo.png",
+      "sha256": "7f177cc92f62931d2c401a6fa4b57f903aa90039edb2d7f7b6c18fb16b8210ae",
+      "reason": "Historical report/introduction/figure/prompt; removed from current docs entry"
+    },
+    {
+      "old_path": "docs/figures/benchmarks/TSR_comparison.png",
+      "new_path": "workshop/archive/project_structure_20261008/docs/figures/benchmarks/TSR_comparison.png",
+      "sha256": "69593b867e9132fc7616c09560176413a9c02f8b854cf1cf40763c7c13b5474c",
+      "reason": "Historical report/introduction/figure/prompt; removed from current docs entry"
+    },
+    {
+      "old_path": "docs/figures/benchmarks/Token_comparison.png",
+      "new_path": "workshop/archive/project_structure_20261008/docs/figures/benchmarks/Token_comparison.png",
+      "sha256": "384d5b297a69c1552afaa2932683256828374096492e64509f54348dab22bb49",
+      "reason": "Historical report/introduction/figure/prompt; removed from current docs entry"
+    },
+    {
+      "old_path": "docs/figures/benchmarks/ourframe_comparison_results.png",
+      "new_path": "workshop/archive/project_structure_20261008/docs/figures/benchmarks/ourframe_comparison_results.png",
+      "sha256": "494cb4b7d4ccb4f256233714769b83ec243b7fe5226746727496fdbb18b4e12b",
+      "reason": "Historical report/introduction/figure/prompt; removed from current docs entry"
+    },
+    {
+      "old_path": "docs/figures/benchmarks/results.png",
+      "new_path": "workshop/archive/project_structure_20261008/docs/figures/benchmarks/results.png",
+      "sha256": "8ba443d5f228dc6339097bc3fc25cd26f2690bc0276fa7f204ad8aac42258754",
+      "reason": "Historical report/introduction/figure/prompt; removed from current docs entry"
+    },
+    {
+      "old_path": "docs/figures/benchmarks/results_zh.png",
+      "new_path": "workshop/archive/project_structure_20261008/docs/figures/benchmarks/results_zh.png",
+      "sha256": "51f10180b799784b1afe7cbb709725803f76dd490c6b427ddd51682011375611",
+      "reason": "Historical report/introduction/figure/prompt; removed from current docs entry"
+    },
+    {
+      "old_path": "docs/figures/qwen_flash_result_1.png",
+      "new_path": "workshop/archive/project_structure_20261008/docs/figures/qwen_flash_result_1.png",
+      "sha256": "96f49d472cad4c31ecd676c04dd1a189a02634e71ce87ea78fece47ef2fa8cab",
+      "reason": "Historical report/introduction/figure/prompt; removed from current docs entry"
+    },
+    {
+      "old_path": "docs/history_attack_filter_report.md",
+      "new_path": "workshop/archive/project_structure_20261008/docs/history_attack_filter_report.md",
+      "sha256": "d6ce4b9d19d19287ebccd8f4ade261460f190b12e5ab7adf94d11e90ff5851aa",
+      "reason": "Historical report/introduction/figure/prompt; removed from current docs entry"
+    },
+    {
+      "old_path": "docs/history_export_report.md",
+      "new_path": "workshop/archive/project_structure_20261008/docs/history_export_report.md",
+      "sha256": "8cf7b9f5c09cbd992c23cdbf33c8d43061580322fc353e720f4e4608aa7656d3",
+      "reason": "Historical report/introduction/figure/prompt; removed from current docs entry"
+    },
+    {
+      "old_path": "docs/history_metrics_report.md",
+      "new_path": "workshop/archive/project_structure_20261008/docs/history_metrics_report.md",
+      "sha256": "12287ecf8ff820a284f34f9938441ecd89149f8f3c8a5981c65e77272c18d98e",
+      "reason": "Historical report/introduction/figure/prompt; removed from current docs entry"
+    },
+    {
+      "old_path": "docs/history_multiselect_page_report.md",
+      "new_path": "workshop/archive/project_structure_20261008/docs/history_multiselect_page_report.md",
+      "sha256": "ac60682ff09c749173cf692702e239e1e1ebac20407ede31961eef070bc90645",
+      "reason": "Historical report/introduction/figure/prompt; removed from current docs entry"
+    },
+    {
+      "old_path": "docs/history_separate_report.md",
+      "new_path": "workshop/archive/project_structure_20261008/docs/history_separate_report.md",
+      "sha256": "b5fa46f581ffa0e13b1234773ae0973f3fc15a0fde670a6595dd61b698daa540",
+      "reason": "Historical report/introduction/figure/prompt; removed from current docs entry"
+    },
+    {
+      "old_path": "docs/history_version_identity_report.md",
+      "new_path": "workshop/archive/project_structure_20261008/docs/history_version_identity_report.md",
+      "sha256": "1c8274194afb8371a168e19ae80433caa3d6f81870527283b38ae5b2cf74a401",
+      "reason": "Historical report/introduction/figure/prompt; removed from current docs entry"
+    },
+    {
+      "old_path": "docs/notes/提示词草稿.txt",
+      "new_path": "workshop/archive/project_structure_20261008/docs/notes/提示词草稿.txt",
+      "sha256": "45d2854067bd6333792c3f1895854d885495f1bf9c9c0fa21d45c48978be9ed7",
+      "reason": "Historical report/introduction/figure/prompt; removed from current docs entry"
+    },
+    {
+      "old_path": "docs/partial_attack_report.md",
+      "new_path": "workshop/archive/project_structure_20261008/docs/partial_attack_report.md",
+      "sha256": "f91eabe5c10bf68859267152a413d01fd2644ec412d1955cd723ba9b5e116ab0",
+      "reason": "Historical report/introduction/figure/prompt; removed from current docs entry"
+    },
+    {
+      "old_path": "ALMML_sub.md",
+      "new_path": "workshop/ALMML_sub.md",
+      "sha256": "288250e3224567d7d9a429fb6876212c80f71dff3aa93117d0d5f60edc2d52c0",
+      "reason": "Workshop ownership or redundant research pointer"
+    },
+    {
+      "old_path": "AIMLL WS.pdf",
+      "new_path": "workshop/references/AIMLL WS.pdf",
+      "sha256": "12aa2de486d19fd781c5f2818bcce5fa0930b6cc2b1a937b051e25601f41a754",
+      "reason": "Workshop ownership or redundant research pointer"
+    },
+    {
+      "old_path": "Paper_TODO.md",
+      "new_path": "workshop/archive/project_structure_20261008/Paper_TODO.md",
+      "sha256": "7c8400100ac48699dbf65c2f6da5ac64d6747a1989d2146d031af43228a60ba0",
+      "reason": "Workshop ownership or redundant research pointer"
+    }
+  ],
+  "retired_aliases": [
+    {
+      "legacy_read_path": "DSCG/docs/workshop_optimization_report.md",
+      "original_storage": "workshop/archive/original_documents/DSCG/docs/workshop_optimization_report.md",
+      "sha256_before": "1e7e0e95c349ab17cc51fe7aa849853218a600e3fe4e297734fc7ef1c40b3d57",
+      "link_target": "../workshop/archive/original_documents/DSCG/docs/workshop_optimization_report.md",
+      "reason": "Retired old docs entry; original evidence bytes remain under workshop"
+    },
+    {
+      "legacy_read_path": "DSCG/docs/framework_optimization_report.md",
+      "original_storage": "workshop/framework_optimization_report.md",
+      "sha256_before": "24c439c5572652c3dd8e9e1dd6269cd3fcb0664099a42c29549ff89fba0a23d4",
+      "link_target": "../workshop/framework_optimization_report.md",
+      "reason": "Retired old docs entry; original evidence bytes remain under workshop"
+    },
+    {
+      "legacy_read_path": "DSCG/docs/framework_v2_report.md",
+      "original_storage": "workshop/framework_v2_report.md",
+      "sha256_before": "7a707d857d1ce9ef4e926bdf33e35427f3bf573fd59593e753384ceb557d9b43",
+      "link_target": "../workshop/framework_v2_report.md",
+      "reason": "Retired old docs entry; original evidence bytes remain under workshop"
+    },
+    {
+      "legacy_read_path": "DSCG/docs/superpowers/plans/2026-10-05-workshop-engineering-optimization.md",
+      "original_storage": "workshop/2026-10-05-workshop-engineering-optimization.md",
+      "sha256_before": "569318e227a9c17ec6dd54dbc793f2be0213c75a59f6ee2f81ccf66f43688868",
+      "link_target": "../../../workshop/2026-10-05-workshop-engineering-optimization.md",
+      "reason": "Retired old docs entry; original evidence bytes remain under workshop"
+    }
+  ],
+  "removed_generated_caches": [
+    "docs/.DS_Store"
+  ],
+  "previous_migration_evidence": {
+    "workshop/results/materials_migration_20261008/migration_manifest.json": "e07b46db274dd462874d9c16309ec99f36056e27028b7ff99e2fa58a8bc1a568",
+    "workshop/results/materials_migration_20261008/move_materials.py": "276c63e82eb55a2ed12840cd28dbbdecdcc5af6b255e2a2c1eed8d29066c0017",
+    "workshop/results/materials_migration_20261008/research_readme_append.md": "9f052e0cfb54601805965d9ff98f570a64d5eb534c85f9dc0c443d0230f32cf6",
+    "workshop/results/materials_migration_20261008/checks.json": "1b8d9bf2c2bdc17109e67e2120acb39c79a7a703ead91629112792b3c759cd5d",
+    "workshop/results/materials_migration_20261008/validation.json": "c90d95a8e2eebc506a689c4f523596aa403b7607d35fedf53b875d2d378a0c76"
+  }
+}

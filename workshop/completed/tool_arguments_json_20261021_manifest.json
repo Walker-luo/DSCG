@@ -1,0 +1,125 @@
+{
+  "schema_version": "dscg.tool-arguments-json-delivery.v1",
+  "base_commit": "54fa09ce6e127a816ae7f9fe9d9d6e025c98738d",
+  "initial_worktree": "",
+  "final_worktree": " M AGENTS.md\n M docs/benchmark.md\n M docs/partial_benchmark.md\n M docs/result_files.md\n M experiments/common/attack_execution.py\n M experiments/common/benchmark_outcomes.py\n M experiments/common/benchmark_progress.py\n M experiments/common/partial_reporting.py\n M experiments/run_partial_benchmark.py\n M tests/attack_parallel_fixture.py\n M tests/test_attack_parallel_native.py\n M tests/test_l1_projection_controls.py\n M tests/test_partial_agentdyn.py\n M tests/test_qwen_utility.py\n M tests/test_serial_runner.py\n M tests/test_task_alignment.py\n M workshop/README.md\n M workshop/completed/README.md\n?? experiments/common/benchmark_tasks.py\n?? tests/test_tool_arguments_json.py\n?? tests/test_tool_arguments_runner.py\n?? tests/tool_arguments_fixture.py\n?? workshop/completed/tool_arguments_json_20261021.md\n?? workshop/completed/tool_arguments_json_20261021_manifest.json\n",
+  "commands": [
+    {
+      "command": "conda run -n ipi python -B -m unittest discover -s tests -v",
+      "exit_code": 0,
+      "tests": 652,
+      "skipped": 10,
+      "log": "workshop/artifacts/20261021_tool_arguments_json/ipi_verified.log"
+    },
+    {
+      "command": "conda run -n ipi-agentdyn python -B -m unittest discover -s tests -v",
+      "exit_code": 0,
+      "tests": 656,
+      "skipped": 1,
+      "log": "workshop/artifacts/20261021_tool_arguments_json/agentdyn_verified.log"
+    },
+    {
+      "command": "/Users/luo/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node --test tests/*.cjs",
+      "exit_code": 0,
+      "tests": 47,
+      "log": "workshop/artifacts/20261021_tool_arguments_json/node.log"
+    },
+    {
+      "command": "conda run -n ipi python -B -m experiments.run_benchmark --help",
+      "exit_code": 0
+    },
+    {
+      "command": "conda run -n ipi python -B -m experiments.run_partial_benchmark --help",
+      "exit_code": 0
+    },
+    {
+      "command": "conda run -n ipi-agentdyn python -B -m experiments.run_benchmark --help",
+      "exit_code": 0
+    },
+    {
+      "command": "conda run -n ipi-agentdyn python -B -m experiments.run_partial_benchmark --help",
+      "exit_code": 0
+    },
+    {
+      "command": "python workshop/artifacts/20261021_tool_arguments_json/validate_delivery.py",
+      "exit_code": 0
+    },
+    {
+      "command": "git diff --check",
+      "exit_code": 0
+    }
+  ],
+  "paid_model_calls": 0,
+  "real_benchmark_runs": 0,
+  "protected_result_files": 708,
+  "source_sha256": {
+    "AGENTS.md": "14198f209671b30afa348c28417a48bb3f93abb7a04ac46b421014fe917ae6d7",
+    "docs/benchmark.md": "c382bc95cbb2a13ceaa63968e215da23ac6c3b30ffec245c37475603759bee5a",
+    "docs/partial_benchmark.md": "3f25d9048ca41590e550dca10d5b226ce36307b5515bf64245fa020dc531d2c9",
+    "docs/result_files.md": "07c12c68f0ad47f5b034c2216572b0c847ef438892bdd492b01a80d097795f93",
+    "experiments/common/attack_execution.py": "486234ffd24a15e7a061781e942d73a8c9afe79604ee2abe9c1843c3520d0c58",
+    "experiments/common/benchmark_outcomes.py": "0b92dc9e49b463043af7f7789aa93b144ab51a39ab4d83fb829f0514f031e0cf",
+    "experiments/common/benchmark_progress.py": "661cd264b47224cd192282038d38e7ddd6b975b0756c59484f8459714bead37e",
+    "experiments/common/partial_reporting.py": "f9912d420ca5c6f02a91d027761f272a6353f670e35557bd82f6d3a4b5fbdbe6",
+    "experiments/run_partial_benchmark.py": "520fd722d87e634ae4fc9eaa4e895b2477992ea6690bfcd81356e501072603a4",
+    "tests/attack_parallel_fixture.py": "69913899b76d0f5e6f2fd84b4ac1a17f1593b433bad462a03f75d4e7db8bec52",
+    "tests/test_attack_parallel_native.py": "bc4bf1b0e7e712bf9acebb355dcac50b65f6b9c40a7ba6c2e3571f6f8e47de7b",
+    "tests/test_l1_projection_controls.py": "6697355839f53f9ce8923a04f078eefb3617bd839c04886a41657fb8439eec4a",
+    "tests/test_partial_agentdyn.py": "b9818eb2a2a3e658a8655181abd3ea40068235865a812979dcb32016e08de416",
+    "tests/test_qwen_utility.py": "f978dae6f2fc6664fca3f22965f1abe5def79ebcd42bcc01bfed494cb344eaab",
+    "tests/test_serial_runner.py": "5d8126ad3bbcbc3422c2111b5d405789fcb5b4349df96ced9d54374060f628cb",
+    "tests/test_task_alignment.py": "e6c3e1c51806c27e97674ac55e02a9d4dfd9face13022d91321fa39e29a79bad",
+    "workshop/README.md": "38ad2977a6dd5c41865d0ee1ef82523ed0c955d0b577fdf083612753a2a64c56",
+    "workshop/completed/README.md": "190a585a6b123afe427cbcaacdb999f43a63bddf931208ce25d62e07a0ffc895",
+    "experiments/common/benchmark_tasks.py": "05cb4c8ebe355eff65de861f4ccc0596ce5f84874e064ebf2c30db6be9de544b",
+    "tests/test_tool_arguments_json.py": "9ae5a2fb70f9d82c482a14c1acf711e5e9da7539ee8408850435f146427e60a8",
+    "tests/test_tool_arguments_runner.py": "598342670185e02fdd5ee44cb8f9eb4d1a375f8990a9fa099d267156c7a7f400",
+    "tests/tool_arguments_fixture.py": "c66d452963b41a1d7148283d0f5e44b75bbcf2fade712f4f98f7001c7a756d96",
+    "workshop/completed/tool_arguments_json_20261021.md": "1c6e1120b3a1fbf6dbfba1b62ed620aa5e7245635d5813605173c614f8ef2843",
+    "workshop/artifacts/20261021_tool_arguments_json/ipi_first.log": "4d52b8f98e7d07a9a2304ee336cd686e4ab0d796f210d4e013a948904caa42fe",
+    "workshop/artifacts/20261021_tool_arguments_json/full_help_ipi.log": "234fb5317e931ad5d10eb4470d639b2e0d481e31d2a192b2d6fec81c01f901cd",
+    "workshop/artifacts/20261021_tool_arguments_json/observer_dyn_green.log": "797f3ab7fad416078b93bcfd61d4e0eecf84c02de7ce2d53e854efb5725e69a7",
+    "workshop/artifacts/20261021_tool_arguments_json/partial_help_ipi.log": "c2a32c693c2dc878ddd594adc7d058052796fbd1d6bab385b5898d2206250bce",
+    "workshop/artifacts/20261021_tool_arguments_json/agentdyn_verified.log": "9402068f6ed3c62541bec3dcb7342f4b4a9237b38dcce5bea45610cbdfe82d01",
+    "workshop/artifacts/20261021_tool_arguments_json/core_green.log": "0ab462ec0424fa445390c31595be62bc58a8de1f01ab7ea0a2887a2d58005291",
+    "workshop/artifacts/20261021_tool_arguments_json/red.log": "d0ec8ccec54d0f39611ccc20ec0e7345232728a0bd087b5022bdb59cff286d37",
+    "workshop/artifacts/20261021_tool_arguments_json/agentdyn_final.log": "abb4304b528166551d71ef0c03fd3562085d3edcf82e4ed8f74959fb2a8ee1d6",
+    "workshop/artifacts/20261021_tool_arguments_json/agentdyn_delivery.log": "a2f914bd2bdda57d96db4906a720757dd5031f51d34aa3ca41277fd27f4725c0",
+    "workshop/artifacts/20261021_tool_arguments_json/diff_check.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "workshop/artifacts/20261021_tool_arguments_json/node.log": "2d5cd8bbd4c3894ab48e5bba1152bdc278ba6155d898baf49c58b3d38ea6b411",
+    "workshop/artifacts/20261021_tool_arguments_json/all_core_ipi.log": "43c5a5114abf44deb2afdde2f4fbda662b88d0c2f0f856d2ea3efe60bb17d3b6",
+    "workshop/artifacts/20261021_tool_arguments_json/observer_green.log": "0734d424f709b7540da56e4e83eb21857be616d4a31370829b990454a9422afb",
+    "workshop/artifacts/20261021_tool_arguments_json/interrupt_green.log": "9fc7237388dcf0875bde20e8a963f651f16d85c86d71a418bc140d74c03ec85e",
+    "workshop/artifacts/20261021_tool_arguments_json/native_red.log": "732be083028c93402f15861bf2101229c79300bfc18376a98bc9e33e16d904f7",
+    "workshop/artifacts/20261021_tool_arguments_json/full_help_agentdyn.log": "234fb5317e931ad5d10eb4470d639b2e0d481e31d2a192b2d6fec81c01f901cd",
+    "workshop/artifacts/20261021_tool_arguments_json/ipi_verified.log": "a8e685ee4c5ee2454f44c39ee467769ac9ef3dda67fef1919d212cd017e0eda3",
+    "workshop/artifacts/20261021_tool_arguments_json/ipi_delivery.log": "cb422677b9628c8eafaa5e8100c675ebdef9a2a753836da4f04bee56c1382140",
+    "workshop/artifacts/20261021_tool_arguments_json/partial_help_agentdyn.log": "c2a32c693c2dc878ddd594adc7d058052796fbd1d6bab385b5898d2206250bce",
+    "workshop/artifacts/20261021_tool_arguments_json/core_dyn_green.log": "0c589ef9556222088e3c3da71f8350501d0cb16eb9d768e11e832e9a53d6746b",
+    "workshop/artifacts/20261021_tool_arguments_json/goal_report_red.log": "a04f571af0a84e9e74ea2456f8aa3d4a0c73cebd227db8dcbd6c321b3dacc580",
+    "workshop/artifacts/20261021_tool_arguments_json/all_core_agentdyn.log": "591c32aecbb4638f5481710b653582c5bcdf4bdb938f76c339545759bbadaa78",
+    "workshop/artifacts/20261021_tool_arguments_json/ipi_final.log": "68dcee2b837a5a949522bab7f4ec29a46f72034f7ff1e27e1e97a570122c6e1c",
+    "workshop/artifacts/20261021_tool_arguments_json/ipi_second.log": "ae6c2296748d3e54e594074b076a3250535a33621bf0353ed0b363aab147d20e",
+    "workshop/artifacts/20261021_tool_arguments_json/runner_green.log": "d973d33969cba115b571e89787b463eb154d7ea03333b4dcdc2196013cf8be77",
+    "workshop/artifacts/20261021_tool_arguments_json/before.json": "4eeb950d5511fd1b4deea9758ff428abdbfb009649e0287161ed9a860c1b59f8",
+    "workshop/artifacts/20261021_tool_arguments_json/ledger.md": "1dba7d67ed6e76b2e39192696f100efc084fdf1fc5b2c9831652494542898ef1",
+    "workshop/artifacts/20261021_tool_arguments_json/validate_delivery.py": "93889cab9305b76d85041a6a440cb97c0cad65e46abefe4cad1b9e17382959bd",
+    "workshop/artifacts/20261021_tool_arguments_json/delivery_validation.json": "f655603f5c914b386c0e9628e51331d6c3886f4cc8eedc23faf2a136c6227399"
+  },
+  "review": "Independent read-only review: no actionable findings; fixture-only deterministic interruption follow-up passed full regressions.",
+  "limitations": [
+    "No online Qwen recovery validation.",
+    "Original invalid arguments unavailable.",
+    "Complete native caches retain original semantics.",
+    "screen and Dashboard unchanged."
+  ],
+  "validation": {
+    "path": "workshop/artifacts/20261021_tool_arguments_json/delivery_validation.json",
+    "protected_result_files": 708,
+    "protected_changed": [],
+    "checked_links": 233,
+    "new_link_errors": [],
+    "preexisting_missing_link_references": 4,
+    "archive_mismatch": []
+  }
+}

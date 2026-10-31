@@ -1,0 +1,157 @@
+{
+  "schema_version": "dscg.workshop-revision.v1",
+  "date": "2026-10-12",
+  "task": "l2-implementation",
+  "previous_manifest": "workshop/archive/l2_delegated_order_20261012/revision_manifest.json",
+  "previous_manifest_sha256": "7a8e3033a49d4550607f84c815870e67b52f347beee2e64037d3a95da0384b05",
+  "head": "4d61149f55f71eb6d1091ea431b95d1abb6d172e",
+  "previous_document_paths_read_original_bytes": true,
+  "files": [
+    {
+      "path": "AGENTS.md",
+      "before_sha256": "202fdd50afca850f4bc59a390ced57cf7a3370390ef25a8af31b399546388f85",
+      "original": "workshop/archive/l2_implementation_20261012/originals/AGENTS.md",
+      "after_sha256": "1c0c7d77a5838028388b2c97245b060903c63bdfc4a1e7613e213d90b0e3798f"
+    },
+    {
+      "path": "README.md",
+      "before_sha256": "2f2c75292fa45954d5251c42d4a927e2b7d8eebd9b1cf496a408ad13cc86ab9e",
+      "original": "workshop/archive/l2_implementation_20261012/originals/README.md",
+      "after_sha256": "6ad97891d027a6fc88e37c4311ca9e208a6671840ee4132f3128e5897ca4c139"
+    },
+    {
+      "path": "dashboard/app.py",
+      "before_sha256": "9600dd3db67b90da5f7df9fd2ffabb2bb4b6d887da70f5d237a3b691710948aa",
+      "original": "workshop/archive/l2_implementation_20261012/originals/dashboard/app.py",
+      "after_sha256": "636576eafc8f1b15b4627a3f1c5aa7ae8f82b7ae3b0d1e5d3132af8ff48c9507"
+    },
+    {
+      "path": "dashboard/evaluation.py",
+      "before_sha256": "b7b3b0f0f9ffaa4a207f1bcbe126f7aa68c2a2cfef6d9bda1168f9e8b96715f2",
+      "original": "workshop/archive/l2_implementation_20261012/originals/dashboard/evaluation.py",
+      "after_sha256": "302f0a87a7658278e1804e4b4504262ed168a28ba716efd0f9c5bb5477f9b1fa"
+    },
+    {
+      "path": "dashboard/static/js/app.js",
+      "before_sha256": "99a86777ff474df23fa6a501fcb36766093f0659c25c0b05e38c523cca2f0908",
+      "original": "workshop/archive/l2_implementation_20261012/originals/dashboard/static/js/app.js",
+      "after_sha256": "7c5995238bcddada102c1b5f1dd0978216525dfe6d833361bcde1f759b841cd9"
+    },
+    {
+      "path": "dashboard/templates/index.html",
+      "before_sha256": "a93bb95966c359ee762bb1d391c1b5c319552507c3768af151cb3689e9b5737b",
+      "original": "workshop/archive/l2_implementation_20261012/originals/dashboard/templates/index.html",
+      "after_sha256": "4bb985fdff63b2911829ac5f71fc8d8252546b2403187ed891f1c10b62aaa839"
+    },
+    {
+      "path": "docs/dashboard.md",
+      "before_sha256": "bb460ad7cdbcecd48687ddb37b62100098d9fa73340b05b239049b5913f845fa",
+      "original": "workshop/archive/l2_implementation_20261012/originals/docs/dashboard.md",
+      "after_sha256": "122d9e39108f6d7403c67f3aa3109421f9e62bc3f5fc2998f3ec93c8be612a69"
+    },
+    {
+      "path": "docs/framework_updates.md",
+      "before_sha256": "5156d9655e8c595a68d22eda33a2064c07aee526113502b5b1614cc5d67d48bf",
+      "original": "workshop/archive/l2_implementation_20261012/originals/docs/framework_updates.md",
+      "after_sha256": "b703dd94e0b33d31a6f30c9968d59b95b47b8c9cf3e872800bce1ddf9e88edfa"
+    },
+    {
+      "path": "dscg/input_isolation.py",
+      "before_sha256": "9b57b94c58f29869158a97932e104e23428be2e28850c0c0e8a0256b67478e51",
+      "original": "workshop/archive/l2_implementation_20261012/originals/dscg/input_isolation.py",
+      "after_sha256": "e22a2bf7ff1301e91f34e25c6224240801a9e09e9cb91358a3512f51f89c7db0"
+    },
+    {
+      "path": "dscg/l2_authorization.py",
+      "before_sha256": null,
+      "original": null,
+      "after_sha256": "6462374affdacb1d0d85b6593bbac7e049f1bc5015744f7276927409db651cc5"
+    },
+    {
+      "path": "dscg/pipelines/defended.py",
+      "before_sha256": "d8524cb9a22dd1e0c3357455ab5b14f0db437f7f01f7f9aaac821ec190769b83",
+      "original": "workshop/archive/l2_implementation_20261012/originals/dscg/pipelines/defended.py",
+      "after_sha256": "264db3857d8a08bc886e3e1461be909f93f2a9cf6143ff0eb806bc2b8199961a"
+    },
+    {
+      "path": "experiments/run_partial_benchmark.py",
+      "before_sha256": "e6c383746f0a6287cca259fc4b7e17b11a535aba9dc9c3a294edf445b7c8e9a6",
+      "original": "workshop/archive/l2_implementation_20261012/originals/experiments/run_partial_benchmark.py",
+      "after_sha256": "d0e316c95cab062b2766baa2a6ad0f6c1ac5cc032568f4b4ddca06b545c95e49"
+    },
+    {
+      "path": "tests/test_dashboard_ui.cjs",
+      "before_sha256": "36195378de644994252b14fe6d0b89cc06cb2ebd1aebf30422ffd4399c8a68d1",
+      "original": "workshop/archive/l2_implementation_20261012/originals/tests/test_dashboard_ui.cjs",
+      "after_sha256": "f2153cfaac88107c5adfa6e0af26a3b770c243ce04b419a2b0ea806bb0ecc396"
+    },
+    {
+      "path": "tests/test_delegated_tasks.py",
+      "before_sha256": null,
+      "original": null,
+      "after_sha256": "c2cff73b3c3e27f540c9c1a4832bc623a890cbccc3cdf269231215525c0f92f9"
+    },
+    {
+      "path": "tests/test_l2_authorization.py",
+      "before_sha256": null,
+      "original": null,
+      "after_sha256": "0fc89207475e37ffb10962e6ec2bf015e355c2b8d88a5b884ca2275353002ca4"
+    },
+    {
+      "path": "tests/test_l2_controls.py",
+      "before_sha256": null,
+      "original": null,
+      "after_sha256": "4fcb94e11b16c11ff54c4be4e0c181a4470533e2dd9aad74a289bfb69b09827d"
+    },
+    {
+      "path": "tests/test_three_layer_pipeline.py",
+      "before_sha256": "ea00d3c7e67f7e62a443d1eb53e09bc1a557242985ec66ca5e9b826e0f9c28c9",
+      "original": "workshop/archive/l2_implementation_20261012/originals/tests/test_three_layer_pipeline.py",
+      "after_sha256": "be9b3bf0822b3c60c2745331bbd2b099a9b7e40870544433b9dfa16db28d1b50"
+    },
+    {
+      "path": "workshop/L2_opt.md",
+      "before_sha256": "4a26264ed60d6662b708a55decef25e637a7f1a8478a27025b189c23f124771a",
+      "original": "workshop/archive/l2_implementation_20261012/originals/workshop/L2_opt.md",
+      "after_sha256": "76176c366b51bf037255bb6336b4516e821b42e10742cae268a9dffd74257906"
+    },
+    {
+      "path": "workshop/README.md",
+      "before_sha256": "bce4e6bc27293301b9179852b5d8e3c7d2c186d118edcea9ab1607eb5ed11630",
+      "original": "workshop/archive/l2_implementation_20261012/originals/workshop/README.md",
+      "after_sha256": "298beac086d23ee4cb60d0136fabb10fcdf74540a189e02fb6bcb7667c1df850"
+    },
+    {
+      "path": "workshop/archive/l2_implementation_20261012/validate_revision.py",
+      "before_sha256": null,
+      "original": null,
+      "after_sha256": "4f984ff3256d496d75553ee852a23383b864247717175e2e300cb70e120e7507"
+    },
+    {
+      "path": "workshop/completed/L2_implementation_plan_20261012.md",
+      "before_sha256": null,
+      "original": null,
+      "after_sha256": "37b34bd1567de644c47cd68809e7bd464b740359bf917505728582258f011020"
+    },
+    {
+      "path": "workshop/completed/README.md",
+      "before_sha256": "32d5acb01b03bda177fc89513395e07d6eccabe8a13bc3a812fd288308f43b30",
+      "original": "workshop/archive/l2_implementation_20261012/originals/workshop/completed/README.md",
+      "after_sha256": "661717005dbec0db89e1579cadbe60eda01193abc71d6bb5ce4fdaf1264ce36c"
+    },
+    {
+      "path": "workshop/completed/l2_implementation_20261012.md",
+      "before_sha256": null,
+      "original": null,
+      "after_sha256": "0b8f7e9c2ec89a3bee54e7f6e88467ba54ab0dffaa79e2e5f7aafdafed69d0a3"
+    }
+  ],
+  "completed_plan": {
+    "from": "workshop/L2_implementation_plan_20261012.md",
+    "to": "workshop/completed/L2_implementation_plan_20261012.md"
+  },
+  "limitations": [
+    "Original snapshot is the pre-existing working tree, not only HEAD.",
+    "Historical manifests are preserved; current changes are a separate explicit revision chain."
+  ]
+}

@@ -1,0 +1,152 @@
+{
+  "date": "2026-10-08",
+  "scope": "Completed materials separated from pending workshop candidates; no runtime change",
+  "entries": [
+    {
+      "old_path": "workshop/2026-10-05-workshop-engineering-optimization.md",
+      "new_path": "workshop/completed/2026-10-05-workshop-engineering-optimization.md",
+      "original_storage": "workshop/archive/workshop_cleanup_20261008/originals/2026-10-05-workshop-engineering-optimization.md",
+      "sha256_before": "569318e227a9c17ec6dd54dbc793f2be0213c75a59f6ee2f81ccf66f43688868",
+      "sha256_after": "569318e227a9c17ec6dd54dbc793f2be0213c75a59f6ee2f81ccf66f43688868",
+      "kind": "completed_material"
+    },
+    {
+      "old_path": "workshop/framework_optimization_20261007.md",
+      "new_path": "workshop/completed/framework_optimization_20261007.md",
+      "original_storage": "workshop/archive/workshop_cleanup_20261008/originals/framework_optimization_20261007.md",
+      "sha256_before": "757694019490e363c09795a265f95477da972eaea572fd1ead892f12cfe7eba9",
+      "sha256_after": "04ed454cb9fa2d444c15902d4a9029d989408f3011cbcf785b3d8f4b4473aa52",
+      "kind": "completed_material"
+    },
+    {
+      "old_path": "workshop/framework_optimization_direction_20261007.md",
+      "new_path": "workshop/completed/framework_optimization_direction_20261007.md",
+      "original_storage": "workshop/archive/workshop_cleanup_20261008/originals/framework_optimization_direction_20261007.md",
+      "sha256_before": "1d5a5b7df47afabdb1b6c062ea1d734c4db6bfea24cd971dc37d74d55aca1f52",
+      "sha256_after": "1d5a5b7df47afabdb1b6c062ea1d734c4db6bfea24cd971dc37d74d55aca1f52",
+      "kind": "completed_material"
+    },
+    {
+      "old_path": "workshop/framework_optimization_report.md",
+      "new_path": "workshop/completed/framework_optimization_report.md",
+      "original_storage": "workshop/archive/workshop_cleanup_20261008/originals/framework_optimization_report.md",
+      "sha256_before": "24c439c5572652c3dd8e9e1dd6269cd3fcb0664099a42c29549ff89fba0a23d4",
+      "sha256_after": "24c439c5572652c3dd8e9e1dd6269cd3fcb0664099a42c29549ff89fba0a23d4",
+      "kind": "completed_material"
+    },
+    {
+      "old_path": "workshop/framework_optimization_review_20261007.md",
+      "new_path": "workshop/completed/framework_optimization_review_20261007.md",
+      "original_storage": "workshop/archive/workshop_cleanup_20261008/originals/framework_optimization_review_20261007.md",
+      "sha256_before": "592e7603850b0a5433e6f40c0e8dd7daab82fbff40646c5c4593d4a1d320856c",
+      "sha256_after": "787af836ae3c3b54dd1194e3fd3aab4917e1d9bca24c741b9b9d5482b38b2f77",
+      "kind": "completed_material"
+    },
+    {
+      "old_path": "workshop/framework_optimization_v2_proposal_20261007.md",
+      "new_path": "workshop/completed/framework_optimization_v2_proposal_20261007.md",
+      "original_storage": "workshop/archive/workshop_cleanup_20261008/originals/framework_optimization_v2_proposal_20261007.md",
+      "sha256_before": "760441eb7dc865ab897eeac70a433d16cdb937c941146bdbe5a145c3a5cdd4f8",
+      "sha256_after": "760441eb7dc865ab897eeac70a433d16cdb937c941146bdbe5a145c3a5cdd4f8",
+      "kind": "completed_material"
+    },
+    {
+      "old_path": "workshop/framework_v2_followup_report.md",
+      "new_path": "workshop/completed/framework_v2_followup_report.md",
+      "original_storage": "workshop/archive/workshop_cleanup_20261008/originals/framework_v2_followup_report.md",
+      "sha256_before": "c5cf811ec31f66cd9a06026e2eb8ae31a6a94833ec308797d7ef0edb23c8da71",
+      "sha256_after": "0c1737ec0397c5706ba42b7602ffa612f5a289eb76009d06f54ca762a051e000",
+      "kind": "completed_material"
+    },
+    {
+      "old_path": "workshop/framework_v2_report.md",
+      "new_path": "workshop/completed/framework_v2_report.md",
+      "original_storage": "workshop/archive/workshop_cleanup_20261008/originals/framework_v2_report.md",
+      "sha256_before": "7a707d857d1ce9ef4e926bdf33e35427f3bf573fd59593e753384ceb557d9b43",
+      "sha256_after": "7a707d857d1ce9ef4e926bdf33e35427f3bf573fd59593e753384ceb557d9b43",
+      "kind": "completed_material"
+    },
+    {
+      "old_path": "workshop/project_structure_20261008.md",
+      "new_path": "workshop/completed/project_structure_20261008.md",
+      "original_storage": "workshop/archive/workshop_cleanup_20261008/originals/project_structure_20261008.md",
+      "sha256_before": "76332be45cc4cda1f0a14dcb7ab5032b8e31612897e1d9802fac90d35533d7b3",
+      "sha256_after": "e5c4cabd9ac4b2522f66bee232f1529cf2c34f57e94b65f8ab07122df2914d18",
+      "kind": "completed_material"
+    },
+    {
+      "old_path": "workshop/workshop_optimization_report.md",
+      "new_path": "workshop/completed/workshop_optimization_report.md",
+      "original_storage": "workshop/archive/workshop_cleanup_20261008/originals/workshop_optimization_report.md",
+      "sha256_before": "5fc7f4f3b6229f0a3d3d293e23431f472c9131827e3703285727f411c6e0e4b2",
+      "sha256_after": "7558c3e1069c26a7466fef26799f003a73e4a725a7364dd046e17c7bf3ce5e53",
+      "kind": "completed_material"
+    },
+    {
+      "old_path": "workshop/ALMML_sub.md",
+      "new_path": "workshop/archive/legacy_submission/ALMML_sub.md",
+      "original_storage": "workshop/archive/legacy_submission/ALMML_sub.md",
+      "sha256_before": "288250e3224567d7d9a429fb6876212c80f71dff3aa93117d0d5f60edc2d52c0",
+      "sha256_after": "288250e3224567d7d9a429fb6876212c80f71dff3aa93117d0d5f60edc2d52c0",
+      "kind": "archived_submission"
+    },
+    {
+      "old_path": "workshop/references/AIMLL WS.pdf",
+      "new_path": "workshop/archive/legacy_submission/AIMLL WS.pdf",
+      "original_storage": "workshop/archive/legacy_submission/AIMLL WS.pdf",
+      "sha256_before": "12aa2de486d19fd781c5f2818bcce5fa0930b6cc2b1a937b051e25601f41a754",
+      "sha256_after": "12aa2de486d19fd781c5f2818bcce5fa0930b6cc2b1a937b051e25601f41a754",
+      "kind": "archived_submission"
+    }
+  ],
+  "updated_documents": [
+    {
+      "path": "workshop/original_framework_direction_20261008.md",
+      "original_storage": "workshop/archive/workshop_cleanup_20261008/originals/original_framework_direction_20261008.md",
+      "sha256_before": "9b0418709c8725581b079f949bfb12b281a2816b07a6f80d717b76c0887c93e1",
+      "sha256_after": "28e29c9d28c226f36428b5d5ba19745002f0e4f33952b6286eb0c7394f35f257"
+    },
+    {
+      "path": "workshop/archive/project_structure_20261008/README.md",
+      "original_storage": "workshop/archive/workshop_cleanup_20261008/originals/project_structure_archive_index.md",
+      "sha256_before": "18643e8547140a43ee7b3dfd194f0b4e6ad55ccfcbce8e0d7819bcef26f95e2c",
+      "sha256_after": "77772e3eecbfff5940ee042ff61ec3fb497ddb3fd7fbf979981891c67ba66b20"
+    }
+  ],
+  "compatibility_links_to_retarget": [
+    {
+      "path": "/Users/luo/Desktop/AgentDefence/research/paper/framework_optimization_20261007.md",
+      "old_target": "../../DSCG/workshop/framework_optimization_20261007.md",
+      "target": "/Users/luo/Desktop/AgentDefence/DSCG/workshop/archive/workshop_cleanup_20261008/originals/framework_optimization_20261007.md",
+      "expected_sha256": "757694019490e363c09795a265f95477da972eaea572fd1ead892f12cfe7eba9"
+    },
+    {
+      "path": "/Users/luo/Desktop/AgentDefence/research/paper/framework_optimization_direction_20261007.md",
+      "old_target": "../../DSCG/workshop/framework_optimization_direction_20261007.md",
+      "target": "/Users/luo/Desktop/AgentDefence/DSCG/workshop/archive/workshop_cleanup_20261008/originals/framework_optimization_direction_20261007.md",
+      "expected_sha256": "1d5a5b7df47afabdb1b6c062ea1d734c4db6bfea24cd971dc37d74d55aca1f52"
+    },
+    {
+      "path": "/Users/luo/Desktop/AgentDefence/research/paper/framework_optimization_review_20261007.md",
+      "old_target": "../../DSCG/workshop/framework_optimization_review_20261007.md",
+      "target": "/Users/luo/Desktop/AgentDefence/DSCG/workshop/archive/workshop_cleanup_20261008/originals/framework_optimization_review_20261007.md",
+      "expected_sha256": "592e7603850b0a5433e6f40c0e8dd7daab82fbff40646c5c4593d4a1d320856c"
+    },
+    {
+      "path": "/Users/luo/Desktop/AgentDefence/research/paper/framework_optimization_v2_proposal_20261007.md",
+      "old_target": "../../DSCG/workshop/framework_optimization_v2_proposal_20261007.md",
+      "target": "/Users/luo/Desktop/AgentDefence/DSCG/workshop/archive/workshop_cleanup_20261008/originals/framework_optimization_v2_proposal_20261007.md",
+      "expected_sha256": "760441eb7dc865ab897eeac70a433d16cdb937c941146bdbe5a145c3a5cdd4f8"
+    }
+  ],
+  "pending_documents": [
+    "workshop/3_layer_opt.md",
+    "workshop/original_framework_direction_20261008.md"
+  ],
+  "unchanged_support_roots": [
+    "workshop/artifacts",
+    "workshop/results",
+    "workshop/archive/project_structure_20261008"
+  ],
+  "raw_results_moved": 0
+}

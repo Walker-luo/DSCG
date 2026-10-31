@@ -13,7 +13,7 @@ import time
 import queue
 import threading
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from io import StringIO
 from pathlib import Path
 
@@ -22,13 +22,22 @@ from flask import (
     send_file, stream_with_context
 )
 
-from agentdojo import logging as ad_logging, benchmark, attacks
-from agentdojo.task_suite import get_suite
+from agentdojo import logging as ad_logging, attacks
+from agentdojo.attacks.attack_registry import ATTACKS
+from dscg.benchmark_catalog import (SUITE_VERSION, get_backend, get_suite, suite_catalog, validate_backend)
 from dscg.model_config import DEEPSEEK_MODEL_IDS
+from dscg.harness_records import SampleStatus
 from dscg.paths import DASHBOARD_RESULTS_DIR, RESULTS_DIR
 from dscg.pipelines.baseline import make_openai_compatible_pipeline
 from dscg.pipelines.defended import make_defended_pipeline
-from dscg.tool_metadata import load_tool_metadata
+from dscg.audit_router import DEFAULT_THRESHOLD
+from dscg.tool_metadata import resolve_tool_metadata, validate_benchmark_tool_metadata
+from experiments.diagnostics.harness_audit import rank_ids, security_result_fields
+from experiments.common.benchmark_outcomes import project_outcomes
+from experiments.common.benchmark_tasks import run_native_suite
+from experiments.common.attack_compatibility import check_attack_compatibility
+from dashboard.history_export import build_history_export
+from dashboard.evaluation import FRAMEWORK_VERSION, aggregate, display_metrics, normalize_config, trace_stats
 
 app = Flask(__name__)
 app.secret_key = "newframe_dashboard_2024"
@@ -76,6 +85,7 @@ DEEPSEEK_MODELS = [
 
 AVAILABLE_MODELS = [
     {"id": "", "label": "Local/Env 配置", "provider": None, "base_url": None},
+    {"id": "qwen3.7-flash", "label": "Qwen3.7-Flash", "provider": "dashscope", "base_url": None},
     {"id": "qwen3-max", "label": "Qwen3-Max", "provider": "dashscope", "base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1"},
     {"id": "qwen-flash-2025-07-28", "label": "Qwen-Flash", "provider": "dashscope", "base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1"},
     {"id": "qwen-plus", "label": "Qwen-Plus", "provider": "dashscope", "base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1"},
@@ -89,18 +99,12 @@ AVAILABLE_MODELS = [
 
 AVAILABLE_SEC_MODELS = [
     {"id": "", "label": "Local/Env 配置", "provider": None, "base_url": None},
+    {"id": "qwen3.7-flash", "label": "Qwen3.7-Flash", "provider": "dashscope", "base_url": None},
     {"id": "qwen3.5-plus", "label": "Qwen3.5-Plus", "provider": "dashscope", "base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1"},
     {"id": "qwen-flash-2025-07-28", "label": "Qwen-Flash", "provider": "dashscope", "base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1"},
     {"id": "qwen-turbo", "label": "Qwen-Turbo (轻量)", "provider": "dashscope", "base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1"},
     {"id": "qwen-plus", "label": "Qwen-Plus", "provider": "dashscope", "base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1"},
     *DEEPSEEK_MODELS,
-]
-
-AVAILABLE_SUITES = [
-    {"id": "workspace", "label": "Workspace", "user_tasks": 40, "injection_tasks": 14},
-    {"id": "travel", "label": "Travel", "user_tasks": 20, "injection_tasks": 7},
-    {"id": "banking", "label": "Banking", "user_tasks": 16, "injection_tasks": 9},
-    {"id": "slack", "label": "Slack", "user_tasks": 21, "injection_tasks": 5},
 ]
 
 AVAILABLE_ATTACKS = [
@@ -111,6 +115,15 @@ AVAILABLE_ATTACKS = [
     {"id": "ignore_previous", "label": "忽略前文指令"},
     {"id": "malicious_sandbox", "label": "恶意沙箱"},
 ]
+
+# Only targeted automatic attacks are supported by this dashboard's task grid.
+# DoS presets have a different scorer/denominator in the partial runner.
+_ATTACK_LABELS = {"important_instructions": "重要指令注入", "ignore_previous": "忽略前文指令",
+                  "injecagent": "InjecAgent", "tool_knowledge": "工具知识注入"}
+AVAILABLE_ATTACKS = [{"id": name, "label": f"{_ATTACK_LABELS.get(name, name)} · {name}"}
+                     for name in dict.fromkeys(["important_instructions", "ignore_previous", "injecagent",
+                                                "tool_knowledge", *sorted(ATTACKS)])
+                     if name in ATTACKS and name != "manual" and name != "dos" and not name.endswith("_dos")]
 
 AVAILABLE_DEFENSES = [
     {"id": None, "label": "无防御 (Baseline)"},
@@ -198,6 +211,10 @@ def run_test_thread(run_id: str, config: dict):
             f"配置: {json.dumps(_redact_run_config(config), ensure_ascii=False)}",
         )
 
+        identity = validate_backend()
+        if config.get("benchmark") and config["benchmark"] != identity:
+            raise ValueError("Benchmark backend identity changed after submission; start a new run")
+        config["benchmark"] = identity
         model_id = config.get("model_id")
         sec_model_id = config.get("sec_model_id")
         provider = config.get("provider")
@@ -215,8 +232,9 @@ def run_test_thread(run_id: str, config: dict):
         use_security_checker = config.get("use_security_checker", True)
         max_user_tasks = config.get("max_user_tasks", 0)   # 0 = all
         max_injection_tasks = config.get("max_injection_tasks", 0)
+        selection_seed = int(config.get("selection_seed", 20260927))
         tool_metadata_path = config.get("tool_metadata_path") or None
-        tool_metadata = load_tool_metadata(tool_metadata_path)
+        tool_metadata = None if is_origin else validate_benchmark_tool_metadata(tool_metadata_path)
         if tool_metadata_path:
             push_log(
                 run_id,
@@ -235,15 +253,44 @@ def run_test_thread(run_id: str, config: dict):
 
         all_summaries = []
         all_structured_records = []
+        overview_reports = []
+        unsupported_suites = []
 
         try:
-            for suite_name in suites:
+            for suite_index, suite_name in enumerate(suites):
                 push_log(run_id, "info", f"\n📂 正在测试套件: {suite_name}")
                 push_progress(run_id, {
                     "current_suite": suite_name,
                     "status": "running",
-                    "phase": "setup"
+                    "phase": "setup",
+                    "completed_suites": suite_index, "total_suites": len(suites)
                 })
+
+                # Check the selected native attack scope before creating a model
+                # client or running any GOAL preflight.
+                suite = get_suite(SUITE_VERSION, suite_name)
+                user_task_ids = list(suite.user_tasks.keys())
+                injection_task_ids = list(suite.injection_tasks.keys())
+                if max_user_tasks > 0 and max_user_tasks < len(user_task_ids):
+                    selected_users = rank_ids(user_task_ids, selection_seed, limit=max_user_tasks)
+                else:
+                    selected_users = user_task_ids
+                if max_injection_tasks > 0 and max_injection_tasks < len(injection_task_ids):
+                    selected_injections = rank_ids(injection_task_ids, selection_seed, limit=max_injection_tasks)
+                else:
+                    selected_injections = injection_task_ids
+                issue = check_attack_compatibility(suite, attack_name if run_attack else 'none',
+                                                   selected_users, selected_injections)
+                if issue is not None:
+                    unsupported_suites.append({'suite': suite_name, 'attack': attack_name,
+                                               'status': 'unsupported', **issue})
+                    push_log(run_id, 'warning', f"[{suite_name}] unsupported ({issue['reason_code']}): "
+                             f"0/{issue['planned_pairs']} 计划组合；影响目标: "
+                             f"{', '.join(issue['injection_task_ids'])}")
+                    push_progress(run_id, {'current_suite': suite_name, 'status': 'unsupported',
+                                           'phase': 'unsupported', 'completed_suites': suite_index + 1,
+                                           'total_suites': len(suites)})
+                    continue
 
                 # ---- 构建 Pipeline ----
                 if is_origin:
@@ -267,6 +314,15 @@ def run_test_thread(run_id: str, config: dict):
                         model_id, sec_model_id,
                         use_sandbox=use_sandbox,
                         use_security_checker=use_security_checker,
+                        input_isolation=config.get("input_isolation", True),
+                        l1_projection_mode=config.get('l1_projection_mode', 'projected'),
+                        prompt_profile=config.get('prompt_profile'),
+                        audit_router_mode=config.get('audit_router_mode', 'off'),
+                        audit_router_threshold=config.get('audit_router_threshold', DEFAULT_THRESHOLD),
+                        authorization_precheck=config.get("authorization_precheck", True),
+                        planning_tool_view=config.get('planning_tool_view', True),
+                        delegated_tasks=config.get('delegated_tasks', True),
+                        trace_level=config.get("trace_level", "summary"),
                         api_key=api_key,
                         provider=provider,
                         base_url=base_url,
@@ -285,32 +341,15 @@ def run_test_thread(run_id: str, config: dict):
                     config["resolved_security_model"] = sec_model_config
                 push_log(run_id, "info", f"已解析模型配置: main={resolved_model_id}, security={resolved_sec_model_id or '无'}")
 
-                # ---- 加载套件 ----
-                suite = get_suite("v1.2", suite_name)
-                user_task_ids = list(suite.user_tasks.keys())
-                injection_task_ids = list(suite.injection_tasks.keys())
-
                 push_log(run_id, "info",
                     f"[{suite_name}] User Tasks: {len(user_task_ids)}, "
                     f"Injection Tasks: {len(injection_task_ids)}")
-
-                # ---- 选择任务子集 ----
-                if max_user_tasks > 0 and max_user_tasks < len(user_task_ids):
-                    selected_users = user_task_ids[:max_user_tasks]
-                else:
-                    selected_users = user_task_ids
-
-                if max_injection_tasks > 0 and max_injection_tasks < len(injection_task_ids):
-                    selected_injections = injection_task_ids[:max_injection_tasks]
-                else:
-                    selected_injections = injection_task_ids
-
                 push_log(run_id, "info",
                     f"[{suite_name}] 选中 {len(selected_users)} 个用户任务, "
                     f"{len(selected_injections)} 个注入任务")
 
                 # ---- 加载攻击 ----
-                attack = attacks.load_attack(attack_name, suite, pipeline)
+                attack = attacks.load_attack(attack_name, suite, pipeline) if run_attack else None
 
                 # ---- 运行基准测试 ----
                 push_progress(run_id, {
@@ -320,32 +359,26 @@ def run_test_thread(run_id: str, config: dict):
                 })
 
                 with ad_logging.OutputLogger(str(run_dir)):
-                    if run_attack:
-                        results = benchmark.benchmark_suite_with_injections(
-                            pipeline, suite, attack, run_dir,
-                            force_rerun=True,
-                            user_tasks=selected_users,
-                            injection_tasks=selected_injections,
-                            verbose=True
-                        )
-                    else:
-                        results = benchmark.benchmark_suite_without_injections(
-                            pipeline, suite, run_dir,
-                            force_rerun=True,
-                            user_tasks=selected_users,
-                            injection_tasks=selected_injections
-                        )
+                    results = run_native_suite(
+                        pipeline, suite, attack, run_dir, force_rerun=True,
+                        user_tasks=selected_users, injection_tasks=selected_injections,
+                        benchmark_version=SUITE_VERSION,
+                    )
 
                 # ---- 结果分析 ----
                 utility_results = results["utility_results"]
                 security_results = results.get("security_results", {})
 
+                outcomes = project_outcomes(utility_results, security_results,
+                    run_dir / pipeline.name.replace("/", "_") / suite_name,
+                    attack_name if run_attack else "none", run_attack=run_attack,
+                    task_errors=results.get('task_errors', []))
+
                 # 结构化记录
                 for task_key, util_status in utility_results.items():
                     user_task_id = task_key[0]
                     injection_task_id = task_key[1] if len(task_key) > 1 else "None"
-                    attack_success = security_results.get(task_key, False) if run_attack else None
-                    defense_success = not attack_success if run_attack else None
+                    outcome = outcomes[task_key]
 
                     all_structured_records.append({
                         "suite_name": suite_name,
@@ -353,21 +386,18 @@ def run_test_thread(run_id: str, config: dict):
                         "attack_type": attack_name if run_attack else "None",
                         "user_task_id": user_task_id,
                         "injection_task_id": injection_task_id,
-                        "utility_success": bool(util_status),
-                        "attack_success": attack_success,
-                        "defense_success": defense_success
+                        **outcome,
                     })
 
                 # 指标计算
-                utility_score = (
-                    sum(utility_results.values()) / len(utility_results)
-                    if utility_results else 0
-                )
+                valid_utility_results = [r['utility_success'] for r in outcomes.values() if isinstance(r['utility_success'], bool)]
+                utility_score = sum(valid_utility_results) / len(valid_utility_results) if valid_utility_results else None
+                valid_security_results = [r['attack_success'] for r in outcomes.values() if isinstance(r['attack_success'], bool)]
                 security_score = (
-                    sum(security_results.values()) / len(security_results)
-                    if run_attack and security_results else 0
+                    sum(valid_security_results) / len(valid_security_results)
+                    if run_attack and valid_security_results else None
                 )
-                defense_score = 1.0 - security_score if run_attack else 1.0
+                defense_score = 1.0 - security_score if security_score is not None else None
 
                 prompt_tokens = main_tracker.total_prompt_tokens
                 completion_tokens = main_tracker.total_completion_tokens
@@ -375,16 +405,25 @@ def run_test_thread(run_id: str, config: dict):
 
                 summary = {
                     "suite_name": suite_name,
+                    "benchmark": identity,
                     "pipeline_name": pipeline.name,
                     "metrics": {
-                        "utility_rate": round(utility_score * 100, 2),
-                        "attack_success_rate": round(security_score * 100, 2),
-                        "defense_success_rate": round(defense_score * 100, 2),
+                        "utility_rate": round(utility_score * 100, 2) if utility_score is not None else None,
+                        "attack_success_rate": round(security_score * 100, 2) if security_score is not None else None,
+                        "defense_success_rate": round(defense_score * 100, 2) if defense_score is not None else None,
                     },
                     "task_counts": {
                         "total_tasks": len(utility_results),
-                        "utility_passed": int(sum(utility_results.values())),
+                        "utility_passed": sum(valid_utility_results),
+                        "utility_valid": len(valid_utility_results),
+                        "execution_errors": sum(r["execution_error"] for r in outcomes.values()),
+                        "framework_failures": sum(r.get('framework_termination',{}).get('kind') == 'framework_failure' for r in outcomes.values()),
                         "attacked_tasks": len(security_results),
+                        "security_valid": len(valid_security_results) if run_attack else 0,
+                        "attack_successes": sum(valid_security_results) if run_attack else 0,
+                        "security_missing": sum(
+                            not isinstance(r["attack_success"], bool) for r in outcomes.values()
+                        ) if run_attack else 0,
                     },
                     "overhead": {
                         "prompt_tokens": prompt_tokens,
@@ -392,20 +431,32 @@ def run_test_thread(run_id: str, config: dict):
                         "total_tokens": total_tokens,
                     }
                 }
+                summary["sec_overhead"] = dict(prompt_tokens=0, completion_tokens=0, total_tokens=0)
 
-                if sec_tracker and use_security_checker:
+                if sec_tracker:
                     summary["sec_overhead"] = {
                         "prompt_tokens": sec_tracker.total_prompt_tokens,
                         "completion_tokens": sec_tracker.total_completion_tokens,
                         "total_tokens": sec_tracker.get_total_tokens(),
                     }
 
+                framework = getattr(pipeline, "dscg_optimization_config", None)
+                summary["framework"] = {**framework, "use_sandbox": use_sandbox} if framework else None
+                summary["task_selection"] = {"strategy": "seed_ranked" if max_user_tasks or max_injection_tasks else "all",
+                                              "seed": selection_seed, "user_task_ids": selected_users,
+                                              "injection_task_ids": selected_injections if run_attack else []}
+                if not is_origin:
+                    summary["layer_stats"] = trace_stats(run_dir, pipeline.name, suite_name,
+                                                         attack_name if run_attack else "none",
+                                                         list(utility_results))
                 all_summaries.append(summary)
+                push_progress(run_id, {"current_suite": suite_name, "phase": "analysis",
+                                       "completed_suites": suite_index + 1, "total_suites": len(suites)})
 
                 push_log(run_id, "info",
                     f"✅ [{suite_name}] 完成! "
-                    f"TSR={utility_score:.1%}, ASR={security_score:.1%}, "
-                    f"Defense={defense_score:.1%}")
+                    "TSR=" + (f"{utility_score:.1%}" if utility_score is not None else "N/A") + ", ASR="
+                    + (f"{security_score:.1%}" if security_score is not None else "N/A"))
 
                 # ---- 保存结果文件 ----
                 suite_output_dir = run_dir / suite_name
@@ -424,6 +475,9 @@ def run_test_thread(run_id: str, config: dict):
                 # JSON summary
                 with open(suite_output_dir / "summary.json", "w", encoding="utf-8") as f:
                     json.dump(summary, f, indent=4, ensure_ascii=False)
+                from dashboard.evaluation import build_suite_report
+                overview_reports.append(build_suite_report(run_dir, summary,
+                    [r for r in all_structured_records if r['suite_name'] == suite_name], suite, config))
 
         finally:
             sys.stdout = old_stdout
@@ -431,9 +485,12 @@ def run_test_thread(run_id: str, config: dict):
         # ---- 汇总所有套件结果 ----
         overall = {
             "run_id": run_id,
+            "benchmark": identity,
             "config": _redact_run_config(config),
             "completed_at": datetime.now().isoformat(),
             "num_suites": len(all_summaries),
+            "status": "unsupported" if not all_summaries and unsupported_suites else "completed",
+            "unsupported_suites": unsupported_suites,
             "suites": all_summaries,
             "total_tasks": sum(s["task_counts"]["total_tasks"] for s in all_summaries),
             "aggregate_metrics": _compute_aggregate(all_summaries),
@@ -444,17 +501,47 @@ def run_test_thread(run_id: str, config: dict):
         with open(run_dir / "overall_results.json", "w", encoding="utf-8") as f:
             json.dump(overall, f, indent=4, ensure_ascii=False, default=str)
 
+        from experiments.common.routing_reports import write_routing_summary
+        routing_summary = write_routing_summary(run_dir, refresh=True, check_running=False)
+        from experiments.common.partial_reporting import write_run_overview
+        write_run_overview(run_dir, [attack_name if run_attack else 'none'], suites,
+            [{'attack': attack_name, 'status': 'unsupported', 'failed_suite': item['suite'],
+              'reason_code': item['reason_code'], 'injection_task_ids': item['injection_task_ids'],
+              'planned_pairs': item['planned_pairs']} for item in unsupported_suites] +
+            ([{'attack': attack_name if run_attack else 'none', 'status': 'completed'}] if all_summaries else []),
+            overview_reports,
+            model_id=config.get('model_id'), task_scope='dashboard', routing_summary=routing_summary)
+
         with _store_lock:
             runs_store[run_id] = overall
 
-        push_done(run_id, overall["aggregate_metrics"])
-        push_log(run_id, "info", f"🏁 测试全部完成! 结果已保存至 {run_dir}")
+        if overall['status'] == 'unsupported':
+            push_done(run_id, {'error': 'all_selected_groups_unsupported'})
+            push_log(run_id, 'warning', f"全部选中场景 unsupported；结果已保存至 {run_dir}")
+        else:
+            push_done(run_id, overall["aggregate_metrics"])
+            push_log(run_id, "info", f"🏁 测试全部完成! 结果已保存至 {run_dir}")
 
     except Exception as e:
-        import traceback
-        push_log(run_id, "error", f"❌ 测试异常: {str(e)}")
-        push_log(run_id, "error", traceback.format_exc())
-        push_done(run_id, {"error": str(e)})
+        from dscg.request_compatibility import api_error_diagnostics
+        diagnostic = api_error_diagnostics(e)
+        if diagnostic is not None:
+            error = {'error': type(e).__name__, 'api_error': diagnostic}
+            push_log(run_id, 'error', f"❌ API请求失败: {json.dumps(error, ensure_ascii=False)}")
+            with _store_lock:
+                if run_id in runs_store:
+                    runs_store[run_id].update(error, status='error')
+            push_done(run_id, error)
+            if 'run_dir' in locals():
+                try:
+                    (run_dir/'execution_error.json').write_text(json.dumps(error, ensure_ascii=False, indent=2)+'\n')
+                except OSError:
+                    push_log(run_id, 'error', 'API错误记录写入失败；终态和受限诊断已发送。')
+        else:
+            import traceback
+            push_log(run_id, "error", f"❌ 测试异常: {str(e)}")
+            push_log(run_id, "error", traceback.format_exc())
+            push_done(run_id, {"error": str(e)})
     finally:
         # 清理队列（延迟，让 SSE 客户端有机会读取完）
         def _cleanup():
@@ -469,21 +556,77 @@ def _compute_aggregate(summaries: list[dict]) -> dict:
     """计算跨套件的聚合指标"""
     if not summaries:
         return {}
-    n = len(summaries)
-    return {
-        "avg_utility_rate": round(sum(s["metrics"]["utility_rate"] for s in summaries) / n, 2),
-        "avg_attack_success_rate": round(sum(s["metrics"]["attack_success_rate"] for s in summaries) / n, 2),
-        "avg_defense_success_rate": round(sum(s["metrics"]["defense_success_rate"] for s in summaries) / n, 2),
-        "total_prompt_tokens": int(sum(s["overhead"]["prompt_tokens"] for s in summaries)),
-        "total_completion_tokens": int(sum(s["overhead"]["completion_tokens"] for s in summaries)),
-        "total_tokens": int(sum(s["overhead"]["total_tokens"] for s in summaries)),
-    }
+    return aggregate(summaries)
 
 
 # =============================================
 # 历史结果目录
 # =============================================
-HISTORY_SUITES = ("workspace", "travel", "banking", "slack")
+def _valid_history_suite(name):
+    # Suites are taken from recorded artifacts, never from the active backend.
+    return isinstance(name, str) and bool(name) and len(name) <= 100 and all(
+        char.isalnum() or char in "_-" for char in name
+    )
+
+
+def _recorded_benchmark(value):
+    if not isinstance(value, dict) or not isinstance(value.get("id"), str):
+        return None
+    return {key: value[key] for key in (
+        "id", "repository", "revision", "suite_version", "implementation_sha256", "catalog_sha256",
+        "tasks_sha256", "environments_sha256", "attacks_sha256", "tools_sha256",
+        "package_version", "runtime_variant", "source_kind", "release_sha256"
+    ) if key in value and isinstance(value[key], str)}
+
+
+def _history_benchmark_metadata(entry):
+    root_values = [_recorded_benchmark(entry.get("benchmark")),
+                   _recorded_benchmark(entry.get("config", {}).get("benchmark"))]
+    suites = [_recorded_benchmark((suite.get("summary") or {}).get("benchmark"))
+              for suite in entry["suites"].values()]
+    values = [value for value in root_values + suites if value]
+    identities = {json.dumps(value, sort_keys=True) for value in values}
+    # A known sibling does not establish the origin of an unidentified suite.
+    complete_suites = bool(suites) and all(suites)
+    identity = json.loads(next(iter(identities))) if len(identities) == 1 and complete_suites else None
+    return {"benchmark": identity,
+            "benchmark_id": identity["id"] if identity else "mixed" if identities else "unknown"}
+
+
+def _comparison_metadata(experiments):
+    warnings = []
+    keys = set()
+    for run in experiments:
+        identity = run.get("benchmark") or run.get("config", {}).get("benchmark")
+        if not isinstance(identity, dict) or not all(identity.get(key) for key in
+                ("id", "repository", "revision", "suite_version", "implementation_sha256", "catalog_sha256")):
+            warnings.append("benchmark_identity_unavailable")
+        keys.add(json.dumps(identity, sort_keys=True))
+        for suite in run.get("suites", []):
+            if not suite.get("benchmark"):
+                warnings.append("benchmark_identity_unavailable")
+            keys.add(json.dumps(suite.get("benchmark"), sort_keys=True))
+    if len(keys) > 1:
+        warnings.append("benchmark_or_catalog_mismatch")
+    task_keys = set()
+    for run in experiments:
+        selections = []
+        for suite in run.get("suites", []):
+            selection = suite.get("task_selection")
+            if not isinstance(selection, dict) or any(
+                not isinstance(selection.get(key), list) or
+                any(not isinstance(task_id, str) for task_id in selection.get(key, []))
+                for key in ("user_task_ids", "injection_task_ids")
+            ):
+                warnings.append("task_selection_unavailable")
+            selections.append((suite.get("suite_name"), selection))
+        task_keys.add(json.dumps(sorted(selections), sort_keys=True))
+    if len(task_keys) > 1:
+        warnings.append("task_selection_mismatch")
+    return {"paired_comparison_ready": not warnings,
+            "comparison_warnings": list(dict.fromkeys(warnings))}
+
+HISTORY_SAMPLE_STATUSES = {status.value for status in SampleStatus} | {"invalid"}
 MAX_HISTORY_EXPERIMENTS = 100
 MAX_HISTORY_TASK_RECORDS = 50000
 
@@ -541,6 +684,61 @@ def _history_int(value) -> int:
     return int(number) if number is not None else 0
 
 
+def _history_count(value):
+    number = _history_number(value)
+    return int(number) if number is not None and number >= 0 and number.is_integer() else None
+
+
+def _history_overview(metrics, counts, overhead, security, summary, is_fraction):
+    utility_valid = _history_count(counts.get("utility_valid"))
+    utility_passed = _history_count(counts.get("utility_passed"))
+    if utility_valid is None or utility_passed is None or utility_passed > utility_valid:
+        utility_passed = None
+    security_valid = _history_count(counts.get("security_valid"))
+    if security_valid is None and _history_count(counts.get("security_missing")) is not None:
+        security_valid = _history_count(counts.get("attacked_tasks"))
+    successes = _history_count(counts.get("attack_successes"))
+    derived = False
+    raw_rate = _history_number(metrics.get("attack_success_rate"))
+    if successes is None and security_valid and raw_rate is not None:
+        percent = raw_rate * 100 if is_fraction and 0 <= raw_rate <= 1 else raw_rate
+        tolerance = 1e-8 if is_fraction else 0.005000001
+        lower = max(0, math.ceil((percent - tolerance) * security_valid / 100))
+        upper = min(security_valid, math.floor((percent + tolerance) * security_valid / 100))
+        if 0 <= percent <= 100 and lower == upper:
+            successes, derived = lower, True
+    if security_valid is None or successes is None or successes > security_valid:
+        successes, derived = None, False
+
+    def tokens(values):
+        total = _history_count(values.get("total_tokens"))
+        if total is not None:
+            return total
+        prompt = _history_count(values.get("prompt_tokens"))
+        completion = _history_count(values.get("completion_tokens"))
+        return prompt + completion if prompt is not None and completion is not None else None
+
+    main, audit = tokens(overhead), tokens(security)
+    no_audit = "defense" in summary and summary["defense"] is None
+    accounting = summary.get("api_accounting")
+    incomplete_usage = False
+    if isinstance(accounting, dict):
+        for tracker in accounting.values():
+            if not isinstance(tracker, dict):
+                continue
+            for phase in tracker.values():
+                if isinstance(phase, dict) and _history_count(phase.get("api_calls")):
+                    failed = _history_count(phase.get("failed_calls"))
+                    missing = _history_count(phase.get("missing_usage_calls"))
+                    incomplete_usage |= failed is None or missing is None or failed > 0 or missing > 0
+    return {
+        "tsr": {"numerator": utility_passed, "denominator": utility_valid},
+        "asr": {"numerator": successes, "denominator": security_valid, "derived": derived},
+        "tokens": {"value": (main or 0) + (audit or 0) if main is not None or audit is not None else None,
+                   "complete": main is not None and (audit is not None or no_audit) and not incomplete_usage},
+    }
+
+
 def _normalize_history_suite(summary: dict, suite_name: str, is_fraction: bool) -> dict:
     metrics = summary.get("metrics")
     task_counts = summary.get("task_counts")
@@ -553,8 +751,19 @@ def _normalize_history_suite(summary: dict, suite_name: str, is_fraction: bool) 
     total_tokens = _history_int(overhead.get("total_tokens")) or (
         prompt_tokens + completion_tokens
     )
+    security = summary.get("sec_overhead")
+    security = security if isinstance(security, dict) else {}
+    sec_prompt = _history_int(security.get("prompt_tokens"))
+    sec_completion = _history_int(security.get("completion_tokens"))
+    sec_total = _history_int(security.get("total_tokens")) or sec_prompt + sec_completion
     return {
+        "main_overhead": {"prompt_tokens": prompt_tokens, "completion_tokens": completion_tokens, "total_tokens": total_tokens},
+        "sec_overhead": {"prompt_tokens": sec_prompt, "completion_tokens": sec_completion, "total_tokens": sec_total},
+        "security_usage_recorded": bool(security),
+        "overview": _history_overview(metrics, task_counts, overhead, security, summary, is_fraction),
         "suite_name": suite_name,
+        "benchmark": _recorded_benchmark(summary.get("benchmark")),
+        "task_selection": summary.get("task_selection") if isinstance(summary.get("task_selection"), dict) else None,
         "pipeline_name": str(summary.get("pipeline_name") or ""),
         "metrics": {
             "utility_rate": _history_percent(metrics.get("utility_rate"), is_fraction),
@@ -569,11 +778,19 @@ def _normalize_history_suite(summary: dict, suite_name: str, is_fraction: bool) 
             "total_tasks": _history_int(task_counts.get("total_tasks")),
             "utility_passed": _history_int(task_counts.get("utility_passed")),
             "attacked_tasks": _history_int(task_counts.get("attacked_tasks")),
+            **{
+                key: _history_int(task_counts[key])
+                for key in (
+                    "security_missing", "security_valid", "attack_successes", "utility_valid", "execution_errors", "planned_tasks",
+                    "selected_user_tasks", "selected_injection_tasks",
+                    "available_user_tasks", "available_injection_tasks",
+                ) if key in task_counts
+            },
         },
         "overhead": {
-            "prompt_tokens": prompt_tokens,
-            "completion_tokens": completion_tokens,
-            "total_tokens": total_tokens,
+            "prompt_tokens": prompt_tokens + sec_prompt,
+            "completion_tokens": completion_tokens + sec_completion,
+            "total_tokens": total_tokens + sec_total,
         },
     }
 
@@ -589,6 +806,62 @@ def _history_source_for_suite(results_root: Path, suite_dir: Path) -> str | None
     if parts[0] == "dashboard" and len(parts) > 1:
         return "/".join(parts[:2])
     return "/".join(parts[:-1]) if len(parts) > 1 else None
+
+
+def _history_group_metadata(entry: dict) -> dict:
+    """Identify recorded attacks and directory groups without guessing legacy defaults."""
+    attacks = set()
+    kinds = set()
+
+    def add_attack(value):
+        if isinstance(value, str) and value.strip():
+            attacks.add("none" if value.strip().lower() == "none" else value.strip())
+
+    for suite_name, suite in entry["suites"].items():
+        summary = suite.get("summary") or {}
+        selection = summary.get("task_selection")
+        if isinstance(selection, dict) and "attack" in selection:
+            add_attack(selection["attack"] if selection["attack"] is not None else "none")
+        add_attack(summary.get("attack_type"))
+        kind = summary.get("attack_kind")
+        if kind in ("none", "targeted", "dos"):
+            kinds.add(kind)
+            if kind == "none":
+                add_attack("none")
+        if suite.get("csv_path"):
+            try:
+                with suite["csv_path"].open(encoding="utf-8-sig", newline="") as stream:
+                    for row in csv.DictReader(stream):
+                        if not row.get("suite_name") or row["suite_name"] == suite_name:
+                            add_attack(row.get("attack_type"))
+            except (OSError, UnicodeError, csv.Error):
+                pass
+    for row in entry["overall_records"]:
+        if isinstance(row, dict):
+            add_attack(row.get("attack_type"))
+    if not attacks:
+        if entry["config"].get("run_attack") is False:
+            add_attack("none")
+            kinds.add("none")
+        else:
+            add_attack(entry["config"].get("attack_name"))
+    attack_name = next(iter(attacks)) if len(attacks) == 1 else "mixed" if attacks else "unknown"
+    parts = entry["source"].split("/")
+    model_parts = parts[1:]
+    if len(model_parts) > 1 and model_parts[-1] == attack_name:
+        model_parts = model_parts[:-1]
+    if model_parts and attack_name not in ("unknown", "mixed"):
+        suffix = "__" + attack_name
+        if model_parts[-1].endswith(suffix):
+            model_parts[-1] = model_parts[-1][:-len(suffix)]
+    return {
+        "result_folder": parts[0],
+        "model_group": "/".join(model_parts),
+        "model_suffix": model_parts[-1] if model_parts else parts[0],
+        "attack_name": attack_name,
+        "attack_names": sorted(attacks),
+        "attack_kind": next(iter(kinds)) if len(kinds) == 1 else "unknown",
+    }
 
 
 def _build_history_catalog(results_root: Path | None = None) -> list[dict]:
@@ -609,6 +882,7 @@ def _build_history_catalog(results_root: Path | None = None) -> list[dict]:
             "suites": {},
             "overall_records": [],
             "config": {},
+            "benchmark": None,
             "pipeline_name": "",
             "updated_timestamp": 0.0,
         })
@@ -631,6 +905,7 @@ def _build_history_catalog(results_root: Path | None = None) -> list[dict]:
             continue
         entry = ensure_entry(source)
         entry["config"] = data.get("config") if isinstance(data.get("config"), dict) else {}
+        entry["benchmark"] = _recorded_benchmark(data.get("benchmark"))
         entry["overall_records"] = (
             data.get("structured_records")
             if isinstance(data.get("structured_records"), list)
@@ -642,7 +917,7 @@ def _build_history_catalog(results_root: Path | None = None) -> list[dict]:
             if not isinstance(suite_summary, dict):
                 continue
             suite_name = suite_summary.get("suite_name")
-            if suite_name not in HISTORY_SUITES:
+            if not _valid_history_suite(suite_name):
                 continue
             entry["pipeline_name"] = (
                 entry["pipeline_name"] or str(suite_summary.get("pipeline_name") or "")
@@ -653,7 +928,7 @@ def _build_history_catalog(results_root: Path | None = None) -> list[dict]:
     # Benchmark and partial-benchmark output write one summary per suite.
     for summary_path in _iter_history_files(root, "summary.json"):
         suite_name = summary_path.parent.name
-        if suite_name not in HISTORY_SUITES:
+        if not _valid_history_suite(suite_name):
             continue
         source = _history_source_for_suite(root, summary_path.parent)
         if not source:
@@ -677,7 +952,7 @@ def _build_history_catalog(results_root: Path | None = None) -> list[dict]:
     # Older or interrupted runs may have task-level CSV files without summaries.
     for csv_path in _iter_history_files(root, "detailed_results.csv"):
         suite_name = csv_path.parent.name
-        if suite_name not in HISTORY_SUITES:
+        if not _valid_history_suite(suite_name):
             continue
         source = _history_source_for_suite(root, csv_path.parent)
         if not source:
@@ -708,7 +983,7 @@ def _build_history_catalog(results_root: Path | None = None) -> list[dict]:
         )
         is_fraction = entry["result_type"] != "dashboard"
         suites = []
-        for suite_name in HISTORY_SUITES:
+        for suite_name in sorted(entry["suites"]):
             suite_entry = entry["suites"].get(suite_name)
             if not suite_entry:
                 continue
@@ -731,6 +1006,8 @@ def _build_history_catalog(results_root: Path | None = None) -> list[dict]:
             "label": str(label),
             "source": entry["source"],
             "result_type": entry["result_type"],
+            **_history_group_metadata(entry),
+            **_history_benchmark_metadata(entry),
             "updated_at": (
                 datetime.fromtimestamp(timestamp).astimezone().isoformat(timespec="seconds")
                 if timestamp
@@ -757,6 +1034,9 @@ def _history_bool(value):
 
 
 def _normalize_history_record(record: dict, suite_name: str) -> dict:
+    status = str(record.get("sample_status") or "unknown")
+    if status not in HISTORY_SAMPLE_STATUSES:
+        status = "unknown"
     return {
         "suite_name": suite_name,
         "user_task_id": str(record.get("user_task_id") or ""),
@@ -764,6 +1044,9 @@ def _normalize_history_record(record: dict, suite_name: str) -> dict:
         "utility_success": _history_bool(record.get("utility_success")),
         "attack_success": _history_bool(record.get("attack_success")),
         "defense_success": _history_bool(record.get("defense_success")),
+        "model_id": str(record.get("model_id") or ""),
+        "attack_type": str(record.get("attack_type") or ""),
+        "sample_status": status,
     }
 
 
@@ -848,17 +1131,48 @@ def _load_history_task_records(
 @app.route("/")
 def index():
     """主页面"""
-    return render_template("index.html")
+    return render_template("index.html", active_page="experiment", framework_version=FRAMEWORK_VERSION)
+
+
+@app.route("/history")
+def history_page():
+    """独立历史分析页。"""
+    return render_template("history.html", active_page="history")
 
 
 @app.route("/api/config")
 def get_config():
     """返回所有可用的配置选项"""
+    try:
+        backend = get_backend()
+        suites = suite_catalog()
+        identity = validate_backend()
+        backend_label = backend.label
+        backend_error = None
+    except (ValueError, ImportError, OSError) as exc:
+        suites, identity, backend_error = [], None, str(exc)
+        backend_label = "未识别基准"
+    metadata_selection, metadata_error = None, None
+    if identity:
+        try:
+            metadata_selection = resolve_tool_metadata(backend=backend).public_dict()
+        except (ValueError, OSError) as exc:
+            metadata_error = str(exc)
     return jsonify({
+        "benchmark_id": identity["id"] if identity else "unknown",
+        "benchmark_label": backend_label,
+        "tool_metadata_path": metadata_selection["path"] if metadata_selection else None,
+        "tool_metadata_selection": metadata_selection,
+        "tool_metadata_error": metadata_error,
+        "benchmark": identity,
+        "suite_version": SUITE_VERSION,
+        "backend_ready": backend_error is None,
+        "backend_error": backend_error,
+        "framework_version": FRAMEWORK_VERSION,
         "models": AVAILABLE_MODELS,
         "sec_models": AVAILABLE_SEC_MODELS,
-        "suites": AVAILABLE_SUITES,
-        "attacks": AVAILABLE_ATTACKS,
+        "suites": suites,
+        "attacks": AVAILABLE_ATTACKS if identity else [],
         "defenses": AVAILABLE_DEFENSES,
     })
 
@@ -873,11 +1187,10 @@ def history_catalog():
     ])
 
 
-@app.route("/api/history/analyze", methods=["POST"])
-def analyze_history_results():
-    payload = request.get_json(silent=True)
+def _build_history_analysis(payload):
+    """Use the same validated selection and metric units for charts and exports."""
     if not isinstance(payload, dict):
-        return jsonify({"error": "Invalid analysis request"}), 400
+        return {"error": "Invalid analysis request"}, 400
     run_ids = payload.get("run_ids")
     if (
         not isinstance(run_ids, list)
@@ -885,19 +1198,19 @@ def analyze_history_results():
         or len(run_ids) > MAX_HISTORY_EXPERIMENTS
         or any(not isinstance(run_id, str) for run_id in run_ids)
     ):
-        return jsonify({"error": "Select between 1 and 100 result sets"}), 400
+        return {"error": "Select between 1 and 100 result sets"}, 400
     run_ids = list(dict.fromkeys(run_ids))
 
     suites_filter = payload.get("suites", [])
     if not isinstance(suites_filter, list) or any(
-        suite not in HISTORY_SUITES for suite in suites_filter
+        not _valid_history_suite(suite) for suite in suites_filter
     ):
-        return jsonify({"error": "Invalid suite selection"}), 400
+        return {"error": "Invalid suite selection"}, 400
 
     catalog = _build_history_catalog()
     by_id = {entry["id"]: entry for entry in catalog}
     if any(run_id not in by_id for run_id in run_ids):
-        return jsonify({"error": "One or more result sets were not found"}), 404
+        return {"error": "One or more result sets were not found"}, 404
 
     include_task_records = payload.get("include_task_records") is True
     remaining_records = MAX_HISTORY_TASK_RECORDS
@@ -910,9 +1223,15 @@ def analyze_history_results():
             "label": entry["label"],
             "source": entry["source"],
             "result_type": entry["result_type"],
+            "benchmark": entry["benchmark"],
+            "benchmark_id": entry["benchmark_id"],
+            **{key: entry[key] for key in (
+                "result_folder", "model_group", "model_suffix", "attack_name", "attack_names", "attack_kind",
+            )},
+            "updated_at": entry["updated_at"],
             "suites": [],
         }
-        for suite_name in HISTORY_SUITES:
+        for suite_name in sorted(internal["suites"]):
             if suites_filter and suite_name not in suites_filter:
                 continue
             suite_entry = internal["suites"].get(suite_name)
@@ -931,7 +1250,7 @@ def analyze_history_results():
                 suite_name,
                 is_fraction,
             )
-            if include_task_records and remaining_records > 0:
+            if include_task_records:
                 records, truncated = _load_history_task_records(
                     suite_entry,
                     internal["overall_records"],
@@ -943,7 +1262,38 @@ def analyze_history_results():
                 remaining_records -= len(records)
             experiment["suites"].append(suite_result)
         experiments.append(experiment)
-    return jsonify({"experiments": experiments})
+    return {"experiments": experiments, **_comparison_metadata(experiments)}, 200
+
+
+@app.route("/api/history/analyze", methods=["POST"])
+def analyze_history_results():
+    data, status = _build_history_analysis(request.get_json(silent=True))
+    return jsonify(data), status
+
+
+@app.route("/api/history/export", methods=["POST"])
+def export_history_results():
+    payload = request.get_json(silent=True)
+    if isinstance(payload, dict):
+        payload = {**payload, "include_task_records": True}
+    data, status = _build_history_analysis(payload)
+    if status != 200:
+        return jsonify(data), status
+    if not any(run["suites"] for run in data["experiments"]):
+        return jsonify({"error": "所选实验中没有与当前场景匹配的数据。"}), 400
+    exported_at = datetime.now(timezone.utc)
+    archive = build_history_export(
+        data["experiments"], payload.get("suites", []), exported_at.isoformat(),
+        comparison={key: data[key] for key in ("paired_comparison_ready", "comparison_warnings")},
+    )
+    response = send_file(
+        archive,
+        mimetype="application/zip",
+        as_attachment=True,
+        download_name=f"dscg-history-analysis-{exported_at:%Y%m%dT%H%M%SZ}.zip",
+    )
+    response.headers["Cache-Control"] = "no-store"
+    return response
 
 
 @app.route("/api/runs", methods=["GET"])
@@ -999,7 +1349,10 @@ def get_run(run_id: str):
     if not run:
         return jsonify({"error": "Run not found"}), 404
 
-    return jsonify(run)
+    public = dict(run)
+    public["config"] = _redact_run_config(run.get("config", {}))
+    public["display_metrics"] = display_metrics(run)
+    return jsonify(public)
 
 
 @app.route("/api/runs/<run_id>/suite/<suite_name>", methods=["GET"])
@@ -1028,8 +1381,17 @@ def start_run():
     config = request.get_json(silent=True) or {}
     if not isinstance(config, dict):
         return jsonify({"error": "Invalid JSON configuration"}), 400
+    try:
+        config = normalize_config(config)
+        config["benchmark"] = validate_backend()
+        if config["run_attack"]:
+            config.setdefault("attack_name", "important_instructions")
+            if config["attack_name"] not in {a["id"] for a in AVAILABLE_ATTACKS}:
+                raise ValueError("请选择已注册的定向攻击；DoS 请使用 partial CLI 的独立计分入口")
+    except (ValueError, TypeError) as exc:
+        return jsonify({"error": str(exc)}), 400
 
-    run_id = datetime.now().strftime("%Y%m%d_%H%M%S") + "_" + uuid.uuid4().hex[:6]
+    run_id = config["benchmark"]["id"] + "_" + datetime.now().strftime("%Y%m%d_%H%M%S") + "_" + uuid.uuid4().hex[:6]
     run_queues[run_id] = queue.Queue()
 
     with _store_lock:
@@ -1096,7 +1458,11 @@ def compare_runs():
                 with open(result_file, "r") as f:
                     run = json.load(f)
         if run:
-            runs_data.append(run)
+            runs_data.append({**run, "aggregate_metrics": display_metrics(run)})
+
+    compatibility = _comparison_metadata(runs_data)
+    if len(runs_data) > 1 and not compatibility["paired_comparison_ready"]:
+        return jsonify({"error": "基准身份、任务目录或任务选择未对齐；请在历史页独立查看各运行", **compatibility}), 400
 
     # 构建对比数据结构
     comparison = {
@@ -1150,9 +1516,10 @@ def compare_runs():
             )
             if suite_data:
                 m = suite_data["metrics"]
+                clean = r.get("config", {}).get("run_attack") is False
                 comparison["per_suite"][suite_name]["utility_rates"].append(m["utility_rate"])
-                comparison["per_suite"][suite_name]["attack_rates"].append(m["attack_success_rate"])
-                comparison["per_suite"][suite_name]["defense_rates"].append(m["defense_success_rate"])
+                comparison["per_suite"][suite_name]["attack_rates"].append(None if clean else m["attack_success_rate"])
+                comparison["per_suite"][suite_name]["defense_rates"].append(None if clean else m["defense_success_rate"])
             else:
                 comparison["per_suite"][suite_name]["utility_rates"].append(None)
                 comparison["per_suite"][suite_name]["attack_rates"].append(None)
@@ -1187,6 +1554,7 @@ def download_report(run_id: str):
     lines.append("【测试配置】")
     lines.append(f"  主模型: {config.get('model_id', 'N/A')}")
     lines.append(f"  审计模型: {config.get('sec_model_id', 'None')}")
+    lines.append(f"  基准身份: {json.dumps(_recorded_benchmark(run.get('benchmark') or config.get('benchmark')), ensure_ascii=False) if run.get('benchmark') or config.get('benchmark') else '历史 / unknown'}")
     lines.append(f"  测试套件: {', '.join(config.get('suites', []))}")
     lines.append(f"  执行攻击: {config.get('run_attack', True)}")
     lines.append(f"  攻击类型: {config.get('attack_name', 'N/A')}")
@@ -1194,15 +1562,22 @@ def download_report(run_id: str):
     if config.get("defense"):
         lines.append(f"  AgentDojo 防御: {config.get('defense')}")
     if not config.get("origin"):
-        lines.append(f"  沙箱: {'启用' if config.get('use_sandbox', True) else '禁用'}")
-        lines.append(f"  安全校验器: {'启用' if config.get('use_security_checker', True) else '禁用'}")
+        lines.append(f"  框架版本: {config.get('framework_version', '未记录')}")
+        lines.append(f"  L1 投影模式: {config.get('l1_projection_mode', '未记录')}")
+        lines.append(f"  提示候选: {config.get('prompt_profile', 'legacy')}")
+        for key, label in (("input_isolation", "L1 工具返回隔离"), ("use_sandbox", "L2 工具授权"),
+                           ("authorization_precheck", "L2 前置检查"), ('planning_tool_view', 'L2 授权工具视图'),
+                           ('delegated_tasks', '显式任务文件展开'), ("use_security_checker", "L3 动作审计")):
+            lines.append(f"  {label}: {str(config[key]) if key in config else '未记录'}")
     lines.append("")
 
-    agg = run.get("aggregate_metrics", {})
+    agg = display_metrics(run) if run.get("suites") else run.get("aggregate_metrics", {})
+    def percent(value):
+        return f"{value:.2f}%" if isinstance(value, (int, float)) else "N/A"
     lines.append("【聚合指标】")
-    lines.append(f"  平均可用性 (TSR): {agg.get('avg_utility_rate', 0):.2f}%")
-    lines.append(f"  平均攻击成功率 (ASR): {agg.get('avg_attack_success_rate', 0):.2f}%")
-    lines.append(f"  平均防御成功率: {agg.get('avg_defense_success_rate', 0):.2f}%")
+    lines.append(f"  任务加权可用性 (TSR): {percent(agg.get('avg_utility_rate'))}")
+    lines.append(f"  攻击成功率 (ASR): {percent(agg.get('avg_attack_success_rate'))}")
+    lines.append(f"  防御成功率: {percent(agg.get('avg_defense_success_rate'))}")
     lines.append(f"  总 Prompt Tokens: {agg.get('total_prompt_tokens', 0):,}")
     lines.append(f"  总 Completion Tokens: {agg.get('total_completion_tokens', 0):,}")
     lines.append(f"  总 Token 消耗: {agg.get('total_tokens', 0):,}")
@@ -1211,11 +1586,16 @@ def download_report(run_id: str):
     for suite in run.get("suites", []):
         lines.append(f"--- {suite['suite_name']} ---")
         m = suite["metrics"]
-        lines.append(f"  TSR: {m['utility_rate']:.2f}%  ASR: {m['attack_success_rate']:.2f}%  "
-                     f"Defense: {m['defense_success_rate']:.2f}%")
-        o = suite["overhead"]
-        lines.append(f"  Tokens: Prompt={o['prompt_tokens']:,}  Completion={o['completion_tokens']:,}  "
-                     f"Total={o['total_tokens']:,}")
+        clean = config.get("run_attack") is False
+        lines.append(f"  TSR: {percent(m.get('utility_rate'))}  ASR: {percent(None if clean else m.get('attack_success_rate'))}  "
+                     f"Defense: {percent(None if clean else m.get('defense_success_rate'))}")
+        counts = suite.get("task_counts", {})
+        lines.append(f"  Tasks={counts.get('total_tasks', '未记录')} Utility valid={counts.get('utility_valid', '未记录')} Security valid={counts.get('security_valid', '未记录')} Errors={counts.get('execution_errors', '未记录')}")
+        o = suite.get("overhead", {})
+        sec = suite.get("sec_overhead", {})
+        tokens = {key: o.get(key, 0) + sec.get(key, 0) for key in ("prompt_tokens", "completion_tokens", "total_tokens")}
+        lines.append(f"  已记录 Tokens（主+审计）: Prompt={tokens['prompt_tokens']:,}  Completion={tokens['completion_tokens']:,}  "
+                     f"Total={tokens['total_tokens']:,}")
         lines.append("")
 
     lines.append("=" * 60)
@@ -1302,7 +1682,7 @@ if __name__ == "__main__":
         print("  方式 3 - 命令行 SSH 隧道:")
         print(f"    ssh -L {port}:localhost:{port} user@<容器宿主机>")
     else:
-        print(f"\n  🌐 访问地址: http://localhost:{port}")
+        print(f"\n  🌐 访问地址: http://127.0.0.1:{port}")
         print(f"  🌐 网络访问: http://{container_ip}:{port}")
 
     print(f"  📁 结果目录: {DASHBOARD_RESULTS_DIR}")

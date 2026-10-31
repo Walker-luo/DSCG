@@ -1,0 +1,43 @@
+{
+  "status": "passed",
+  "head": "2dcc3d18af59de0136286d1c7090dba7624f6f8f",
+  "prior_validation_sha256": "fac502ef86e050d441f23d3f2c131d7e5f863a4cc8e08541f1ae5f8cf02acf33",
+  "prior_files_verified": 19,
+  "prior_artifacts_verified": 30,
+  "followup_originals": [
+    {
+      "path": "docs/README.md",
+      "original": "workshop/archive/l1_projection_20261013/originals/docs/README.md",
+      "original_sha256": "dc4248d0e05a13a71d3820d18c4048b69bcb0abbe7190ecfff30e38d2b1a2844",
+      "current_sha256": "55ad89abf07e37027c6209b625152082f72e7da70227d95cae4f0b686d179008"
+    },
+    {
+      "path": "docs/dashboard.md",
+      "original": "workshop/archive/l1_projection_20261013/originals/docs/dashboard.md",
+      "original_sha256": "8c5bbd81423c30404d9ef9d95b37106d546e42f4eb5ab3f22bfd00b93d22b0da",
+      "current_sha256": "bce7c942e92542e1e681c1e70851613f3019acd6d02c498e330efec9e21639c2"
+    }
+  ],
+  "additional_links": 16,
+  "current_tracked_changes": [
+    "AGENTS.md",
+    "README.md",
+    "dashboard/app.py",
+    "dashboard/evaluation.py",
+    "dashboard/templates/index.html",
+    "docs/README.md",
+    "docs/dashboard.md",
+    "docs/evaluation.md",
+    "docs/framework_updates.md",
+    "docs/model_tool_configuration.md",
+    "dscg/input_isolation.py",
+    "dscg/pipelines/defended.py",
+    "experiments/run_partial_benchmark.py",
+    "workshop/L1_opt.md",
+    "workshop/README.md",
+    "workshop/completed/README.md"
+  ],
+  "model_calls": 0,
+  "runtime_changes": 0,
+  "reason": "Final full-text consistency check found two current guides still labeled v2.2; source/tests/prior evidence unchanged"
+}

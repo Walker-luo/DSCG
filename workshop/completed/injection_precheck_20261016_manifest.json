@@ -1,0 +1,92 @@
+{
+  "schema_version": "dscg.injection-precheck-curated.v1",
+  "revision": "db66f2679240460d8ca8402507bdd311e38aa292",
+  "working_tree": "dirty; standalone script/tests and documentation added; no runtime/default changes",
+  "files": {
+    "experiments/run_injection_precheck.py": "6042dadc152cce91a06d92b1eff724d62697f32c80a9737cab26994c9a9d279e",
+    "tests/test_injection_precheck.py": "ee002c1f55f7fe9219e26493f2570a24dc93b3b08b20ee60965fdcf9dd6620d0",
+    "docs/injection_precheck.md": "1511b9875f9517e0f1bb3d5e80a4560c37e213a6740b625826af85cb0b13c171",
+    "workshop/completed/injection_precheck_20261016.md": "7177ee03d4d7742a4e1b560d7fffd99b6ea1966e3ef75db081e4ea53e946f995",
+    "README.md": "906bc7b9ea6d7cacb809efcf5df9da541691c92c9c442f8555453f4c3bf95753",
+    "AGENTS.md": "d7b57094af818010db4ab5e356a935632530c55e7066b9de9c24169079cac388",
+    "docs/README.md": "c82189ee6f0da56f4caf0c1193a79956cac39ea0bca69fc216bcb1ba0a8efcb4",
+    "docs/full_benchmark.md": "1e66f22c8facca5fc62976d09744adf3b190881661fc26e8539717acfd077223",
+    "workshop/README.md": "3f7b934a7cd04808b55616b5c7ddf200508acfbd4b947dfb5a5ba6a90c03b5a3",
+    "workshop/completed/README.md": "7a1cff44f2a993ad199eecdb6ec230cfbc07a88c61676abdeda4cb6ca80f765f"
+  },
+  "commands": [
+    {
+      "command": "conda run -n ipi python -B -m unittest discover -s tests -p test_injection_precheck.py -v",
+      "exit_code": 0,
+      "tests": 16,
+      "log": "green_06.log",
+      "sha256": "cb4bcff89425ef67a8bf8298647f76d7bfd144dee117ef7f8f3021b82c14d5f0"
+    },
+    {
+      "command": "conda run -n ipi python -B -m unittest discover -s tests -v",
+      "exit_code": 0,
+      "tests": 358,
+      "log": "full_regression.log",
+      "sha256": "9db2295d80c35c8be322328906eac45a0696c0d7f06e3bf8ad0b3cf11e92e76b"
+    },
+    {
+      "command": "conda run -n ipi python -B -m unittest discover -s tests -p 'test_partial*.py' -v",
+      "exit_code": 0,
+      "tests": 38,
+      "log": "partial_regression.log",
+      "sha256": "fd47786e81f779635e8fb9576932d9e514a62f1f0908854f573fec80efcaa027"
+    },
+    {
+      "command": "conda run -n ipi python -B -m unittest discover -s tests -p test_full_benchmark.py -v",
+      "exit_code": 0,
+      "tests": 15,
+      "log": "full_runner_regression.log",
+      "sha256": "28393c9e2cb1de975a7d05cf4feaf11102ea1e17e83fd332d42eccb03fad4957"
+    },
+    {
+      "command": "conda run -n ipi python -B -m experiments.run_injection_precheck --help",
+      "exit_code": 0,
+      "log": "help.log",
+      "sha256": "7a68752df992e2a20a61f5d914861cae687bb7e77995f717204e49ef55dcd189"
+    },
+    {
+      "command": "conda run -n ipi python -B -m experiments.run_injection_precheck screen --help",
+      "exit_code": 0,
+      "log": "screen_help.log",
+      "sha256": "eac09f53060d3382cdf5a18029891497d80d21bb7ab4ba37dbf1c3ca30623a05"
+    },
+    {
+      "command": "conda run -n ipi python -B -m experiments.run_injection_precheck benchmark --help",
+      "exit_code": 0,
+      "log": "benchmark_help.log",
+      "sha256": "8edf87360bb723096b4a0474979493856615c56021f8a601e7cf0eed383c6e87"
+    },
+    {
+      "command": "git diff --check",
+      "exit_code": 0,
+      "log": "diff_check.log"
+    }
+  ],
+  "counts": {
+    "registered_targets": 35,
+    "compatible_historical_prechecks": 14,
+    "historical_statuses": {
+      "pass": 10,
+      "fail": 4
+    },
+    "new_real_model_requests": 0,
+    "new_real_benchmark_samples": 0
+  },
+  "protection": {
+    "protected_baseline_files": 280,
+    "unchanged_existing_runtime_files": 17,
+    "verified_archived_originals": 6
+  },
+  "validation_path": "workshop/artifacts/20261016_injection_precheck/validation.json",
+  "validation_sha256": "19633211106843aa7bc4ce6611cc2bbf9776b66aafdc1edf936c53cac2d4739e",
+  "limitations": [
+    "offline checks do not establish model efficacy, real E0 passage, or deployable L3 thresholds",
+    "separate historical/native-preflight usage unknown; provider revision unpinned"
+  ],
+  "next_action": "Run the new screen command on the server, resolve errors, review failed traces, then use one frozen cohort for matched baseline/DSCG."
+}

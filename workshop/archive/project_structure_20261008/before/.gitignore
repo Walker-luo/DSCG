@@ -1,0 +1,11 @@
+/results/
+__pycache__/
+*.pyc
+.DS_Store
+.env
+config/models.local.toml
+config/*.local.toml
+config/tools.local.toml
+/examples/
+/download/
+/workshop/results/

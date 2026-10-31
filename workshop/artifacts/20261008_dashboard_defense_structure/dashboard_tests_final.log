@@ -1,0 +1,25 @@
+test_log_redaction_covers_provider_error_messages (test_dashboard_config.DashboardConfigTests) ... ok
+test_redaction_removes_raw_credentials_from_public_config (test_dashboard_config.DashboardConfigTests) ... ok
+test_start_run_stores_redacted_config_but_passes_secret_to_worker (test_dashboard_config.DashboardConfigTests) ... ok
+test_analysis_rejects_unmapped_ids_and_invalid_suites (test_dashboard_history.DashboardHistoryTests) ... ok
+test_analyze_loads_task_records_only_for_selected_results (test_dashboard_history.DashboardHistoryTests) ... ok
+test_catalog_discovers_result_layouts_and_normalizes_rates (test_dashboard_history.DashboardHistoryTests) ... ok
+test_catalog_groups_nested_attacks_by_folder_and_model_suffix (test_dashboard_history.DashboardHistoryTests) ... ok
+test_dashboard_exposes_the_history_analysis_view (test_dashboard_history.DashboardHistoryTests) ... ok
+test_disabled_attack_config_takes_precedence_over_retained_attack_name (test_dashboard_history.DashboardHistoryTests) ... ok
+test_export_contains_selected_comparison_metrics_and_task_records (test_dashboard_history.DashboardHistoryTests) ... ok
+test_export_csv_neutralizes_formula_labels_without_changing_json (test_dashboard_history.DashboardHistoryTests) ... ok
+test_export_deduplicates_selection_and_rejects_empty_suite_match (test_dashboard_history.DashboardHistoryTests) ... ok
+test_export_excludes_policy_errors_and_timeouts_even_with_boolean_outcomes (test_dashboard_history.DashboardHistoryTests) ... ok
+test_export_keeps_missing_and_error_results_out_of_observed_denominators (test_dashboard_history.DashboardHistoryTests) ... ok
+test_export_marks_every_suite_affected_by_global_record_limit (test_dashboard_history.DashboardHistoryTests) ... ok
+test_export_reads_csv_only_experiments_and_flags_legacy_status (test_dashboard_history.DashboardHistoryTests) ... ok
+test_export_rejects_invalid_or_disappeared_selections (test_dashboard_history.DashboardHistoryTests) ... ok
+test_export_respects_suite_filter_and_csv_rates_use_percent_units (test_dashboard_history.DashboardHistoryTests) ... ok
+test_history_is_a_separate_page_with_multiselect_models_and_no_experiment_script (test_dashboard_history.DashboardHistoryTests) ... ok
+test_legacy_attack_metadata_is_read_without_guessing_missing_or_mixed_attacks (test_dashboard_history.DashboardHistoryTests) ... ok
+
+----------------------------------------------------------------------
+Ran 20 tests in 0.135s
+
+OK

@@ -1,0 +1,238 @@
+"""Explicit resume preserves native caching and immutable run evidence."""
+from contextlib import redirect_stdout, redirect_stderr
+from io import StringIO
+import json
+import os
+from pathlib import Path
+from tempfile import TemporaryDirectory as _TemporaryDirectory
+from types import SimpleNamespace
+import unittest
+from unittest.mock import patch
+
+from agentdojo.task_suite import get_suite
+from experiments import run_benchmark as full, run_partial_benchmark as runner
+from test_partial_attacks import fake_pipeline
+
+def TemporaryDirectory(*args, **kwargs):
+    root = Path(__file__).resolve().parents[1] / "workshop/artifacts/20261030_fliter_goal_impl/offline"
+    root.mkdir(parents=True, exist_ok=True)
+    kwargs.setdefault("dir", root)
+    return _TemporaryDirectory(*args, **kwargs)
+
+
+
+OLD_ATTACKS = ['ignore_previous', 'injecagent', 'important_instructions', 'tool_knowledge']
+
+
+class ReuseCliTests(unittest.TestCase):
+    def test_both_cli_reuse_overrides_environment_and_preserves_omission(self):
+        for cli in (runner.cli, full.cli):
+            with self.subTest(cli=cli), patch.object(runner, 'main', return_value=0) as run, patch.dict(
+                os.environ, {'DSCG_FORCE_RERUN': '1'}, clear=True
+            ):
+                self.assertEqual(cli(['--reuse', '--name', 'old', '--baseline']), 0)
+                self.assertTrue(run.call_args.kwargs['reuse'])
+                self.assertFalse(run.call_args.kwargs['force_rerun'])
+                self.assertIsNone(run.call_args.kwargs['attack'])
+                self.assertIsNone(run.call_args.kwargs['suites'])
+
+    def test_reuse_requires_name_and_rejects_explicit_force_or_export(self):
+        for cli in (runner.cli, full.cli):
+            for flags in (['--reuse'], ['--reuse', '--name', 'old', '--force-rerun'],
+                          ['--reuse', '--name', 'old', '--write-task-manifest', 'out.json']):
+                with self.subTest(flags=flags), patch.object(runner, 'main') as run, redirect_stderr(StringIO()):
+                    with self.assertRaises(SystemExit) as error:
+                        cli(flags)
+                    self.assertEqual(error.exception.code, 2)
+                    run.assert_not_called()
+
+
+class ReuseIntegrationTests(unittest.TestCase):
+    def setUp(self):
+        artifacts = Path(__file__).resolve().parents[1] / 'workshop/artifacts/20261030_fliter_goal_impl/offline'
+        artifacts.mkdir(parents=True, exist_ok=True)
+        temp = TemporaryDirectory(dir=artifacts); self.addCleanup(temp.cleanup)
+        self.root = Path(temp.name); self.executed = []
+        def execute(_suite, pipeline, task, injection_task=None, injections=None):
+            self.executed.append((task.ID, getattr(injection_task, 'ID', None)))
+            runner.logging.Logger.get().log([
+                {'role': 'user', 'content': [{'type': 'text', 'content': 'offline fixture'}]},
+                {'role': 'assistant', 'content': [{'type': 'text', 'content': 'done'}], 'tool_calls': None},
+            ])
+            return task.ID != 'user_task_0', False
+        suite = get_suite('v1.2', 'workspace')
+        from experiments.common.benchmark_tasks import run_native_suite
+        for p in [patch.object(runner, 'run_suite_with_progress', side_effect=run_native_suite),
+                  patch.object(runner, 'make_openai_compatible_pipeline', side_effect=fake_pipeline),
+                  patch.object(runner, 'resolve_model_config', create=True,
+                               return_value=SimpleNamespace(model_id='offline-model')),
+                  patch.object(runner.attacks, 'load_attack', side_effect=lambda name, *_: SimpleNamespace(
+                      name=name, is_dos_attack=False, attack=lambda *_: {})),
+                  patch.object(type(suite), 'run_task_with_pipeline', autospec=True, side_effect=execute)]:
+            p.start(); self.addCleanup(p.stop)
+
+    @property
+    def base(self):
+        return self.root / 'agentdojo/offline-model_old'
+
+    def run_benchmark(self, entry=runner.main, **overrides):
+        options = dict(origin=True, suites=['workspace'], results_dir=self.root, run_name='old',
+                       attack='tool_knowledge')
+        options.update(overrides)
+        with redirect_stdout(StringIO()):
+            return entry(**options)
+
+    def files(self):
+        return {p.relative_to(self.base): p.read_bytes() for p in self.base.rglob('*') if p.is_file()}
+
+    def test_recorded_api_projection_policy_binds_reuse_before_writes_or_calls(self):
+        self.assertEqual(self.run_benchmark(),0)
+        manifest=self.base / 'run_manifest.json'
+        value=json.loads(manifest.read_text())
+        self.assertEqual(value['common'].get('outcome_projection'),'native-grades-recorded-api-errors-v2')
+        value['common'].pop('outcome_projection');manifest.write_text(json.dumps(value))
+        before=self.files();calls=len(self.executed)
+        self.assertEqual(self.run_benchmark(reuse=True),1)
+        self.assertEqual(len(self.executed),calls)
+        self.assertEqual(self.files(),before)
+
+    def test_resume_only_missing_native_task_and_keeps_completed_failure(self):
+        for entry in (runner.main, full.main):
+            with self.subTest(entry=entry):
+                self.assertEqual(self.run_benchmark(entry), 0)
+                paths = sorted(self.base.glob('tool_knowledge/workspace/user_task_*/injection_task_*.json'))
+                removed = paths[-1]; original = {p: p.read_bytes() for p in paths[:-1]}
+                removed.unlink(); calls = len(self.executed)
+                self.assertEqual(self.run_benchmark(entry, reuse=True), 0)
+                self.assertEqual(len(self.executed), calls + 1)
+                for p, data in original.items(): self.assertEqual(p.read_bytes(), data)
+                failure = json.loads(paths[0].read_text()); self.assertFalse(failure['utility'])
+                # A new name isolates the next scope, as full cannot reuse partial.
+                if entry == runner.main:
+                    self.root = self.root / 'full'; self.root.mkdir()
+
+    def test_reuse_restores_four_attacks_and_rejects_new_typical_without_writes(self):
+        self.assertEqual(self.run_benchmark(attack=OLD_ATTACKS), 0)
+        previous = self.files(); calls = len(self.executed)
+        self.assertEqual(self.run_benchmark(reuse=True, attack=None, suites=None), 0)
+        self.assertEqual(len(self.executed), calls)
+        manifest = json.loads((self.base / 'summary.json').read_text())
+        self.assertEqual(manifest['attacks'], OLD_ATTACKS)
+        self.assertTrue(list((self.base / 'reuse').glob('*/snapshot/summary.json')))
+        current = self.files()
+        self.assertEqual(self.run_benchmark(reuse=True, attack='typical'), 1)
+        self.assertEqual(self.files(), current)
+        for path, data in previous.items():
+            if path.name == 'run_manifest.json': self.assertEqual((self.base / path).read_bytes(), data)
+
+    def test_later_suite_configuration_conflict_precedes_all_task_calls_and_writes(self):
+        self.assertEqual(self.run_benchmark(suites=['workspace', 'travel']), 0)
+        path = self.base / 'run_manifest.json'
+        value = json.loads(path.read_text()); value['groups']['tool_knowledge/travel']['profile'] = 'no-checker'
+        path.write_text(json.dumps(value)); before = self.files(); calls = len(self.executed)
+        self.assertEqual(self.run_benchmark(reuse=True, suites=['workspace', 'travel']), 1)
+        self.assertEqual(len(self.executed), calls)
+        self.assertEqual(self.files(), before)
+
+    def test_root_manifest_restores_omitted_plan_without_duplicate_plan_files(self):
+        self.assertEqual(self.run_benchmark(), 0)
+        path = self.base / 'run_manifest.json'
+        original = path.read_bytes(); calls = len(self.executed)
+        for name in ('benchmark_plan.json', 'screened_run_manifest.json', 'suite_manifest.json'):
+            self.assertFalse((self.base / name).exists())
+        self.assertEqual(self.run_benchmark(reuse=True, attack=None, suites=None), 0)
+        self.assertEqual(path.read_bytes(), original)
+        self.assertEqual(len(self.executed), calls)
+
+    def test_source_changes_resume_without_changing_manifest(self):
+        self.assertEqual(self.run_benchmark(), 0)
+        fixture = json.loads((Path(__file__).with_name('fixtures') / 'benchmark_reuse_source_20261017.json').read_text())
+        path = self.base / 'run_manifest.json'
+        binding = json.loads(path.read_text()); binding['common']['source'] = fixture
+        path.write_text(json.dumps(binding)); original = path.read_bytes(); calls = len(self.executed)
+        self.assertEqual(self.run_benchmark(reuse=True), 0)
+        self.assertEqual(path.read_bytes(), original)
+        self.assertEqual(len(self.executed), calls)
+        binding['common']['source']['source_sha256']['dscg/pipelines/defended.py'] = '0' * 64
+        path.write_text(json.dumps(binding)); before = self.files()
+        self.assertEqual(self.run_benchmark(reuse=True), 0)
+        self.assertEqual(path.read_bytes(), before[path.relative_to(self.base)])
+
+    def test_clean_reuse_rebuilds_missing_user_only(self):
+        self.assertEqual(self.run_benchmark(run_attack=False), 0)
+        path = sorted(self.base.glob('none/workspace/user_task_*/none.json'))[-1]
+        path.unlink(); calls = len(self.executed)
+        self.assertEqual(self.run_benchmark(reuse=True, run_attack=False, attack=None), 0)
+        self.assertEqual(len(self.executed), calls + 1)
+
+    def test_native_accepted_error_cache_is_not_automatically_retried(self):
+        self.assertEqual(self.run_benchmark(), 0)
+        path = next(self.base.glob('tool_knowledge/workspace/user_task_*/injection_task_*.json'))
+        value = json.loads(path.read_text()); value['error'] = 'offline provider error'
+        path.write_text(json.dumps(value)); before = path.read_bytes(); calls = len(self.executed)
+        self.assertEqual(self.run_benchmark(reuse=True), 1)
+        self.assertEqual(len(self.executed), calls)
+        self.assertEqual(path.read_bytes(), before)
+        summary = json.loads((self.base / "tool_knowledge/workspace/summary.json").read_text())
+        self.assertEqual(summary["task_counts"]["execution_errors"], 1)
+        self.assertEqual(summary["task_counts"]["attacked_tasks"], 8)
+
+    def test_native_incomplete_cache_is_preserved_before_task_reruns(self):
+        self.assertEqual(self.run_benchmark(), 0)
+        path = next(self.base.glob('tool_knowledge/workspace/user_task_*/injection_task_*.json'))
+        value = json.loads(path.read_text()); del value['utility']
+        path.write_text(json.dumps(value)); before = path.read_bytes(); calls = len(self.executed)
+        self.assertEqual(self.run_benchmark(reuse=True), 0)
+        self.assertEqual(len(self.executed), calls + 1)
+        snapshot = next((self.base / 'reuse').glob('*/snapshot/' + path.relative_to(self.base).as_posix()))
+        self.assertEqual(snapshot.read_bytes(), before)
+
+    def test_corrupt_native_json_is_reported_without_retrying_or_replacing_it(self):
+        self.assertEqual(self.run_benchmark(), 0)
+        path = next(self.base.glob('tool_knowledge/workspace/user_task_*/injection_task_*.json'))
+        path.write_text('{'); calls = len(self.executed)
+        self.assertEqual(self.run_benchmark(reuse=True), 1)
+        self.assertEqual(path.read_text(), '{')
+        self.assertEqual(len(self.executed), calls)
+
+    def test_reuse_missing_directory_and_api_force_conflict_do_not_start_tasks(self):
+        self.assertEqual(self.run_benchmark(reuse=True), 1)
+        self.assertEqual(self.executed, [])
+        self.assertFalse(self.base.exists())
+        with self.assertRaises(ValueError): self.run_benchmark(reuse=True, force_rerun=True)
+
+    def test_native_defense_change_is_rejected_before_cache_or_task_execution(self):
+        self.assertEqual(self.run_benchmark(), 0)
+        before = self.files(); calls = len(self.executed)
+        self.assertEqual(self.run_benchmark(reuse=True, defense='spotlighting_with_delimiting'), 1)
+        self.assertEqual(self.executed.__len__(), calls)
+        self.assertEqual(self.files(), before)
+
+    def test_missing_native_defense_binding_rejects_even_matching_summary_evidence(self):
+        self.assertEqual(self.run_benchmark(), 0)
+        path = self.base / 'run_manifest.json'
+        binding = json.loads(path.read_text()); binding['common'].pop('agentdojo_defense', None)
+        for group in binding['groups'].values(): group.pop('agentdojo_defense', None)
+        path.write_text(json.dumps(binding))
+        summary_path = self.base / 'tool_knowledge/workspace/summary.json'
+        summary = json.loads(summary_path.read_text()); summary['defense'] = None
+        summary_path.write_text(json.dumps(summary))
+        before = self.files(); calls = len(self.executed)
+        self.assertEqual(self.run_benchmark(reuse=True), 1)
+        self.assertEqual(len(self.executed), calls)
+        self.assertEqual(self.files(), before)
+
+
+if __name__ == '__main__':
+    unittest.main()
+
+
+# Explicitly retain historical upstream suites as generic offline fixtures.
+def setUpModule():
+    global _fixture_backend
+    from test_partial_agentdyn import legacy_fixture_backend
+    _fixture_backend = legacy_fixture_backend(globals())
+
+
+def tearDownModule():
+    _fixture_backend.close()
