@@ -1,0 +1,96 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="183mm" height="99.72mm" viewBox="0 0 519 283" role="img" aria-labelledby="dscg-title dscg-desc">
+<title id="dscg-title">DSCG mediated tool-use architecture</title>
+<desc id="dscg-desc">The agent compiles task-level tool permissions, plans tool calls, checks and audits candidates, then uses a reference monitor and ticketed executor before feeding isolated tool results back to the planner.</desc>
+<rect x="0" y="0" width="519" height="283" fill="#ffffff"/>
+
+<g id="edge-task-to-authorization" fill="none" stroke="#315c84" stroke-width="1.05" stroke-linecap="round" stroke-linejoin="round"><path d="M101 89 H108"/></g>
+<polygon points="108,89 105,87 105,91" fill="#315c84"/>
+<g id="edge-authorization-to-model" fill="none" stroke="#315c84" stroke-width="1.05" stroke-linecap="round" stroke-linejoin="round"><path d="M203 89 H210"/></g>
+<polygon points="210,89 207,87 207,91" fill="#315c84"/>
+<g id="edge-model-to-batch" fill="none" stroke="#315c84" stroke-width="1.05" stroke-linecap="round" stroke-linejoin="round"><path d="M305 89 H312"/></g>
+<polygon points="312,89 309,87 309,91" fill="#315c84"/>
+<g id="edge-batch-to-audit" fill="none" stroke="#315c84" stroke-width="1.05" stroke-linecap="round" stroke-linejoin="round"><path d="M407 89 H414"/></g>
+<polygon points="414,89 411,87 411,91" fill="#315c84"/>
+<g id="edge-audit-to-monitor" fill="none" stroke="#315c84" stroke-width="1.05" stroke-linecap="round" stroke-linejoin="round"><path d="M461.5 118 V157 H359.5 V180"/></g>
+<polygon points="359.5,180 357.5,177 361.5,177" fill="#315c84"/>
+<g id="edge-monitor-to-execution" fill="none" stroke="#315c84" stroke-width="1.05" stroke-linecap="round" stroke-linejoin="round"><path d="M312 209 H305"/></g>
+<polygon points="305,209 308,207 308,211" fill="#315c84"/>
+<g id="edge-execution-to-isolation" fill="none" stroke="#667789" stroke-width="0.8" stroke-linecap="round" stroke-linejoin="round"><path d="M210.000 209.000 L207.400 209.000 M205.400 209.000 L203.000 209.000"/></g>
+<polygon points="203,209 206,207 206,211" fill="#667789"/>
+<g id="edge-isolation-to-planner" fill="none" stroke="#667789" stroke-width="0.8" stroke-linecap="round" stroke-linejoin="round"><path d="M155.500 180.000 L155.500 177.400 M155.500 175.400 L155.500 172.800 M155.500 170.800 L155.500 168.200 M155.500 166.200 L155.500 164.000 M155.500 164.000 L155.900 164.000 M157.900 164.000 L160.500 164.000 M162.500 164.000 L165.100 164.000 M167.100 164.000 L169.700 164.000 M171.700 164.000 L174.300 164.000 M176.300 164.000 L178.900 164.000 M180.900 164.000 L183.500 164.000 M185.500 164.000 L188.100 164.000 M190.100 164.000 L192.700 164.000 M194.700 164.000 L197.300 164.000 M199.300 164.000 L201.900 164.000 M203.900 164.000 L206.500 164.000 M208.500 164.000 L211.100 164.000 M213.100 164.000 L215.700 164.000 M217.700 164.000 L220.300 164.000 M222.300 164.000 L224.900 164.000 M226.900 164.000 L229.500 164.000 M231.500 164.000 L234.100 164.000 M236.100 164.000 L238.700 164.000 M240.700 164.000 L243.300 164.000 M245.300 164.000 L247.900 164.000 M249.900 164.000 L252.500 164.000 M254.500 164.000 L257.100 164.000 M257.500 162.400 L257.500 159.800 M257.500 157.800 L257.500 155.200 M257.500 153.200 L257.500 150.600 M257.500 148.600 L257.500 146.000 M257.500 144.000 L257.500 141.400 M257.500 139.400 L257.500 136.800 M257.500 134.800 L257.500 132.200 M257.500 130.200 L257.500 127.600 M257.500 125.600 L257.500 123.000 M257.500 121.000 L257.500 118.400"/></g>
+<polygon points="257.5,118 255.5,121 259.5,121" fill="#667789"/>
+<g id="edge-frozen-grants-to-batch" fill="none" stroke="#315c84" stroke-width="1.05" stroke-linecap="round" stroke-linejoin="round"><path d="M155.5 118 V139 H359.5 V118"/></g>
+<polygon points="359.5,118 357.5,121 361.5,121" fill="#315c84"/>
+<g id="edge-raw-evidence-to-audit" fill="none" stroke="#667789" stroke-width="0.8" stroke-linecap="round" stroke-linejoin="round"><path d="M257.500 238.000 L257.500 240.600 M257.500 242.600 L257.500 245.200 M257.500 247.200 L257.500 249.800 M257.500 251.800 L257.500 254.000 M257.500 254.000 L257.900 254.000 M259.900 254.000 L262.500 254.000 M264.500 254.000 L267.100 254.000 M269.100 254.000 L271.700 254.000 M273.700 254.000 L276.300 254.000 M278.300 254.000 L280.900 254.000 M282.900 254.000 L285.500 254.000 M287.500 254.000 L290.100 254.000 M292.100 254.000 L294.700 254.000 M296.700 254.000 L299.300 254.000 M301.300 254.000 L303.900 254.000 M305.900 254.000 L308.500 254.000 M310.500 254.000 L313.100 254.000 M315.100 254.000 L317.700 254.000 M319.700 254.000 L322.300 254.000 M324.300 254.000 L326.900 254.000 M328.900 254.000 L331.500 254.000 M333.500 254.000 L336.100 254.000 M338.100 254.000 L340.700 254.000 M342.700 254.000 L345.300 254.000 M347.300 254.000 L349.900 254.000 M351.900 254.000 L354.500 254.000 M356.500 254.000 L359.100 254.000 M361.100 254.000 L363.700 254.000 M365.700 254.000 L368.300 254.000 M370.300 254.000 L372.900 254.000 M374.900 254.000 L377.500 254.000 M379.500 254.000 L382.100 254.000 M384.100 254.000 L386.700 254.000 M388.700 254.000 L391.300 254.000 M393.300 254.000 L395.900 254.000 M397.900 254.000 L400.500 254.000 M402.500 254.000 L405.100 254.000 M407.100 254.000 L409.700 254.000 M411.700 254.000 L414.300 254.000 M416.300 254.000 L418.900 254.000 M420.900 254.000 L423.500 254.000 M425.500 254.000 L428.100 254.000 M430.100 254.000 L432.700 254.000 M434.700 254.000 L437.300 254.000 M439.300 254.000 L441.900 254.000 M443.900 254.000 L446.500 254.000 M448.500 254.000 L451.100 254.000 M453.100 254.000 L455.700 254.000 M457.700 254.000 L460.300 254.000 M462.300 254.000 L464.900 254.000 M466.900 254.000 L469.500 254.000 M471.500 254.000 L474.100 254.000 M476.100 254.000 L478.700 254.000 M480.700 254.000 L483.300 254.000 M485.300 254.000 L487.900 254.000 M489.900 254.000 L492.500 254.000 M494.500 254.000 L497.100 254.000 M499.100 254.000 L501.700 254.000 M503.700 254.000 L506.300 254.000 M508.300 254.000 L510.900 254.000 M512.900 254.000 L515.500 254.000 M516.000 252.500 L516.000 249.900 M516.000 247.900 L516.000 245.300 M516.000 243.300 L516.000 240.700 M516.000 238.700 L516.000 236.100 M516.000 234.100 L516.000 231.500 M516.000 229.500 L516.000 226.900 M516.000 224.900 L516.000 222.300 M516.000 220.300 L516.000 217.700 M516.000 215.700 L516.000 213.100 M516.000 211.100 L516.000 208.500 M516.000 206.500 L516.000 203.900 M516.000 201.900 L516.000 199.300 M516.000 197.300 L516.000 194.700 M516.000 192.700 L516.000 190.100 M516.000 188.100 L516.000 185.500 M516.000 183.500 L516.000 180.900 M516.000 178.900 L516.000 176.300 M516.000 174.300 L516.000 171.700 M516.000 169.700 L516.000 167.100 M516.000 165.100 L516.000 162.500 M516.000 160.500 L516.000 157.900 M516.000 155.900 L516.000 153.300 M516.000 151.300 L516.000 148.700 M516.000 146.700 L516.000 144.100 M516.000 142.100 L516.000 139.500 M516.000 137.500 L516.000 134.900 M516.000 132.900 L516.000 130.300 M516.000 128.300 L516.000 125.700 M516.000 123.700 L516.000 121.100 M516.000 119.100 L516.000 116.500 M516.000 114.500 L516.000 111.900 M516.000 109.900 L516.000 107.300 M516.000 105.300 L516.000 102.700 M516.000 100.700 L516.000 98.100 M516.000 96.100 L516.000 93.500 M516.000 91.500 L516.000 89.000 M516.000 89.000 L515.900 89.000 M513.900 89.000 L511.300 89.000 M509.300 89.000 L509.000 89.000"/></g>
+<polygon points="509,89 512,87 512,91" fill="#667789"/>
+<g id="edge-model-to-response" fill="none" stroke="#315c84" stroke-width="1.05" stroke-linecap="round" stroke-linejoin="round"><path d="M257.5 60 V43"/></g>
+<polygon points="257.5,43 255.5,46 259.5,46" fill="#315c84"/>
+<text x="205" y="148" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="6.2" fill="#152b3a">Frozen tool grants</text>
+<text x="207" y="173" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="6.2" fill="#152b3a">Planning view</text>
+<text x="390" y="263" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="6.2" fill="#152b3a">Bounded evidence from raw results</text>
+<g id="node-trusted-task">
+<rect x="6" y="60" width="95" height="58" rx="2.5" fill="#f7f8fa" stroke="#9aa8b4" stroke-width="0.8"/>
+<g id="icon-trusted-task" transform="translate(15 68)" fill="none" stroke="#315c84" stroke-width="0.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2 0.5 H7 L9 2.5 V10 H2 Z M7 0.5 V2.5 H9 M3.6 4.5 H7.4 M3.6 6.5 H7.4"/></g>
+<text x="28" y="77" text-anchor="start" font-family="Arial, Helvetica, sans-serif" font-size="7.4" font-weight="600" fill="#152b3a">Trusted task</text>
+<text x="53.5" y="94" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="6.6" fill="#152b3a">User request + native</text>
+<text x="53.5" y="103" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="6.6" fill="#152b3a">tool definitions</text>
+</g>
+<g id="node-l2-authorization">
+<rect x="108" y="60" width="95" height="58" rx="2.5" fill="#e6f0f9" stroke="#6689aa" stroke-width="0.8"/>
+<g id="icon-l2-authorization" transform="translate(117 68)" fill="none" stroke="#315c84" stroke-width="0.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 0.5 L9 2 V5.2 C9 7.5 7.3 9.2 5 10 C2.7 9.2 1 7.5 1 5.2 V2 Z M3.2 5.1 L4.5 6.4 L7 3.8"/></g>
+<text x="130" y="77" text-anchor="start" font-family="Arial, Helvetica, sans-serif" font-size="7.4" font-weight="600" fill="#152b3a">L2 · Authorization</text>
+<text x="155.5" y="94" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="6.6" fill="#152b3a">Static task view</text>
+<text x="155.5" y="103" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="6.6" fill="#152b3a">Global tool grants</text>
+</g>
+<g id="node-main-model">
+<rect x="210" y="60" width="95" height="58" rx="2.5" fill="#ffffff" stroke="#8295a4" stroke-width="0.8"/>
+<g id="icon-main-model" transform="translate(219 68)" fill="none" stroke="#315c84" stroke-width="0.8" stroke-linecap="round" stroke-linejoin="round"><rect x="1.5" y="1.5" width="7" height="7" rx="1"/><path d="M3.3 0 V1.5 M6.7 0 V1.5 M3.3 8.5 V10 M6.7 8.5 V10 M0 3.3 H1.5 M0 6.7 H1.5 M8.5 3.3 H10 M8.5 6.7 H10"/><circle cx="5" cy="5" r="1.3"/></g>
+<text x="232" y="77" text-anchor="start" font-family="Arial, Helvetica, sans-serif" font-size="7.4" font-weight="600" fill="#152b3a">Main model</text>
+<text x="257.5" y="94" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="6.6" fill="#152b3a">Task-aware planning</text>
+<text x="257.5" y="103" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="6.6" fill="#152b3a">Authorized tools</text>
+</g>
+<g id="node-l2-batch-check">
+<rect x="312" y="60" width="95" height="58" rx="2.5" fill="#e6f0f9" stroke="#6689aa" stroke-width="0.8"/>
+<g id="icon-l2-batch-check" transform="translate(321 68)" fill="none" stroke="#315c84" stroke-width="0.8" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="1" width="8.5" height="8.5" rx="0.7"/><path d="M2.5 3.5 L3.3 4.2 L4.5 2.7 M5.4 3.5 H8 M2.5 6.8 L3.3 7.5 L4.5 6 M5.4 6.8 H8"/></g>
+<text x="334" y="77" text-anchor="start" font-family="Arial, Helvetica, sans-serif" font-size="7.4" font-weight="600" fill="#152b3a">L2 · Batch check</text>
+<text x="359.5" y="94" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="6.6" fill="#152b3a">Validate candidates</text>
+<text x="359.5" y="103" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="6.6" fill="#152b3a">as a whole batch</text>
+</g>
+<g id="node-l3-action-audit">
+<rect x="414" y="60" width="95" height="58" rx="2.5" fill="#f1edf8" stroke="#9581aa" stroke-width="0.8"/>
+<g id="icon-l3-action-audit" transform="translate(423 68)" fill="none" stroke="#315c84" stroke-width="0.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="4.1" cy="4.1" r="3.3"/><path d="M6.5 6.5 L9.6 9.6 M2.8 4.1 L3.7 5 L5.5 3.1"/></g>
+<text x="436" y="77" text-anchor="start" font-family="Arial, Helvetica, sans-serif" font-size="7.4" font-weight="600" fill="#152b3a">L3 · Action audit</text>
+<text x="461.5" y="94" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="6.6" fill="#152b3a">Eligible reads exempt;</text>
+<text x="461.5" y="103" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="6.6" fill="#152b3a">audit other calls</text>
+</g>
+<g id="node-l1-isolation">
+<rect x="108" y="180" width="95" height="58" rx="2.5" fill="#e9f4ef" stroke="#6e9c8a" stroke-width="0.8"/>
+<g id="icon-l1-isolation" transform="translate(117 188)" fill="none" stroke="#315c84" stroke-width="0.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 0.5 L9 2 V5.2 C9 7.5 7.3 9.2 5 10 C2.7 9.2 1 7.5 1 5.2 V2 Z M2.8 4.8 H7.2 M3.8 3.2 V6.4"/></g>
+<text x="130" y="197" text-anchor="start" font-family="Arial, Helvetica, sans-serif" font-size="7.4" font-weight="600" fill="#152b3a">L1 · Input isolation</text>
+<text x="155.5" y="214" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="6.6" fill="#152b3a">Source wrapping or</text>
+<text x="155.5" y="223" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="6.6" fill="#152b3a">bounded projection</text>
+</g>
+<g id="node-tool-execution">
+<rect x="210" y="180" width="95" height="58" rx="2.5" fill="#f7f8fa" stroke="#9aa8b4" stroke-width="0.8"/>
+<g id="icon-tool-execution" transform="translate(219 188)" fill="none" stroke="#315c84" stroke-width="0.8" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="1.5" width="8.5" height="7.2" rx="0.7"/><path d="M2.5 3.3 L4.1 4.7 L2.5 6.1 M5.1 6.2 H7.8"/></g>
+<text x="232" y="197" text-anchor="start" font-family="Arial, Helvetica, sans-serif" font-size="7.4" font-weight="600" fill="#152b3a">Tool execution</text>
+<text x="257.5" y="214" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="6.6" fill="#152b3a">Ticketed executor</text>
+<text x="257.5" y="223" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="6.6" fill="#152b3a">Native call order</text>
+</g>
+<g id="node-reference-monitor">
+<rect x="312" y="180" width="95" height="58" rx="2.5" fill="#edf2f7" stroke="#8499aa" stroke-width="0.8"/>
+<g id="icon-reference-monitor" transform="translate(321 188)" fill="none" stroke="#315c84" stroke-width="0.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 0.5 L9 2 V5.2 C9 7.5 7.3 9.2 5 10 C2.7 9.2 1 7.5 1 5.2 V2 Z"/><circle cx="5" cy="4.5" r="1.2"/><path d="M5 5.7 V7.5"/></g>
+<text x="334" y="197" text-anchor="start" font-family="Arial, Helvetica, sans-serif" font-size="7.4" font-weight="600" fill="#152b3a">Reference Monitor</text>
+<text x="359.5" y="214" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="6.6" fill="#152b3a">Check batch and audit</text>
+<text x="359.5" y="223" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="6.6" fill="#152b3a">Issue one-use tickets</text>
+</g>
+<g id="node-final-response"><rect x="215" y="23" width="85" height="20" rx="2.5" fill="#f7f8fa" stroke="#9aa8b4" stroke-width="0.8"/>
+<g id="icon-final-response" transform="translate(225 28)" fill="none" stroke="#315c84" stroke-width="0.8" stroke-linecap="round" stroke-linejoin="round"><path d="M0.5 1.5 H9.5 V7.5 H6 L3.5 9.5 V7.5 H0.5 Z M2.3 3.5 H7.7 M2.3 5.3 H6.3"/></g>
+<text x="265" y="36" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="7.1" fill="#152b3a">Final response</text>
+</g>
+<path d="M30 274 H42" fill="none" stroke="#315c84" stroke-width="1.05"/><polygon points="42,274 39,272 39,276" fill="#315c84"/>
+<text x="46" y="276" text-anchor="start" font-family="Arial, Helvetica, sans-serif" font-size="6.0" fill="#152b3a">Task / control / candidate</text>
+<path d="M200.000 274.000 L202.600 274.000 M204.600 274.000 L207.200 274.000 M209.200 274.000 L211.800 274.000" fill="none" stroke="#667789" stroke-width="0.8"/><polygon points="212,274 209,272 209,276" fill="#667789"/>
+<text x="216" y="276" text-anchor="start" font-family="Arial, Helvetica, sans-serif" font-size="6.0" fill="#152b3a">Tool return / evidence</text>
+<text x="489" y="276" text-anchor="end" font-family="Arial, Helvetica, sans-serif" font-size="6.0" fill="#152b3a">Deny / abstain block execution</text>
+</svg>
