@@ -571,9 +571,16 @@ def _run_single_attack(
         resolved_sec_model_id = None if origin or not use_security_checker else sec_model_config.get("model_id", sec_model_id)
         original_name = pipeline.name
         _apply_run_name(pipeline, resolved_model_id, run_name)
-        base_output_dir = Path(run_base) if run_base is not None else resolve_run_path(
-            logdir, backend.id, resolved_model_id, run_name, default_name=original_name)
-        result_dir_name = base_output_dir.name
+        if run_base is not None:
+            base_output_dir = Path(run_base)
+        else:
+            base_output_dir = resolve_run_path(
+                logdir, backend.id, resolved_model_id, run_name, default_name=original_name)
+        # Runs nest under <model>/<name>; the flat label still carries the model so reports,
+        # bindings and native attack registry lookups keep identifying model and experiment.
+        label = run_component(resolved_model_id, run_name, default_name=original_name)
+        plain = str(run_name) if run_name is not None and str(run_name).strip() else label
+        result_dir_name = label if base_output_dir.name in {plain, label} else base_output_dir.name
         pipeline.name = result_dir_name
         def bind(path, expected):
             if reuse_plan is not None:

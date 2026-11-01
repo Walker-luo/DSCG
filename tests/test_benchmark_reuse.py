@@ -73,7 +73,7 @@ class ReuseIntegrationTests(unittest.TestCase):
 
     @property
     def base(self):
-        return self.root / 'agentdojo/offline-model_old'
+        return self.root / 'agentdojo/offline-model/old'
 
     def run_benchmark(self, entry=runner.main, **overrides):
         options = dict(origin=True, suites=['workspace'], results_dir=self.root, run_name='old',

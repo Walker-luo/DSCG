@@ -126,7 +126,7 @@ class SerialRunnerTests(unittest.TestCase):
                     self.assertEqual(partial.main(**options), 0)
                     before_calls = len(calls)
                     self.assertEqual(before_calls, 6 if clean else 24)
-                    base = Path(temp) / f'{get_backend().id}/offline-model_serial'
+                    base = Path(temp) / f'{get_backend().id}/offline-model/serial'
                     traces = {p: p.read_bytes() for p in base.glob('*/*/*/*/*.json')}
                     self.assertEqual(partial.main(**options, reuse=True), 0)
                     self.assertEqual(len(calls), before_calls)
@@ -227,7 +227,7 @@ class SerialRunnerTests(unittest.TestCase):
             suites = list(get_suites())[:2]
             self.assertEqual(partial.main(origin=True, suites=suites, attack='typical',
                              run_name='serial', results_dir=temp), 0)
-            base = Path(temp) / f'{get_backend().id}/offline-model_serial'
+            base = Path(temp) / f'{get_backend().id}/offline-model/serial'
             self.assertEqual(native.call_count, 6)
             self.assertEqual(json.loads((base / 'suite_manifest.json').read_text())['suites'], suites)
             manifest = json.loads((base / 'attack_manifest.json').read_text())

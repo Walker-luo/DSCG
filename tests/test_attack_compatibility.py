@@ -54,7 +54,7 @@ class AgentDynToolKnowledgeCompatibilityTests(unittest.TestCase):
                 self.assertEqual(status, 1)
                 model.assert_not_called()
                 self.assertIn('unsupported', output.getvalue())
-                base = Path(temp) / 'agentdyn/offline-model_unsupported'
+                base = Path(temp) / 'agentdyn/offline-model/unsupported'
                 execution = json.loads(next((base / 'execution').glob('*/execution.json')).read_text())
                 group = execution['groups'][0]
                 self.assertEqual(group['status'], 'unsupported')
@@ -71,7 +71,7 @@ class AgentDynToolKnowledgeCompatibilityTests(unittest.TestCase):
             options = dict(origin=True, suites=['shopping', 'dailylife'], attack='tool_knowledge',
                            results_dir=temp, run_name='mixed')
             self.assertEqual(partial.main(**options), 0)
-            base = Path(temp) / 'agentdyn/offline-model_mixed'
+            base = Path(temp) / 'agentdyn/offline-model/mixed'
             trace = next(base.glob('tool_knowledge/shopping/*/*/*.json'))
             original = trace.read_bytes()
             self.assertEqual(partial.main(**options, reuse=True), 0)
@@ -87,7 +87,7 @@ class AgentDynToolKnowledgeCompatibilityTests(unittest.TestCase):
                 patch.object(type(target), 'ground_truth', side_effect=RuntimeError('secret-content')):
             self.assertEqual(partial.main(origin=True, suites=['dailylife'],
                              attack='tool_knowledge', results_dir=temp, run_name='unexpected'), 1)
-            base = Path(temp) / 'agentdyn/offline-model_unexpected'
+            base = Path(temp) / 'agentdyn/offline-model/unexpected'
             group = json.loads(next((base / 'execution').glob('*/execution.json')).read_text())['groups'][0]
             self.assertEqual(group['status'], 'error')
             self.assertEqual(group['execution_error']['stage'], 'attack_compatibility')
@@ -155,14 +155,14 @@ class AgentDynToolKnowledgeCompatibilityTests(unittest.TestCase):
                 patch.object(precheck, 'make_openai_compatible_pipeline', side_effect=serial_fixture.baseline):
             self.assertEqual(precheck.screen(config_path=None, run_name='cohort-screen',
                              suites=['dailylife'], results_dir=temp), 0)
-            cohort = Path(temp) / 'agentdyn/offline-model_cohort-screen/cohort.json'
+            cohort = Path(temp) / 'agentdyn/offline-model/cohort-screen/cohort.json'
             with patch.object(cohorts, 'resolve_model_config', side_effect=serial_fixture.resolve), \
                     patch.object(partial, 'make_openai_compatible_pipeline') as model:
                 self.assertEqual(partial.main(cohort_path=cohort, suites=['dailylife'],
                                  origin=True, results_dir=temp, run_name='cohort-run',
                                  attack='tool_knowledge'), 1)
                 model.assert_not_called()
-            base = Path(temp) / 'agentdyn/offline-model_cohort-run'
+            base = Path(temp) / 'agentdyn/offline-model/cohort-run'
             execution = json.loads(next((base/'execution').glob('*/execution.json')).read_text())
             self.assertEqual(execution['groups'][0]['status'], 'unsupported')
             self.assertEqual(execution['groups'][0]['planned_pairs'], 9)

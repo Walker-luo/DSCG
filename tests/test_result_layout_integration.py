@@ -56,7 +56,7 @@ class ResultLayoutIntegrationTests(unittest.TestCase):
 
     def test_incomplete_or_conflicting_new_run_does_not_fall_back_to_legacy(self):
         root=self.temporary();backend=get_backend().id;suite=get_suites()[0]
-        old=root/f'offline-model_{backend}_same';new=root/backend/'offline-model_same'
+        old=root/f'offline-model_{backend}_same';new=root/backend/'offline-model'/'same'
         options=dict(origin=True,suites=[suite],run_attack=False,run_name='same',results_dir=root)
         with fixture.patched(),redirect_stdout(StringIO()):
             with patch.object(partial,'resolve_run_path',return_value=old):

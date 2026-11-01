@@ -64,7 +64,7 @@ class InjectionPrecheckTests(unittest.TestCase):
 
     @property
     def output(self):
-        return self.root / 'screens' / get_backend().id / 'qwen3.7-flash_screen'
+        return self.root / 'screens' / get_backend().id / 'qwen3.7-flash' / 'screen'
 
     def screen(self, **kwargs):
         with redirect_stdout(StringIO()):
@@ -304,7 +304,7 @@ class InjectionPrecheckTests(unittest.TestCase):
             self.assertEqual(precheck.screen(config_path=None, run_name='reused', suites=[self.suite.name],
                              results_dir=self.root / 'screens', reuse_from=source), 1)
         self.assertEqual(self.suite.executed, [])
-        target = source.with_name('qwen3.7-flash_reused')
+        target = source.with_name('reused')
         self.assertEqual(json.loads((target / 'summary.json').read_text())['counts'], {'error': 2})
         for path, content in before.items():
             self.assertEqual(path.read_bytes(), content)

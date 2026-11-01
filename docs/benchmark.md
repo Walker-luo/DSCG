@@ -112,7 +112,7 @@ clean／DoS不接受这两个参数。Python入口为`fliter_path`与`goal=False
 
 ## 结果文件
 
-默认 `results/benchmarks/<backend>/<model>_<name>/`；partial根为results/partial_benchmark。`--results-dir DIR`仍会追加后端／运行层级。根 `summary.md`、`failure_cases.jsonl`、`l3_router_summary.md/json`是查阅入口，根summary.json含筛选／GOAL checkpoint，根run_manifest.json绑定配置；原生JSON／CSV保留。详见[结果文件](result_files.md)。
+默认 `results/benchmarks/<backend>/<model>/<name>/`（旧结果仍按 `<model>_<name>` 原地读取，不迁移）；partial根为results/partial_benchmark。`--results-dir DIR`仍会追加后端／运行层级。根 `summary.md`、`failure_cases.jsonl`、`l3_router_summary.md/json`是查阅入口，根summary.json含筛选／GOAL checkpoint，根run_manifest.json绑定配置；原生JSON／CSV保留。详见[结果文件](result_files.md)。
 
 agent临时测量显式使用新的 `--results-dir workshop/artifacts/<YYYYMMDD>_<task>/benchmarks`，不写用户正式结果目录。
 

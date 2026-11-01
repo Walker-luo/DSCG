@@ -113,7 +113,7 @@ class StandaloneScreenTests(unittest.TestCase):
                 patch.object(helpers, 'get_suite', return_value=suite), \
                 patch.object(screen, '_native_attempt', side_effect=attempt) as native:
             self.assertEqual(screen.screen(config_path=None, run_name='screen', suites=[suite_name], results_dir=temporary), 1)
-            root = Path(temporary) / identity['id'] / 'qwen3.7-flash_screen'
+            root = Path(temporary) / identity['id'] / 'qwen3.7-flash' / 'screen'
             output = json.loads((root / 'fliter.json').read_text())
             self.assertEqual(set(output), {'schema_version', 'benchmark', 'excluded'})
             self.assertEqual(output['benchmark'], identity)

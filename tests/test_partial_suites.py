@@ -40,7 +40,7 @@ class PartialSuiteTests(unittest.TestCase):
             options = ['--baseline', '--name', 'three', '--results-dir', directory,
                        '--suites', 'travel', 'banking', 'slack']
             self.assertEqual(runner.cli(options), 0)
-            base = Path(directory) / 'agentdojo/offline_three'
+            base = Path(directory) / 'agentdojo/offline/three'
             manifest = json.loads((base / 'summary.json').read_text())
             self.assertEqual(manifest['suites'], ['travel', 'banking', 'slack'])
             self.assertEqual(manifest['task_scope'], 'partial')
@@ -64,7 +64,7 @@ class PartialSuiteTests(unittest.TestCase):
             self.offline(stack)
             self.assertEqual(runner.cli(['--baseline', '--clean', '--suites', 'travel', 'banking', 'slack',
                                          '--name', 'clean', '--results-dir', directory]), 0)
-            base = Path(directory) / 'agentdojo/offline_clean/none'
+            base = Path(directory) / 'agentdojo/offline/clean/none'
             self.assertFalse((base / 'workspace').exists())
             self.assertEqual(sum(json.loads((base / name / 'summary.json').read_text())['task_counts']['total_tasks']
                                  for name in ['travel', 'banking', 'slack']), 9)

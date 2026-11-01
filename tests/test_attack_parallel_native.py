@@ -30,7 +30,7 @@ class NativeAttackParallelTests(unittest.TestCase):
         self.root=Path(temp.name)
 
     def base(self,name):
-        return self.root/get_backend().id/('offline-model_'+name)
+        return self.root/get_backend().id/'offline-model'/name
 
     def summaries(self,name):
         return {str(p.relative_to(self.base(name))):json.loads(p.read_text())

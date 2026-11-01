@@ -61,7 +61,7 @@ class PartialReportingTests(unittest.TestCase):
                                **({"suites": ["workspace"], "attack": "injecagent"} | options))
 
     def read_outputs(self, directory):
-        root = Path(directory) / "agentdojo/offline_report"
+        root = Path(directory) / "agentdojo/offline/report"
         self.assertTrue((root / "summary.md").is_file(), "run-level compact summary is missing")
         self.assertTrue((root / "failure_cases.jsonl").is_file(), "failure excerpts are missing")
         return root, (root / "summary.md").read_text(), [
@@ -215,7 +215,7 @@ class PartialReportingTests(unittest.TestCase):
             # Establish a verifiable binding before inserting a stale aggregate.
             self.assertEqual(self.run_fixture(directory, suites=['workspace', 'travel'],
                 attack=['tool_knowledge', 'injecagent']), 0)
-            stale = Path(directory) / "agentdojo/offline_report/tool_knowledge/travel/summary.json"
+            stale = Path(directory) / "agentdojo/offline/report/tool_knowledge/travel/summary.json"
             stale.parent.mkdir(parents=True, exist_ok=True)
             stale.write_text(json.dumps({"metrics": {"utility_rate": 0.123456}}))
             self.assertEqual(self.run_fixture(directory, results=results,

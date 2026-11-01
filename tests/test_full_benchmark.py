@@ -171,7 +171,7 @@ class FullExecutionTests(unittest.TestCase):
             for origin, name in ((True, 'baseline'), (False, 'defended')):
                 self.assertEqual(full.main(origin=origin, suites=list(SUITES), run_name=name,
                                            results_dir=directory, attack='injecagent', force_rerun=True), 0)
-                base = Path(directory) / f'agentdojo/offline-model_{name}'
+                base = Path(directory) / f'agentdojo/offline-model/{name}'
                 self.assertEqual(json.loads((base / 'run_manifest.json').read_text())['common']['task_scope'], 'full')
                 self.assertTrue((base / 'summary.md').exists())
                 self.assertTrue((base / 'failure_cases.jsonl').exists())
@@ -211,7 +211,7 @@ class FullExecutionTests(unittest.TestCase):
             metadata.assert_not_called()
             self.assertEqual(sum(len(call.kwargs['user_tasks']) for call in benchmark.call_args_list),
                              sum(len(get_suite('v1.2', name).user_tasks) for name in SUITES))
-            for path in Path(directory).glob('*/*/*/*/summary.json'):
+            for path in Path(directory).glob('*/*/*/*/*/summary.json'):
                 summary = json.loads(path.read_text())
                 self.assertIsNone(summary['metrics']['attack_success_rate'])
                 self.assertEqual(summary['task_counts']['attacked_tasks'], 0)
@@ -231,7 +231,7 @@ class FullExecutionTests(unittest.TestCase):
         ):
             self.assertEqual(full.main(origin=True, suites=['slack'], results_dir=directory, run_name='mixed',
                                        attack=['injecagent', 'dos']), 1)
-            base = Path(directory) / 'agentdojo/offline-model_mixed'
+            base = Path(directory) / 'agentdojo/offline-model/mixed'
             statuses = json.loads((base / 'summary.json').read_text())['run_records']
             self.assertEqual([run['status'] for run in statuses], ['error', 'completed'])
             summary = json.loads((base / 'dos/slack/summary.json').read_text())
@@ -251,7 +251,7 @@ class FullExecutionTests(unittest.TestCase):
         ):
             self.assertEqual(full.main(origin=True, suites=['slack'], results_dir=directory,
                                        run_name='unknown', attack='injecagent'), 0)
-            summary = json.loads(next(Path(directory).glob('*/*/*/*/summary.json')).read_text())
+            summary = json.loads(next(Path(directory).glob('*/*/*/*/*/summary.json')).read_text())
             self.assertIsNone(summary['metrics']['attack_success_rate'])
             self.assertIsNone(summary['metrics']['defense_success_rate'])
             self.assertEqual(summary['task_counts']['attacked_tasks'], 0)
@@ -283,7 +283,7 @@ class FullExecutionTests(unittest.TestCase):
             self.assertEqual(full.main(**options), 0)
             expected = len(suite.injection_tasks) * len(suite.user_tasks)
             self.assertEqual(task.call_count, expected)  # Independent GOAL checks are not part of scored execution.
-            base = Path(directory) / f'agentdojo/{model}_native'
+            base = Path(directory) / 'agentdojo' / model / 'native'
             output = base / 'tool_knowledge/slack'
             scored = list(output.glob('user_task_*/injection_task_*.json'))
             self.assertEqual(len(scored), len(suite.user_tasks) * len(suite.injection_tasks))
@@ -299,7 +299,7 @@ class FullExecutionTests(unittest.TestCase):
             progress_options = {**options, 'run_name': 'native_progress', 'progress': True}
             self.assertEqual(full.main(**progress_options), 0)
             self.assertEqual(task.call_count, 2 * expected)
-            progress_summary = json.loads((base.parent / f'{model}_native_progress' /
+            progress_summary = json.loads((base.parent / 'native_progress' /
                 'tool_knowledge/slack/summary.json').read_text())
             standard_summary = json.loads((output / 'summary.json').read_text())
             self.assertEqual(progress_summary['task_selection'], standard_summary['task_selection'])
@@ -316,9 +316,9 @@ class FullExecutionTests(unittest.TestCase):
         ) as benchmark:
             options = dict(origin=True, suites=['slack'], results_dir=directory, run_name='same', attack='injecagent')
             self.assertEqual(shared.main(**options), 0)
-            path = Path(directory) / 'agentdojo/offline-model_same/run_manifest.json'
+            path = Path(directory) / 'agentdojo/offline-model/same/run_manifest.json'
             original = path.read_bytes()
-            root = Path(directory) / 'agentdojo/offline-model_same'
+            root = Path(directory) / 'agentdojo/offline-model/same'
             previous_reports = {p: p.read_bytes() for p in root.rglob('*') if p.is_file()}
             benchmark.reset_mock()
             self.assertEqual(full.main(**options, force_rerun=True), 1)

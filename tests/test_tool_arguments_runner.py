@@ -24,7 +24,7 @@ class ToolArgumentsRunnerTests(unittest.TestCase):
         root.mkdir(parents=True,exist_ok=True)
         temp=TemporaryDirectory(dir=root);self.addCleanup(temp.cleanup);self.root=Path(temp.name)
 
-    def base(self,name):return self.root/get_backend().id/('gpt-4o-2024-05-13_'+name)
+    def base(self,name):return self.root/get_backend().id/'gpt-4o-2024-05-13'/name
 
     def test_progress_and_attack_parallel_keep_error_denominators_tokens_and_reuse(self):
         attacks=['ignore_previous','important_instructions'];suite=get_suites()[0]

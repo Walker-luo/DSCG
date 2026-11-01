@@ -3,7 +3,7 @@
 适用于当前工作区，后续随v3.6保存；当前代码版本仍为v3.5.4，布局为`flat-v1`。运行名可用v36，但实际`defense_version`／profile以文件记录为准。历史结果保留各自配置和标签，不重标。CLI默认目录：
 
 ```text
-results/{benchmarks,partial_benchmark}/<backend>/<model>_<name>/
+results/{benchmarks,partial_benchmark}/<backend>/<model>/<name>/
   run_manifest.json       # 单一根配置绑定（common/groups、任务范围与筛选设置）
   summary.json / summary.md  # GOAL checkpoint／筛选与测量汇总
   fliter.json             # 仅复制输入排除名单，不合并GOAL新增排除

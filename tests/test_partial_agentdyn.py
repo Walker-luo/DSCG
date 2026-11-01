@@ -193,8 +193,8 @@ class AgentDynOfflineExecution(unittest.TestCase):
                 patch.object(runner, 'make_defended_pipeline', side_effect=lambda *a, **k: (*self.factory(), None)), \
                 patch.object(runner.benchmark, 'benchmark_suite_without_injections', side_effect=results):
             self.assertEqual(runner.main(run_attack=False, results_dir=root, run_name='metadata', suites=['shopping']), 0)
-            summary = json.loads((Path(root) / 'agentdyn/provider-model_metadata/none/shopping/summary.json').read_text())
-            bindings = load_run_bindings(Path(root) / 'agentdyn/provider-model_metadata')
+            summary = json.loads((Path(root) / 'agentdyn/provider-model/metadata/none/shopping/summary.json').read_text())
+            bindings = load_run_bindings(Path(root) / 'agentdyn/provider-model/metadata')
             self.assertEqual(bindings['none/shopping/run_manifest.json'].get('tool_metadata_selection'), record)
             self.assertEqual(summary['run_manifest'], '../../run_manifest.json')
             self.assertEqual(summary.get('tool_metadata_selection'), record)
@@ -226,7 +226,7 @@ class AgentDynOfflineExecution(unittest.TestCase):
                         for attacked in (False, True):
                             name = f'{scope}_{attacked}'
                             self.assertEqual(entry(origin=True, run_attack=attacked, run_name=name, results_dir=directory), 0)
-                            base = Path(directory) / (identity['id'] + '/provider-model_' + name)
+                            base = Path(directory) / identity['id'] / 'provider-model' / name
                             manifest = json.loads((base / 'summary.json').read_text())
                             bindings = load_run_bindings(base)
                             self.assertEqual(manifest['benchmark'], identity)

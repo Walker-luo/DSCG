@@ -122,7 +122,7 @@ class PartialAttackTests(unittest.TestCase):
                 self.assertEqual(runner.main(origin=origin, suites=["workspace"], run_name=mode,
                                              results_dir=directory, force_rerun=True,
                                              **({"attack": "all"} if preset == "all" else {})), 0)
-                base = Path(directory) / f"agentdojo/offline-model_{mode}"
+                base = Path(directory) / f"agentdojo/offline-model/{mode}"
                 manifest = json.loads((base / "summary.json").read_text())
                 self.assertEqual(manifest["attacks"], selected_attacks)
                 self.assertNotIn("manual", manifest["attacks"])
@@ -162,10 +162,10 @@ class PartialAttackTests(unittest.TestCase):
         ):
             self.assertEqual(runner.main(origin=True, suites=["workspace"], run_name="partial",
                                          results_dir=directory, attack=["tool_knowledge", "injecagent"]), 1)
-            manifest = json.loads((Path(directory) / "agentdojo/offline-model_partial" / "summary.json").read_text())
+            manifest = json.loads((Path(directory) / "agentdojo/offline-model/partial" / "summary.json").read_text())
             self.assertEqual([run["status"] for run in manifest["run_records"]], ["error", "completed"])
             self.assertEqual(manifest["run_records"][0]["error_type"], "ValueError")
-            self.assertTrue((Path(directory) / "agentdojo/offline-model_partial/injecagent/workspace/summary.json").exists())
+            self.assertTrue((Path(directory) / "agentdojo/offline-model/partial/injecagent/workspace/summary.json").exists())
 
     @patch.object(runner, 'run_suite_with_progress', side_effect=run_native_suite)
     def test_native_traces_sidecars_and_cache_use_the_flat_attack_directory(self, _execute):
@@ -194,7 +194,7 @@ class PartialAttackTests(unittest.TestCase):
                            results_dir=directory, attack=attack_name)
             self.assertEqual(runner.main(**options), 0)
             self.assertEqual(task.call_count, 9)  # Scored tasks only; GOAL is independent.
-            root = Path(directory) / f"agentdojo/{model_id}_baseline"
+            root = Path(directory) / "agentdojo" / model_id / "baseline"
             result = root / attack_name / "workspace"
             injection = next(iter(suite.injection_tasks))
             trace = result / "user_task_0" / f"{injection}.json"

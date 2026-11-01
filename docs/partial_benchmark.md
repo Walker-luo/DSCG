@@ -22,7 +22,7 @@ python -m experiments.run_partial_benchmark --suites banking slack \
 
 默认static先抽任务视图再编译权限；单次授权用显式legacy。运行名不选择策略。static支持NoL2／NoChecker消融（路由设off），baseline仍原生legacy；其他历史候选要求L2／L3；详见[profile说明](qwen_utility.md)。
 
-结果为 `results/partial_benchmark/<backend>/<model>_<name>/`。agent临时测试另设新的 `--results-dir workshop/artifacts/<YYYYMMDD>_<task>/partial_benchmark`。先看根summary和failure_cases，字段见[结果文件](result_files.md)。
+结果为 `results/partial_benchmark/<backend>/<model>/<name>/`；旧目录按 `<model>_<name>` 原地续跑，不迁移。agent临时测试另设新的 `--results-dir workshop/artifacts/<YYYYMMDD>_<task>/partial_benchmark`。先看根summary和failure_cases，字段见[结果文件](result_files.md)。
 
 ## 干净任务对照
 

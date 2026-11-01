@@ -113,7 +113,7 @@ class FliterRunnerTests(unittest.TestCase):
         self.execute(fliter_path=self.fliter(['injection_task_0','injection_task_1','injection_task_2']), goal=True)
         self.assertEqual(self.goals, [])
         self.assertTrue(all(not targets for _,targets in self.scored))
-        summaries = list((self.root/'results').glob('*/*/summary.json'))
+        summaries = list((self.root/'results').glob('*/*/*/summary.json'))
         self.assertEqual(json.loads(summaries[0].read_text())['selection_report']['targets_retained'],0)
 
     def test_checkpoint_resume_does_not_retry_interrupted_goal(self):
@@ -177,7 +177,7 @@ class FliterRunnerTests(unittest.TestCase):
         self.goal_errors['injection_task_1'] = json.JSONDecodeError('fixture','{',1)
         self.assertEqual(self.execute(goal=True),1)
         self.assertEqual(self.scored[0][1],['injection_task_0','injection_task_2'])
-        summary_path = next((self.root/'results').glob('*/*/summary.json'))
+        summary_path = next((self.root/'results').glob('*/*/*/summary.json'))
         summary = json.loads(summary_path.read_text())
         checks = summary['selection_report']['goal_checks']
         failed = next(c for c in checks if c['injection_task_id']=='injection_task_1')
