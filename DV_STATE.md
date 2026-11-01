@@ -23,6 +23,7 @@
 - **任务源／Monitor：**保留中介准备读取、有限明确txt/md委托、冻结授权／目录、整批回执及一次性票据；普通返回不能新增任务权威，污染委托源仍在既有边界外。
 - **读取／入口：**sink-free-read-v4范围不变；CLI router shadow、factory/API off，off仍审计非免审批次。static NoL2／NoChecker仅router off；full／partial／Dashboard共享工厂与原生评分。
 - **错误投影：**共享读取器合并当前attempt后，对已记账API失败派生null标签；旧attempt不污染新attempt。原生评分／实际效果不改，旧持久汇总不回写；新投影策略绑定reuse身份。SDK retries0，原生generation仍可重试，未记账失败无法推断。
+- **结果目录与 Dashboard 模型维度（2026-11-01）：**新运行保存为 `<results-dir>/<backend>/<model>/<name>/`，旧 `<backend>/<model>_<name>` 与 `<model>_<backend>_<name>` 仍原地读取、不迁移；报告与绑定标签保持 `model_name`（含模型名），以满足 agentdojo attack registry 的模型名解析。Dashboard 历史目录改为按记录 `model_id` 提供**模型**筛选，并以 `run_key`（`<model_group>/<run_name>`）区分同模型的多次运行；flat-v1 的 run 级 `summary.json` 不再被当成 suite 条目。`results/workshop/agentdojo` 下的 qwen 目录已按 `qwen3.7-flash/<name>` 归位。
 - **筛选入口：**`--fliter`／Python `fliter_path`读取最小后端绑定排除表；默认不做GOAL。显式`--goal`使用当前测量配置，每剩余目标一次、跨攻击共用；失败排除、错误跳过并exit1，续跑不重试已开始目标。旧cohort输入拒绝，历史结果只读兼容。partial原前三目标内筛除、不补位；clean／DoS不接受筛选。
 - **未新增：**host意图进度FSM、完成闸门、恢复、动态扩权、参数修补、对象／数据／参数硬授权或最终文本审计。
 

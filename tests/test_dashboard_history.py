@@ -305,6 +305,41 @@ class DashboardHistoryTests(unittest.TestCase):
         self.assertEqual(rows[0]["model_suffix"], "model_baseline")
         self.assertEqual(rows[0]["attack_name"], "injecagent")
 
+    def test_model_folder_layout_keeps_the_model_dimension_and_run_name(self):
+        base = self.results_root / "benchmarks/agentdojo/qwen3.7-flash"
+        for run, attack in (("v3.6", "ignore_previous"), ("baseline", "ignore_previous")):
+            data = summary("workspace", 0.5, 0.25, 0.75)
+            data.update(model_id="qwen3.7-flash", task_selection={"attack": attack})
+            write_json(base / run / attack / "workspace/summary.json", data)
+        other = summary("workspace", 0.4, 0.3, 0.7)
+        other.update(model_id="deepseek-flash", task_selection={"attack": "ignore_previous"})
+        write_json(self.results_root / "benchmarks/agentdojo/deepseek-flash/clean/ignore_previous/workspace/summary.json", other)
+        with patch("dashboard.app.RESULTS_DIR", self.results_root):
+            catalog = self.client.get("/api/history/catalog").get_json()
+        qwen = [item for item in catalog if item["source"].startswith("benchmarks/agentdojo/qwen3.7-flash/")]
+        self.assertEqual(len(qwen), 2)
+        for item in qwen:
+            self.assertEqual(item["model"], "qwen3.7-flash")
+            self.assertEqual(item["model_group"], "agentdojo/qwen3.7-flash")
+            self.assertEqual(item["model_suffix"], "qwen3.7-flash")
+            self.assertEqual(item["run_key"], "agentdojo/qwen3.7-flash/" + item["run_name"])
+        self.assertEqual({item["run_name"] for item in qwen}, {"v3.6", "baseline"})
+        self.assertEqual(len({item["run_key"] for item in qwen}), 2)
+        deepseek = next(item for item in catalog if item["source"].startswith("benchmarks/agentdojo/deepseek-flash/"))
+        self.assertEqual(deepseek["model"], "deepseek-flash")
+        self.assertEqual(deepseek["run_name"], "clean")
+
+    def test_flat_layout_keeps_the_recorded_model_for_the_model_dimension(self):
+        data = summary("workspace", 0.5, 0.25, 0.75)
+        data.update(model_id="qwen3.7-flash", task_selection={"attack": "ignore_previous"})
+        write_json(self.results_root / "benchmarks/agentdojo/qwen3.7-flash_legacy_run" / "ignore_previous/workspace/summary.json", data)
+        with patch("dashboard.app.RESULTS_DIR", self.results_root):
+            catalog = self.client.get("/api/history/catalog").get_json()
+        item = next(entry for entry in catalog if entry["source"].startswith("benchmarks/agentdojo/qwen3.7-flash_legacy_run"))
+        self.assertEqual(item["model"], "qwen3.7-flash")
+        self.assertEqual(item["model_group"], "agentdojo/qwen3.7-flash_legacy_run")
+        self.assertEqual(item["run_name"], "")
+
     def test_disabled_attack_config_takes_precedence_over_retained_attack_name(self):
         write_json(self.results_root / "dashboard/benign/overall_results.json", {
             "config": {"run_attack": False, "attack_name": "important_instructions"},

@@ -89,3 +89,38 @@ test("pending analyses cannot restore results hidden by a new filter and the new
   gate.invalidate(); // Clear selection while another request is pending.
   assert.equal(gate.isCurrent(newRequest), false);
 });
+
+const nestedCatalog = [
+  { id: "n1", result_folder: "benchmarks", benchmark_id: "agentdojo", model: "qwen3.7-flash",
+    model_group: "benchmarks/agentdojo/qwen3.7-flash", run_key: "benchmarks/agentdojo/qwen3.7-flash/v3.6",
+    model_suffix: "qwen3.7-flash", run_name: "v3.6", attack_name: "ignore_previous" },
+  { id: "n2", result_folder: "benchmarks", benchmark_id: "agentdojo", model: "qwen3.7-flash",
+    model_group: "benchmarks/agentdojo/qwen3.7-flash", run_key: "benchmarks/agentdojo/qwen3.7-flash/baseline",
+    model_suffix: "qwen3.7-flash", run_name: "baseline", attack_name: "ignore_previous" },
+  { id: "n3", result_folder: "benchmarks", benchmark_id: "agentdojo", model: "deepseek-flash",
+    model_group: "benchmarks/agentdojo/deepseek-flash", run_key: "benchmarks/agentdojo/deepseek-flash/v3.6_clean",
+    model_suffix: "deepseek-flash", run_name: "v3.6_clean", attack_name: "none" },
+];
+test("model selection separates <model>/<name> runs across models and keeps run names distinct", () => {
+  assert.deepEqual(selection.filterRuns(nestedCatalog, { model: "qwen3.7-flash" }).map(r => r.id), ["n1", "n2"]);
+  assert.deepEqual(selection.filterRuns(nestedCatalog, { model: "deepseek-flash" }).map(r => r.id), ["n3"]);
+  const state = selection.resolveFilters(nestedCatalog, { model: "deepseek-flash" });
+  assert.deepEqual(state.modelIds, ["deepseek-flash", "qwen3.7-flash"]);
+  assert.deepEqual(state.models, ["benchmarks/agentdojo/deepseek-flash/v3.6_clean"]);
+  assert.deepEqual(state.attacks, ["none"]);
+  assert.equal(state.filters.model, "deepseek-flash");
+});
+test("an unknown or removed model falls back to every model", () => {
+  assert.equal(selection.resolveFilters(nestedCatalog, { model: "gone" }).filters.model, "all");
+  assert.equal(selection.resolveFilters(nestedCatalog, {}).filters.model, "all");
+  assert.deepEqual(selection.filterRuns(nestedCatalog, selection.resolveFilters(nestedCatalog, { model: "gone" }).filters).map(r => r.id), ["n1", "n2", "n3"]);
+});
+
+test("runs of one model stay separately selectable instead of collapsing to one entry", () => {
+  const keys = selection.resolveFilters(nestedCatalog, { model: "qwen3.7-flash" }).models;
+  assert.deepEqual(keys, ["benchmarks/agentdojo/qwen3.7-flash/baseline", "benchmarks/agentdojo/qwen3.7-flash/v3.6"]);
+  assert.deepEqual(
+    selection.filterRuns(nestedCatalog, { models: ["benchmarks/agentdojo/qwen3.7-flash/v3.6"] }).map(r => r.id), ["n1"]);
+  assert.deepEqual(
+    selection.filterRuns(nestedCatalog, { models: keys }).map(r => r.id), ["n1", "n2"]);
+});

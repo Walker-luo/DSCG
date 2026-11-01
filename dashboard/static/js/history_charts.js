@@ -40,7 +40,7 @@
     const runsById = new Map(experiments.map(run => [experimentKey(run), run]));
     Object.entries(previousStyles).forEach(([key, previous]) => {
       const run = runsById.get(key);
-      const modelKey = previous.modelKey || run?.model_group || run?.model_suffix || key;
+      const modelKey = previous.modelKey || run?.run_key || run?.model_group || run?.model_suffix || key;
       const index = models.size;
       const style = models.get(modelKey) || {
         pointStyle: shapes[index % shapes.length], borderDash: dashes[index % dashes.length],
@@ -52,7 +52,7 @@
     experiments.forEach((run) => {
       const key = experimentKey(run);
       if (Object.hasOwn(styles, key)) return;
-      const modelKey = run.model_group || run.model_suffix || key;
+      const modelKey = run.run_key || run.model_group || run.model_suffix || key;
       if (models.has(modelKey)) { styles[key] = models.get(modelKey); return; }
       const index = models.size;
       const style = {
@@ -70,8 +70,11 @@
   function describeExperiment(run) {
     const model = run.model_suffix || run.model_group;
     const separator = model ? model.indexOf("_") : -1;
+    // <model>/<name> layout: the model is the folder and the run name is the label.
+    // <model>_<name>: the run name follows the first underscore.
+    const label = run.run_name || (separator >= 0 ? model.slice(separator + 1) : model || run.label || experimentKey(run));
     return {
-      label: separator >= 0 ? model.slice(separator + 1) : model || run.label || experimentKey(run),
+      label: label,
       fullLabel: run.label || [run.model_group || model || experimentKey(run), run.attack_name].filter(Boolean).join(" / "),
       subtitle: run.attack_name || "未记录攻击",
     };
@@ -82,13 +85,13 @@
     const attacks = Array.from(new Set([...catalog, ...experiments].map(run => run.attack_name || "unknown")))
       .sort((a, b) => a.localeCompare(b));
     catalog.forEach(run => {
-      const key = run.model_group || run.model_suffix || experimentKey(run);
+      const key = run.run_key || run.model_group || run.model_suffix || experimentKey(run);
       if (!order.has(key)) order.set(key, order.size);
     });
     const sorted = [...experiments].sort((a, b) =>
       (a.attack_name || "unknown").localeCompare(b.attack_name || "unknown") ||
-      (order.get(a.model_group || a.model_suffix || experimentKey(a)) ?? Infinity) -
-        (order.get(b.model_group || b.model_suffix || experimentKey(b)) ?? Infinity) ||
+      (order.get(a.run_key || a.model_group || a.model_suffix || experimentKey(a)) ?? Infinity) -
+        (order.get(b.run_key || b.model_group || b.model_suffix || experimentKey(b)) ?? Infinity) ||
       (a.source || "").localeCompare(b.source || ""));
     const groups = [];
     sorted.forEach(run => {

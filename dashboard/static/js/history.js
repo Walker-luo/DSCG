@@ -3,7 +3,7 @@
   const historyCharts = window.DSCGHistoryCharts;
   const historySelection = window.DSCGHistorySelection;
   const analysisRequests = historySelection.createRequestGate();
-  let filters = { folder: "all", backend: "all", models: null, attack: "all" };
+  let filters = { folder: "all", backend: "all", model: "all", models: null, attack: "all" };
   let suiteSelection = null;
   let catalog = [];
   let loaded = false;
@@ -24,7 +24,7 @@
       updateSelection();
     });
     document.querySelector("#history-run-list").addEventListener("change", updateSelection);
-    ["folder", "backend", "attack"].forEach((key) => {
+    ["folder", "backend", "model", "attack"].forEach((key) => {
       document.querySelector("#history-" + key + "-select").addEventListener("change", () => {
         filters[key] = document.querySelector("#history-" + key + "-select").value;
         refreshFilterResults(true);
@@ -114,7 +114,7 @@
       checkbox.value = model;
       checkbox.setAttribute("aria-label", model);
       checkbox.checked = filters.models === null || filters.models.includes(model);
-      const run = catalog.find(item => item.model_group === model);
+      const run = catalog.find(item => historySelection.runKey(item) === model);
       const text = document.createElement("span");
       const title = document.createElement("strong");
       title.textContent = historyCharts.describeExperiment(run).label;
@@ -133,6 +133,7 @@
     filters = resolved.filters;
     [["folder", resolved.folders, "全部目录"],
       ["backend", resolved.backends, "全部基准"],
+      ["model", resolved.modelIds, "全部模型"],
       ["attack", resolved.attacks, "全部攻击"]].forEach(([key, values, allLabel]) => {
       const select = document.querySelector("#history-" + key + "-select");
       select.replaceChildren();

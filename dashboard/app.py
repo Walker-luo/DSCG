@@ -854,10 +854,22 @@ def _history_group_metadata(entry: dict) -> dict:
         suffix = "__" + attack_name
         if model_parts[-1].endswith(suffix):
             model_parts[-1] = model_parts[-1][:-len(suffix)]
+    # Layouts: <folder>/<backend>/<model>/<name>, <folder>/<backend>/<model>_<name>,
+    # and the oldest <folder>/<model>_<backend>_<name>. The model dimension must not drift
+    # to the run name, so a recorded model_id always wins and nesting is explicit.
+    nested = len(model_parts) == 3
+    recorded_model = str(entry.get("model_id") or "").strip()
+    path_model = model_parts[1] if nested else (model_parts[-1] if model_parts else parts[0])
+    model = recorded_model or path_model
+    group = "/".join(model_parts[:2]) if nested else "/".join(model_parts) or parts[0]
+    run_name = model_parts[2] if nested else ""
     return {
         "result_folder": parts[0],
-        "model_group": "/".join(model_parts),
-        "model_suffix": model_parts[-1] if model_parts else parts[0],
+        "model": model,
+        "model_group": group,
+        "run_key": group + "/" + run_name if run_name else group,
+        "model_suffix": path_model,
+        "run_name": run_name,
         "attack_name": attack_name,
         "attack_names": sorted(attacks),
         "attack_kind": next(iter(kinds)) if len(kinds) == 1 else "unknown",
@@ -937,6 +949,10 @@ def _build_history_catalog(results_root: Path | None = None) -> list[dict]:
         summary = _read_history_json(summary_path)
         if summary is None:
             continue
+        # A run-level summary (flat-v1 runs write one at the run root) is not a suite summary;
+        # its parent folder is a run name, so indexing it as a suite would invent entries.
+        if summary.get("suite_name") != suite_name:
+            continue
         entry = ensure_entry(source)
         entry["pipeline_name"] = (
             entry["pipeline_name"] or str(summary.get("pipeline_name") or "")
@@ -975,6 +991,10 @@ def _build_history_catalog(results_root: Path | None = None) -> list[dict]:
             ),
             {},
         )
+        recorded_model = first_summary.get("model_id") if isinstance(first_summary, dict) else None
+        if not recorded_model and isinstance(first_summary, dict):
+            recorded_model = (first_summary.get("main_model") or {}).get("model_id")
+        entry["model_id"] = str(recorded_model or entry.get("model_id") or "").strip()
         label = (
             config.get("label")
             or entry["pipeline_name"]
@@ -1226,7 +1246,8 @@ def _build_history_analysis(payload):
             "benchmark": entry["benchmark"],
             "benchmark_id": entry["benchmark_id"],
             **{key: entry[key] for key in (
-                "result_folder", "model_group", "model_suffix", "attack_name", "attack_names", "attack_kind",
+                "result_folder", "model", "model_group", "run_key", "model_suffix", "run_name",
+                "attack_name", "attack_names", "attack_kind",
             )},
             "updated_at": entry["updated_at"],
             "suites": [],
