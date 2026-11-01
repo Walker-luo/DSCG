@@ -51,9 +51,11 @@ from dscg.audit_router import (LocalAuditRouter, RouterReceiptVerifier, argument
                                normalized as router_normalized, digest as router_digest,
                                catalog_snapshot as router_catalog_snapshot, DEFAULT_THRESHOLD, POLICY_VERSION as ROUTER_POLICY_VERSION,
                                validate_router_options)
+from dscg.authorization_steps import COMPACT_INPUT as COMPACT_AUTH_INPUT
 from dscg.audit_context import (INPUT_SCHEMA as AUDIT_INPUT_SCHEMA_VERSION, EVIDENCE_VERSION,
                                 FACT_BUDGET, MAX_RESULTS, MAX_CALL_ARGUMENTS, select_tool_evidence,
-                                literal_numbered_layout)
+                                literal_numbered_layout, PRESENTATION as AUDIT_PRESENTATION,
+                                ARGUMENT_TEXT_LIMIT, SOURCE_BUDGET)
 from dscg.prompt_profiles import (validate_profile, resolve_profile, semantic_catalog, audit_policy,
                                   authorization_policy, profile_binding, CATALOG_SCHEMA)
 from dscg import anchored_task_view as anchored_view
@@ -300,7 +302,7 @@ def _normalise_audit_value(value: Any, depth: int = 0) -> Any:
     if value is None or isinstance(value, bool):
         return value
     if isinstance(value, str):
-        return _normalise_text(value)
+        return _normalise_text(value, ARGUMENT_TEXT_LIMIT)
     if isinstance(value, int):
         return value
     if isinstance(value, float):
@@ -1090,6 +1092,24 @@ class AuthorizationCompilationError(ValueError):
         super().__init__(reason_code)
 
 
+def _authorization_action_entry(spec, effect, *, compact=None):
+    """One action tool as the model sees it; compact mode drops fields the schema already carries."""
+    compact = (COMPACT_AUTH_INPUT == 'v3') if compact is None else compact
+    entry = {**spec, 'operation_effect': effect}
+    if not compact:
+        entry['native_argument_names'] = sorted(spec['parameters'].get('properties', {}))
+    return entry
+
+
+def _dump_authorization_packet(packet, permission_mode, *, compact=None):
+    """Serialize the L2 input; compact separators only remove whitespace."""
+    compact = (COMPACT_AUTH_INPUT == 'v3') if compact is None else compact
+    options = {'ensure_ascii': False, 'sort_keys': not permission_mode}
+    if compact:
+        options['separators'] = (',', ':')
+    return json.dumps(packet, **options)
+
+
 class ToolAuthorizationCompiler:
     """Compiles a grant without access to model proposals or conversation history.
 
@@ -1333,19 +1353,20 @@ class ToolAuthorizationCompiler:
         # 3. 构建单次意图解析 Prompt (要求输出 JSON)
         input_packet = {"user_request": request.text, "available_tools": catalog if step_mode else action_tools}
         if permission_mode:
+            compact = COMPACT_AUTH_INPUT == 'v3'
             input_packet = {'user_request': request.text,
                             'coverage_review': ['Review every requested outcome, including conditional/later steps.',
                                 'For each outcome consider discovery, update/create and the requested delivery audience.',
                                 'Unknown parameters do not remove a requested tool capability; explicit prohibitions still apply.'],
                             'automatic_read_tools': {n: catalog[n] for n in all_tools if n not in action_tools},
-                            'action_tools': {name: {**spec,
-                                'operation_effect': metadata[name].metadata.effect if metadata[name].registered else 'unknown',
-                                'native_argument_names': sorted(spec['parameters'].get('properties', {}))} for name, spec in action_tools.items()}}
+                            'action_tools': {name: _authorization_action_entry(
+                                spec, metadata[name].metadata.effect if metadata[name].registered else 'unknown',
+                                compact=compact) for name, spec in action_tools.items()}}
         if profile is not None:
             input_packet['tool_risks'] = {name: metadata[name].public_dict() for name in action_tools}
         if static_task_view:
             input_packet['auxiliary_task_view'] = auxiliary_view(static_task_view)
-        prompt = json.dumps(input_packet, ensure_ascii=False, sort_keys=not permission_mode)
+        prompt = _dump_authorization_packet(input_packet, permission_mode)
 
         # 4. 独立上下文编译授权，复用主模型的客户端和 token 统计。
         request_kwargs = {
@@ -2595,7 +2616,7 @@ class ActionSecurityChecker(agent_pipeline.BasePipelineElement):
         self.SYSTEM_POLICY = audit_policy(type(self).SYSTEM_POLICY if self.prompt_profile in ('legacy', TASK_VIEW_PROFILE, *anchored_view.PROFILES) else type(self).CLASSIC_POLICY, self.prompt_profile)
 
     def _handoff_record(self,query,runtime,calls,messages,extra_args,record):
-        record['audit_model_view_version'] = ('dscg.audit-input.v4.2' if self.prompt_profile in ('legacy', TASK_VIEW_PROFILE, *anchored_view.PROFILES)
+        record['audit_model_view_version'] = (('dscg.audit-input.v4.3' if AUDIT_PRESENTATION == 'v3' else 'dscg.audit-input.v4.2') if self.prompt_profile in ('legacy', TASK_VIEW_PROFILE, *anchored_view.PROFILES)
             and not getattr(self, '_legacy_audit_input', False) else
             'dscg.audit-input.v5.10' if self.prompt_profile == V35_PROFILE else AUDIT_INPUT_SCHEMA_VERSION)
         # Active routing authenticates every checker outcome, so a public
@@ -3135,8 +3156,9 @@ def router_configuration_hash(main_config, sec_config, *, input_isolation, autho
                                            'audit_input_schema': 'dscg.audit-input.v5.10' if prompt_profile == V35_PROFILE else 'dscg.audit-input.v4.2' if prompt_profile in ('legacy', TASK_VIEW_PROFILE, *anchored_view.PROFILES) else AUDIT_INPUT_SCHEMA_VERSION,
                                            'audit_review_rules_sha256': _hash_json(REVIEW_RULES),
                                            'audit_review_examples_sha256': _hash_json([ActionSecurityChecker.TASK_READ_DECISION_EXAMPLES if prompt_profile in ('legacy', TASK_VIEW_PROFILE, *anchored_view.PROFILES) else ActionSecurityChecker.READ_DECISION_EXAMPLES, ActionSecurityChecker.EFFECT_DECISION_EXAMPLES]),
-                                           'audit_evidence_version': EVIDENCE_VERSION,
-                                           'audit_evidence_bounds': [FACT_BUDGET, MAX_RESULTS, MAX_CALL_ARGUMENTS],
+                                           'audit_evidence_version': ('task-evidence-v3' if AUDIT_PRESENTATION == 'v3' else EVIDENCE_VERSION),
+                                           'audit_evidence_bounds': [FACT_BUDGET, MAX_RESULTS, MAX_CALL_ARGUMENTS]
+                                                                     + ([SOURCE_BUDGET, ARGUMENT_TEXT_LIMIT] if AUDIT_PRESENTATION == 'v3' else []),
                                            "input_bounds": [AUDIT_MAX_REQUEST_LENGTH,AUDIT_MAX_TOOL_DESCRIPTION_LENGTH,
                                                             AUDIT_MAX_STRING_LENGTH,AUDIT_MAX_ARGUMENT_DEPTH,
                                                             AUDIT_MAX_HISTORY_RECORDS,AUDIT_MAX_TOOL_RESULTS,AUDIT_MAX_TOOL_RESULT_LENGTH]})

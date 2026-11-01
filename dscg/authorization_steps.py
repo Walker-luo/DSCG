@@ -1,5 +1,12 @@
 """Native tool definitions and bounded single-call authorization step records."""
+import os
+
 from dscg.decision_schema import ACTION_PROTOCOL, MAX_STEPS, MAX_INTENT
+
+# Input-only presentation arm: same catalogue semantics in compact JSON without fields the
+# full parameter schema already carries. Off by default; host catalogue and validation are unchanged.
+COMPACT_INPUT = 'v3' if os.environ.get('DSCG_AUTHORIZATION_INPUT') == 'v3' else 'v2'
+
 
 LEGACY_PROTOCOL = 'native-steps-v1'
 PROTOCOL = ACTION_PROTOCOL

@@ -1,5 +1,6 @@
 """Bounded semantic evidence for auditing; never an authorization channel."""
 import json
+import os
 import re
 import unicodedata
 
@@ -7,6 +8,13 @@ import yaml
 
 INPUT_SCHEMA = 'dscg.audit-input.v2'
 EVIDENCE_VERSION = 'task-evidence-v2'
+# Presentation arm: expand the single audit input so a packet that would otherwise be
+# truncated shows its relevant returns and candidate arguments in full. Off by default;
+# every bound below stays explicit and still truncates past its own limit.
+PRESENTATION = 'v3' if os.environ.get('DSCG_AUDIT_PRESENTATION') == 'v3' else 'v2'
+EVIDENCE_VERSION_V3 = 'task-evidence-v3'
+SOURCE_BUDGET = 32768
+ARGUMENT_TEXT_LIMIT = 8192 if PRESENTATION == 'v3' else 512
 MAX_RESULTS = 8
 RECENT_RESULTS = 4
 FACT_BUDGET = 8192
@@ -133,7 +141,8 @@ def _share_budget(lengths, budget):
     return sizes
 
 
-def select_tool_evidence(messages, query, calls, normalize_text, normalize_value, argument_flags, *, preserve_complete=True):
+def select_tool_evidence(messages, query, calls, normalize_text, normalize_value, argument_flags, *,
+                         preserve_complete=True, expand_budget=None):
     current = []
     found_user = False
     for message in messages or []:
@@ -189,8 +198,17 @@ def select_tool_evidence(messages, query, calls, normalize_text, normalize_value
         prepared[:-RECENT_RESULTS], key=lambda r: (r[0], r[1]), reverse=True
     )[:MAX_RESULTS - min(RECENT_RESULTS, len(prepared))]
     selected.sort(key=lambda r: r[1])
-    remaining = max(0, FACT_BUDGET - sum(row[3] + row[4] for row in selected))
     lengths = [len(row[2]['content']) for row in selected]
+    # A packet that would lose text under the ordinary budget gets one bounded expansion
+    # instead of a second audit pass. Small packets keep the original budget and bytes.
+    expand_budget = (PRESENTATION == 'v3') if expand_budget is None else bool(expand_budget)
+    budget = FACT_BUDGET
+    expanded = False
+    if expand_budget:
+        needed = sum(lengths) + sum(row[3] + row[4] for row in selected)
+        if needed > FACT_BUDGET:
+            budget, expanded = SOURCE_BUDGET, True
+    remaining = max(0, budget - sum(row[3] + row[4] for row in selected))
     sizes = _share_budget(lengths, remaining)
     if preserve_complete:
         # Candidate matches must not shrink the former coverage of recent corrections.
@@ -212,10 +230,14 @@ def select_tool_evidence(messages, query, calls, normalize_text, normalize_value
         results.append(item)
     omitted = len(current) - len(results)
     return results, bool(omitted), {
-        'version': EVIDENCE_VERSION if preserve_complete else 'task-evidence-v1', 'available_results': len(current),
+        'version': (EVIDENCE_VERSION_V3 if expand_budget else EVIDENCE_VERSION)
+        if preserve_complete else 'task-evidence-v1',
+        # New diagnostics appear only in the expanded arm so the default packet stays byte-identical.
+        **({'source_budget': budget, 'budget_expanded': expanded} if expand_budget else {}),
+        'available_results': len(current),
         'selected_results': len(results), 'omitted_results': omitted,
         'content_characters': sum(len(r['content']) for r in results),
         'call_argument_characters': sum(row[3] for row in selected),
         'error_characters': sum(row[4] for row in selected),
-        'fact_budget': FACT_BUDGET,
+        'fact_budget': budget,
     }

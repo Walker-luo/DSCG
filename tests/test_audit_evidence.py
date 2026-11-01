@@ -198,3 +198,55 @@ class AuditEvidenceTests(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+class AuditPresentationArmTests(unittest.TestCase):
+    """P0 arm: one bounded expansion instead of a second audit pass; default stays byte-stable."""
+
+    def selector(self):
+        from dscg.audit_context import select_tool_evidence
+        from dscg.audit_router import argument_flags
+        from dscg.pipelines.defended import _normalise_audit_value, _normalise_text
+        return select_tool_evidence, argument_flags, _normalise_text, _normalise_audit_value
+
+    def messages(self, size):
+        query = 'send the list to david'
+        rows = [user(query), result('list_files', {}, 'A' * size, 'big')]
+        return query, rows
+
+    def test_truncated_packet_uses_the_bounded_expansion_and_keeps_small_packets_stable(self):
+        select, flags, norm, normv = self.selector()
+        query, rows = self.messages(29000)
+        small_query, small_rows = self.messages(64)
+        plain, _, plain_sel = select(small_rows, small_query, [], norm, normv, flags, expand_budget=False)
+        wide, _, wide_sel = select(small_rows, small_query, [], norm, normv, flags, expand_budget=True)
+        self.assertEqual(wide[0]['content'], plain[0]['content'])
+        self.assertEqual(wide_sel['version'], 'task-evidence-v3')
+        self.assertEqual(plain_sel['version'], 'task-evidence-v2')
+        self.assertNotIn('source_budget', plain_sel)
+        self.assertFalse(wide_sel['budget_expanded'])
+
+        default_rows, _, default_sel = select(rows, query, [], norm, normv, flags, expand_budget=False)
+        expanded_rows, _, expanded_sel = select(rows, query, [], norm, normv, flags, expand_budget=True)
+        self.assertTrue(default_rows[0]['content_truncated'])
+        self.assertEqual(len(default_rows[0]['content']), 8190)
+        self.assertFalse(expanded_rows[0]['content_truncated'])
+        self.assertEqual(len(expanded_rows[0]['content']), 29000)
+        self.assertEqual(expanded_sel['source_budget'], 32768)
+        self.assertTrue(expanded_sel['budget_expanded'])
+
+    def test_expansion_is_still_bounded_and_marks_the_loss(self):
+        select, flags, norm, normv = self.selector()
+        query, rows = self.messages(40000)
+        wide, _, wide_sel = select(rows, query, [], norm, normv, flags, expand_budget=True)
+        self.assertTrue(wide[0]['content_truncated'])
+        self.assertEqual(wide_sel['source_budget'], 32768)
+        self.assertLessEqual(len(wide[0]['content']), 32768)
+
+    def test_candidate_arguments_use_the_arm_limit_and_flag_the_loss(self):
+        from dscg.audit_router import argument_flags
+        body = 'x' * 600
+        self.assertTrue(argument_flags({'body': body})['arguments_truncated'])          # 默认预览上限 512
+        self.assertFalse(argument_flags({'body': body}, text_limit=8192)['arguments_truncated'])
+        self.assertTrue(argument_flags({'body': 'x' * 8193}, text_limit=8192)['arguments_truncated'])
+        self.assertTrue(argument_flags({'outer': {'body': body}})['arguments_truncated'])

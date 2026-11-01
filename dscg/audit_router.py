@@ -17,6 +17,7 @@ from threading import Lock
 import ipaddress
 import re
 from urllib.parse import urlsplit
+from dscg.audit_context import ARGUMENT_TEXT_LIMIT as AUDIT_ARGUMENT_TEXT_LIMIT
 import unicodedata
 
 from dscg.tool_metadata import metadata_for_runtime, metadata_catalog_hash
@@ -50,14 +51,15 @@ def normalized(value):
     return ''.join(c if c in '\n\t' or c.isprintable() else f'\\u{ord(c):04x}' for c in text)
 
 
-def argument_flags(value, depth=0):
+def argument_flags(value, depth=0, text_limit=None):
     flags = dict(arguments_truncated=False, arguments_nonfinite_or_unsupported=False)
     if depth >= 4:
         flags['arguments_truncated'] = True
     elif value is None or isinstance(value, bool):
         pass
     elif isinstance(value, str):
-        flags['arguments_truncated'] = len(normalized(value)) > 512
+        limit = AUDIT_ARGUMENT_TEXT_LIMIT if text_limit is None else int(text_limit)
+        flags['arguments_truncated'] = len(normalized(value)) > limit
     elif isinstance(value, int):
         flags['arguments_nonfinite_or_unsupported'] = value.bit_length() > 4096
     elif isinstance(value, float):
@@ -69,7 +71,7 @@ def argument_flags(value, depth=0):
             flags['arguments_nonfinite_or_unsupported'] = any(not isinstance(k, str) for k in value)
             flags['arguments_truncated'] |= any(len(normalized(k)) > 128 for k in value if isinstance(k, str))
         for child in children:
-            sub = argument_flags(child, depth + 1)
+            sub = argument_flags(child, depth + 1, text_limit)
             for key in flags:
                 flags[key] |= sub[key]
     else:

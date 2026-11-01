@@ -105,3 +105,4 @@
 - [v3.5.1 残余问题优化与Qwen专项验证（2026-10-26）](v35_optimization_20261026.md)
 - [workshop 选择性提交迁移（2026-10-25）](workshop_commit_transfer_20261025.md)
 - [DSCG Workshop 优化结果](workshop_optimization_report.md)
+- 2026-11-01：[P0／P1 单因素臂实施与首轮在线验证](./p0_p1_arms_20261101.md)：qwen 定向20键 12/20→17/20，重复9/15→15/15，P0 净省 9.1% token。

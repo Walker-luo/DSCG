@@ -62,3 +62,32 @@ class StepAuthorizationTests(unittest.TestCase):
   with patch.object(d.ToolAuthorizationCompiler,'CLASSIC_POLICY','changed candidate base'):
    self.assertEqual(default,identity('legacy'))
    self.assertNotEqual(candidate,identity('protocol-v1'))
+
+
+class CompactAuthorizationInputTests(unittest.TestCase):
+    """P1 arm: compact input keeps every semantic field and only drops presentation whitespace."""
+
+    def spec(self):
+        return {'description': 'send a message', 'authorization': 'requires_selection',
+                'parameters': {'type': 'object',
+                               'properties': {'body': {'type': 'string'}, 'to': {'type': 'string'}},
+                               'required': ['body']}}
+
+    def test_compact_entry_keeps_schema_and_drops_the_derived_name_list(self):
+        from dscg.pipelines.defended import _authorization_action_entry
+        verbose = _authorization_action_entry(self.spec(), 'write', compact=False)
+        compact = _authorization_action_entry(self.spec(), 'write', compact=True)
+        self.assertIn('native_argument_names', verbose)
+        self.assertNotIn('native_argument_names', compact)
+        for key in ('description', 'parameters', 'authorization', 'operation_effect'):
+            self.assertEqual(compact[key], verbose[key])
+
+    def test_compact_dump_parses_to_the_same_packet(self):
+        import json
+        from dscg.pipelines.defended import _dump_authorization_packet
+        packet = {'user_request': '请发送 中文 ', 'action_tools': {'send_email': self.spec()}}
+        verbose = _dump_authorization_packet(packet, False, compact=False)
+        compact = _dump_authorization_packet(packet, False, compact=True)
+        self.assertEqual(json.loads(verbose), json.loads(compact))
+        self.assertLess(len(compact), len(verbose))
+        self.assertNotIn(': ', compact)
