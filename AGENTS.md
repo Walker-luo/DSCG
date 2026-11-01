@@ -1,5 +1,14 @@
 # DSCG Agent Instructions
 
+## Working directories: workstation and test server
+
+- `/home/yuxin_luo/DSCG` is the user's working directory on the test server (`user-PowerEdge-T640`: Ubuntu, 96 cores, 125 GB RAM, RTX 5090 + L20), where subsequent tests are run; the workstation checkout of the same repository is `/Users/luo/Desktop/AgentDefence/DSCG`. Both copies of this file are kept byte-identical and updated through GitHub: edit it once, commit and push, then take the new version on the other side instead of hand-editing a second copy.
+- The checkout root is the repository root: in-repo relative paths used below (`DV_STATE.md`, `docs/`, `workshop/`, `tests/`, `experiments/`) resolve against it, and the sibling research checkout `../research/` is `/home/yuxin_luo/research` on the server and `/Users/luo/Desktop/AgentDefence/research` on the workstation; both hold `technical_route.md` and `Qwen_API.md`. `/home/yuxin_luo/BaseIntent` is an unrelated repository and stays out of scope.
+- Git differs per machine and must be checked per machine: the workstation is on `workshop` tracking `origin/workshop`; the server checkout has a detached HEAD at `6726cb0` plus an untracked `AgentDyn/` backend source clone, and its remote-tracking refs may be stale. Do not commit, switch or reset branches merely to reconcile the two checkouts; report the branch/HEAD a run actually used.
+- Conda: the workstation uses `/opt/miniconda3` with `ipi` (AgentDojo) and `ipi-agentdyn` (AgentDyn); the server uses `~/miniconda3` with `DSCG` (AgentDojo; the `ipi` env named in the commands below does not exist there, substitute `DSCG`), `ipi-agentdyn` and `crawler`. On the server, conda is absent from the PATH of non-interactive shells: use `~/miniconda3/bin/conda run -n <env> ...` or source `~/miniconda3/etc/profile.d/conda.sh`. Verify the env actually used instead of assuming a name.
+- Server storage: `/home` is about 93% full (~540 GB free). Keep new outputs in `workshop/artifacts/<YYYYMMDD>_<task>/`, pass `--results-dir` there, and avoid duplicated result trees, extra backend clones or copying large raw results between the two machines.
+- Report every run with its host, conda env, exact command, exit code and artifact paths, in addition to the revision and usage facts required below.
+
 ## Scope and working rules
 
 - Work in `DSCG/`, the engineering repository for indirect prompt-injection defense. Keep the sibling `../research/` repository separate; do not copy paper plans here or create a nested research checkout.
