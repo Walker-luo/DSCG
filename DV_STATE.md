@@ -1,6 +1,6 @@
 # DSCG Project State
 
-> 2026-11-01（Asia/Shanghai）。当前 **v3.6**，默认 **static-task-v354 / DSCG_v3.5.4**；`static-task-v361`（v3.6.1）经评估无净收益，**已回退并保留为显式候选**。只保留现行机制、验证范围与遗留问题；历史报告不作为新的调用授权。
+> 2026-11-02（Asia/Shanghai）。当前 **v3.6.2**，默认 **static-task-v354 / authorization_input=v3 / audit_presentation=v2**；`static-task-v361`（v3.6.1）经评估无净收益，**已回退并保留为显式候选**。只保留现行机制、验证范围与遗留问题；历史报告不作为新的调用授权。
 
 ## 1. 工作区与当前任务
 
@@ -25,6 +25,7 @@
 - **任务源／Monitor：**保留中介准备读取、有限明确txt/md委托、冻结授权／目录、整批回执及一次性票据；普通返回不能新增任务权威，污染委托源仍在既有边界外。
 - **读取／入口：**sink-free-read-v4范围不变；CLI router shadow、factory/API off，off仍审计非免审批次。static NoL2／NoChecker仅router off；full／partial／Dashboard共享工厂与原生评分。
 - **错误投影：**共享读取器合并当前attempt后，对已记账API失败派生null标签；旧attempt不污染新attempt。原生评分／实际效果不改，旧持久汇总不回写；新投影策略绑定reuse身份。SDK retries0，原生generation仍可重试，未记账失败无法推断。
+- **v3.6.2 发版（2026-11-02）：**默认启用 P1（`authorization_input=v3`，L2 紧凑输入，无损、每键 −16.7%～−18%），P0 保持开关（`DSCG_AUDIT_PRESENTATION=v3`，默认关，qwen 上净成本 +5.7%）。两者都进配置身份；`static-task-v354` 字节未变；`framework_version_for_profile(static-task-v354)=DSCG_v3.6.2`。沿用 v3.6.1 名称的 `static-task-v361` 不动。见[发版说明](workshop/completed/v362_release_20261102.md)。
 - **P0／P1 单因素臂（2026-11-01，默认关闭）：**`DSCG_AUDIT_PRESENTATION=v3` 在证据会截断时启用一次 32,768 字符完整呈现并把候选参数上限提到 8,192（审计视图 v4.3／`task-evidence-v3`）；`DSCG_AUTHORIZATION_INPUT=v3` 只做 L2 输入紧凑序列化并去掉 `native_argument_names`。默认路径与 v3.6 逐字节一致，既有固定哈希测试未改。qwen3.7-flash 定向 20 键：v3.6 12/20 → P0 17/20（block 2→0、0 回退、p=0.0625），5 键×3 次重复 9/15 → 15/15；P0 每任务 token −9.1%（审计 +86%、生成 −25%），P1 的 L2 每键 −16.7%；ASR 全 0（16 攻击键，样本小）。P2 未实施。详见[报告](workshop/completed/p0_p1_arms_20261101.md)与[分析 §8](analysis/v3.6_workshop.md)。**组合臂后续验证（60 个攻击键 + clean40）**：无 block 的键上与对照持平（ctl 54/60 → 52/60，3 修 5 退，双次退步键 3 次重复 ctl 4/6 vs 5/6 属噪声），ASR 0/60；token +5.7%（审计 +89%、L2 −18%）。结论：P0 收益只限"本会被 block"的键，默认不应开启；P1 可作下一默认候选。
 - **结果目录与 Dashboard 模型维度（2026-11-01）：**新运行保存为 `<results-dir>/<backend>/<model>/<name>/`，旧 `<backend>/<model>_<name>` 与 `<model>_<backend>_<name>` 仍原地读取、不迁移；报告与绑定标签保持 `model_name`（含模型名），以满足 agentdojo attack registry 的模型名解析。Dashboard 历史目录改为按记录 `model_id` 提供**模型**筛选，并以 `run_key`（`<model_group>/<run_name>`）区分同模型的多次运行；flat-v1 的 run 级 `summary.json` 不再被当成 suite 条目。`results/workshop/agentdojo` 下的 qwen 目录已按 `qwen3.7-flash/<name>` 归位。
 - **筛选入口：**`--fliter`／Python `fliter_path`读取最小后端绑定排除表；默认不做GOAL。显式`--goal`使用当前测量配置，每剩余目标一次、跨攻击共用；失败排除、错误跳过并exit1，续跑不重试已开始目标。旧cohort输入拒绝，历史结果只读兼容。partial原前三目标内筛除、不补位；clean／DoS不接受筛选。

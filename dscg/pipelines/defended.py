@@ -3142,6 +3142,8 @@ def router_configuration_hash(main_config, sec_config, *, input_isolation, autho
                                            "isolation_rule_sha256": _hash_json(ISOLATION_POLICY if prompt_profile == V35_PROFILE else ISOLATION_RULE),
                                            "completion_rule_sha256": _hash_json(TASK_COMPLETION_PROMPT),
                                            "framework_version": framework_version_for_profile(prompt_profile),
+                                           "authorization_input": COMPACT_AUTH_INPUT,
+                                           "audit_presentation": AUDIT_PRESENTATION,
                                            "input_isolation": input_isolation,"authorization_precheck": authorization_precheck,
                                            'l1_projection_mode': l1_projection_mode,
                                            'l1_projection_profile_sha256': L1_PROFILE_SHA256,
@@ -3402,6 +3404,7 @@ def make_qwen_newFrame_pipeline(
         'diagnostics_request_schema': diagnostics.REQUEST_REFERENCE_SCHEMA, 'outcome_projection':diagnostics.OUTCOME_PROJECTION_VERSION,
         **profile_binding(prompt_profile),
         "framework_version": framework_version_for_profile(prompt_profile),
+        'authorization_input': COMPACT_AUTH_INPUT, 'audit_presentation': AUDIT_PRESENTATION,
         **({'decision_contracts': {'audit': contract_identity(sec_config, AUDIT_SCHEMA, 'dscg_audit_v2') if use_security_checker else None,
                                   'authorization_protocol': (V35_AUTH_PROTOCOL if profile_hash is None else 'configured-profile-json-object') if use_sandbox else None,
                                   'authorization_format': (response_format(main_config, {}, 'dscg_tool_permissions_v1')['type'] if profile_hash is None else 'json_object') if use_sandbox else None}}

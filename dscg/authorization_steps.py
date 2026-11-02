@@ -3,9 +3,10 @@ import os
 
 from dscg.decision_schema import ACTION_PROTOCOL, MAX_STEPS, MAX_INTENT
 
-# Input-only presentation arm: same catalogue semantics in compact JSON without fields the
-# full parameter schema already carries. Off by default; host catalogue and validation are unchanged.
-COMPACT_INPUT = 'v3' if os.environ.get('DSCG_AUTHORIZATION_INPUT') == 'v3' else 'v2'
+# v3.6.2 default: compact JSON input without fields the full parameter schema already carries.
+# The host catalogue, permissions and execution schemas are unchanged; set
+# DSCG_AUTHORIZATION_INPUT=v2 only to reproduce the pre-v3.6.2 verbose input.
+COMPACT_INPUT = 'v2' if os.environ.get('DSCG_AUTHORIZATION_INPUT') == 'v2' else 'v3'
 
 
 LEGACY_PROTOCOL = 'native-steps-v1'

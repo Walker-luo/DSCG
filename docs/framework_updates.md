@@ -1,3 +1,16 @@
+# v3.6.2 当前交接
+
+更新：2026-11-02。当前默认 **`static-task-v354`／`DSCG_v3.6.2`**，在 v3.6 之上只改两处输入形态：
+
+| 项 | 默认 | 说明 |
+| --- | --- | --- |
+| L2 工具编译输入（P1） | **紧凑（`authorization_input=v3`）** | 紧凑 JSON + 去掉可由 `parameters.properties` 推出的 `native_argument_names`；工具集合、完整描述、参数类型/必填/默认/枚举、自动读取分类不变。可用 `DSCG_AUTHORIZATION_INPUT=v2` 复现旧输入 |
+| L3 审计输入（P0） | 关闭（`audit_presentation=v2`） | 需要时用 `DSCG_AUDIT_PRESENTATION=v3` 开启：证据会截断时启用一次上限 32,768 字符的完整呈现，候选参数上限 512→8,192 |
+
+- 两个形态都进配置身份（`authorization_input`／`audit_presentation`），跨形态的旧缓存不会被复用。
+- `static-task-v354`（`a70ca4ab…`）字节未变；`static-task-v361` 仍是已回退的候选（`DSCG_v3.6.1`）。
+- 证据：`workshop/completed/p0_p1_arms_20261101.md`（P0 定向 20 键 12/20→17/20、重复 9/15→15/15，无 block 的 60 键持平、token +5.7%；P1 的 L2 每键 −16.7%～−18%）。
+
 # v3.6 当前交接（v3.6.1 已回退）
 
 更新：2026-10-31。当前默认 **`static-task-v354`／`DSCG_v3.5.4`**，即 v3.6 基线（v3.5.4 策略 + 筛选／GOAL／存储改动）。

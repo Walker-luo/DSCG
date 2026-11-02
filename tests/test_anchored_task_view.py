@@ -97,7 +97,7 @@ class AnchoredTaskViewTests(unittest.TestCase):
         for name in ('POLICY','PLANNING_POLICY','AUDIT_GUIDANCE','ERROR_GUIDANCE'):
             with self.subTest(policy=name),patch.object(view,name,'different behavior'):
                 self.assertNotEqual(original,profile_binding(PROFILE))
-        self.assertEqual(framework_version_for_profile(PROFILE),'DSCG_v3.5.4')
+        self.assertEqual(framework_version_for_profile(PROFILE),'DSCG_v3.6.2')
         self.assertEqual(framework_version_for_profile('static-task-v352'),'DSCG_v3.5.3')
 
     def test_original_static_profile_remains_exact_quote_protocol(self):
@@ -171,7 +171,7 @@ class V361IdentityTests(unittest.TestCase):
         self.assertIn(view.CANDIDATE, profiles.PROFILES)
         self.assertEqual(profiles.resolve_profile(view.CANDIDATE), view.CANDIDATE)
         self.assertEqual(framework_version_for_profile(view.CANDIDATE), 'DSCG_v3.6.1')
-        self.assertEqual(framework_version_for_profile('static-task-v354'), 'DSCG_v3.5.4')
+        self.assertEqual(framework_version_for_profile('static-task-v354'), 'DSCG_v3.6.2')
 
     def test_frozen_texts_are_unchanged_and_candidate_adds_two_rules(self):
         from dscg import task_view

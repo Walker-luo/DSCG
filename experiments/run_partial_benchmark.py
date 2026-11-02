@@ -18,6 +18,8 @@ from dscg.paths import RESULTS_DIR, BENCHMARK_RESULTS_DIR
 from dscg.audit_router import (DEFAULT_THRESHOLD, POLICY_VERSION as ROUTER_POLICY_VERSION,
                                validate_router_options, summarize_events, LocalAuditRouter)
 from dscg.input_isolation import FRAMEWORK_VERSION, framework_version_for_profile
+from dscg.authorization_steps import COMPACT_INPUT as COMPACT_AUTH_INPUT
+from dscg.audit_context import PRESENTATION as AUDIT_PRESENTATION
 from dscg.l1_projection import MODES as L1_PROJECTION_MODES, PROFILE_SHA256 as L1_PROFILE_SHA256
 from dscg.pipelines.baseline import make_openai_compatible_pipeline
 from dscg.pipelines.defended import make_defended_pipeline, router_configuration_hash, defended_pipeline_name
@@ -145,6 +147,7 @@ def _describe_pipeline(model_id, sec_model_id, *, origin, defense, **options):
                         'audit_router_threshold': router.threshold if router else None,
                         'audit_router_policy_version': ROUTER_POLICY_VERSION if router else None,
                         'audit_router_artifact_sha256': router.artifact_sha256 if router else None,
+                        'authorization_input': COMPACT_AUTH_INPUT, 'audit_presentation': AUDIT_PRESENTATION,
                         **profile_binding(prompt_profile)}
         name = defended_pipeline_name(main.model_id, use_sandbox=sandbox, use_security_checker=checker,
             input_isolation=isolation, authorization_precheck=sandbox, l1_projection_mode=projection,
@@ -647,6 +650,8 @@ def _run_single_attack(
             'planning_tool_view': bool(planning_tool_view and not origin),
             'delegated_tasks': bool(delegated_tasks and not origin),
             "audit_router_mode": audit_router_mode,
+            "authorization_input": getattr(pipeline,"dscg_optimization_config",{}).get("authorization_input"),
+            "audit_presentation": getattr(pipeline,"dscg_optimization_config",{}).get("audit_presentation"),
             "audit_router_artifact_sha256": getattr(pipeline,"dscg_optimization_config",{}).get("audit_router_artifact_sha256"),
             "audit_router_config_sha256": getattr(pipeline,"dscg_optimization_config",{}).get("audit_router_config_sha256"),
             **({'task_failure_policy': pipeline.dscg_optimization_config['task_failure_policy']}
@@ -875,7 +880,7 @@ def cli(argv: list[str] | None = None, *, task_scope: str = 'partial', entrypoin
         "--name",
         dest="run_name",
         metavar="NAME",
-        help="本次运行名称；结果保存于 --results-dir 指定目录下的 <backend>/<model_id>_<NAME>/。",
+        help="本次运行名称；结果保存于 --results-dir 指定目录下的 <backend>/<model_id>/<NAME>/。",
     )
     parser.add_argument(
         "--trace-level",
