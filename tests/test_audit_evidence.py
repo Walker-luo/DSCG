@@ -38,7 +38,7 @@ class AuditEvidenceTests(unittest.TestCase):
         self.assertFalse(target['content_truncated'])
         self.assertLessEqual(packet['tool_results_selection']['content_characters'] +
                              packet['tool_results_selection']['call_argument_characters'] +
-                             packet['tool_results_selection']['error_characters'], 8192)
+                             packet['tool_results_selection']['error_characters'], 32768)
         self.assertTrue(any(row['content_truncated'] for row in rows))
         self.assertEqual(messages, before)
 
@@ -119,7 +119,7 @@ class AuditEvidenceTests(unittest.TestCase):
         messages = [user(query)] + [result('read_records', {'path': str(i)}, 'x' * 12000, str(i))
                                    for i in range(12)]
         packet = self.packet(query, messages, 'read_records')
-        self.assertLessEqual(sum(len(r['content']) for r in packet['recent_tool_results']), 8192)
+        self.assertLessEqual(sum(len(r['content']) for r in packet['recent_tool_results']), 32768)
         self.assertTrue(packet['tool_results_window_truncated'])
         self.assertTrue(any(r['content_truncated'] for r in packet['recent_tool_results']))
         messages = [user(query), result('read_records', {'path': 'x' * 6000}, '[]')]
@@ -246,7 +246,7 @@ class AuditPresentationArmTests(unittest.TestCase):
     def test_candidate_arguments_use_the_arm_limit_and_flag_the_loss(self):
         from dscg.audit_router import argument_flags
         body = 'x' * 600
-        self.assertTrue(argument_flags({'body': body})['arguments_truncated'])          # 默认预览上限 512
-        self.assertFalse(argument_flags({'body': body}, text_limit=8192)['arguments_truncated'])
+        self.assertFalse(argument_flags({'body': body})['arguments_truncated'])         # v3.6.3 默认 8192
+        self.assertTrue(argument_flags({'body': body}, text_limit=512)['arguments_truncated'])
         self.assertTrue(argument_flags({'body': 'x' * 8193}, text_limit=8192)['arguments_truncated'])
-        self.assertTrue(argument_flags({'outer': {'body': body}})['arguments_truncated'])
+        self.assertTrue(argument_flags({'outer': {'body': 'x'*9000}})['arguments_truncated'])

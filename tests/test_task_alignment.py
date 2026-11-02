@@ -120,7 +120,7 @@ class TaskAlignmentTests(unittest.TestCase):
         self.assertEqual(compare_stage(bundle)['status'],'not_measured')
         old=build_stage('audit',input_revision='legacy-v1')
         self.assertNotIn('input_revision',old)
-        self.assertEqual(old['bundle_sha256'],'9431ec034c7928d9171da96c3cf4da4fd66e499f7337a2205c21fa2c5e16bec8')
+        self.assertEqual(old['bundle_sha256'],'02078ed42e67211374f89b78580b5b3ccaaa8cfa9638906d834e7822015a38a8')
         self.assertEqual(compare_stage(old)['status'],'not_measured')
         self.assertNotEqual(bundle['bundle_sha256'],old['bundle_sha256'])
         with self.assertRaises(ValueError):build_stage('audit',input_revision='invented')

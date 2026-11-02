@@ -106,3 +106,4 @@
 - [workshop 选择性提交迁移（2026-10-25）](workshop_commit_transfer_20261025.md)
 - [DSCG Workshop 优化结果](workshop_optimization_report.md)
 - 2026-11-01：[P0／P1 单因素臂实施与首轮在线验证](./p0_p1_arms_20261101.md)：qwen 定向20键 12/20→17/20，重复9/15→15/15，P0 净省 9.1% token。
+- 2026-11-02：[v3.6.3 发版](./v363_release_20261102.md)：P0 审计证据补全改为默认开（P1 仍默认开），版本 `DSCG_v3.6.3`，测试只需 `run_benchmark` 一条命令。

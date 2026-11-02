@@ -48,7 +48,9 @@ class AlgorithmRouterTests(unittest.TestCase):
     def test_completeness_is_structural_not_placeholder_search(self):
         a=self.api()
         self.assertFalse(any(a.argument_flags({'x':'<max-depth> …<truncated>'}).values()))
-        self.assertTrue(a.argument_flags({'x':'x'*513})['arguments_truncated'])
+        self.assertFalse(a.argument_flags({'x':'x'*513})['arguments_truncated'])
+        self.assertTrue(a.argument_flags({'x':'x'*513}, text_limit=512)['arguments_truncated'])
+        self.assertTrue(a.argument_flags({'x':'x'*8193})['arguments_truncated'])
         self.assertTrue(a.argument_flags({'x':math.nan})['arguments_nonfinite_or_unsupported'])
         self.assertTrue(a.argument_flags({'x':object()})['arguments_nonfinite_or_unsupported'])
         self.assertTrue(a.argument_flags({'x':{'a':{'b':{'c':1}}}})['arguments_truncated'])

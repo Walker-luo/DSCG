@@ -1,3 +1,17 @@
+# v3.6.3 当前交接
+
+更新：2026-11-02。当前默认 **`static-task-v354`／`DSCG_v3.6.3`**，两个输入形态都默认打开：
+
+| 项 | 默认 | 消融 | 说明 |
+| --- | --- | --- | --- |
+| L2 工具编译输入（P1） | `authorization_input=v3` | `DSCG_AUTHORIZATION_INPUT=v2` | 紧凑 JSON + 去掉冗余 `native_argument_names`；语义不变 |
+| L3 审计输入（P0） | `audit_presentation=v3` | `DSCG_AUDIT_PRESENTATION=v2` | 证据会截断时启用一次上限 32,768 字符的完整呈现；候选参数上限 8,192 |
+| 版本 | `DSCG_v3.6.3` | — | `static-task-v354` 提示字节未变 |
+
+- 两个形态都进配置身份，并在 `run_manifest.json` 的 `common` 记录，跨形态的旧缓存不会被复用。
+- 发版原因：用户测试只用 `experiments/run_benchmark.py`，不再要求临时加开关；P0 在 deepseek/workspace 上是被证实的 TSR 修复项（qwen 上净成本 +5.7%，可显式用 `=v2` 关闭）。
+- 证据见 `workshop/completed/v362_release_20261102.md` 与 `workshop/completed/p0_p1_arms_20261101.md`。
+
 # v3.6.2 当前交接
 
 更新：2026-11-02。当前默认 **`static-task-v354`／`DSCG_v3.6.2`**，在 v3.6 之上只改两处输入形态：

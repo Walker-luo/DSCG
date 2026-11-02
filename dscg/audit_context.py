@@ -8,10 +8,11 @@ import yaml
 
 INPUT_SCHEMA = 'dscg.audit-input.v2'
 EVIDENCE_VERSION = 'task-evidence-v2'
-# Presentation arm: expand the single audit input so a packet that would otherwise be
-# truncated shows its relevant returns and candidate arguments in full. Off by default;
-# every bound below stays explicit and still truncates past its own limit.
-PRESENTATION = 'v3' if os.environ.get('DSCG_AUDIT_PRESENTATION') == 'v3' else 'v2'
+# Default since v3.6.3: expand the single audit input so a packet that would otherwise be
+# truncated shows its relevant returns and candidate arguments in full. Every bound below
+# stays explicit and still truncates past its own limit; DSCG_AUDIT_PRESENTATION=v2 only
+# reproduces the pre-v3.6.3 presentation.
+PRESENTATION = 'v2' if os.environ.get('DSCG_AUDIT_PRESENTATION') == 'v2' else 'v3'
 EVIDENCE_VERSION_V3 = 'task-evidence-v3'
 SOURCE_BUDGET = 32768
 ARGUMENT_TEXT_LIMIT = 8192 if PRESENTATION == 'v3' else 512
