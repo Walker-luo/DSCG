@@ -2,7 +2,7 @@
 
 DSCG 是工具使用型 LLM Agent 的间接提示词注入防御研究原型，支持 AgentDojo 与 AgentDyn，使用原生评分比较任务成功率（TSR）、攻击成功率（ASR）和模型开销。
 
-当前代码标识为 **DSCG_v3.6**，默认 **`prompt_profile=static-task-v354`**。`static-task-v361`（v3.6.1）在 834 配对键上与 v3.6 持平（−0.34pp，p=0.91）、单项收益仅约 +0.4pp，**已评估后回退，保留为显式候选**；`legacy` 为单次授权对照；运行名不选择策略。测试直接运行 benchmark 即可，不需要 `--prompt-profile`。见[v3.6.1逐例分析与回退建议](analysis/details.md)、[阶段报告](workshop/completed/v361_optimization_20261031.md)。
+当前代码标识为 **DSCG_v3.7**，默认 **`prompt_profile=static-task-v354`**。v3.7 在 v3.6 之上只改两处**输入形态**，默认全部打开：①L2 工具编译输入紧凑化（`authorization_input=v3`，去掉可由参数 schema 推出的冗余字段，语义与覆盖不变）；②L3 审计证据补全（`audit_presentation=v3`，证据会截断时启用一次上限 32,768 字符的完整呈现，候选参数上限 8,192；超过仍截断、仍可 deny/abstain）。两者都写进 `run_manifest.json`，分别可用 `DSCG_AUTHORIZATION_INPUT=v2`／`DSCG_AUDIT_PRESENTATION=v2` 消融。`static-task-v361`（v3.6.1）经评估无净收益并已回退，保留为显式候选；`legacy` 为单次授权对照；运行名不选择策略。测试直接运行 benchmark 即可，不需要 `--prompt-profile` 或任何环境变量。见[v3.7 发版说明](workshop/completed/v37_release_20261103.md)、[框架更新](docs/framework_updates.md)。
 
 显式`static-task-v352`保留v3.5.3策略，`legacy`为单次授权对照。既有正式结果见[v3.5.4分析](analysis/v3-5-4.md)，本次入口与存储验证见[实施记录](workshop/completed/fliter_goal_20261030.md)。历史结果保留原版本名，不重标为v3.6。
 
@@ -14,6 +14,8 @@ DSCG 是工具使用型 LLM Agent 的间接提示词注入防御研究原型，�
 | L2 | 根据完整可信任务与原生工具定义编译、冻结工具授权；默认先提取静态任务视图，再返回全局动作工具布尔表并合并自动读取权限。只展示已授权工具，候选整批复核。 | 普通动作任务通常2次；显式legacy通常1次 |
 | L3 | 对当前实际工具参数与任务约束、有限成功证据进行审计；外发同时检查正文和目的地，返回严格四字段判决。 | 非免审批次通常1次 |
 | Monitor | 执行前复核整批候选、授权、审计回执和一次性票据，保持原生调用顺序。 | 无独立调用 |
+
+L2 与 L3 的**模型输入**由两个可消融形态控制（v3.7 默认均开启）：L2 用紧凑 JSON 且不带可由 `parameters` 推出的字段名列表；L3 在证据原本会被截断时，按同一预算规则完整呈现相关返回与候选正文（上限 32,768／8,192 字符），超过上限仍标截断。两者都不改变工具集合、权限校验、执行 schema、评分或原生调用顺序。
 
 ```mermaid
 flowchart LR

@@ -1,3 +1,17 @@
+# v3.7 当前交接
+
+更新：2026-11-03。当前默认 **`static-task-v354`／`DSCG_v3.7`**。v3.7 = v3.6.3 的输入形态定版，无新增机制：
+
+| 项 | 默认 | 消融 | 说明 |
+| --- | --- | --- | --- |
+| L2 工具编译输入 | `authorization_input=v3` | `DSCG_AUTHORIZATION_INPUT=v2` | 紧凑 JSON + 去掉冗余字段名；工具集合/描述/参数 schema 不变 |
+| L3 审计输入 | `audit_presentation=v3` | `DSCG_AUDIT_PRESENTATION=v2` | 证据会截断时 32,768 字符完整呈现；候选参数上限 8,192；超限仍截断 |
+| 版本 | `DSCG_v3.7` | — | `static-task-v354` 提示字节未变 |
+
+- 两者都进配置身份与 `run_manifest.json`（`authorization_input`／`audit_presentation`），跨形态不复用缓存。
+- qwen3.7-flash 四场景攻击批（3 攻击）：banking 255/432=59.0%、slack 215/315=68.3%、travel 299/360=83.1%、workspace 772/839=92.0%，ASR 全 0；总 token 39.98M。deepseek-flash workspace clean 39/40（v3.6 为 34/40）。
+- 证据与命令见 `workshop/completed/v37_release_20261103.md`。
+
 # v3.6.3 当前交接
 
 更新：2026-11-02。当前默认 **`static-task-v354`／`DSCG_v3.6.3`**，两个输入形态都默认打开：
