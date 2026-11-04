@@ -69,9 +69,9 @@ print(security.public_dict())
 
 公共客户端对DashScope将developer转换为system；DeepSeek另将确认的纯文本system块合并为字符串。baseline、DSCG、screen与Dashboard共用，不修改已安装后端。适配身份进入公开配置，更新请求身份后用新运行名；旧结果不重写。
 
-Qwen3.7-Flash／DashScope及DeepSeek默认关闭思考。generation的实际temperature取决于后端序列化，**不能把模型对象上的0等同于发送了0**；看诊断 `model_request` 中实际字段。SDK `max_retries=0`，原生generation仍可能自带重试，不承诺全链路单次传输。采样／思考不是本地模型TOML的任意扩展键。
+Qwen3.7-Flash／DashScope及DeepSeek默认关闭思考。`qwen3.5-flash`／`qwen3.7-plus`／`qwen3.8-flash` 的思考默认开启，由 `dscg/model_config.py` 的 `thinking_request_options` 显式发送 `extra_body.enable_thinking=false`（含同名日期快照）；其他组合请求字节不变，旧结果不迁移。generation的实际temperature取决于后端序列化，**不能把模型对象上的0等同于发送了0**；看诊断 `model_request` 中实际字段。SDK `max_retries=0`，原生generation仍可能自带重试，不承诺全链路单次传输。采样／思考不是本地模型TOML的任意扩展键。
 
-默认L2／L3对支持的官方DashScope HTTPS + qwen3.7-flash组合使用严格JSON Schema，其他组合使用JSON Object并保持严格宿主校验；拒绝时不自动降级或修补。
+默认L2／L3对支持的官方DashScope HTTPS + `qwen3.7-flash`／`qwen3.5-flash`／`qwen3.7-plus`／`qwen3.8-flash` 组合使用严格JSON Schema（`DASHSCOPE_STRICT_SCHEMA_MODEL_IDS`），其他组合（含该集合外的日期快照）使用JSON Object并保持严格宿主校验；拒绝时不自动降级或修补。
 
 API错误只保存受限 `api_error`：状态码、code、param和角色计数；不保存密钥、HTTP头或完整SDK异常。400／422先核对角色、正文、tools及response_format；普通聊天成功不证明完整协议兼容。历史请求错误和真实任务效果分开，不能记为成功防御。
 

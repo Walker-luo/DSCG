@@ -7,6 +7,25 @@ from time import perf_counter
 from dscg.request_compatibility import attach_api_error
 from dscg.task_diagnostics import record_model_request
 
+
+def outbound_request_options(completions, kwargs):
+    """Return the options actually sent, including transport-level merges.
+
+    Diagnostics must show the real outbound extra_body; the transport adds it
+    after this layer, so merge the same values here without mutating the call.
+    """
+
+    options = getattr(completions, 'request_options', None)
+    if not options or not isinstance(options, dict):
+        return kwargs
+    merged = dict(kwargs)
+    extra = dict(options.get('extra_body') or {})
+    extra.update(merged.get('extra_body') or {})
+    if extra:
+        merged['extra_body'] = extra
+    return merged
+
+
 class _CompletionsProxy:
     def __init__(self, completions, tracker):
         self._completions, self._tracker = completions, tracker
@@ -14,7 +33,8 @@ class _CompletionsProxy:
     def create(self, *args, **kwargs):
         tracker = self._tracker
         record = tracker._phases[tracker._phase.get()]
-        record_model_request(tracker._phase.get(), kwargs, record['api_calls'] + 1)
+        outbound = outbound_request_options(self._completions, kwargs)
+        record_model_request(tracker._phase.get(), outbound, record['api_calls'] + 1)
         record['api_calls'] += 1
         started = perf_counter()
         try:

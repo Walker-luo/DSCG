@@ -61,9 +61,10 @@ class _Proxy:
 
 
 class _Completions(_Proxy):
-    def __init__(self, target, system_text_only=False):
+    def __init__(self, target, system_text_only=False, request_options=None):
         super().__init__(target)
         self._system_text_only = system_text_only
+        self.request_options = dict(request_options or {})
 
     def _adapt_message(self, message):
         if not isinstance(message, Mapping):
@@ -87,6 +88,16 @@ class _Completions(_Proxy):
             # Materialize iterators once; leave source messages/content untouched.
             messages = [self._adapt_message(message) for message in messages]
             kwargs['messages'] = messages
+        options = getattr(self, 'request_options', None)
+        if options:
+            # Transport-level options are merged once here; caller values win and
+            # models without options keep byte-identical requests.
+            merged = dict(kwargs)
+            extra = dict(options.get('extra_body') or {})
+            extra.update(merged.get('extra_body') or {})
+            if extra:
+                merged['extra_body'] = extra
+            kwargs = merged
         try:
             return self._target.create(*args, **kwargs)
         except Exception as exc:
@@ -95,24 +106,30 @@ class _Completions(_Proxy):
 
 
 class _Chat(_Proxy):
-    def __init__(self, target, system_text_only=False):
+    def __init__(self, target, system_text_only=False, request_options=None):
         super().__init__(target)
         self._system_text_only = system_text_only
+        self._request_options = dict(request_options or {})
 
     @property
     def completions(self):
-        return _Completions(self._target.completions, self._system_text_only)
+        return _Completions(self._target.completions, self._system_text_only,
+                            self._request_options)
 
 
 class SystemRoleChatClient(_Proxy):
     _system_text_only = False
 
+    def __init__(self, target, request_options=None):
+        super().__init__(target)
+        self.request_options = dict(request_options or {})
+
     @property
     def chat(self):
-        return _Chat(self._target.chat, self._system_text_only)
+        return _Chat(self._target.chat, self._system_text_only, self.request_options)
 
     def with_options(self, *args, **kwargs):
-        return type(self)(self._target.with_options(*args, **kwargs))
+        return type(self)(self._target.with_options(*args, **kwargs), self.request_options)
 
     copy = with_options
 

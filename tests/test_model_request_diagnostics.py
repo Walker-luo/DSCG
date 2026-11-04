@@ -60,6 +60,30 @@ class ModelRequestDiagnosticsTests(unittest.TestCase):
             restored = load_task_trace(trace)
             self.assertEqual(restored['dscg_model_requests'], records)
 
+    def test_transport_options_are_recorded_as_sent(self):
+        from dscg.request_compatibility import DashScopeChatClient
+        sent = []
+        raw = Mock()
+        def record(*args, **kwargs):
+            sent.append(kwargs)
+            return SimpleNamespace(usage=SimpleNamespace(prompt_tokens=1, completion_tokens=1))
+        raw.chat.completions.create.side_effect = record
+        client = DashScopeChatClient(raw, request_options={'extra_body': {'enable_thinking': False}})
+        tracker = TokenTrackerClient(client)
+        with TemporaryDirectory() as tmp:
+            with DiagnosticSession(self.logger(tmp), 'one', {}) as session:
+                with tracker.phase('generation'):
+                    tracker.chat.completions.create(model='qwen3.7-plus',
+                        messages=[{'role': 'user', 'content': 'PRIVATE PROMPT'}])
+                session.finish({})
+            side = Path(tmp)/'engine/banking/user_task_0/none/none.dscg.jsonl'
+            text = side.read_text()
+            records = [row['record'] for row in map(json.loads, text.splitlines())
+                       if row['event'] == 'model_request']
+            self.assertEqual(records[0]['enable_thinking'], False)
+            self.assertNotIn('PRIVATE PROMPT', text)
+        self.assertEqual(sent[0]['extra_body'], {'enable_thinking': False})
+
     def test_compact_audit_preserves_input_identity_without_body(self):
         record = dict(audit_input_sha256='a'*64, audit_model_view_version='legacy-v4.2',
                       decision='allow', prompt='PRIVATE', policy_features={'secret':'PRIVATE'})

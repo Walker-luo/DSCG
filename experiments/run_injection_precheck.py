@@ -26,6 +26,12 @@ from experiments.common.injection_cohort import (
 )
 
 SCREEN_SCHEMA = 'dscg.fliter-screen.v1'
+# Online screening runs one native baseline trajectory per GOAL and spends real
+# quota, so only explicitly authorized model/provider pairs may generate a list.
+SCREENING_MODELS = frozenset({
+    ('dashscope', 'qwen3.7-flash'), ('dashscope', 'qwen3.5-flash'),
+    ('dashscope', 'qwen3.7-plus'), ('dashscope', 'qwen3.8-flash'),
+    ('deepseek', 'deepseek-flash')})
 
 
 class Progress:
@@ -288,10 +294,10 @@ def screen(*, config_path, run_name, results_dir=None, reuse_from=None, suites=N
     progress = Progress()
     progress.emit('启动，正在读取配置与任务目录。')
     config = resolve_model_config(config_path=config_path)
-    if (config.provider, config.model_id) not in {('dashscope', 'qwen3.7-flash'),
-                                                 ('deepseek', 'deepseek-flash')}:
-        raise ValueError('Online screening requires qwen3.7-flash via dashscope '
-                         'or deepseek-flash via deepseek; no fallback is allowed')
+    if (config.provider, config.model_id) not in SCREENING_MODELS:
+        raise ValueError('Online screening requires qwen3.7-flash, qwen3.5-flash, '
+                         'qwen3.7-plus or qwen3.8-flash via dashscope, or '
+                         'deepseek-flash via deepseek; no fallback is allowed')
     current_binding = {**_binding(config, suites), 'schema_version': SCREEN_SCHEMA}
     root = resolve_run_path(results_dir or RESULTS_DIR / 'injection_precheck', backend.id,
                             config.model_id, run_name, allow_legacy=True)

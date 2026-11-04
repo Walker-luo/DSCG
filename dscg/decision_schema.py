@@ -5,6 +5,8 @@ import json
 import math
 from urllib.parse import urlsplit
 
+from dscg.model_config import DASHSCOPE_STRICT_SCHEMA_MODEL_IDS
+
 AUDIT_PROTOCOL = 'dscg.audit-decision.v2'
 ACTION_PROTOCOL = 'action-steps-v2'
 MAX_STEPS, MAX_INTENT = 24, 256
@@ -43,7 +45,8 @@ def response_format(config, schema, name):
     host = urlsplit(public.get('base_url') or '').hostname or ''
     official = host in {'dashscope.aliyuncs.com', 'dashscope-intl.aliyuncs.com'} or (
         host.endswith('.maas.aliyuncs.com') and len(host.split('.')) >= 5)
-    if (public.get('provider') == 'dashscope' and public.get('model_id') == 'qwen3.7-flash'
+    if (public.get('provider') == 'dashscope'
+            and public.get('model_id') in DASHSCOPE_STRICT_SCHEMA_MODEL_IDS
             and official and urlsplit(public.get('base_url') or '').scheme == 'https'):
         return {'type': 'json_schema', 'json_schema': {
             'name': name, 'strict': True, 'schema': deepcopy(schema)}}

@@ -40,6 +40,15 @@ ROLE_CONFIG_SECTIONS = {
 }
 DEFAULT_MAIN_MODEL_ID = "qwen3.7-flash"
 DEEPSEEK_MODEL_IDS = ("deepseek-flash", "deepseek-v4-pro")
+# DashScope Qwen models whose thinking defaults to on.  They need the explicit
+# enable_thinking=false switch in extra_body; the recorded reasoning_effort=none
+# of qwen3.7-flash is not a documented switch for them.  Dated snapshots share
+# the same prefix and inherit the switch.
+DASHSCOPE_NON_THINKING_MODEL_IDS = ("qwen3.5-flash", "qwen3.7-plus", "qwen3.8-flash")
+# DashScope Qwen models allowed to use strict JSON Schema for L2/L3.  The host
+# still validates every decision; this only selects the request format.
+DASHSCOPE_STRICT_SCHEMA_MODEL_IDS = frozenset({
+    "qwen3.7-flash", "qwen3.5-flash", "qwen3.7-plus", "qwen3.8-flash"})
 
 
 @dataclass(frozen=True)
@@ -60,11 +69,11 @@ class ModelConfig:
             kwargs["base_url"] = self.base_url
         return kwargs
 
-    def public_dict(self) -> dict[str, str | int | None]:
+    def public_dict(self) -> dict[str, str | int | dict[str, bool] | None]:
         """Return safe metadata suitable for experiment results and logs."""
 
         adapter = {'dashscope': DASHSCOPE_ADAPTER, 'deepseek': DEEPSEEK_ADAPTER}.get(self.provider)
-        return {
+        public = {
             "model_id": self.model_id,
             "provider": self.provider,
             "base_url": self.base_url,
@@ -73,6 +82,10 @@ class ModelConfig:
             "sdk_max_retries": 0,
             **({'chat_request_adapter': adapter} if adapter else {}),
         }
+        options = thinking_request_options(self)
+        if options:
+            public['enable_thinking'] = options['extra_body']['enable_thinking']
+        return public
 
 
 def reasoning_effort_for_config(config: ModelConfig) -> str | None:
@@ -89,6 +102,21 @@ def reasoning_effort_for_config(config: ModelConfig) -> str | None:
     ):
         return "none"
     return None
+
+
+def thinking_request_options(config: ModelConfig) -> dict[str, dict[str, bool]]:
+    """Return the explicit non-thinking switch for DashScope Qwen models.
+
+    Models whose thinking defaults to on need ``enable_thinking=false`` in
+    ``extra_body``. Passing it explicitly keeps their requests comparable with
+    the recorded qwen3.7-flash configuration instead of silently enabling
+    thinking. Other models keep their existing request bytes unchanged.
+    """
+
+    if config.provider == 'dashscope' and config.model_id.startswith(
+            DASHSCOPE_NON_THINKING_MODEL_IDS):
+        return {'extra_body': {'enable_thinking': False}}
+    return {}
 
 
 PROVIDER_PRESETS: dict[str, ProviderPreset] = {
@@ -404,8 +432,9 @@ def create_openai_client(config: ModelConfig):
     import openai
 
     client = openai.OpenAI(**config.client_kwargs())
+    options = thinking_request_options(config)
     if config.provider == 'dashscope':
-        return SystemRoleChatClient(client)
+        return SystemRoleChatClient(client, request_options=options)
     if config.provider == 'deepseek':
-        return DeepSeekChatClient(client)
+        return DeepSeekChatClient(client, request_options=options)
     return client

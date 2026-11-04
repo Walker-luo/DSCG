@@ -91,6 +91,13 @@ class StandaloneScreenTests(unittest.TestCase):
                 screen.screen(config_path=None, run_name='invalid', suites=[suite_name], results_dir=temporary)
             factory.assert_not_called()
 
+    def test_screening_allowlist_covers_authorized_models(self):
+        from experiments import run_injection_precheck as screen
+        self.assertEqual(set(screen.SCREENING_MODELS), {
+            ('dashscope', 'qwen3.7-flash'), ('dashscope', 'qwen3.5-flash'),
+            ('dashscope', 'qwen3.7-plus'), ('dashscope', 'qwen3.8-flash'),
+            ('deepseek', 'deepseek-flash')})
+
     def test_minimal_output_fail_error_separate_resume_no_retry(self):
         from experiments import run_injection_precheck as screen
         from experiments.common import injection_cohort as helpers

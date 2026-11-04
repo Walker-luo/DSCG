@@ -25,12 +25,12 @@ class RequestCompatibilityTests(unittest.TestCase):
     def config(self, provider='dashscope', model='qwen-future-fixture'):
         return ModelConfig(model, 'offline-key', 'https://offline.invalid/v1', provider)
 
-    def client(self, handler, provider='dashscope'):
+    def client(self, handler, provider='dashscope', model=None):
         raw = OpenAI(api_key='offline-key', base_url='https://offline.invalid/v1',
                      http_client=httpx.Client(transport=httpx.MockTransport(handler)))
         self.addCleanup(raw.close)
         with patch('openai.OpenAI', return_value=raw):
-            client = create_openai_client(self.config(provider))
+            client = create_openai_client(self.config(provider, model or 'qwen-future-fixture'))
         return client, raw
 
     def test_dashscope_copies_roles_only_preserving_every_other_field(self):
@@ -58,6 +58,30 @@ class RequestCompatibilityTests(unittest.TestCase):
         self.assertEqual((messages, tools), original)
         self.assertEqual(captured[0]['reasoning_effort'], 'none')
         self.assertEqual(len(captured), 1)
+
+    def test_non_thinking_models_send_explicit_switch_and_caller_values_win(self):
+        captured = []
+        def handler(request):
+            captured.append(json.loads(request.content))
+            return httpx.Response(200, json=completion(), request=request)
+        client, _ = self.client(handler, model='qwen3.7-plus')
+        client.chat.completions.create(model='qwen3.7-plus',
+            messages=[{'role': 'user', 'content': 'task'}], temperature=0)
+        self.assertEqual(captured[0]['extra_body'], {'enable_thinking': False})
+        self.assertNotIn('reasoning_effort', captured[0])
+        client.chat.completions.create(model='qwen3.7-plus',
+            messages=[{'role': 'user', 'content': 'task'}],
+            extra_body={'enable_thinking': True, 'top_k': 1})
+        self.assertEqual(captured[1]['extra_body'], {'enable_thinking': True, 'top_k': 1})
+        widened = client.with_options(max_retries=0)
+        widened.chat.completions.create(model='qwen3.7-plus',
+            messages=[{'role': 'user', 'content': 'task'}])
+        self.assertEqual(captured[2]['extra_body'], {'enable_thinking': False})
+        plain, _ = self.client(handler)
+        plain.chat.completions.create(model='qwen3.7-flash',
+            messages=[{'role': 'user', 'content': 'task'}], reasoning_effort='none')
+        self.assertNotIn('extra_body', captured[3])
+        self.assertEqual(captured[3]['reasoning_effort'], 'none')
 
     def test_other_provider_keeps_original_client_and_developer_role(self):
         captured = []

@@ -9,10 +9,15 @@ from dscg.pipelines import defended as d
 
 class DecisionContractTests(unittest.TestCase):
     def test_only_declared_official_qwen_gets_schema(self):
-        config = dict(model_id='qwen3.7-flash', provider='dashscope',
-                      base_url='https://workspace.cn-beijing.maas.aliyuncs.com/compatible-mode/v1')
-        self.assertEqual(response_format(config, AUDIT_SCHEMA, 'audit')['type'], 'json_schema')
+        base = dict(provider='dashscope',
+                    base_url='https://workspace.cn-beijing.maas.aliyuncs.com/compatible-mode/v1')
+        for model_id in ('qwen3.7-flash', 'qwen3.5-flash', 'qwen3.7-plus', 'qwen3.8-flash'):
+            with self.subTest(model_id=model_id):
+                config = {**base, 'model_id': model_id}
+                self.assertEqual(response_format(config, AUDIT_SCHEMA, 'audit')['type'], 'json_schema')
+        config = {**base, 'model_id': 'qwen3.7-flash'}
         for changes in [dict(provider='custom'), dict(model_id='deepseek-flash'),
+                        dict(model_id='qwen3.8-max'), dict(model_id='qwen3.7-flash-2026-07-15'),
                         dict(base_url='https://maas.aliyuncs.com.attacker.invalid/v1'),
                         dict(base_url='http://dashscope.aliyuncs.com/v1')]:
             self.assertEqual(response_format({**config, **changes}, AUDIT_SCHEMA, 'audit'), {'type': 'json_object'})
