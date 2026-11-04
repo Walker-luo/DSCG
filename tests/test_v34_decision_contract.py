@@ -11,7 +11,8 @@ class DecisionContractTests(unittest.TestCase):
     def test_only_declared_official_qwen_gets_schema(self):
         base = dict(provider='dashscope',
                     base_url='https://workspace.cn-beijing.maas.aliyuncs.com/compatible-mode/v1')
-        for model_id in ('qwen3.7-flash', 'qwen3.5-flash', 'qwen3.7-plus', 'qwen3.8-flash'):
+        for model_id in ('qwen3.7-flash', 'qwen3.5-flash', 'qwen3.7-plus',
+                         'qwen3.8-flash', 'qwen3.7-plus-2026-05-26'):
             with self.subTest(model_id=model_id):
                 config = {**base, 'model_id': model_id}
                 self.assertEqual(response_format(config, AUDIT_SCHEMA, 'audit')['type'], 'json_schema')

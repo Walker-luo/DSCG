@@ -48,7 +48,10 @@ DASHSCOPE_NON_THINKING_MODEL_IDS = ("qwen3.5-flash", "qwen3.7-plus", "qwen3.8-fl
 # DashScope Qwen models allowed to use strict JSON Schema for L2/L3.  The host
 # still validates every decision; this only selects the request format.
 DASHSCOPE_STRICT_SCHEMA_MODEL_IDS = frozenset({
-    "qwen3.7-flash", "qwen3.5-flash", "qwen3.7-plus", "qwen3.8-flash"})
+    "qwen3.7-flash", "qwen3.5-flash", "qwen3.7-plus", "qwen3.8-flash",
+    # The qwen3.7-plus alias is not provisioned on the 2026-11 test endpoint (403);
+    # the pinned snapshot below is the tested, working id.
+    "qwen3.7-plus-2026-05-26"})
 
 
 @dataclass(frozen=True)
