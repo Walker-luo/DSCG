@@ -186,3 +186,54 @@ class V361IdentityTests(unittest.TestCase):
         audit = view.audit_guidance(view.CANDIDATE)
         self.assertIn('Counter-examples', audit)
         self.assertTrue(audit.startswith(task_view.AUDIT_GUIDANCE_V361))
+
+
+class FlatWireProtocolTests(unittest.TestCase):
+    """qwen3.5-flash gets a fixed-field task-view wire; the parsed view stays identical."""
+
+    def request(self):
+        return '1. Read the inbox.\n2. Then reply to the newest message.'
+
+    def test_registry_is_literal_and_default_keeps_prior_bytes(self):
+        from dscg.model_config import task_view_wire
+        self.assertEqual(task_view_wire('qwen3.5-flash'), 'anchored-task-view-flat-v3')
+        for model in ('qwen3.7-flash', 'deepseek-flash', 'qwen3.5', None, ''):
+            self.assertEqual(task_view_wire(model), 'anchored-task-view-object-v2')
+
+    def test_flat_and_object_wires_parse_to_the_same_view(self):
+        from dscg.anchored_task_view import (WIRE_FLAT, WIRE_OBJECT, parse_task_view, request_anchors)
+        request = self.request()
+        first, second = request_anchors(request)[0]['id'], request_anchors(request)[1]['id']
+        object_view = {'tasks': [
+            {'intent': 'read inbox', 'anchor_id': first, 'relation': {'kind': 'independent'}},
+            {'intent': 'reply', 'anchor_id': second, 'relation': {'kind': 'conditional',
+                                                                  'condition': 'if a message exists'}}]}
+        flat_view = {'tasks': [
+            {'intent': 'read inbox', 'anchor_id': first, 'relation_kind': 'independent', 'condition': ''},
+            {'intent': 'reply', 'anchor_id': second, 'relation_kind': 'conditional',
+             'condition': 'if a message exists'}]}
+        self.assertEqual(parse_task_view(flat_view, request, wire=WIRE_FLAT),
+                         parse_task_view(object_view, request, wire=WIRE_OBJECT))
+
+    def test_flat_wire_rejects_mixed_shapes_and_condition_misuse(self):
+        from dscg.anchored_task_view import WIRE_FLAT, parse_task_view, request_anchors
+        from dscg.task_view import TaskViewValidationError
+        request = self.request()
+        anchor = request_anchors(request)[0]['id']
+        cases = [
+            ({'tasks': [{'intent': 'x', 'anchor_id': anchor, 'relation': {'kind': 'independent'}}]},
+             'FIELDS_MISMATCH', 'task_row_fields'),
+            ({'tasks': [{'intent': 'x', 'anchor_id': anchor, 'relation_kind': 'independent',
+                         'condition': 'not allowed'}]}, 'FIELDS_MISMATCH', 'unexpected_condition'),
+            ({'tasks': [{'intent': 'x', 'anchor_id': anchor, 'relation_kind': 'conditional',
+                         'condition': ''}]}, 'TYPE_OR_LENGTH', None),
+            ({'tasks': [{'intent': 'x', 'anchor_id': 'r999', 'relation_kind': 'independent',
+                         'condition': ''}]}, 'UNKNOWN_REFERENCE', None),
+        ]
+        for payload, rule, shape in cases:
+            with self.subTest(rule=rule, shape=shape):
+                with self.assertRaises(TaskViewValidationError) as caught:
+                    parse_task_view(payload, request, wire=WIRE_FLAT)
+                self.assertEqual(caught.exception.diagnostics['rule'], rule)
+                if shape:
+                    self.assertEqual(caught.exception.diagnostics['relation_shape'], shape)

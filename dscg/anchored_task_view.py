@@ -44,6 +44,8 @@ PROFILE = 'static-task-v354'
 CANDIDATE = 'static-task-v361'
 PROFILES = (PROFILE, CANDIDATE)
 PROTOCOL = 'dscg.static-task-view.v2'
+WIRE_OBJECT = 'anchored-task-view-object-v2'
+WIRE_FLAT = 'anchored-task-view-flat-v3'
 ERROR_GUIDANCE = ('Tool authorization failed; no tool may execute. Report this failure accurately. '
                   'Do not invent tools, simulate execution, or retry to expand permission.')
 _PLANNING_EXTRA = PLANNING_POLICY[len(BASE_PLANNING_POLICY):]
@@ -88,6 +90,42 @@ POLICY = (
 )
 
 
+POLICY_FLAT_OLD = (
+    'relation is an object with kind=independent, after_previous, or conditional. Use after_previous '
+    'for an actual ordering requirement. Use conditional ONLY for a genuine user-stated trigger; '
+    'then add condition containing that actual trigger. Never insert a placeholder or invent an '
+    'implicit trigger. Conjunctions such as and/also do not themselves make an outcome conditional. '
+    'Independent and after_previous branches have no condition field. Eligibility filters such '
+    'as price/rating are criteria within an intent, not a new '
+    'conditional action unless the user actually makes that outcome conditional. '
+    'Return ONLY JSON {"tasks":[{"intent":"short outcome","anchor_id":"r1",'
+    '"relation":{"kind":"independent"}}]}, 1 to 24 items.'
+)
+
+POLICY_FLAT_NEW = (
+    'Every row has exactly the four fields intent, anchor_id, relation_kind and condition. '
+    'relation_kind is independent, after_previous, or conditional. Use after_previous for an '
+    'actual ordering requirement. Use conditional ONLY for a genuine user-stated trigger; then put '
+    'that actual trigger in condition. Set condition to the empty string for independent and '
+    'after_previous. Never insert a placeholder or invent an implicit trigger. Conjunctions such as '
+    'and/also do not themselves make an outcome conditional. Eligibility filters such as '
+    'price/rating are criteria within an intent, not a new conditional action unless the user '
+    'actually makes that outcome conditional. '
+    'Return ONLY JSON {"tasks":[{"intent":"short outcome","anchor_id":"r1",'
+    '"relation_kind":"independent","condition":""}]}, 1 to 24 items. '
+    'Every row MUST contain all four fields. condition MUST be the empty string unless '
+    'relation_kind is conditional, and MUST contain the actual user-stated trigger when it is.'
+)
+
+assert POLICY.count(POLICY_FLAT_OLD) == 1
+POLICY_FLAT = POLICY.replace(POLICY_FLAT_OLD, POLICY_FLAT_NEW)
+
+
+def policy(wire=WIRE_OBJECT):
+    """Wire-matched task-view instruction; the flat variant changes shape wording only."""
+    return POLICY_FLAT if wire == WIRE_FLAT else POLICY
+
+
 def request_anchors(request):
     if not isinstance(request, str) or not request.strip():
         raise TaskViewValidationError('user_request','TYPE_OR_LENGTH')
@@ -101,7 +139,17 @@ def request_anchors(request):
     return anchors
 
 
-def schema(request):
+def schema(request, wire=WIRE_OBJECT):
+    if wire == WIRE_FLAT:
+        return {'type':'object','additionalProperties':False,'required':['tasks'],
+            'properties':{'tasks':{'type':'array','minItems':1,'maxItems':24,
+                'items':{'type':'object','additionalProperties':False,
+                    'required':['intent','anchor_id','relation_kind','condition'],
+                    'properties':{'intent':{'type':'string','minLength':1,'maxLength':256},
+                        'anchor_id':{'type':'string','enum':[a['id'] for a in request_anchors(request)]},
+                        'relation_kind':{'type':'string',
+                            'enum':['independent','after_previous','conditional']},
+                        'condition':{'type':'string','maxLength':256}}}}}}
     return {'type':'object','additionalProperties':False,'required':['tasks'],
         'properties':{'tasks':{'type':'array','minItems':1,'maxItems':24,
             'items':{'type':'object','additionalProperties':False,
@@ -116,7 +164,9 @@ def schema(request):
                             'condition':{'type':'string','minLength':1,'maxLength':256}}}]}}}}}}
 
 
-def parse_task_view(value, request):
+def parse_task_view(value, request, wire=WIRE_OBJECT):
+    if wire == WIRE_FLAT:
+        return _parse_task_view_flat(value, request)
     anchors = {a['id']:a for a in request_anchors(request)}
     if not isinstance(value, dict) or set(value) != {'tasks'}:
         raise TaskViewValidationError('$','FIELDS_MISMATCH')
@@ -134,13 +184,59 @@ def parse_task_view(value, request):
         if not isinstance(anchor_id, str) or anchor_id not in anchors:
             raise TaskViewValidationError(field+'.anchor_id','UNKNOWN_REFERENCE')
         if not isinstance(relation, dict) or relation.get('kind') not in ('independent','after_previous','conditional'):
-            raise TaskViewValidationError(field+'.relation','INVALID_RELATION')
+            raise TaskViewValidationError(field+'.relation','INVALID_RELATION',
+                relation_shape='not_object' if not isinstance(relation, dict) else 'unknown_kind')
         kind = relation['kind']
-        if set(relation) != ({'kind','condition'} if kind == 'conditional' else {'kind'}):
-            raise TaskViewValidationError(field+'.relation','FIELDS_MISMATCH')
+        expected_fields = {'kind','condition'} if kind == 'conditional' else {'kind'}
+        if set(relation) != expected_fields:
+            raise TaskViewValidationError(field+'.relation','FIELDS_MISMATCH',
+                relation_shape='extra_fields' if set(relation) - expected_fields else 'missing_fields',
+                extra_fields=len(set(relation) - expected_fields),
+                missing_fields=len(expected_fields - set(relation)),
+                condition_present='condition' in relation)
         condition = relation.get('condition','')
         if kind == 'conditional' and (not isinstance(condition, str) or not 1 <= len(condition) <= 256 or not condition.strip()):
             raise TaskViewValidationError(field+'.relation.condition','TYPE_OR_LENGTH')
+        anchor = anchors[anchor_id]
+        if request[anchor['start']:anchor['end']] != anchor['text']:
+            raise TaskViewValidationError(field+'.anchor_id','REFERENCE_MISMATCH')
+        result.append((intent, kind, condition, anchor['start'], anchor['end']))
+    return tuple(result)
+
+
+def _parse_task_view_flat(value, request):
+    """Fixed-field wire: same items and semantics, no mutually exclusive object shapes."""
+    anchors = {a['id']:a for a in request_anchors(request)}
+    if not isinstance(value, dict) or set(value) != {'tasks'}:
+        raise TaskViewValidationError('$','FIELDS_MISMATCH',relation_shape='task_row_fields')
+    rows = value['tasks']
+    if not isinstance(rows, list) or not 1 <= len(rows) <= 24:
+        raise TaskViewValidationError('tasks','INVALID_TASK_COUNT')
+    result = []
+    expected_fields = {'intent','anchor_id','relation_kind','condition'}
+    for index, row in enumerate(rows):
+        field = f'tasks[{index}]'
+        if not isinstance(row, dict) or set(row) != expected_fields:
+            raise TaskViewValidationError(field,'FIELDS_MISMATCH',
+                relation_shape='task_row_fields',
+                extra_fields=len(set(row) - expected_fields) if isinstance(row, dict) else None,
+                missing_fields=len(expected_fields - set(row)) if isinstance(row, dict) else None)
+        intent, anchor_id = row['intent'], row['anchor_id']
+        kind, condition = row['relation_kind'], row['condition']
+        if not isinstance(intent, str) or not 1 <= len(intent) <= 256 or not intent.strip():
+            raise TaskViewValidationError(field+'.intent','TYPE_OR_LENGTH')
+        if not isinstance(anchor_id, str) or anchor_id not in anchors:
+            raise TaskViewValidationError(field+'.anchor_id','UNKNOWN_REFERENCE')
+        if not isinstance(kind, str) or kind not in ('independent','after_previous','conditional'):
+            raise TaskViewValidationError(field+'.relation_kind','INVALID_RELATION',
+                relation_shape='unknown_kind')
+        if not isinstance(condition, str) or len(condition) > 256:
+            raise TaskViewValidationError(field+'.condition','TYPE_OR_LENGTH')
+        if kind == 'conditional' and not condition.strip():
+            raise TaskViewValidationError(field+'.condition','TYPE_OR_LENGTH')
+        if kind != 'conditional' and condition.strip():
+            raise TaskViewValidationError(field+'.condition','FIELDS_MISMATCH',
+                relation_shape='unexpected_condition')
         anchor = anchors[anchor_id]
         if request[anchor['start']:anchor['end']] != anchor['text']:
             raise TaskViewValidationError(field+'.anchor_id','REFERENCE_MISMATCH')

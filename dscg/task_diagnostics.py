@@ -291,6 +291,15 @@ def record_model_request(phase, options, call_index):
     body = options.get('extra_body')
     if isinstance(body, dict) and type(body.get('enable_thinking')) is bool:
         record['enable_thinking'] = body['enable_thinking']
+    # Record the response-format actually sent, plus a schema digest rather than the schema.
+    response_format = options.get('response_format')
+    if isinstance(response_format, dict):
+        kind = response_format.get('type')
+        record['response_format_type'] = kind if isinstance(kind, str) else None
+        spec = response_format.get('json_schema')
+        schema = spec.get('schema') if isinstance(spec, dict) else None
+        if isinstance(schema, dict):
+            record['response_format_sha256'] = hashlib.sha256(_json(schema).encode()).hexdigest()
     session.emit('model_request', record)
 
 

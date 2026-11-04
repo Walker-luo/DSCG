@@ -106,9 +106,11 @@ SCHEMA = {'type':'object','additionalProperties':False,'required':['tasks'],
 
 
 class TaskViewValidationError(ValueError):
-    def __init__(self, field, rule):
+    def __init__(self, field, rule, **extra):
         super().__init__('AUTH_INVALID_INTENTS')
         self.diagnostics = {'failure_type':'AUTH_INVALID_INTENTS','field':field,'rule':rule}
+        # Bounded structural detail only; field values are never recorded.
+        self.diagnostics.update(extra)
 
 
 def parse_task_view(value, request):

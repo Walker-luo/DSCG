@@ -32,7 +32,7 @@ from dscg.authorization_steps import PROTOCOL as STEP_PROTOCOL, POLICY as STEP_P
 from dscg.decision_schema import (AUDIT_PROTOCOL, AUDIT_SCHEMA, action_schema, response_format,
                                   contract_identity, validate_audit, DecisionContractError,
                                   load_decision_json)
-from dscg.intent_evidence import (PROFILE as V35_PROFILE, AUTH_PROTOCOL as V35_AUTH_PROTOCOL,
+from dscg.intent_evidence import (AUTH_POLICY_ALLOWED, ALLOWED_TOOLS_WIRE, allowed_tools_schema, parse_allowed_tools, PROFILE as V35_PROFILE, AUTH_PROTOCOL as V35_AUTH_PROTOCOL,
     AUTH_POLICY as COMPLETE_AUTH_POLICY,
     AUDIT_PROTOCOL as V35_AUDIT_PROTOCOL, MAIN_TASK_POLICY, ISOLATION_POLICY, REVIEW_RULES, DECISION_GUIDE, ENVELOPE_SCHEMA, permission_schema, parse_permissions, parse_envelope, audit_request_options, audit_model_settings, audit_contract_identity, AUDIT_FORMAT)
 from dscg.input_isolation import FRAMEWORK_VERSION, ISOLATION_RULE, build_isolated_view, framework_version_for_profile
@@ -52,6 +52,7 @@ from dscg.audit_router import (LocalAuditRouter, RouterReceiptVerifier, argument
                                catalog_snapshot as router_catalog_snapshot, DEFAULT_THRESHOLD, POLICY_VERSION as ROUTER_POLICY_VERSION,
                                validate_router_options)
 from dscg.authorization_steps import COMPACT_INPUT as COMPACT_AUTH_INPUT
+from dscg.model_config import task_view_wire, permission_wire
 from dscg.audit_context import (INPUT_SCHEMA as AUDIT_INPUT_SCHEMA_VERSION, EVIDENCE_VERSION,
                                 FACT_BUDGET, MAX_RESULTS, MAX_CALL_ARGUMENTS, select_tool_evidence,
                                 literal_numbered_layout, PRESENTATION as AUDIT_PRESENTATION,
@@ -1087,8 +1088,9 @@ class ToolAuthorizationContract:
 class AuthorizationCompilationError(ValueError):
     """Public diagnostic code; provider response bodies stay out of traces."""
 
-    def __init__(self, reason_code: str):
+    def __init__(self, reason_code: str, diagnostics: dict | None = None):
         self.reason_code = reason_code
+        self.diagnostics = diagnostics
         super().__init__(reason_code)
 
 
@@ -1179,8 +1181,9 @@ class ToolAuthorizationCompiler:
 
     def _extract_task_view(self, request):
         anchored = self.prompt_profile in anchored_view.PROFILES
-        policy = anchored_view.POLICY if anchored else TASK_VIEW_POLICY
-        schema = anchored_view.schema(request) if anchored else TASK_VIEW_SCHEMA
+        wire = task_view_wire(getattr(self.llm, 'name', None)) if anchored else anchored_view.WIRE_OBJECT
+        policy = anchored_view.policy(wire) if anchored else TASK_VIEW_POLICY
+        schema = anchored_view.schema(request, wire=wire) if anchored else TASK_VIEW_SCHEMA
         packet = {'user_request':request}
         if anchored: packet['request_anchors'] = anchored_view.request_anchors(request)
         options = {'model':self.llm.name, 'messages':[
@@ -1204,14 +1207,17 @@ class ToolAuthorizationCompiler:
         if choice.finish_reason != 'stop':
             raise AuthorizationCompilationError('AUTH_INCOMPLETE')
         try:
-            parser = anchored_view.parse_task_view if anchored else parse_task_view
+            parser = ((lambda payload, req: anchored_view.parse_task_view(payload, req, wire=wire))
+                      if anchored else parse_task_view)
             parsed = parser(load_decision_json(choice.message.content),request)
         except (ValueError,TypeError) as exc:
             diagnostics.record_validation('authorization_intents','failed',
                 diagnostics=getattr(exc,'diagnostics',{'failure_type':'AUTH_INVALID_INTENTS'}))
             raise AuthorizationCompilationError('AUTH_INVALID_INTENTS') from exc
         diagnostics.record_event('authorization_task_view',{
-            'protocol':anchored_view.PROTOCOL if anchored else TASK_VIEW_PROTOCOL,'user_request_sha256':_authorization_hash(request),
+            'protocol':anchored_view.PROTOCOL if anchored else TASK_VIEW_PROTOCOL,
+            **({'wire':wire} if anchored else {}),
+            'user_request_sha256':_authorization_hash(request),
             'items':public_task_view(parsed)})
         return parsed
 
@@ -1277,11 +1283,14 @@ class ToolAuthorizationCompiler:
         permissions = ()
         decision_format = response_format(getattr(self.llm, 'dscg_model_config', None),
             action_schema(action_tools), 'dscg_action_steps_v2') if action_step_mode else {'type': 'json_object'}
+        permission_wire_name = permission_wire(getattr(self.llm, 'name', None)) if permission_mode else 'boolean-table-v1'
+        allowed_list_mode = permission_mode and permission_wire_name == ALLOWED_TOOLS_WIRE
         if permission_mode:
             decision_format = response_format(getattr(self.llm, 'dscg_model_config', None),
-                permission_schema(action_tools), 'dscg_tool_permissions_v1')
+                allowed_tools_schema(action_tools) if allowed_list_mode else permission_schema(action_tools),
+                'dscg_allowed_action_tools_v1' if allowed_list_mode else 'dscg_tool_permissions_v1')
         steps = ()
-        base_policy = self.SYSTEM_POLICY if permission_mode else STEP_POLICY if step_mode else self.CLASSIC_POLICY
+        base_policy = (AUTH_POLICY_ALLOWED if allowed_list_mode else self.SYSTEM_POLICY) if permission_mode else STEP_POLICY if step_mode else self.CLASSIC_POLICY
         policy = authorization_policy(self.PROFILE_POLICY if profile is not None else base_policy,
                                       'legacy' if self.prompt_profile in (V35_PROFILE, TASK_VIEW_PROFILE, *anchored_view.PROFILES) and self.authorization_profile is not None else self.prompt_profile, bounded=profile is not None)
         authorization_mode = 'bounded-profile-v1' if profile is not None else 'legacy'
@@ -1307,6 +1316,7 @@ class ToolAuthorizationCompiler:
             for tool in allowed
             if metadata[tool].metadata.deterministic_read
         )
+        task_view_wire_name = task_view_wire(getattr(self.llm, 'name', None))
 
         def contract() -> ToolAuthorizationContract:
             return ToolAuthorizationContract(
@@ -1319,7 +1329,7 @@ class ToolAuthorizationCompiler:
                     "tool_metadata_schema": TOOL_METADATA_SCHEMA_VERSION,
                     "temperature": 0.0,
                     **({"decision_contract": decision_format} if action_step_mode or permission_mode else {}),
-                    **({'task_view_contract': {'policy':anchored_view.POLICY,'schema':anchored_view.schema(request.text)}
+                    **({'task_view_contract': {'policy':anchored_view.policy(task_view_wire_name),'schema':anchored_view.schema(request.text, wire=task_view_wire_name)}
                         if self.prompt_profile in anchored_view.PROFILES else {'policy':TASK_VIEW_POLICY,'schema':TASK_VIEW_SCHEMA}}
                        if static_task_view else {}),
                 }),
@@ -1414,11 +1424,24 @@ class ToolAuthorizationCompiler:
             implicit_reads = frozenset(name for name in allowed if metadata[name].metadata.deterministic_read)
             return contract()
 
+        if allowed_list_mode:
+            try:
+                selected = parse_allowed_tools(result_json, set(action_tools))
+            except ValueError as exc:
+                detail = getattr(exc, 'diagnostics', {'failure_type': str(exc)})
+                diagnostics.record_validation('authorization_tools', 'failed', diagnostics=detail)
+                raise AuthorizationCompilationError(str(exc), detail) from exc
+            permissions = tuple(sorted((name, name in selected) for name in action_tools))
+            allowed.update(selected)
+            return contract()
+
         if permission_mode:
             try:
                 selected, permissions = parse_permissions(result_json, set(action_tools))
             except ValueError as exc:
-                raise AuthorizationCompilationError(str(exc)) from exc
+                detail = getattr(exc, 'diagnostics', {'failure_type': str(exc)})
+                diagnostics.record_validation('authorization_tools', 'failed', diagnostics=detail)
+                raise AuthorizationCompilationError(str(exc), detail) from exc
             allowed.update(selected)
             return contract()
 
@@ -3143,6 +3166,8 @@ def router_configuration_hash(main_config, sec_config, *, input_isolation, autho
                                            "completion_rule_sha256": _hash_json(TASK_COMPLETION_PROMPT),
                                            "framework_version": framework_version_for_profile(prompt_profile),
                                            "authorization_input": COMPACT_AUTH_INPUT,
+                                           "task_view_wire": task_view_wire(main_config.model_id),
+                                           "permission_wire": permission_wire(main_config.model_id),
                                            "audit_presentation": AUDIT_PRESENTATION,
                                            "input_isolation": input_isolation,"authorization_precheck": authorization_precheck,
                                            'l1_projection_mode': l1_projection_mode,

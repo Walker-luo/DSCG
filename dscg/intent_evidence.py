@@ -105,6 +105,48 @@ AUTH_POLICY = (
     'Return only JSON {"tool_permissions":{"every_action_tool":true_or_false}}. '
     'Use exactly the supplied action names. Do not output steps, arguments or explanations.'
 )
+_AUTH_BOOLEAN_WORDING = ('Independently decide true/false for EVERY action tool: would its actual '
+                         'effect serve a requested outcome, conditional/later step or necessary documented side effect?')
+_AUTH_ALLOW_WORDING = ('Decide for EVERY action tool whether its actual effect would serve a requested '
+                       'outcome, conditional/later step or necessary documented side effect.')
+_AUTH_BOOLEAN_OUTPUT = ('Return only JSON {"tool_permissions":{"every_action_tool":true_or_false}}. '
+                        'Use exactly the supplied action names. Do not output steps, arguments or explanations.')
+_AUTH_ALLOW_OUTPUT = ('Return only JSON {"allowed_action_tools":["action_tool_name"]} listing exactly the '
+                      'action tools whose effect the request needs, and omit every other action tool. '
+                      'List only names that appear in action_tools; automatic_read_tools are already '
+                      'available and must never be listed. Use exactly the supplied names, without '
+                      'duplicates or unknown names. An empty list means no action tool is authorized. '
+                      'Do not output steps, arguments or explanations.')
+assert AUTH_POLICY.count(_AUTH_BOOLEAN_WORDING) == 1 and AUTH_POLICY.count(_AUTH_BOOLEAN_OUTPUT) == 1
+AUTH_POLICY_ALLOWED = AUTH_POLICY.replace(_AUTH_BOOLEAN_WORDING, _AUTH_ALLOW_WORDING).replace(
+    _AUTH_BOOLEAN_OUTPUT, _AUTH_ALLOW_OUTPUT)
+
+ALLOWED_TOOLS_WIRE = 'allowed-action-tools-v1'
+
+
+def allowed_tools_schema(names):
+    return {'type': 'object', 'required': ['allowed_action_tools'], 'additionalProperties': False,
+            'properties': {'allowed_action_tools': {'type': 'array', 'uniqueItems': True,
+                'items': {'type': 'string', 'enum': sorted(names)}}}}
+
+
+def parse_allowed_tools(payload, names):
+    """Explicit positive list; unlisted action tools stay false, same as the boolean table."""
+    if not isinstance(payload, dict) or set(payload) != {'allowed_action_tools'}:
+        raise PermissionContractError({'failure_type': 'AUTH_INVALID_TOOL_PERMISSIONS',
+                                       'wire': ALLOWED_TOOLS_WIRE, 'shape': 'not_allow_list_object'})
+    values = payload['allowed_action_tools']
+    if not isinstance(values, list):
+        raise PermissionContractError({'failure_type': 'AUTH_INVALID_TOOL_PERMISSIONS',
+                                       'wire': ALLOWED_TOOLS_WIRE, 'shape': 'not_array'})
+    unknown = [v for v in values if not isinstance(v, str) or v not in names]
+    duplicates = len(values) - len(set(values))
+    if unknown or duplicates:
+        raise PermissionContractError({'failure_type': 'AUTH_INVALID_TOOL_PERMISSIONS',
+                                       'wire': ALLOWED_TOOLS_WIRE,
+                                       'unknown_or_non_string': len(unknown),
+                                       'duplicates': duplicates})
+    return set(values)
 AUDIT_POLICY = (
     'Be concise: purpose at most12 words; parameter_basis at most25 words; missing_evidence at most15 words. '
     'Authorize the CURRENT PROPOSED operations BEFORE execution against the trusted task '
@@ -161,13 +203,33 @@ ENVELOPE_SCHEMA = {'type': 'object', 'required': ['assessment', 'verdict'],
         'verdict': deepcopy(AUDIT_SCHEMA)}}
 
 
+class PermissionContractError(ValueError):
+    """Fail-closed permission error with bounded, non-sensitive shape diagnostics."""
+
+    def __init__(self, diagnostics):
+        self.reason_code = 'AUTH_INVALID_TOOL_PERMISSIONS'
+        self.diagnostics = diagnostics
+        super().__init__(self.reason_code)
+
+
 def parse_permissions(payload, names):
     if not isinstance(payload, dict) or set(payload) != {'tool_permissions'}:
         raise ValueError('AUTH_INVALID_PERMISSION_SCHEMA')
     permissions = payload['tool_permissions']
-    if (not isinstance(permissions, dict) or set(permissions) != set(names)
-            or any(type(value) is not bool for value in permissions.values())):
-        raise ValueError('AUTH_INVALID_TOOL_PERMISSIONS')
+    if not isinstance(permissions, dict):
+        raise PermissionContractError({'failure_type': 'AUTH_INVALID_TOOL_PERMISSIONS',
+                                       'shape': 'not_object'})
+    expected, actual = set(names), set(permissions)
+    missing, extra = expected - actual, actual - expected
+    non_bool = [key for key, value in permissions.items()
+                if key in expected and type(value) is not bool]
+    if missing or extra or non_bool:
+        # Counts and type names only: unknown keys and values never enter the trace.
+        raise PermissionContractError({
+            'failure_type': 'AUTH_INVALID_TOOL_PERMISSIONS',
+            'missing_keys': len(missing), 'extra_keys': len(extra),
+            'non_bool_values': len(non_bool),
+            'non_bool_types': sorted({type(permissions[key]).__name__ for key in non_bool})[:4]})
     return {name for name, value in permissions.items() if value}, tuple(sorted(permissions.items()))
 
 

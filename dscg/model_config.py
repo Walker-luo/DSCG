@@ -47,6 +47,24 @@ DEEPSEEK_MODEL_IDS = ("deepseek-flash", "deepseek-v4-pro")
 DASHSCOPE_NON_THINKING_MODEL_IDS = ("qwen3.5-flash", "qwen3.7-plus", "qwen3.8-flash")
 # DashScope Qwen models allowed to use strict JSON Schema for L2/L3.  The host
 # still validates every decision; this only selects the request format.
+# L2 task-view wire protocol per exact model id. Model ids are matched literally, not
+# by prefix; snapshots and aliases need online verification before being registered here.
+TASK_VIEW_WIRE_MODELS = {'qwen3.5-flash': 'anchored-task-view-flat-v3'}
+TASK_VIEW_WIRE_DEFAULT = 'anchored-task-view-object-v2'
+# L2 action-permission wire: explicit positive list instead of the full boolean table.
+PERMISSION_WIRE_MODELS = {'qwen3.5-flash': 'allowed-action-tools-v1'}
+PERMISSION_WIRE_DEFAULT = 'boolean-table-v1'
+
+def task_view_wire(model_id: str | None) -> str:
+    """Return the L2 task-view wire protocol for one model; default keeps prior bytes."""
+    return TASK_VIEW_WIRE_MODELS.get(str(model_id or '').strip(), TASK_VIEW_WIRE_DEFAULT)
+
+
+def permission_wire(model_id: str | None) -> str:
+    """Return the L2 permission wire protocol for one model; default keeps prior bytes."""
+    return PERMISSION_WIRE_MODELS.get(str(model_id or '').strip(), PERMISSION_WIRE_DEFAULT)
+
+
 DASHSCOPE_STRICT_SCHEMA_MODEL_IDS = frozenset({
     "qwen3.7-flash", "qwen3.5-flash", "qwen3.7-plus", "qwen3.8-flash",
     # The qwen3.7-plus alias is not provisioned on the 2026-11 test endpoint (403);

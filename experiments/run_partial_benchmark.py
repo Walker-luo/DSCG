@@ -13,7 +13,7 @@ from agentdojo.attacks.attack_registry import ATTACKS
 from dscg.benchmark_catalog import get_suite, benchmark_identity, validate_backend, get_backend, get_suites, SUITE_VERSION
 import json
 
-from dscg.model_config import ModelConfigurationError, resolve_model_config
+from dscg.model_config import task_view_wire, permission_wire, ModelConfigurationError, resolve_model_config
 from dscg.paths import RESULTS_DIR, BENCHMARK_RESULTS_DIR
 from dscg.audit_router import (DEFAULT_THRESHOLD, POLICY_VERSION as ROUTER_POLICY_VERSION,
                                validate_router_options, summarize_events, LocalAuditRouter)
@@ -652,6 +652,8 @@ def _run_single_attack(
             "audit_router_mode": audit_router_mode,
             "authorization_input": getattr(pipeline,"dscg_optimization_config",{}).get("authorization_input"),
             "audit_presentation": getattr(pipeline,"dscg_optimization_config",{}).get("audit_presentation"),
+            "task_view_wire": task_view_wire((getattr(pipeline,'dscg_model_config',{}) or {}).get('model_id')),
+            "permission_wire": permission_wire((getattr(pipeline,'dscg_model_config',{}) or {}).get('model_id')),
             "audit_router_artifact_sha256": getattr(pipeline,"dscg_optimization_config",{}).get("audit_router_artifact_sha256"),
             "audit_router_config_sha256": getattr(pipeline,"dscg_optimization_config",{}).get("audit_router_config_sha256"),
             **({'task_failure_policy': pipeline.dscg_optimization_config['task_failure_policy']}
