@@ -1,101 +1,142 @@
 <!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>DSCG system architecture</title><style>
-* { box-sizing: border-box; } body { margin: 0; background: #f4f6f8; font-family: Arial, Helvetica, sans-serif; } main { max-width: 1420px; margin: 24px auto; padding: 0 20px; } .frame { overflow-x: auto; background: #fff; border: 1px solid #d8e0e6; } svg { display: block; width: 100%; min-width: 1000px; height: auto; }
-</style></head><body><main><div class="frame">
-<svg xmlns="http://www.w3.org/2000/svg" width="183mm" height="99.72mm" viewBox="0 0 519 283" role="img" aria-labelledby="dscg-title dscg-desc">
-<title id="dscg-title">DSCG mediated tool-use architecture</title>
-<desc id="dscg-desc">The agent compiles task-level tool permissions, plans tool calls, checks and audits candidates, then uses a reference monitor and ticketed executor before feeding isolated tool results back to the planner.</desc>
-<rect x="0" y="0" width="519" height="283" fill="#ffffff"/>
+<html lang="en"><head><meta charset="utf-8">
+<!-- Skin: IEEE print (diagram-design profile "paper-ieee"). paper #ffffff; ink #162a38; muted #46596a;
+     soft #5f7183; accent #a63d2f; L2 #e6f0f9/#5f87ab; L3 #f1edf8/#8a76a3; L1 #e9f4ef/#6e9c8a;
+     enforcement #edf2f7/#48647c; Arial only, system font source, no web fonts. Canvas 544x296 units = 183 mm. -->
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>DSCG execution mediation path</title><style>
 
-<g id="edge-task-to-authorization" fill="none" stroke="#315c84" stroke-width="1.05" stroke-linecap="round" stroke-linejoin="round"><path d="M101 89 H108"/></g>
-<polygon points="108,89 105,87 105,91" fill="#315c84"/>
-<g id="edge-authorization-to-model" fill="none" stroke="#315c84" stroke-width="1.05" stroke-linecap="round" stroke-linejoin="round"><path d="M203 89 H210"/></g>
-<polygon points="210,89 207,87 207,91" fill="#315c84"/>
-<g id="edge-model-to-batch" fill="none" stroke="#315c84" stroke-width="1.05" stroke-linecap="round" stroke-linejoin="round"><path d="M305 89 H312"/></g>
-<polygon points="312,89 309,87 309,91" fill="#315c84"/>
-<g id="edge-batch-to-audit" fill="none" stroke="#315c84" stroke-width="1.05" stroke-linecap="round" stroke-linejoin="round"><path d="M407 89 H414"/></g>
-<polygon points="414,89 411,87 411,91" fill="#315c84"/>
-<g id="edge-audit-to-monitor" fill="none" stroke="#315c84" stroke-width="1.05" stroke-linecap="round" stroke-linejoin="round"><path d="M461.5 118 V157 H359.5 V180"/></g>
-<polygon points="359.5,180 357.5,177 361.5,177" fill="#315c84"/>
-<g id="edge-monitor-to-execution" fill="none" stroke="#315c84" stroke-width="1.05" stroke-linecap="round" stroke-linejoin="round"><path d="M312 209 H305"/></g>
-<polygon points="305,209 308,207 308,211" fill="#315c84"/>
-<g id="edge-execution-to-isolation" fill="none" stroke="#667789" stroke-width="0.8" stroke-linecap="round" stroke-linejoin="round"><path d="M210.000 209.000 L207.400 209.000 M205.400 209.000 L203.000 209.000"/></g>
-<polygon points="203,209 206,207 206,211" fill="#667789"/>
-<g id="edge-isolation-to-planner" fill="none" stroke="#667789" stroke-width="0.8" stroke-linecap="round" stroke-linejoin="round"><path d="M155.500 180.000 L155.500 177.400 M155.500 175.400 L155.500 172.800 M155.500 170.800 L155.500 168.200 M155.500 166.200 L155.500 164.000 M155.500 164.000 L155.900 164.000 M157.900 164.000 L160.500 164.000 M162.500 164.000 L165.100 164.000 M167.100 164.000 L169.700 164.000 M171.700 164.000 L174.300 164.000 M176.300 164.000 L178.900 164.000 M180.900 164.000 L183.500 164.000 M185.500 164.000 L188.100 164.000 M190.100 164.000 L192.700 164.000 M194.700 164.000 L197.300 164.000 M199.300 164.000 L201.900 164.000 M203.900 164.000 L206.500 164.000 M208.500 164.000 L211.100 164.000 M213.100 164.000 L215.700 164.000 M217.700 164.000 L220.300 164.000 M222.300 164.000 L224.900 164.000 M226.900 164.000 L229.500 164.000 M231.500 164.000 L234.100 164.000 M236.100 164.000 L238.700 164.000 M240.700 164.000 L243.300 164.000 M245.300 164.000 L247.900 164.000 M249.900 164.000 L252.500 164.000 M254.500 164.000 L257.100 164.000 M257.500 162.400 L257.500 159.800 M257.500 157.800 L257.500 155.200 M257.500 153.200 L257.500 150.600 M257.500 148.600 L257.500 146.000 M257.500 144.000 L257.500 141.400 M257.500 139.400 L257.500 136.800 M257.500 134.800 L257.500 132.200 M257.500 130.200 L257.500 127.600 M257.500 125.600 L257.500 123.000 M257.500 121.000 L257.500 118.400"/></g>
-<polygon points="257.5,118 255.5,121 259.5,121" fill="#667789"/>
-<g id="edge-frozen-grants-to-batch" fill="none" stroke="#315c84" stroke-width="1.05" stroke-linecap="round" stroke-linejoin="round"><path d="M155.5 118 V139 H359.5 V118"/></g>
-<polygon points="359.5,118 357.5,121 361.5,121" fill="#315c84"/>
-<g id="edge-raw-evidence-to-audit" fill="none" stroke="#667789" stroke-width="0.8" stroke-linecap="round" stroke-linejoin="round"><path d="M257.500 238.000 L257.500 240.600 M257.500 242.600 L257.500 245.200 M257.500 247.200 L257.500 249.800 M257.500 251.800 L257.500 254.000 M257.500 254.000 L257.900 254.000 M259.900 254.000 L262.500 254.000 M264.500 254.000 L267.100 254.000 M269.100 254.000 L271.700 254.000 M273.700 254.000 L276.300 254.000 M278.300 254.000 L280.900 254.000 M282.900 254.000 L285.500 254.000 M287.500 254.000 L290.100 254.000 M292.100 254.000 L294.700 254.000 M296.700 254.000 L299.300 254.000 M301.300 254.000 L303.900 254.000 M305.900 254.000 L308.500 254.000 M310.500 254.000 L313.100 254.000 M315.100 254.000 L317.700 254.000 M319.700 254.000 L322.300 254.000 M324.300 254.000 L326.900 254.000 M328.900 254.000 L331.500 254.000 M333.500 254.000 L336.100 254.000 M338.100 254.000 L340.700 254.000 M342.700 254.000 L345.300 254.000 M347.300 254.000 L349.900 254.000 M351.900 254.000 L354.500 254.000 M356.500 254.000 L359.100 254.000 M361.100 254.000 L363.700 254.000 M365.700 254.000 L368.300 254.000 M370.300 254.000 L372.900 254.000 M374.900 254.000 L377.500 254.000 M379.500 254.000 L382.100 254.000 M384.100 254.000 L386.700 254.000 M388.700 254.000 L391.300 254.000 M393.300 254.000 L395.900 254.000 M397.900 254.000 L400.500 254.000 M402.500 254.000 L405.100 254.000 M407.100 254.000 L409.700 254.000 M411.700 254.000 L414.300 254.000 M416.300 254.000 L418.900 254.000 M420.900 254.000 L423.500 254.000 M425.500 254.000 L428.100 254.000 M430.100 254.000 L432.700 254.000 M434.700 254.000 L437.300 254.000 M439.300 254.000 L441.900 254.000 M443.900 254.000 L446.500 254.000 M448.500 254.000 L451.100 254.000 M453.100 254.000 L455.700 254.000 M457.700 254.000 L460.300 254.000 M462.300 254.000 L464.900 254.000 M466.900 254.000 L469.500 254.000 M471.500 254.000 L474.100 254.000 M476.100 254.000 L478.700 254.000 M480.700 254.000 L483.300 254.000 M485.300 254.000 L487.900 254.000 M489.900 254.000 L492.500 254.000 M494.500 254.000 L497.100 254.000 M499.100 254.000 L501.700 254.000 M503.700 254.000 L506.300 254.000 M508.300 254.000 L510.900 254.000 M512.900 254.000 L515.500 254.000 M516.000 252.500 L516.000 249.900 M516.000 247.900 L516.000 245.300 M516.000 243.300 L516.000 240.700 M516.000 238.700 L516.000 236.100 M516.000 234.100 L516.000 231.500 M516.000 229.500 L516.000 226.900 M516.000 224.900 L516.000 222.300 M516.000 220.300 L516.000 217.700 M516.000 215.700 L516.000 213.100 M516.000 211.100 L516.000 208.500 M516.000 206.500 L516.000 203.900 M516.000 201.900 L516.000 199.300 M516.000 197.300 L516.000 194.700 M516.000 192.700 L516.000 190.100 M516.000 188.100 L516.000 185.500 M516.000 183.500 L516.000 180.900 M516.000 178.900 L516.000 176.300 M516.000 174.300 L516.000 171.700 M516.000 169.700 L516.000 167.100 M516.000 165.100 L516.000 162.500 M516.000 160.500 L516.000 157.900 M516.000 155.900 L516.000 153.300 M516.000 151.300 L516.000 148.700 M516.000 146.700 L516.000 144.100 M516.000 142.100 L516.000 139.500 M516.000 137.500 L516.000 134.900 M516.000 132.900 L516.000 130.300 M516.000 128.300 L516.000 125.700 M516.000 123.700 L516.000 121.100 M516.000 119.100 L516.000 116.500 M516.000 114.500 L516.000 111.900 M516.000 109.900 L516.000 107.300 M516.000 105.300 L516.000 102.700 M516.000 100.700 L516.000 98.100 M516.000 96.100 L516.000 93.500 M516.000 91.500 L516.000 89.000 M516.000 89.000 L515.900 89.000 M513.900 89.000 L511.300 89.000 M509.300 89.000 L509.000 89.000"/></g>
-<polygon points="509,89 512,87 512,91" fill="#667789"/>
-<g id="edge-model-to-response" fill="none" stroke="#315c84" stroke-width="1.05" stroke-linecap="round" stroke-linejoin="round"><path d="M257.5 60 V43"/></g>
-<polygon points="257.5,43 255.5,46 259.5,46" fill="#315c84"/>
-<text x="205" y="148" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="6.2" fill="#152b3a">Frozen tool grants</text>
-<text x="207" y="173" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="6.2" fill="#152b3a">Planning view</text>
-<text x="390" y="263" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="6.2" fill="#152b3a">Bounded evidence from raw results</text>
+*{box-sizing:border-box}
+body{margin:0;background:#ffffff;color:#162a38;font-family:Arial,Helvetica,sans-serif}
+main{max-width:640px;margin:40px auto 48px;padding:0 24px}
+.eyebrow{font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:#5f7183;margin:0 0 6px}
+h1{font-family:Arial,Helvetica,sans-serif;font-weight:600;font-size:26px;line-height:1.2;margin:0 0 6px;letter-spacing:-.01em}
+p.sub{margin:0 0 22px;font-size:13px;color:#46596a}
+.diagram-container{width:100%;overflow-x:auto;border-top:1px solid #cfd8e0;padding-top:18px}
+.diagram-container svg{display:block;width:100%;min-width:544px;height:auto}
+footer{margin-top:18px;padding-top:10px;border-top:1px solid #cfd8e0;font-size:11px;color:#5f7183;display:flex;justify-content:space-between;gap:16px}
+@media print{.diagram-container{overflow-x:visible}.diagram-container svg{min-width:0}}
+
+</style></head><body><main>
+<p class="eyebrow">DSCG &middot; implemented system</p>
+<h1>Execution mediation path</h1>
+<p class="sub">Task-scoped authorization and audit sit between the agent and every tool call.</p>
+<div class="diagram-container">
+<svg xmlns="http://www.w3.org/2000/svg" width="183.0mm" height="99.57mm" viewBox="0 0 544 296" role="img" aria-labelledby="system-architecture-title system-architecture-desc">
+<title id="system-architecture-title">DSCG execution mediation path</title>
+<desc id="system-architecture-desc">Execution path from the trusted task through task-scoped authorization, a deterministic whole-batch check, an action audit and a reference monitor that binds tool execution to one-use tickets, with tool results returning to the planner through input isolation and denied calls never executing.</desc>
+<defs>
+<marker id="arrow-control" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#35576f"/></marker>
+<marker id="arrow-return" markerWidth="7" markerHeight="5" refX="6.4" refY="2.5" orient="auto"><polygon points="0 0, 7 2.5, 0 5" fill="#667789"/></marker>
+<g id="icon-task" fill="none" stroke="#35576f" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3 1.5h6l3 3v10H3z M9 1.5v3h3 M5 8h5 M5 11h5"/></g>
+<g id="icon-l2" fill="none" stroke="#35576f" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M8 1.5 13 3.4v4.1c0 3-2.2 5.4-5 6.8-2.8-1.4-5-3.8-5-6.8V3.4z M5.4 7.8l1.6 1.6 3.6-3.6"/></g>
+<g id="icon-model" fill="none" stroke="#35576f" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="3.5" width="9" height="9" rx="1.5"/><rect x="6.2" y="6.2" width="3.6" height="3.6" rx=".5"/><path d="M6 1v2.5 M10 1v2.5 M6 12.5V15 M10 12.5V15 M1 6h2.5 M1 10h2.5 M12.5 6H15 M12.5 10H15"/></g>
+<g id="icon-audit" fill="none" stroke="#35576f" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="6.5" cy="6.5" r="4.5"/><path d="m10 10 3.8 3.8 M4.5 6.5l1.3 1.3 2.7-2.7"/></g>
+<g id="icon-l1" fill="none" stroke="#35576f" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="12" height="10" rx="1.5"/><path d="M5 1v4 M11 1v4 M5.2 8h5.6 M8 5.8v4.4"/></g>
+<g id="icon-tools" fill="none" stroke="#35576f" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><rect x="1.5" y="2.5" width="13" height="11" rx="1.3"/><path d="m4.2 5.5 2 2-2 2 M8 10h3.5"/></g>
+<g id="icon-monitor" fill="none" stroke="#35576f" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M8 1.5 13 3.4v4.1c0 3-2.2 5.4-5 6.8-2.8-1.4-5-3.8-5-6.8V3.4z"/><circle cx="8" cy="6.8" r="1.2"/><path d="M8 8v2"/></g>
+<g id="icon-response" fill="none" stroke="#35576f" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M2 2.5h12v8H8l-3.5 3v-3H2z M4.5 5h7 M4.5 7.5h5"/></g>
+</defs>
+<rect width="544" height="296" fill="#ffffff"/>
+<path d="M104,92 H116" fill="none" stroke="#35576f" stroke-width="1.1" stroke-linecap="butt" stroke-linejoin="round" marker-end="url(#arrow-control)"/>
+<path d="M212,92 H224" fill="none" stroke="#35576f" stroke-width="1.1" stroke-linecap="butt" stroke-linejoin="round" marker-end="url(#arrow-control)"/>
+<path d="M320,92 H332" fill="none" stroke="#35576f" stroke-width="1.1" stroke-linecap="butt" stroke-linejoin="round" marker-end="url(#arrow-control)"/>
+<path d="M428,92 H440" fill="none" stroke="#35576f" stroke-width="1.1" stroke-linecap="butt" stroke-linejoin="round" marker-end="url(#arrow-control)"/>
+<path d="M488,124 V180" fill="none" stroke="#35576f" stroke-width="1.1" stroke-linecap="butt" stroke-linejoin="round" marker-end="url(#arrow-control)"/>
+<path d="M440,212 H428" fill="none" stroke="#35576f" stroke-width="1.1" stroke-linecap="butt" stroke-linejoin="round" marker-end="url(#arrow-control)"/>
+<path d="M332,212 H320" fill="none" stroke="#667789" stroke-width="0.85" stroke-linecap="butt" stroke-linejoin="round" marker-end="url(#arrow-return)"/>
+<path d="M272,180 V124" fill="none" stroke="#667789" stroke-width="0.85" stroke-linecap="butt" stroke-linejoin="round" marker-end="url(#arrow-return)"/>
+<path d="M272,60 V40" fill="none" stroke="#35576f" stroke-width="1.1" stroke-linecap="butt" stroke-linejoin="round" marker-end="url(#arrow-control)"/>
+<path d="M164,124 V146 H264 a8,8 0 0 1 16,0 H380 V124" fill="none" stroke="#667789" stroke-width="0.85" stroke-linecap="butt" stroke-linejoin="round" stroke-dasharray="5,4" marker-end="url(#arrow-return)"/>
+<path d="M400,180 V160 H464 V124" fill="none" stroke="#667789" stroke-width="0.85" stroke-linecap="butt" stroke-linejoin="round" stroke-dasharray="5,4" marker-end="url(#arrow-return)"/>
+<path d="M488,244 V254" fill="none" stroke="#a63d2f" stroke-width="1.1" stroke-linecap="butt"/>
+<path d="M480,254 H496" fill="none" stroke="#a63d2f" stroke-width="2.2" stroke-linecap="round"/>
 <g id="node-trusted-task">
-<rect x="6" y="60" width="95" height="58" rx="2.5" fill="#f7f8fa" stroke="#9aa8b4" stroke-width="0.8"/>
-<g id="icon-trusted-task" transform="translate(15 68)" fill="none" stroke="#315c84" stroke-width="0.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2 0.5 H7 L9 2.5 V10 H2 Z M7 0.5 V2.5 H9 M3.6 4.5 H7.4 M3.6 6.5 H7.4"/></g>
-<text x="28" y="77" text-anchor="start" font-family="Arial, Helvetica, sans-serif" font-size="7.4" font-weight="600" fill="#152b3a">Trusted task</text>
-<text x="53.5" y="94" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="6.6" fill="#152b3a">User request + native</text>
-<text x="53.5" y="103" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="6.6" fill="#152b3a">tool definitions</text>
+<rect x="8" y="60" width="96" height="64" rx="4" fill="#f7f8fa" stroke="#8d9aa5" stroke-width="0.9"/>
+<use href="#icon-task" x="48" y="63"/>
+<text x="56" y="86" font-family="Arial, Helvetica, sans-serif" font-size="7.97" fill="#162a38" text-anchor="middle" font-weight="600">Trusted task</text>
+<text x="56" y="101" font-family="Arial, Helvetica, sans-serif" font-size="6.9" fill="#46596a" text-anchor="middle">user request +</text>
+<text x="56" y="113" font-family="Arial, Helvetica, sans-serif" font-size="6.9" fill="#46596a" text-anchor="middle">native tool definitions</text>
 </g>
 <g id="node-l2-authorization">
-<rect x="108" y="60" width="95" height="58" rx="2.5" fill="#e6f0f9" stroke="#6689aa" stroke-width="0.8"/>
-<g id="icon-l2-authorization" transform="translate(117 68)" fill="none" stroke="#315c84" stroke-width="0.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 0.5 L9 2 V5.2 C9 7.5 7.3 9.2 5 10 C2.7 9.2 1 7.5 1 5.2 V2 Z M3.2 5.1 L4.5 6.4 L7 3.8"/></g>
-<text x="130" y="77" text-anchor="start" font-family="Arial, Helvetica, sans-serif" font-size="7.4" font-weight="600" fill="#152b3a">L2 · Authorization</text>
-<text x="155.5" y="94" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="6.6" fill="#152b3a">Static task view</text>
-<text x="155.5" y="103" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="6.6" fill="#152b3a">Global tool grants</text>
+<rect x="116" y="60" width="96" height="64" rx="4" fill="#e6f0f9" stroke="#5f87ab" stroke-width="0.9"/>
+<use href="#icon-l2" x="156" y="63"/>
+<text x="164" y="86" font-family="Arial, Helvetica, sans-serif" font-size="7.97" fill="#162a38" text-anchor="middle" font-weight="600">L2 · Authorization</text>
+<text x="164" y="101" font-family="Arial, Helvetica, sans-serif" font-size="6.9" fill="#46596a" text-anchor="middle">task view + tool grants</text>
+<text x="164" y="113" font-family="Arial, Helvetica, sans-serif" font-size="6.9" fill="#46596a" text-anchor="middle">compile as needed</text>
 </g>
 <g id="node-main-model">
-<rect x="210" y="60" width="95" height="58" rx="2.5" fill="#ffffff" stroke="#8295a4" stroke-width="0.8"/>
-<g id="icon-main-model" transform="translate(219 68)" fill="none" stroke="#315c84" stroke-width="0.8" stroke-linecap="round" stroke-linejoin="round"><rect x="1.5" y="1.5" width="7" height="7" rx="1"/><path d="M3.3 0 V1.5 M6.7 0 V1.5 M3.3 8.5 V10 M6.7 8.5 V10 M0 3.3 H1.5 M0 6.7 H1.5 M8.5 3.3 H10 M8.5 6.7 H10"/><circle cx="5" cy="5" r="1.3"/></g>
-<text x="232" y="77" text-anchor="start" font-family="Arial, Helvetica, sans-serif" font-size="7.4" font-weight="600" fill="#152b3a">Main model</text>
-<text x="257.5" y="94" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="6.6" fill="#152b3a">Task-aware planning</text>
-<text x="257.5" y="103" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="6.6" fill="#152b3a">Authorized tools</text>
+<rect x="224" y="60" width="96" height="64" rx="4" fill="#f7f8fa" stroke="#8d9aa5" stroke-width="0.9"/>
+<use href="#icon-model" x="264" y="63"/>
+<text x="272" y="86" font-family="Arial, Helvetica, sans-serif" font-size="7.97" fill="#162a38" text-anchor="middle" font-weight="600">Main model</text>
+<text x="272" y="101" font-family="Arial, Helvetica, sans-serif" font-size="6.9" fill="#46596a" text-anchor="middle">planning view + grants</text>
+<text x="272" y="113" font-family="Arial, Helvetica, sans-serif" font-size="6.9" fill="#46596a" text-anchor="middle">one batch per round</text>
 </g>
 <g id="node-l2-batch-check">
-<rect x="312" y="60" width="95" height="58" rx="2.5" fill="#e6f0f9" stroke="#6689aa" stroke-width="0.8"/>
-<g id="icon-l2-batch-check" transform="translate(321 68)" fill="none" stroke="#315c84" stroke-width="0.8" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="1" width="8.5" height="8.5" rx="0.7"/><path d="M2.5 3.5 L3.3 4.2 L4.5 2.7 M5.4 3.5 H8 M2.5 6.8 L3.3 7.5 L4.5 6 M5.4 6.8 H8"/></g>
-<text x="334" y="77" text-anchor="start" font-family="Arial, Helvetica, sans-serif" font-size="7.4" font-weight="600" fill="#152b3a">L2 · Batch check</text>
-<text x="359.5" y="94" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="6.6" fill="#152b3a">Validate candidates</text>
-<text x="359.5" y="103" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="6.6" fill="#152b3a">as a whole batch</text>
+<rect x="332" y="60" width="96" height="64" rx="4" fill="#e6f0f9" stroke="#5f87ab" stroke-width="0.9"/>
+<use href="#icon-l2" x="372" y="63"/>
+<text x="380" y="86" font-family="Arial, Helvetica, sans-serif" font-size="7.97" fill="#162a38" text-anchor="middle" font-weight="600">L2 · Batch check</text>
+<text x="380" y="101" font-family="Arial, Helvetica, sans-serif" font-size="6.9" fill="#46596a" text-anchor="middle">whole batch vs. grants</text>
+<text x="380" y="113" font-family="Arial, Helvetica, sans-serif" font-size="6.9" fill="#46596a" text-anchor="middle">0 model calls</text>
 </g>
 <g id="node-l3-action-audit">
-<rect x="414" y="60" width="95" height="58" rx="2.5" fill="#f1edf8" stroke="#9581aa" stroke-width="0.8"/>
-<g id="icon-l3-action-audit" transform="translate(423 68)" fill="none" stroke="#315c84" stroke-width="0.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="4.1" cy="4.1" r="3.3"/><path d="M6.5 6.5 L9.6 9.6 M2.8 4.1 L3.7 5 L5.5 3.1"/></g>
-<text x="436" y="77" text-anchor="start" font-family="Arial, Helvetica, sans-serif" font-size="7.4" font-weight="600" fill="#152b3a">L3 · Action audit</text>
-<text x="461.5" y="94" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="6.6" fill="#152b3a">Eligible reads exempt;</text>
-<text x="461.5" y="103" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="6.6" fill="#152b3a">audit other calls</text>
+<rect x="440" y="60" width="96" height="64" rx="4" fill="#f1edf8" stroke="#8a76a3" stroke-width="0.9"/>
+<use href="#icon-audit" x="480" y="63"/>
+<text x="488" y="86" font-family="Arial, Helvetica, sans-serif" font-size="7.97" fill="#162a38" text-anchor="middle" font-weight="600">L3 · Action audit</text>
+<text x="488" y="101" font-family="Arial, Helvetica, sans-serif" font-size="6.9" fill="#46596a" text-anchor="middle">allow / deny / abstain</text>
+<text x="488" y="113" font-family="Arial, Helvetica, sans-serif" font-size="6.9" fill="#46596a" text-anchor="middle">nonexempt calls only</text>
 </g>
 <g id="node-l1-isolation">
-<rect x="108" y="180" width="95" height="58" rx="2.5" fill="#e9f4ef" stroke="#6e9c8a" stroke-width="0.8"/>
-<g id="icon-l1-isolation" transform="translate(117 188)" fill="none" stroke="#315c84" stroke-width="0.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 0.5 L9 2 V5.2 C9 7.5 7.3 9.2 5 10 C2.7 9.2 1 7.5 1 5.2 V2 Z M2.8 4.8 H7.2 M3.8 3.2 V6.4"/></g>
-<text x="130" y="197" text-anchor="start" font-family="Arial, Helvetica, sans-serif" font-size="7.4" font-weight="600" fill="#152b3a">L1 · Input isolation</text>
-<text x="155.5" y="214" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="6.6" fill="#152b3a">Source wrapping or</text>
-<text x="155.5" y="223" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="6.6" fill="#152b3a">bounded projection</text>
+<rect x="224" y="180" width="96" height="64" rx="4" fill="#e9f4ef" stroke="#6e9c8a" stroke-width="0.9"/>
+<use href="#icon-l1" x="264" y="183"/>
+<text x="272" y="206" font-family="Arial, Helvetica, sans-serif" font-size="7.97" fill="#162a38" text-anchor="middle" font-weight="600">L1 · Input isolation</text>
+<text x="272" y="221" font-family="Arial, Helvetica, sans-serif" font-size="6.9" fill="#46596a" text-anchor="middle">wrap or project returns</text>
+<text x="272" y="233" font-family="Arial, Helvetica, sans-serif" font-size="6.9" fill="#46596a" text-anchor="middle">raw history kept</text>
 </g>
 <g id="node-tool-execution">
-<rect x="210" y="180" width="95" height="58" rx="2.5" fill="#f7f8fa" stroke="#9aa8b4" stroke-width="0.8"/>
-<g id="icon-tool-execution" transform="translate(219 188)" fill="none" stroke="#315c84" stroke-width="0.8" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="1.5" width="8.5" height="7.2" rx="0.7"/><path d="M2.5 3.3 L4.1 4.7 L2.5 6.1 M5.1 6.2 H7.8"/></g>
-<text x="232" y="197" text-anchor="start" font-family="Arial, Helvetica, sans-serif" font-size="7.4" font-weight="600" fill="#152b3a">Tool execution</text>
-<text x="257.5" y="214" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="6.6" fill="#152b3a">Ticketed executor</text>
-<text x="257.5" y="223" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="6.6" fill="#152b3a">Native call order</text>
+<rect x="332" y="180" width="96" height="64" rx="4" fill="#f7f8fa" stroke="#8d9aa5" stroke-width="0.9"/>
+<use href="#icon-tools" x="372" y="183"/>
+<text x="380" y="206" font-family="Arial, Helvetica, sans-serif" font-size="7.97" fill="#162a38" text-anchor="middle" font-weight="600">Tool execution</text>
+<text x="380" y="221" font-family="Arial, Helvetica, sans-serif" font-size="6.9" fill="#46596a" text-anchor="middle">ticketed, native order</text>
+<text x="380" y="233" font-family="Arial, Helvetica, sans-serif" font-size="6.9" fill="#46596a" text-anchor="middle">host side effects</text>
 </g>
 <g id="node-reference-monitor">
-<rect x="312" y="180" width="95" height="58" rx="2.5" fill="#edf2f7" stroke="#8499aa" stroke-width="0.8"/>
-<g id="icon-reference-monitor" transform="translate(321 188)" fill="none" stroke="#315c84" stroke-width="0.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 0.5 L9 2 V5.2 C9 7.5 7.3 9.2 5 10 C2.7 9.2 1 7.5 1 5.2 V2 Z"/><circle cx="5" cy="4.5" r="1.2"/><path d="M5 5.7 V7.5"/></g>
-<text x="334" y="197" text-anchor="start" font-family="Arial, Helvetica, sans-serif" font-size="7.4" font-weight="600" fill="#152b3a">Reference Monitor</text>
-<text x="359.5" y="214" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="6.6" fill="#152b3a">Check batch and audit</text>
-<text x="359.5" y="223" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="6.6" fill="#152b3a">Issue one-use tickets</text>
+<rect x="440" y="180" width="96" height="64" rx="4" fill="#edf2f7" stroke="#48647c" stroke-width="0.9"/>
+<use href="#icon-monitor" x="480" y="183"/>
+<text x="488" y="206" font-family="Arial, Helvetica, sans-serif" font-size="7.97" fill="#162a38" text-anchor="middle" font-weight="600">Reference Monitor</text>
+<text x="488" y="221" font-family="Arial, Helvetica, sans-serif" font-size="6.9" fill="#46596a" text-anchor="middle">one-use tickets</text>
+<text x="488" y="233" font-family="Arial, Helvetica, sans-serif" font-size="6.9" fill="#46596a" text-anchor="middle">deny: no ticket</text>
 </g>
-<g id="node-final-response"><rect x="215" y="23" width="85" height="20" rx="2.5" fill="#f7f8fa" stroke="#9aa8b4" stroke-width="0.8"/>
-<g id="icon-final-response" transform="translate(225 28)" fill="none" stroke="#315c84" stroke-width="0.8" stroke-linecap="round" stroke-linejoin="round"><path d="M0.5 1.5 H9.5 V7.5 H6 L3.5 9.5 V7.5 H0.5 Z M2.3 3.5 H7.7 M2.3 5.3 H6.3"/></g>
-<text x="265" y="36" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="7.1" fill="#152b3a">Final response</text>
+<g id="node-final-response">
+<rect x="224" y="8" width="96" height="32" rx="4" fill="#f7f8fa" stroke="#8d9aa5" stroke-width="0.9"/>
+<use href="#icon-response" x="231" y="16"/>
+<text x="280" y="26.6" font-family="Arial, Helvetica, sans-serif" font-size="7.97" fill="#162a38" text-anchor="middle" font-weight="600">Final response</text>
 </g>
-<path d="M30 274 H42" fill="none" stroke="#315c84" stroke-width="1.05"/><polygon points="42,274 39,272 39,276" fill="#315c84"/>
-<text x="46" y="276" text-anchor="start" font-family="Arial, Helvetica, sans-serif" font-size="6.0" fill="#152b3a">Task / control / candidate</text>
-<path d="M200.000 274.000 L202.600 274.000 M204.600 274.000 L207.200 274.000 M209.200 274.000 L211.800 274.000" fill="none" stroke="#667789" stroke-width="0.8"/><polygon points="212,274 209,272 209,276" fill="#667789"/>
-<text x="216" y="276" text-anchor="start" font-family="Arial, Helvetica, sans-serif" font-size="6.0" fill="#152b3a">Tool return / evidence</text>
-<text x="489" y="276" text-anchor="end" font-family="Arial, Helvetica, sans-serif" font-size="6.0" fill="#152b3a">Deny / abstain block execution</text>
+<rect x="299.53" y="130" width="62.47" height="10" rx="1.5" fill="#ffffff"/>
+<text x="359" y="138" font-family="Arial, Helvetica, sans-serif" font-size="6.6" fill="#5f7183" text-anchor="end" letter-spacing="0.06em">FROZEN GRANTS</text>
+<rect x="278" y="152" width="58.44" height="10" rx="1.5" fill="#ffffff"/>
+<text x="281" y="160" font-family="Arial, Helvetica, sans-serif" font-size="6.6" fill="#5f7183" letter-spacing="0.06em">PLANNING VIEW</text>
+<rect x="392.261" y="166" width="39.74" height="10" rx="1.5" fill="#ffffff"/>
+<text x="429" y="174" font-family="Arial, Helvetica, sans-serif" font-size="6.6" fill="#5f7183" text-anchor="end" letter-spacing="0.06em">EVIDENCE</text>
+<rect x="415.933" y="249" width="58.07" height="10" rx="1.5" fill="#ffffff"/>
+<text x="471" y="257" font-family="Arial, Helvetica, sans-serif" font-size="6.6" fill="#5f7183" text-anchor="end" letter-spacing="0.06em">DENY / ABSTAIN</text>
+<path d="M8,190 V234" fill="none" stroke="#cfd8e0" stroke-width="1.4"/>
+<text x="20" y="197" font-family="Arial, Helvetica, sans-serif" font-size="6.3" fill="#5f7183" letter-spacing="0.14em">MODEL INPUT FORMS</text>
+<text x="20" y="215" font-family="Arial, Helvetica, sans-serif" font-size="7" fill="#162a38">L2: compact tool catalogue.</text>
+<text x="20" y="229" font-family="Arial, Helvetica, sans-serif" font-size="7" fill="#162a38">L3: tool-return evidence ≤32,768 chars.</text>
+<path d="M8,270 H536" fill="none" stroke="#cfd8e0" stroke-width="0.8"/>
+<path d="M8,283 H38" fill="none" stroke="#35576f" stroke-width="1.1" stroke-linecap="butt"/>
+<polygon points="38,283 32,280.5 32,285.5" fill="#35576f"/>
+<text x="44" y="285" font-family="Arial, Helvetica, sans-serif" font-size="6.5" fill="#46596a">task, control, ticket</text>
+<path d="M146.714,283 H176.714" fill="none" stroke="#667789" stroke-width="0.85" stroke-linecap="butt"/>
+<polygon points="176.714,283 170.714,280.5 170.714,285.5" fill="#667789"/>
+<text x="182.714" y="285" font-family="Arial, Helvetica, sans-serif" font-size="6.5" fill="#46596a">tool return, planning view</text>
+<path d="M303.855,283 H343.855" fill="none" stroke="#667789" stroke-width="0.85" stroke-linecap="butt" stroke-dasharray="5,4"/>
+<polygon points="343.855,283 337.855,280.5 337.855,285.5" fill="#667789"/>
+<text x="349.855" y="285" font-family="Arial, Helvetica, sans-serif" font-size="6.5" fill="#46596a">frozen grants, evidence</text>
+<path d="M467.303,277 V289" fill="none" stroke="#a63d2f" stroke-width="2.2" stroke-linecap="round"/>
+<text x="476.303" y="285" font-family="Arial, Helvetica, sans-serif" font-size="6.5" fill="#46596a">deny / abstain blocks</text>
 </svg>
-</div></main></body></html>
+</div>
+<footer><span>Arial, 6.0&ndash;7.6&nbsp;pt at 183&nbsp;mm</span><span>DSCG v3.7 &middot; Fig. 1</span></footer>
+</main></body></html>
