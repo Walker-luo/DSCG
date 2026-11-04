@@ -67,20 +67,21 @@ class RequestCompatibilityTests(unittest.TestCase):
         client, _ = self.client(handler, model='qwen3.7-plus')
         client.chat.completions.create(model='qwen3.7-plus',
             messages=[{'role': 'user', 'content': 'task'}], temperature=0)
-        self.assertEqual(captured[0]['extra_body'], {'enable_thinking': False})
+        self.assertIs(captured[0]['enable_thinking'], False)
         self.assertNotIn('reasoning_effort', captured[0])
         client.chat.completions.create(model='qwen3.7-plus',
             messages=[{'role': 'user', 'content': 'task'}],
             extra_body={'enable_thinking': True, 'top_k': 1})
-        self.assertEqual(captured[1]['extra_body'], {'enable_thinking': True, 'top_k': 1})
+        self.assertIs(captured[1]['enable_thinking'], True)
+        self.assertEqual(captured[1]['top_k'], 1)
         widened = client.with_options(max_retries=0)
         widened.chat.completions.create(model='qwen3.7-plus',
             messages=[{'role': 'user', 'content': 'task'}])
-        self.assertEqual(captured[2]['extra_body'], {'enable_thinking': False})
+        self.assertIs(captured[2]['enable_thinking'], False)
         plain, _ = self.client(handler)
         plain.chat.completions.create(model='qwen3.7-flash',
             messages=[{'role': 'user', 'content': 'task'}], reasoning_effort='none')
-        self.assertNotIn('extra_body', captured[3])
+        self.assertNotIn('enable_thinking', captured[3])
         self.assertEqual(captured[3]['reasoning_effort'], 'none')
 
     def test_other_provider_keeps_original_client_and_developer_role(self):
