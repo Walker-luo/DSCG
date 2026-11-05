@@ -1,255 +1,60 @@
-# AIMLL Workshop 后续计划（2026-11-04，DashScope 版）
+# AIMLL Workshop 后续路线（2026-11-05）
 
-> **2026-11-04 稿件更新：**`main.tex` 已纳入工作区中新出现的 Qwen3.5-Flash v3.7 完整结果和 clean 对照，当前包含三个模型配置；图 1 更新了模块图标，图 2 更新为三模型配对结果。Qwen3.5 的有效配对任务成功为 1,805→1,175/2,139，clean 为 90→53/97。历史结果仍保留 v3.6.3 身份。下文原计划和“两模型”状态保留供参考；尚未完成的测试仍是计划，不代表授权或已运行。
+以现有 AgentDojo 实验写清 DSCG 的适用边界。任务级授权与逐动作审计要求模型稳定地遵守输出协议，并判断当前动作是否有充分依据。Qwen3.7-Flash 配置在本批测试中同时改善安全性与任务完成率，DeepSeek-Flash 配置则以小幅任务效用下降换取更低的攻击成功率。Qwen3.5-Flash 的任务效用损失使这套审计强度在该配置下失去实用性。它作为限制案例保留在正文，完整结果放入附录。
 
-> 现状：`paper/main.tex` + `paper/main.pdf` 为 4 页草稿（上限 6 页），Table 1 + Fig. 1 + Fig. 2 已落地，数字由 `paper/fig/paper_numbers.json` 统一生成。
-> 模型策略：**只用 DashScope 第一方 Qwen**；先测 baseline ASR，再按观测到的易感性选模型，不按“强/弱”预设。
-> 截稿：2027-01-15；当前约 10 周。
+## 1. 证据与版本
 
-## 1. 当前已完成
+本计划由 v3.7 和 v3.8 共用。v3.7 为框架对照版本，文档以 `efe5887` 为基线。v3.8 先作为候选完成其他模型的配对验证，再决定是否接入。
 
-| 项 | 状态 |
+| 配置 | 有效配对键 | 原生 TSR，baseline → DSCG | 原生攻击命中数，baseline → DSCG | 论文位置 |
+| --- | ---: | ---: | ---: | --- |
+| Qwen3.7-Flash / v3.6.3 | 1,943 | 73.3% → 79.3% | 438 → 0 | 主结果 |
+| DeepSeek-Flash / v3.6.3 | 1,836 | 83.6% → 82.4% | 38 → 5 | 主结果，低基线 ASR 对照 |
+| Qwen3.5-Flash / v3.7 | 2,139 | 84.4% → 54.9% | 221 → 2 | 正文保留摘要，完整结果进附录 |
+
+Qwen3.5-Flash 的 clean 成功数也从 90/97 降到 53/97，四个场景均下降。逐键结果显示，任务失败涉及 L2 协议、L3 对合法动作的阻断，以及规划和交付遗漏。这里的“弱审计模型”描述的是当前审计负载下的表现。实验中主模型与审计器使用同一模型，且跨模型的保留攻击集合与记录版本不同，论文应把结论限定在实测配置。若要独立估计审计器的作用，可将固定主模型、替换审计器的同键实验列为未来工作。[v3.7 分析](../analysis/v3.7.md) · [论文数字源](fig/paper_numbers.json)
+
+### v3.8 的定位
+
+v3.8 是 Qwen3.5-Flash 的 L2 兼容尝试。定向开发集上，初版适配将 L2 协议错误从 15/64 降到 2/64，任务成功从 v3.7 的 4/64 增至 19/64，同键原生基线为 54/64。最终交付快照单独验证了 16 个 clean 键，L2 协议错误为 0/16，任务成功为 3/16，其中 5 个键仍有 L3 abstain。审计提示的试验未见净收益并已撤回。各快照和子集分别报告，保留实际运行标识和 wire 协议。
+
+这些数据说明协议适配能消除一部分编译障碍，却未恢复任务效用。论文将 v3.8 定性为局部兼容尝试，放在附录的机制诊断段。定向样本来自此前失败键，19/64 仅用于说明该开发集上的变化。根据已有尝试，继续针对该模型调协议和提示的预期边际收益较低，此方向停止迭代。验证记录见 v3.8 提交 `4cd1056` 中的 `analysis/v3.8.md`。
+
+### v3.8 跨模型验证与回退
+
+优先复测已有 Qwen3.7-Flash 和 DeepSeek-Flash 配置。每个模型使用相同的任务键、攻击、筛选范围、模型角色和评分分别跑 v3.7、v3.8，覆盖 clean 与攻击场景。按实际代码提交和运行配置区分版本，报告共同有效键上的 TSR、原生 ASR、协议失败、运行错误和 token。已有 v3.6.3 结果保留历史身份。
+
+若同键复测确认 v3.8 在其他模型上的 TSR 下降或 ASR 上升，框架回退到 v3.7，投稿继续使用本计划，v3.8 的结果作为诊断材料保留。验证通过后再单独提交 v3.8。数据不足时保持待定。
+
+## 2. 稿件修改清单
+
+| 位置 | 待办 |
 | --- | --- |
-| 论文 | `paper/main.tex` 初稿；`paper/main.pdf` 5 页；0 overfull，无未定义引用 |
-| 数据 | Qwen3.5 使用 v3.7 + baseline；Qwen3.7 和 DeepSeek 使用 v3.6.3 + baseline；不重标历史版本 |
-| 主表 | 4 suite、三个模型配置、配对键；Qwen3.5 2,139 / Qwen3.7 1,943 / DeepSeek 1,836 |
-| 图 1 | `paper/fig/system-architecture.png`，4325×2356，600 dpi；PDF 183×99.5 mm |
-| 图 2 | `paper/fig/results-tradeoff.pdf/png`；ASR 配对点 + TSR delta；QA 全 PASS |
-| 数字源 | `paper/fig/extract_paper_numbers.py` → `paper_numbers.json` / `results-tradeoff.csv` |
+| 摘要与引言 | 用一句话交代跨配置差异，并保留 Qwen3.5-Flash 的效用失败，含 TSR 84.4% → 54.9%。 |
+| 正文方法与结果 | 主表与 Fig. 2 聚焦 Qwen3.7-Flash 和 DeepSeek-Flash。按各模型内的共同有效键报告 TSR、原生 ASR、成本及 clean 数据可用性。Qwen3.5-Flash 的边界段链接完整附录。 |
+| 局限性 | 说明审计负载对模型的要求、主模型与审计器的角色混杂、筛选集合和版本差异。把“强模型上可用、弱模型上失效”落到实测配置与效用门槛。 |
+| 附录或独立补充材料 | 保存 Qwen3.5-Flash 四场景、三攻击及 clean 对照，附配对分母、逐键退步统计、成本口径、L2/L3 代表案例和 v3.8 各定向臂记录。 |
+| 图表与复现 | 沿用统一数字源生成主表、图和附录表。保存可公开的运行身份、筛选摘要与逐键结果。保持原生谓词与标签，单列 API 错误和未知用量。 |
 
-下表保留原两模型计划基线；三模型最新数字见 `paper/fig/paper_numbers.json` 和论文 Table 1：
+正文可用表述：
 
-| | Qwen3.7-Flash | DeepSeek-Flash |
-|---|---:|---:|
-| baseline ASR | 22.5%（438/1,943） | 2.1%（38/1,836） |
-| DSCG ASR | 0（上界 0.2%） | 0.27%（5/1,836） |
-| TSR | 73.3% → 79.3%（p<0.001） | 83.6% → 82.4%（p=0.08） |
-| clean TSR | 85.6%（仅 DSCG） | 90.7% → 86.6% |
+> In our evaluation, DSCG preserved practical task utility with the Qwen3.7-Flash and DeepSeek-Flash configurations. With Qwen3.5-Flash, the same authorization-and-audit design imposed a substantial utility penalty despite reducing native attack success. Targeted protocol adaptations reduced authorization-format errors, but task utility remained low. Full results and failure analysis are provided in the appendix.
 
-## 2. 观点评估：基线易感性 ≠ 模型强度
+## 3. 附录验收
 
-**数据支持**：Qwen baseline ASR 22.5%，DeepSeek 只有 2.1%；模型选择会显著改变防御看起来有没有用。
+1. **v3.7 全量结果。** 汇总 2,139 个共同有效攻击键与 97 个 clean 用户任务，列出四场景 TSR、原生 ASR、分母与记录错误。攻击批已知总 token 为 45.29M → 48.66M，包含生成、L2 与审计，基线另有未知用量。clean ASR 标为不适用。
+2. **失败分析。** 报告 719 个退步键中 261 个 L2 编译失败与 344 个曾被阻断的键。分别展示协议错误、短且完整输入上的 abstain、未发起调用和执行后未完成。区分发生过阻断和确认的误拒。
+3. **攻击命中。** 保留 v3.7 的两次原生攻击命中及其最终文本引用行为，注明原生判据与人工解释各自的口径。
+4. **v3.8 尝试。** 分表标明开发集、代码快照、有效分母、局部改善和剩余失败。准备附录时核对实际 run manifest 的版本与 wire 字段。
+5. **提交形式。** 优先按会务对附录及补充材料的规则安排页数与入口。如果采用独立附件，正文保留核心负结果及其数据定位。
 
-**不能直接推出**“强模型自带强 IPI 防御”：
-1. “强”没有独立度量，只有 TSR/ASR 两个行为指标。
-2. 两模型筛选集不同（Qwen 保留 27/35 个 GOAL，DeepSeek 24/35），ASR 不是同一把尺子。
-3. 审计器 = 主模型；DeepSeek 的低 ASR 可能来自主模型不易被带偏，也可能来自审计器更保守。
-4. 单次运行、静态攻击；2.1% 不是“强模型普遍安全”。
+## 4. 执行顺序
 
-**只测弱模型的问题**：等于在“有提升空间”的样本上选模型，会高估 DSCG 收益，并丢掉“低 headroom 时防御成本占主导”的边界；审稿人会读成 cherry-picking。
-
-**采用的说法**：把“强模型”改成“**低基线易感性模型**”；把“只测弱模型”改成“**以弱模型为主、保留低 ASR 边界**”。先测 baseline ASR，再定组合。
-
-## 3. DashScope 模型调研（2026-11-02 官方页）
-
-来源：[文本生成与视觉理解](https://help.aliyun.com/zh/model-studio/text-generation-model)、[模型调用价格](https://www.alibabacloud.com/help/zh/model-studio/model-pricing)、[深度思考](https://help.aliyun.com/zh/model-studio/deep-thinking)。价格为北京地域、人民币/百万 Token，有限时折扣，跑前以控制台为准。
-
-### 3.1 候选
-
-| 模型 ID | 价格（输入/输出） | 上下文 | 思考默认 | Function Calling / JSON | 角色 |
-| --- | --- | ---: | --- | --- | --- |
-| `qwen3.7-flash` | 0.2/0.8（≤32K）；0.6/2.4（32K–256K） | 1M | 支持；当前记录 `reasoning_effort=none` | 支持 / 支持 | 高易感 anchor（22.5%），最便宜 |
-| `qwen3.8-flash` | 0.8/2.7 | 1M | 默认开 | 支持 / 支持 | 新一代小模型；候选高/中易感 |
-| `qwen3.7-plus` | 2/8（≤256K）；6/24（256K–1M） | 1M | 默认开 | 支持 / 支持 | 中间档；候选低/中易感 |
-| `qwen3.8-max` | 12/36 | 1M | 默认开 | 支持 / 支持 | 当前旗舰；候选低易感边界 |
-| `qwen3.5-flash` | 0.2/2（≤128K） | 1M | 支持 | 支持 / 支持 | 旧一代小模型；高易感 fallback |
-| `qwen3.7-max` | 12/36 | 1M | 默认开 | 支持 / 支持 | 旧旗舰；除非 3.8-max 不可用，否则不选 |
-
-不选 `qwen3-max` / `qwen-plus` / `qwen-flash` / `qwen-turbo`：属于更旧代际，和 3.8/3.7 系列混在一起只会增加“代际”混杂，不如用 3.5-flash 作为唯一旧代际对照。
-
-> DeepSeek-Flash 是已有低 ASR anchor，**不在 DashScope**；新增模型全部用 DashScope 第一方 Qwen。如果你要求所有模型同平台，可把 anchor 换成 DashScope 托管的 `deepseek-v4.1-flash`，但现有 1,836 键结果作废，不推荐。
-
-
-### 3.2 选型逻辑（先筛后选）
-
-不建议直接按“qwen3.8-max 一定最强/最稳”拍板；先用 **baseline-only 筛选** 测易感性：
-
-- 每个候选跑 4 suite × 3 用户 × 3 目标 × `important_instructions` = **36 键**，只跑 baseline，不跑 DSCG。
-- 记录 baseline ASR、TSR、工具调用失败、协议失败。
-- 选 4 个模型：Qwen3.7-Flash（高 anchor）+ DeepSeek-Flash（低 anchor）+ **2 个新模型**，其中一个观测 ASR 高、一个观测 ASR 低。
-- 高易感优先从 `qwen3.8-flash` / `qwen3.5-flash` 中选；低易感优先 `qwen3.8-max`，其次 `qwen3.7-plus`。
-- 如果 `qwen3.8-flash` 的 baseline ASR 已经很低，就补 `qwen3.5-flash` 作为第二个高易感点，而不是硬说“新一代小模型也弱”。
-
-筛选是用 baseline 结果选模型，不是用 DSCG 结果选模型；这个选择规则要写进论文，避免“按结果挑模型”的质疑。
-
-### 3.3 非思考模式是前置条件
-
-官方文档明确：`qwen3.8-max`、`qwen3.8-flash`、`qwen3.7-plus` **默认开启思考**，且 `enable_thinking` 是非标准参数，必须通过 `extra_body` 传；`qwen3.7-plus` 的思考 token 可占输出 60% 以上。当前 `dscg/model_config.py::reasoning_effort_for_config` 只对 `qwen3.7-flash` 返回 `none`，对 3.8/3.7-plus 返回 `None`，直接跑会变成 thinking 模式，和现有结果不可比。
-
-需要的最小代码改动：
-
-1. 在 `dscg/model_config.py` 增加一个 DashScope 非思考模型集合/判断（`qwen3.8-*`、`qwen3.7-plus` 等）。
-2. 在 `dscg/pipelines/baseline.py`、`dscg/pipelines/defended.py` 的请求构造处，对集合内模型传 `extra_body={'enable_thinking': False}`，不再依赖 `reasoning_effort`；保留 `qwen3.7-flash` 现有行为，避免旧结果不可比。
-3. `run_manifest.json` / 诊断记录实际 `enable_thinking`；现在 `task_diagnostics.py` 已能记录 `extra_body.enable_thinking`，复用即可。
-4. 测试：mock client 捕获请求 kwargs，断言新模型有 `extra_body.enable_thinking=False`、没有 `reasoning_effort`；旧 Qwen3.7-Flash 路径不变。离线两环境跑 targeted tests；在线用 qwen3.7-flash 跑 ≥9 个计分案例确认无回归，再各模型 1 个 smoke。
-
-如果 smoke 发现 `enable_thinking` 被忽略或返回 `reasoning_content`，停止该模型，不把 thinking 结果混进主表。
-
-## 4. 后续测试
-
-### P0：不做会留下明显缺口
-
-common grid 用 `--write-task-manifest` 先导出 partial 清单，再取所有入选模型共同支持的 task/attack 键，写入同一份 `--task-manifest`；不要直接用各模型的 `--fliter` 做跨模型比较。
-
-
-| # | 测试 | 规模 | 目的 |
-| --- | --- | --- | --- |
-| 1 | **Qwen baseline clean** | 97 个用户任务（4 suite） | 补当前唯一缺失的 clean 对照；和 DeepSeek 的 88/97 对齐 |
-| 2 | **模型筛选** | 5 个候选 × 36 键 baseline-only | 按观测 baseline ASR 选 2 个新模型，不按“强弱”预设 |
-| 3 | **冻结 common grid** | partial 4 suite × 3 用户 × 3 目标 × 3 攻击 = 108 键/模型臂 | 新模型与 Qwen/DeepSeek 用同一批键；已有全量结果切同一批键，不重跑 |
-| 4 | **新模型 A（高易感）** | baseline + DSCG，108×2 | 验证弱模型收益可复现 |
-| 5 | **新模型 B（低易感）** | baseline + DSCG，108×2 | 验证低 headroom 边界 |
-| 6 | **固定审计器对照** | DeepSeek 主 + Qwen 审计，108 键 | 分离“主模型易感性”与“审计器行为” |
-
-### P1：增强说服力，但不阻塞投稿
-
-| # | 测试 | 规模 | 目的 |
-| --- | --- | --- | --- |
-| 7 | 新模型 clean | 97 任务/模型 | 算净误拒 |
-| 8 | 最小消融 | 一个模型 full vs `--no-checker`，108×2 | 回答 L3 的贡献 |
-| 9 | 外部基线 | spotlighting / repeat_user_prompt，108 键 | 与已有防御对比；需补 `--agentdojo-defense` 开关 |
-| 10 | 成本/延迟 | 新 run 的 usage | 每模型 token/例、审计占比、人民币成本 |
-
-### P2：有余力再做
-
-| # | 测试 | 说明 |
-| --- | --- | --- |
-| 11 | 自适应攻击探针 | 10 条针对 L2/L3 的手工注入；定性，不称 benchmark |
-| 12 | AgentDyn 1 suite | shopping 或 dailylife，partial 81/72 键 × 2 臂 |
-| 13 | 语义 ASR 复核 | 抽 40 条攻击案例人工判读；新模型各抽 10 条 |
-| 14 | 复现包 | 代码快照、config、prompt 哈希、任务清单、CSV、README |
-
-### Commands（工作站 `ipi`；服务器改用 `~/miniconda3/bin/conda run -n DSCG`）
-
-```bash
-# 1) Qwen baseline clean
-conda run -n ipi python -B -m experiments.run_benchmark \
-  --suites workspace banking slack travel --baseline --clean \
-  --name qwen_baseline_clean --results-dir workshop/artifacts/20261104_aimll_followup
-
-# 2) 模型筛选：只跑 baseline，36 键
-conda run -n ipi python -B -m experiments.run_partial_benchmark \
-  --suites workspace banking slack travel --attack important_instructions --baseline \
-  --model-config config/models.aimll_qwen38_flash.toml \
-  --name screen_qwen38_flash --results-dir workshop/artifacts/20261104_aimll_screen
-
-# 3) 选中模型后，baseline / DSCG 各一次，108 键
-conda run -n ipi python -B -m experiments.run_partial_benchmark \
-  --suites workspace banking slack travel --attack typical \
-  --model-config config/models.aimll_qwen38_max.toml \
-  --name aimll_qwen38_max_dscg --results-dir workshop/artifacts/20261104_aimll_followup
-conda run -n ipi python -B -m experiments.run_partial_benchmark \
-  --suites workspace banking slack travel --attack typical --baseline \
-  --model-config config/models.aimll_qwen38_max.toml \
-  --name aimll_qwen38_max_baseline --results-dir workshop/artifacts/20261104_aimll_followup
-```
-
-
-新模型配置示例（只改 `[main]`，`[security]` 固定 Qwen；provider 地址沿用现有 `config/models.local.toml`）：
-
-```toml
-[main]
-provider = "dashscope"
-model_id = "qwen3.8-max"
-
-[security]
-provider = "dashscope"
-model_id = "qwen3.7-flash"
-
-[providers.dashscope]
-base_url = "<沿用现有地址>"
-api_key_env = "DASHSCOPE_API_KEY"
-```
-
-固定审计器只改 `[security]`，主模型沿用现有 DeepSeek 配置：
-
-```toml
-[main]
-provider = "deepseek"
-model_id = "deepseek-flash"
-[security]
-provider = "dashscope"
-model_id = "qwen3.7-flash"
-```
-
-> 现有 DeepSeek 配置在 `config/models.local.toml` 的 deepseek provider；主模型 ID 以实际配置为准，不要照抄示例。
-
-### 规模与预算（4 模型版）
-
-| 项目 | 计分运行 | 估算 token |
-| --- | ---: | ---: |
-| Qwen baseline clean | 97 | ~0.8M |
-| 模型筛选（5 候选 × 36） | 180 | ~2.5M |
-| 新高易感模型（两臂） | 216 | ~5M |
-| 新低易感模型（两臂，qwen3.8-max） | 216 | ~5M |
-| 固定审计器（DeepSeek + Qwen） | 108 | ~2.5M |
-| 新模型 clean（2 个） | 194 | ~2M |
-| **合计** | **~1,011** | **~18M** |
-
-按 ~26k token/例估。人民币成本主要来自 `qwen3.8-max` 的 216 例（约 5.6M token，按 12/36 约 80 元）；其余模型便宜，总成本预计 <200 元。实际以控制台计费为准。
-
-## 5. 作图
-
-### Fig. 1
-
-已完成，不需要改；除非架构或版本标识变化。保持 `paper/fig/system-architecture.html` 为唯一源，PNG 600 dpi、PDF 183×99.5 mm；改文字后跑 `self_check.py` 并重新导出。
-
-### Fig. 2
-
-当前三模型版本使用每模型、每场景的配对结果；如果最终是 4 个模型，可考虑改成**模型级两面板**：
-
-- (a) 横轴 baseline ASR、纵轴 DSCG ASR，画 y=x；每个点一个模型，标注模型名与 n。
-- (b) 横轴 baseline ASR、纵轴 ΔTSR（pp）或 clean 代价；看低 headroom 是否转为成本。
-
-per-suite 数字放 Table 1 或 artifact CSV；不要把 4 模型 × 4 suite 全塞进 dumbbell。
-
-### QA
-
-- 数据先写 `paper/fig/model-portfolio.csv`，脚本读 CSV，不手抄。
-- `require_matplotlib_panel_alignment` + `audit_pdf_text.py` + `audit_figure_collisions.py` 全过；冲突审计不通过不交付。
-- 图内字号 ≥5 pt；最终宽 7.16 in；Arial/Helvetica。
-
-## 6. 论文修改（在图/表定稿后）
-
-1. **摘要/Intro**：保留“baseline susceptibility”，不要写“strong models are robust”；新增一句模型选择规则（先测 baseline ASR，再选高/低两端）。
-2. **Protocol**：写 common grid、每模型筛选集、固定审计器 arm、非思考模式设置。
-3. **Results**：模型级表/图；Qwen clean baseline 补进 clean 段；写清“以弱模型为主、保留低 ASR 边界”。
-4. **Limitations**：模型数、单 benchmark、无自适应、筛选集/审计器混杂、单次运行；模型是按 baseline ASR 选的，不是随机样本。
-5. **页数**：当前 4 页；4 模型版的页数仍需重新编译核对。若超页，先压 Related Work 和失败分析细节，不压结果表。
-
-## 7. 时间线
-
-| 时间 | 任务 |
+| 阶段 | 完成条件 |
 | --- | --- |
-| 11/04–11/10 | 非思考模式小改动 + 测试；Qwen baseline clean；5 模型 baseline 筛选 |
-| 11/11–11/24 | 冻结 common grid；新高/低模型两臂；固定审计器；新模型 clean |
-| 11/25–12/01 | 重算数字；模型级表/图；更新 Results |
-| 12/02–12/15 | 改摘要/Intro/Limitations；内部评审；图 QA |
-| 12/16–12/31 | 格式、引用、页数；缓冲 |
-| 01/01–01/14 | 最终检查、PDF eXpress 自检、提交 |
+| 版本验证 | 完成 v3.8 的跨模型配对复测，按上述条件决定保留或回退。 |
+| 证据冻结 | 锁定已有运行与数字源。补齐附录所需的运行身份和统计字段，有条件时用已有记录做共同键敏感性检查。 |
+| 写作与图表 | 同步摘要、引言、方法、结果和局限性，主表及 Fig. 2 与附录使用同一套提取口径。 |
+| 定稿 | 复核所有版本、分子分母、图表引用和原生标签。编译检查页数、引用及版式，按会务要求打包正文、附录和复现材料。 |
 
-如果只做最小版本（Qwen baseline clean + 固定审计器，不扩模型）：11 月底可定稿。
-
-## 8. 风险与止损
-
-| 风险 | 止损 |
-| --- | --- |
-| 自定义 DashScope endpoint 不提供 qwen3.8 系列 | 先 smoke；不可用则切官方 `https://dashscope.aliyuncs.com/compatible-mode/v1`，记录实际 base_url；仍不可用就停，不换 provider |
-| 非思考参数被忽略 | 检查响应 `reasoning_content`/reasoning tokens；有则停用该模型，不混入主表 |
-| qwen3.8-flash 的 baseline ASR 也很低 | 补 qwen3.5-flash 作为第二个高易感点；不硬说“新一代小模型也弱” |
-| 固定审计器显示 DeepSeek 低 ASR 主要来自审计器 | 如实报告；把“强模型”改成“主模型+审计器组合”，仍是有效发现 |
-| 4 模型 6 页放不下 | 模型级表/图；per-suite 进 artifact；正文只留关键数字 |
-| “只测弱模型”被质疑 | 保留 DeepSeek 低 ASR 边界；写明按 baseline ASR 选模型与 headroom 偏差 |
-
-## 9. 明确不做
-
-- 不把“强模型自带强防御”写成结论；不把 2.1% 当成模型普遍属性。
-- 不用非 DashScope provider，不引入 GPT/Claude/Llama 等外部 key。
-- 不做多 seed、全量重跑、超大模型矩阵。
-- 不新增机制、不改评分/分母、不重标原生 ASR。
-
-## 10. 需要你确认
-
-1. 接受“Qwen3.7-Flash + DeepSeek-Flash + 2 个 DashScope 新模型”的 4 模型方案吗？
-2. 同意先做非思考模式小改动（`extra_body.enable_thinking=false`）并跑 Qwen baseline clean + 5 模型 baseline 筛选吗？
-3. 如果筛选后只能再跑一个：优先选观测 ASR 最高的新模型（弱模型复现），还是 `qwen3.8-max`（低 headroom 边界）？我建议前者 + 保留 DeepSeek 边界。
+当前草稿仍按三模型呈现，以上为待执行的稿件调整。此前的四模型扩展、候选筛选与 Qwen3.5-Flash 再调优从投稿待办中移除。现有 Qwen3.7-Flash clean 基线缺口按缺失披露。若后续决定补测，先确定它要回答的单一问题及固定口径。
