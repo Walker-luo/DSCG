@@ -912,6 +912,7 @@ def cli(argv: list[str] | None = None, *, task_scope: str = 'partial', entrypoin
         help="结果根目录；缺省使用 results/benchmarks/。" if full else "结果根目录；缺省使用 results/partial_benchmark/。",
     )
     parser.add_argument("--no-checker", action="store_true", help="P0 消融：保留授权/monitor/ticket，关闭语义审计。")
+    parser.add_argument("--no-sandbox", action="store_true", help="测试消融：关闭 L2 授权编译，保留 L3 审计与监控；须配合 --audit-router-mode off。")
     parser.add_argument('--no-tool-view', action='store_true', help='L2 对照：规划器展示完整工具目录，保留执行权限检查。')
     parser.add_argument('--no-delegated-tasks', action='store_true', help='关闭显式任务文件展开，用于原任务编译对照。')
     parser.add_argument('--prompt-profile', choices=PROMPT_PROFILES, default=None,
@@ -934,6 +935,10 @@ def cli(argv: list[str] | None = None, *, task_scope: str = 'partial', entrypoin
     args = parser.parse_args(argv)
     if args.audit_router_mode is None:
         args.audit_router_mode = 'off' if args.baseline or args.no_checker else 'shadow'
+    if args.baseline and args.no_sandbox:
+        parser.error('--no-sandbox cannot be combined with --baseline')
+    if args.no_sandbox and args.audit_router_mode != 'off':
+        parser.error('--no-sandbox requires --audit-router-mode off')
     try:
         validate_router_options(args.audit_router_threshold, args.audit_router_artifact)
     except ValueError as exc:
@@ -999,6 +1004,7 @@ def cli(argv: list[str] | None = None, *, task_scope: str = 'partial', entrypoin
             config_path=args.config_path,
             results_dir=args.results_dir if args.results_dir is not None else BENCHMARK_RESULTS_DIR if full else None,
             attack=selected_attacks,
+            use_sandbox=not args.no_sandbox,
             use_security_checker=not args.no_checker, audit_retries=args.audit_retries,
             completion_prompt=args.completion_prompt, task_manifest_path=args.task_manifest_path,
             audit_router_mode=args.audit_router_mode,audit_router_artifact=args.audit_router_artifact, audit_router_threshold=args.audit_router_threshold,

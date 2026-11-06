@@ -198,6 +198,22 @@ class FliterRunnerTests(unittest.TestCase):
                 results_dir=self.root/'results',run_name='dos',attack=dos,goal=True)
         self.assertEqual(self.configurations,[])
 
+    def test_no_sandbox_cli_requires_router_off_and_disables_l2(self):
+        with self.assertRaises(SystemExit):
+            with redirect_stderr(io.StringIO()):
+                runner.cli(['--suites', self.suite_name, '--no-sandbox', '--name', 'probe'])
+        captured = {}
+        def fake(**kwargs):
+            captured.update(kwargs)
+            return 0
+        with patch.object(runner, 'main', fake):
+            rc = runner.cli(['--suites', self.suite_name, '--no-sandbox',
+                             '--audit-router-mode', 'off', '--name', 'probe'])
+        self.assertEqual(rc, 0)
+        self.assertFalse(captured['use_sandbox'])
+        self.assertTrue(captured['use_security_checker'])
+        self.assertEqual(captured['audit_router_mode'], 'off')
+
     def test_old_flags_rejected_at_cli(self):
         for flag in ('--cohort','--screened','--screen-reuse'):
             with self.subTest(flag=flag), self.assertRaises(SystemExit) as exc:
