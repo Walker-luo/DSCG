@@ -121,7 +121,7 @@ Use [README.md](README.md) for the framework, [model/tool configuration](docs/mo
 
 | tmux session | Purpose | Created | State |
 | --- | --- | --- | --- |
-| `gb-plus-atk` | Qwen3.7-Plus snapshot: GOAL screen then baseline/v3.7 attack arms | 2026-11-06 | active |
+| `gb-plus-atk` | Qwen3.7-Plus snapshot: GOAL screen then attack arms — baseline finished 18:17; **v3.7 arm interrupted 20:00 by user** (workspace partial, resumable with `--reuse`) | 2026-11-06 | ended |
 | `gb-nol2` | Qwen3.7-Flash workspace NoL2 rerun via `--no-sandbox` | 2026-11-06 | active |
 | `gb-plus-cln` | Qwen3.7-Plus snapshot: clean arms (finished) | 2026-11-06 | ended, session closed |
 | `gb-ablate` | Qwen3.7-Flash workspace full + NoL3 ablation (finished) | 2026-11-06 | ended, session closed |
