@@ -109,6 +109,21 @@ Use [README.md](README.md) for the framework, [model/tool configuration](docs/mo
 - Run targeted offline checks appropriate to code changes, respecting current-task restrictions. Broader commands, when warranted, are `conda run -n ipi python -B -m unittest discover -s tests -v`, the same in `ipi-agentdyn`, and `node --test tests/*.cjs`. Backend-specific skips are explicit. Known pre-existing Python failures/errors remain; do not claim the full suite is green or alter unrelated defenses to hide them.
 - I3/E0 diagnostics live at `experiments.diagnostics.i3_p0_stress` and `experiments.diagnostics.harness_audit`; pass a fresh artifact `--output`. I3 partial exit 1 and synthetic E0 self-checks do not pass research gates. Small samples, overlapping regression signals, audit explanations and engineering tests do not prove causal/general safety or novelty.
 
+## Test-run conventions (2026-11-06 onwards)
+
+- **Backend and version scope.** AgentDojo only (server `DSCG` conda env); do not run AgentDyn or `ipi-agentdyn` unless explicitly asked. All new measurements use the v3.7 framework. v3.8 is abandoned: its recorded probe results stay as dated evidence, but no new v3.8 runs are started.
+- **Naming.** Follow the existing per-model directory convention: clean arms end in `_clean`; attack arms are named after the measured configuration (`baseline`, `v3.7`, `v3.7-plus-2026-05-26`). Never reuse a name that already exists inside the same model directory, and give ablations an explicit label (for example `ablation_workspace_full`).
+- **Results.** Pass `--results-dir /home/yuxin_luo/DSCG/results/workshop` on every run so outputs land in `results/workshop/<backend>/<model>/<name>/`. Logs, launchers, manifests and frozen lists go to `workshop/artifacts/<YYYYMMDD>_<task>/`.
+- **tmux reuse.** Reuse the sessions recorded below instead of creating new ones. When a new session is unavoidable, add a row with its purpose and remove the row after `tmux kill-session`. Long lanes are plain shell scripts under the artifact directory so a dropped SSH connection cannot stop them.
+- **Concurrency.** At most three model-calling processes at a time; lanes must write disjoint result directories and must not share an active `--name` in the same model directory.
+- Keep reporting host, commit, exact command, exit code, model/settings and usage denominators as required above.
+
+| tmux session | Purpose | Created | State |
+| --- | --- | --- | --- |
+| `gb-plus-atk` | Qwen3.7-Plus snapshot: GOAL screen then baseline/v3.7 attack arms | 2026-11-06 | active |
+| `gb-plus-cln` | Qwen3.7-Plus snapshot: clean arms then workspace NoL2 ablation | 2026-11-06 | active |
+| `gb-ablate` | Qwen3.7-Flash workspace L2/L3 ablation (full then NoL3) | 2026-11-06 | active |
+
 ## Storage, reports and historical context
 
 - Put pending engineering plans in `workshop/`, completed stage reports in `workshop/completed/`, and original/superseded material in `workshop/archive/`. Do not create competing plan directories; formal paper work stays in `../research/`.

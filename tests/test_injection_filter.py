@@ -95,8 +95,8 @@ class StandaloneScreenTests(unittest.TestCase):
         from experiments import run_injection_precheck as screen
         self.assertEqual(set(screen.SCREENING_MODELS), {
             ('dashscope', 'qwen3.7-flash'), ('dashscope', 'qwen3.5-flash'),
-            ('dashscope', 'qwen3.7-plus'), ('dashscope', 'qwen3.8-flash'),
-            ('deepseek', 'deepseek-flash')})
+            ('dashscope', 'qwen3.7-plus'), ('dashscope', 'qwen3.7-plus-2026-05-26'),
+            ('dashscope', 'qwen3.8-flash'), ('deepseek', 'deepseek-flash')})
 
     def test_minimal_output_fail_error_separate_resume_no_retry(self):
         from experiments import run_injection_precheck as screen

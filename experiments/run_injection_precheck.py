@@ -30,8 +30,8 @@ SCREEN_SCHEMA = 'dscg.fliter-screen.v1'
 # quota, so only explicitly authorized model/provider pairs may generate a list.
 SCREENING_MODELS = frozenset({
     ('dashscope', 'qwen3.7-flash'), ('dashscope', 'qwen3.5-flash'),
-    ('dashscope', 'qwen3.7-plus'), ('dashscope', 'qwen3.8-flash'),
-    ('deepseek', 'deepseek-flash')})
+    ('dashscope', 'qwen3.7-plus'), ('dashscope', 'qwen3.7-plus-2026-05-26'),
+    ('dashscope', 'qwen3.8-flash'), ('deepseek', 'deepseek-flash')})
 
 
 class Progress:
