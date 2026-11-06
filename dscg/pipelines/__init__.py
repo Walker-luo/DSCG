@@ -1,1 +1,1 @@
-"""AgentDojo pipeline builders used by DSCG experiments."""
+"""AgentDojo pipeline builders used by GrantBind experiments."""

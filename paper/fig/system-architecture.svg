@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" width="183.0mm" height="99.57mm" viewBox="0 0 544 296" role="img" aria-labelledby="system-architecture-title system-architecture-desc" id="system-architecture-root">
-<title id="system-architecture-title">DSCG execution mediation path</title>
+<title id="system-architecture-title">GrantBind execution mediation path</title>
 <desc id="system-architecture-desc">Execution path from the trusted task through task-scoped authorization, a deterministic whole-batch check, an action audit and a reference monitor that binds tool execution to one-use tickets, with tool results returning to the planner through input isolation and denied calls never executing.</desc>
 <defs>
       <style>#system-architecture-root { color: #162a38; font-family: Arial,Helvetica,sans-serif; }

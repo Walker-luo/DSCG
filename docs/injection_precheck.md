@@ -34,7 +34,7 @@ python -m experiments.run_partial_benchmark --suites banking slack \
   --fliter /absolute/path/to/fliter.json --goal --name goal_partial_01
 ```
 
-先应用fliter，再给每个剩余目标执行一次直接GOAL，使用**当前测量pipeline**：baseline是原生无防御，DSCG使用当前防御配置。每目标一条完整轨迹，可含多次模型请求；结果跨攻击共享。通过才进入计分，失败排除，错误／中断分开记录；不重试已开始目标。
+先应用fliter，再给每个剩余目标执行一次直接GOAL，使用**当前测量pipeline**：baseline是原生无防御，GrantBind使用当前防御配置。每目标一条完整轨迹，可含多次模型请求；结果跨攻击共享。通过才进入计分，失败排除，错误／中断分开记录；不重试已开始目标。
 
 GOAL是直接目标可完成性检查，不是间接注入攻击或正常用户clean任务，不进入TSR／ASR分母。不同pipeline可能保留不同集合；比较须报告实际范围与共同任务键，不能把排除当作防御成功。
 
@@ -51,6 +51,6 @@ python -m experiments.run_injection_precheck screen \
 
 默认覆盖当前后端全部注入目标，可用`--suites`选择子集。**仅依据第一次完整轨迹：通过保留，未通过直接剔除，不等第二次失败，也不做补测。**每GOAL只跑一次完整轨迹；失败、错误／中断目标进入`fliter.json`，错误另外报告且退出1，不以基础设施错误证明目标不可完成。成功保留；已完成／已开始尝试不重试。输出位于`results/injection_precheck/<backend>/<model>_<name>/`，新运行只用根`run_manifest.json`保存筛选配置（schema为`dscg.fliter-screen.v1`），根`summary.json`保存计数与`selection_report.goal_checks`，并生成`fliter.json`和`summary.md`；GOAL原生轨迹在`goal/<suite>/<injection>.json`。每目标状态为`passed`／`failed`／`error`，成本为`{"models": [api_accounting]}`或未知`null`，不在汇总重复完整模型配置。`attempts/`仅保存开始／结束、绑定摘要、证据引用与记账，供中断恢复，不复制轨迹。
 
-同配置／name／输出根续跑仅处理尚未开始目标；全新筛选使用新名称。历史已冻结名单及证据保留原字节／规则；含旧`screen_manifest.json`／`status.json`的目录拒绝写入续跑，不自动迁移。`--reuse-from /absolute/path/to/source_run`只读复用兼容的旧原生baseline证据或新`goal/`证据；来源可为旧筛选配置或新的单一根配置，但测量GOAL须确认为相同模型配置的原生无防御baseline。DSCG或其他防御测量的GOAL不能作为独立baseline筛选证据。独立无防御screen与测量当前pipeline GOAL是不同范围，成本分开记账。
+同配置／name／输出根续跑仅处理尚未开始目标；全新筛选使用新名称。历史已冻结名单及证据保留原字节／规则；含旧`screen_manifest.json`／`status.json`的目录拒绝写入续跑，不自动迁移。`--reuse-from /absolute/path/to/source_run`只读复用兼容的旧原生baseline证据或新`goal/`证据；来源可为旧筛选配置或新的单一根配置，但测量GOAL须确认为相同模型配置的原生无防御baseline。GrantBind或其他防御测量的GOAL不能作为独立baseline筛选证据。独立无防御screen与测量当前pipeline GOAL是不同范围，成本分开记账。
 
 完整测量、partial及结果字段分别见[完整指南](benchmark.md)、[partial指南](partial_benchmark.md)和[结果文件](result_files.md)。agent临时检查显式使用新的`--results-dir workshop/artifacts/<YYYYMMDD>_<task>/injection_precheck`。

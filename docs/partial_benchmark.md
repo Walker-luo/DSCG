@@ -44,7 +44,7 @@ python -m experiments.run_partial_benchmark --suites banking slack \
   --fliter /absolute/path/to/fliter.json --goal --name v36_partial_goal_01
 ```
 
-先取原前3用户×原前3目标，再应用排除表；不补位。`--goal`默认关闭；开启后，每个保留目标按当前测量pipeline运行一次直接GOAL，跨攻击共享结果，只有通过目标进入计分。失败排除，错误单独跳过并退出1；均不计TSR／ASR，已开始GOAL不重试。全部剔除时不计分、指标N/A；baseline与DSCG的GOAL可能保留不同集合，配对比较须使用实际共同任务键。旧`--cohort`已拒绝，历史结果仍可读取，不迁移。
+先取原前3用户×原前3目标，再应用排除表；不补位。`--goal`默认关闭；开启后，每个保留目标按当前测量pipeline运行一次直接GOAL，跨攻击共享结果，只有通过目标进入计分。失败排除，错误单独跳过并退出1；均不计TSR／ASR，已开始GOAL不重试。全部剔除时不计分、指标N/A；baseline与GrantBind的GOAL可能保留不同集合，配对比较须使用实际共同任务键。旧`--cohort`已拒绝，历史结果仍可读取，不迁移。
 
 <a id="并发运行"></a>
 

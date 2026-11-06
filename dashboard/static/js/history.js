@@ -270,7 +270,7 @@
       const disposition = response.headers.get("Content-Disposition") || "";
       const filename = disposition.match(/filename="?([a-zA-Z0-9_.-]+\.zip)"?/);
       link.href = url;
-      link.download = filename ? filename[1] : "dscg-history-analysis.zip";
+      link.download = filename ? filename[1] : "grantbind-history-analysis.zip";
       document.body.append(link);
       link.click();
       link.remove();

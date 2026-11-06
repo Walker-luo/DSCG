@@ -1311,7 +1311,7 @@ def export_history_results():
         archive,
         mimetype="application/zip",
         as_attachment=True,
-        download_name=f"dscg-history-analysis-{exported_at:%Y%m%dT%H%M%SZ}.zip",
+        download_name=f"grantbind-history-analysis-{exported_at:%Y%m%dT%H%M%SZ}.zip",
     )
     response.headers["Cache-Control"] = "no-store"
     return response
@@ -1579,7 +1579,7 @@ def download_report(run_id: str):
     lines.append(f"  测试套件: {', '.join(config.get('suites', []))}")
     lines.append(f"  执行攻击: {config.get('run_attack', True)}")
     lines.append(f"  攻击类型: {config.get('attack_name', 'N/A')}")
-    lines.append(f"  框架类型: {'原始模型' if config.get('origin') else 'DSCG'}")
+    lines.append(f"  框架类型: {'原始模型' if config.get('origin') else 'GrantBind'}")
     if config.get("defense"):
         lines.append(f"  AgentDojo 防御: {config.get('defense')}")
     if not config.get("origin"):
@@ -1620,7 +1620,7 @@ def download_report(run_id: str):
         lines.append("")
 
     lines.append("=" * 60)
-    lines.append("  报告由 DSCG Web Dashboard 自动生成")
+    lines.append("  报告由 GrantBind Web Dashboard 自动生成")
     lines.append("=" * 60)
 
     report_text = "\n".join(lines)
@@ -1674,7 +1674,7 @@ if __name__ == "__main__":
 
     # ---- 打印启动信息 ----
     print("=" * 60)
-    print("  🔐 DSCG - Agent 安全评测台")
+    print("  🔐 GrantBind - Agent 安全评测台")
     print("=" * 60)
 
     if is_docker:

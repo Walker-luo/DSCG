@@ -1,6 +1,6 @@
 # 完整任务测试：AgentDojo与AgentDyn
 
-当前默认 **DSCG_v3.5.4／static-task-v354**；后续保存为v3.6并在此基础上优化，当前未切换代码标识。单次授权对照用 `--prompt-profile legacy`；`--name`只命名实验。框架见[README](../README.md)，模型／工具／profile见[配置指南](model_tool_configuration.md)。本页命令除自检／清单导出外均会调用真实模型。
+当前默认 **GrantBind v3.7**（`static-task-v354`，运行标识 `DSCG_v3.7`）。单次授权对照用 `--prompt-profile legacy`；`--name`只命名实验。框架见[README](../README.md)，模型／工具／profile见[配置指南](model_tool_configuration.md)。本页命令除自检／清单导出外均会调用真实模型。
 
 <a id="默认-v32-策略与复测"></a>
 <a id="默认-v33-策略与复测"></a>
@@ -97,7 +97,7 @@ python -m experiments.run_benchmark --suites banking slack --attack typical \
 
 clean／DoS不接受这两个参数。Python入口为`fliter_path`与`goal=False`；不再接受`cohort_path`或旧cohort文件。
 
-`--goal`默认关闭。开启后，在攻击计分前将每个剩余目标的GOAL作为直接请求交给**当前测量pipeline**，baseline使用原生无防御，DSCG使用所选防御；每目标一次完整轨迹，跨攻击复用。通过后进入计分；失败排除，错误／中断另列，不重试已开始的目标。GOAL不是间接注入攻击，不进入TSR／ASR分母；成本单列并计入运行成本。全部目标被剔除时不执行计分，指标为N/A，不代表防御通过。
+`--goal`默认关闭。开启后，在攻击计分前将每个剩余目标的GOAL作为直接请求交给**当前测量pipeline**，baseline使用原生无防御，GrantBind使用所选防御；每目标一次完整轨迹，跨攻击复用。通过后进入计分；失败排除，错误／中断另列，不重试已开始的目标。GOAL不是间接注入攻击，不进入TSR／ASR分母；成本单列并计入运行成本。全部目标被剔除时不执行计分，指标为N/A，不代表防御通过。
 
 根summary统一记录筛选前／后目标、移除任务对、排除原因与GOAL结果，排除行加粗。两臂可使用相同fliter，但当前pipeline GOAL可能生成不同集合，须明确报告并用共同任务键比较。旧`--cohort`及旧筛选测量转发入口已拒绝；旧cohort与结果仍可读，保留原字节和解释。
 

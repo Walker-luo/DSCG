@@ -4,7 +4,7 @@
      soft #5f7183; accent #a63d2f; L2 #e6f0f9/#5f87ab; L3 #f1edf8/#8a76a3; L1 #e9f4ef/#6e9c8a;
      enforcement #edf2f7/#48647c; Arial only, system font source, no web fonts. Canvas 544x296 units = 183 mm. -->
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>DSCG execution mediation path</title><style>
+<title>GrantBind execution mediation path</title><style>
 
 *{box-sizing:border-box}
 body{margin:0;background:#ffffff;color:#162a38;font-family:Arial,Helvetica,sans-serif}
@@ -18,12 +18,12 @@ footer{margin-top:18px;padding-top:10px;border-top:1px solid #cfd8e0;font-size:1
 @media print{.diagram-container{overflow-x:visible}.diagram-container svg{min-width:0}}
 
 </style></head><body><main>
-<p class="eyebrow">DSCG &middot; implemented system</p>
+<p class="eyebrow">GrantBind &middot; implemented system</p>
 <h1>Execution mediation path</h1>
 <p class="sub">Task-scoped authorization and audit sit between the agent and every tool call.</p>
 <div class="diagram-container">
 <svg xmlns="http://www.w3.org/2000/svg" width="183.0mm" height="99.57mm" viewBox="0 0 544 296" role="img" aria-labelledby="system-architecture-title system-architecture-desc">
-<title id="system-architecture-title">DSCG execution mediation path</title>
+<title id="system-architecture-title">GrantBind execution mediation path</title>
 <desc id="system-architecture-desc">Execution path from the trusted task through task-scoped authorization, a deterministic whole-batch check, an action audit and a reference monitor that binds tool execution to one-use tickets, with tool results returning to the planner through input isolation and denied calls never executing.</desc>
 <defs>
 <marker id="arrow-control" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#35576f"/></marker>
@@ -138,5 +138,5 @@ footer{margin-top:18px;padding-top:10px;border-top:1px solid #cfd8e0;font-size:1
 <text x="476.303" y="285" font-family="Arial, Helvetica, sans-serif" font-size="6.5" fill="#46596a">deny / abstain blocks</text>
 </svg>
 </div>
-<footer><span>Arial, 6.0&ndash;7.6&nbsp;pt at 183&nbsp;mm</span><span>DSCG v3.7 &middot; Fig. 1</span></footer>
+<footer><span>Arial, 6.0&ndash;7.6&nbsp;pt at 183&nbsp;mm</span><span>GrantBind v3.7 &middot; Fig. 1</span></footer>
 </main></body></html>

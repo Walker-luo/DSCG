@@ -4,6 +4,7 @@
     "qwen35": {
       "model_id": "qwen3.5-flash",
       "defense_run": "v3.7",
+      "clean_baseline_run": "baseline_clean",
       "full": {
         "baseline": {
           "valid": 2139,
@@ -73,6 +74,29 @@
             "mcnemar_p": 0.0
           }
         },
+        "attacks": {
+          "ignore_previous": {
+            "n": 713,
+            "base_tsr": 618,
+            "dscg_tsr": 381,
+            "base_asr": 2,
+            "dscg_asr": 0
+          },
+          "important_instructions": {
+            "n": 713,
+            "base_tsr": 596,
+            "dscg_tsr": 399,
+            "base_asr": 108,
+            "dscg_asr": 1
+          },
+          "tool_knowledge": {
+            "n": 713,
+            "base_tsr": 591,
+            "dscg_tsr": 395,
+            "base_asr": 111,
+            "dscg_asr": 1
+          }
+        },
         "total": {
           "n": 2139,
           "base_tsr": 1805,
@@ -86,6 +110,10 @@
           "utility_discordant": [
             719,
             89
+          ],
+          "attack_discordant": [
+            219,
+            0
           ],
           "mcnemar_p": 0.0,
           "asr_upper95": 0.34
@@ -101,7 +129,61 @@
           "tsr": 53
         },
         "paired_n": 97,
-        "mcnemar_p": 0.0
+        "utility_discordant": [
+          39,
+          2
+        ],
+        "mcnemar_p": 0.0,
+        "mixed": {
+          "run": "audit_3.7-flash_clean",
+          "security_model_id": "qwen3.7-flash",
+          "defense_version": "DSCG_v3.7",
+          "task_view_wire": "anchored-task-view-flat-v3",
+          "permission_wire": "allowed-action-tools-v1",
+          "n": 97,
+          "tsr": 82,
+          "suites": {
+            "workspace": {
+              "n": 40,
+              "base_tsr": 38,
+              "dscg_tsr": 26,
+              "mixed_tsr": 39
+            },
+            "travel": {
+              "n": 20,
+              "base_tsr": 18,
+              "dscg_tsr": 11,
+              "mixed_tsr": 16
+            },
+            "banking": {
+              "n": 16,
+              "base_tsr": 14,
+              "dscg_tsr": 5,
+              "mixed_tsr": 8
+            },
+            "slack": {
+              "n": 21,
+              "base_tsr": 20,
+              "dscg_tsr": 11,
+              "mixed_tsr": 19
+            }
+          },
+          "utility_discordant_vs_same_model": [
+            0,
+            29
+          ],
+          "utility_discordant_vs_baseline": [
+            11,
+            3
+          ],
+          "cost": {
+            "tokens": 2480936,
+            "main_tokens": 2007205,
+            "audit_tokens": 473731,
+            "audit_calls": 142,
+            "unknown_usage_records": 0
+          }
+        }
       },
       "cost": {
         "baseline": {
@@ -123,6 +205,7 @@
     "qwen": {
       "model_id": "qwen3.7-flash",
       "defense_run": "v3.6.3",
+      "clean_baseline_run": null,
       "full": {
         "baseline": {
           "valid": 1944,
@@ -192,6 +275,29 @@
             "mcnemar_p": 0.3915
           }
         },
+        "attacks": {
+          "ignore_previous": {
+            "n": 648,
+            "base_tsr": 515,
+            "dscg_tsr": 510,
+            "base_asr": 27,
+            "dscg_asr": 0
+          },
+          "important_instructions": {
+            "n": 648,
+            "base_tsr": 451,
+            "dscg_tsr": 517,
+            "base_asr": 223,
+            "dscg_asr": 0
+          },
+          "tool_knowledge": {
+            "n": 647,
+            "base_tsr": 459,
+            "dscg_tsr": 513,
+            "base_asr": 188,
+            "dscg_asr": 0
+          }
+        },
         "total": {
           "n": 1943,
           "base_tsr": 1425,
@@ -206,6 +312,10 @@
             147,
             262
           ],
+          "attack_discordant": [
+            438,
+            0
+          ],
           "mcnemar_p": 0.0,
           "asr_upper95": 0.2
         }
@@ -216,8 +326,8 @@
           "tsr": 0
         },
         "dscg": {
-          "n": 97,
-          "tsr": 83
+          "n": 95,
+          "tsr": 82
         }
       },
       "cost": {
@@ -240,6 +350,7 @@
     "deepseek": {
       "model_id": "deepseek-flash",
       "defense_run": "v3.6.3",
+      "clean_baseline_run": "baseline_clean",
       "full": {
         "baseline": {
           "valid": 1836,
@@ -309,6 +420,29 @@
             "mcnemar_p": 0.0072
           }
         },
+        "attacks": {
+          "ignore_previous": {
+            "n": 612,
+            "base_tsr": 515,
+            "dscg_tsr": 510,
+            "base_asr": 12,
+            "dscg_asr": 1
+          },
+          "important_instructions": {
+            "n": 612,
+            "base_tsr": 509,
+            "dscg_tsr": 501,
+            "base_asr": 14,
+            "dscg_asr": 1
+          },
+          "tool_knowledge": {
+            "n": 612,
+            "base_tsr": 511,
+            "dscg_tsr": 501,
+            "base_asr": 12,
+            "dscg_asr": 3
+          }
+        },
         "total": {
           "n": 1836,
           "base_tsr": 1535,
@@ -322,6 +456,10 @@
           "utility_discordant": [
             91,
             68
+          ],
+          "attack_discordant": [
+            33,
+            0
           ],
           "mcnemar_p": 0.0807,
           "asr_upper95": 0.64
@@ -337,6 +475,10 @@
           "tsr": 84
         },
         "paired_n": 97,
+        "utility_discordant": [
+          8,
+          4
+        ],
         "mcnemar_p": 0.3877
       },
       "cost": {
@@ -352,6 +494,157 @@
           "main_tokens": 33286716,
           "audit_tokens": 10794442,
           "audit_calls": 2700,
+          "unknown_usage_records": 0
+        }
+      }
+    },
+    "qwen38": {
+      "model_id": "qwen3.8-flash",
+      "defense_run": "v3.7",
+      "clean_baseline_run": "clean",
+      "full": {
+        "baseline": {
+          "valid": 108,
+          "tsr": 91,
+          "asr": 2,
+          "errors": 0
+        },
+        "v3.7": {
+          "valid": 108,
+          "tsr": 98,
+          "asr": 2,
+          "errors": 0
+        }
+      },
+      "paired": {
+        "suites": {
+          "workspace": {
+            "n": 27,
+            "base_tsr": 26,
+            "dscg_tsr": 27,
+            "base_asr": 0,
+            "dscg_asr": 0,
+            "base_tsr_pct": 96.3,
+            "dscg_tsr_pct": 100.0,
+            "base_asr_pct": 0.0,
+            "dscg_asr_pct": 0.0,
+            "delta_tsr_pp": 3.7,
+            "mcnemar_p": 1.0
+          },
+          "travel": {
+            "n": 27,
+            "base_tsr": 27,
+            "dscg_tsr": 27,
+            "base_asr": 0,
+            "dscg_asr": 0,
+            "base_tsr_pct": 100.0,
+            "dscg_tsr_pct": 100.0,
+            "base_asr_pct": 0.0,
+            "dscg_asr_pct": 0.0,
+            "delta_tsr_pp": 0.0,
+            "mcnemar_p": 1.0
+          },
+          "banking": {
+            "n": 27,
+            "base_tsr": 11,
+            "dscg_tsr": 17,
+            "base_asr": 0,
+            "dscg_asr": 0,
+            "base_tsr_pct": 40.74,
+            "dscg_tsr_pct": 62.96,
+            "base_asr_pct": 0.0,
+            "dscg_asr_pct": 0.0,
+            "delta_tsr_pp": 22.22,
+            "mcnemar_p": 0.0312
+          },
+          "slack": {
+            "n": 27,
+            "base_tsr": 27,
+            "dscg_tsr": 27,
+            "base_asr": 2,
+            "dscg_asr": 2,
+            "base_tsr_pct": 100.0,
+            "dscg_tsr_pct": 100.0,
+            "base_asr_pct": 7.41,
+            "dscg_asr_pct": 7.41,
+            "delta_tsr_pp": 0.0,
+            "mcnemar_p": 1.0
+          }
+        },
+        "attacks": {
+          "ignore_previous": {
+            "n": 36,
+            "base_tsr": 32,
+            "dscg_tsr": 32,
+            "base_asr": 1,
+            "dscg_asr": 0
+          },
+          "important_instructions": {
+            "n": 36,
+            "base_tsr": 29,
+            "dscg_tsr": 33,
+            "base_asr": 1,
+            "dscg_asr": 1
+          },
+          "tool_knowledge": {
+            "n": 36,
+            "base_tsr": 30,
+            "dscg_tsr": 33,
+            "base_asr": 0,
+            "dscg_asr": 1
+          }
+        },
+        "total": {
+          "n": 108,
+          "base_tsr": 91,
+          "dscg_tsr": 98,
+          "base_asr": 2,
+          "dscg_asr": 2,
+          "base_tsr_pct": 84.26,
+          "dscg_tsr_pct": 90.74,
+          "base_asr_pct": 1.85,
+          "dscg_asr_pct": 1.85,
+          "utility_discordant": [
+            0,
+            7
+          ],
+          "attack_discordant": [
+            2,
+            2
+          ],
+          "mcnemar_p": 0.0156,
+          "asr_upper95": 6.5
+        }
+      },
+      "clean": {
+        "baseline": {
+          "n": 97,
+          "tsr": 83
+        },
+        "dscg": {
+          "n": 97,
+          "tsr": 83
+        },
+        "paired_n": 97,
+        "utility_discordant": [
+          7,
+          7
+        ],
+        "mcnemar_p": 1.0
+      },
+      "cost": {
+        "baseline": {
+          "tokens": 1410125,
+          "main_tokens": 1410125,
+          "audit_tokens": 0,
+          "audit_calls": 0,
+          "unknown_usage_records": 0
+        },
+        "dscg": {
+          "tokens": 2013223,
+          "main_tokens": 1561856,
+          "audit_tokens": 451367,
+          "audit_calls": 176,
           "unknown_usage_records": 0
         }
       }

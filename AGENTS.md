@@ -1,8 +1,8 @@
-# DSCG Agent Instructions
+# GrantBind Agent Instructions
 
 ## Working directories: workstation and test server
 
-- `/home/yuxin_luo/DSCG` is the user's working directory on the test server (`user-PowerEdge-T640`: Ubuntu, 96 cores, 125 GB RAM, RTX 5090 + L20), where subsequent tests are run; the workstation checkout of the same repository is `/Users/luo/Desktop/AgentDefence/DSCG`. Both copies of this file are kept byte-identical and updated through GitHub: edit it once, commit and push, then take the new version on the other side instead of hand-editing a second copy.
+- `/home/yuxin_luo/DSCG` is the user's working directory on the test server (`user-PowerEdge-T640`: Ubuntu, 96 cores, 125 GB RAM, RTX 5090 + L20), where subsequent tests are run; the workstation checkout of the same repository is `/Users/luo/Desktop/AgentDefence/GrantBind`. Both copies of this file are kept byte-identical and updated through GitHub: edit it once, commit and push, then take the new version on the other side instead of hand-editing a second copy.
 - The checkout root is the repository root: in-repo relative paths used below (`DV_STATE.md`, `docs/`, `workshop/`, `tests/`, `experiments/`) resolve against it, and the sibling research checkout `../research/` is `/home/yuxin_luo/research` on the server and `/Users/luo/Desktop/AgentDefence/research` on the workstation; both hold `technical_route.md` and `Qwen_API.md`. `/home/yuxin_luo/BaseIntent` is an unrelated repository and stays out of scope.
 - Git differs per machine and must be checked per machine: the workstation is on `workshop` tracking `origin/workshop`; the server checkout has a detached HEAD at `6726cb0` plus an untracked `AgentDyn/` backend source clone, and its remote-tracking refs may be stale. Do not commit, switch or reset branches merely to reconcile the two checkouts; report the branch/HEAD a run actually used.
 - Conda: the workstation uses `/opt/miniconda3` with `ipi` (AgentDojo) and `ipi-agentdyn` (AgentDyn); the server uses `~/miniconda3` with `DSCG` (AgentDojo; the `ipi` env named in the commands below does not exist there, substitute `DSCG`), `ipi-agentdyn` and `crawler`. On the server, conda is absent from the PATH of non-interactive shells: use `~/miniconda3/bin/conda run -n <env> ...` or source `~/miniconda3/etc/profile.d/conda.sh`. Verify the env actually used instead of assuming a name.
@@ -11,7 +11,7 @@
 
 ## Scope and working rules
 
-- Work in `DSCG/`, the engineering repository for indirect prompt-injection defense. Keep the sibling `../research/` repository separate; do not copy paper plans here or create a nested research checkout.
+- Work in the GrantBind engineering checkout for indirect prompt-injection defense. Keep the sibling `../research/` repository separate; do not copy paper plans here or create a nested research checkout.
 - Before research-driven changes, read `../research/technical_route.md` and follow its current implementation-status link. E0 remains pending, I3 partial (24 valid probes, 8 scope violations), and I2 locked. Do not reopen the closed provenance/source-to-sink route or add object/data/parameter authorization, recovery, or other locked mechanisms without a new research-side decision.
 - Preserve existing dirty work, user moves/deletions, unrelated conflict markers, credentials, historical results and evidence. Do not stage or commit unless explicitly requested. Keep the filename `AGENTS.md`; do not create lowercase `agents.md`.
 - Delegated subagents, including planning and review, may use only `gpt-6.1-sol` or `gpt-6.1-terra`. Default to Sol by inheritance or explicit selection; Terra may be selected when appropriate, especially for visual tasks. User model restrictions override skill model-selection/escalation advice. Do not select Astra or any other model unless the user explicitly requests it; report selected-model unavailability without automatic fallback.
@@ -61,7 +61,7 @@ Update `DV_STATE.md` when:
 
 Use [README.md](README.md) for the framework, [model/tool configuration](docs/model_tool_configuration.md) for setup, and [evaluation](docs/evaluation.md), [benchmark](docs/benchmark.md), [partial](docs/partial_benchmark.md), [screening](docs/injection_precheck.md) and [result files](docs/result_files.md) for operations. Historical reports describe their dated configurations; verify against current code before changing behavior.
 
-## Current framework: DSCG_v3.7 / static-task-v354
+## Current framework: GrantBind v3.7 (recorded as DSCG_v3.7) / static-task-v354
 
 - Default `static-task-v354` runs both v3.7 input forms: compact L2 catalogue input (`authorization_input=v3`) and expanded single-pass audit evidence (`audit_presentation=v3`, 32,768/8,192 character bounds). Both are bound into the run identity and recorded in `run_manifest.json`; `DSCG_AUTHORIZATION_INPUT=v2` and `DSCG_AUDIT_PRESENTATION=v2` exist only for ablation.
 - Full, partial, cohort and Dashboard share the production factory. Default `static-task-v354` uses two-stage L2; explicit `legacy` is the single-authorization control. Baseline defaults to legacy and uses the native loop. Select profiles from the current registry; experiment names do not select strategies.

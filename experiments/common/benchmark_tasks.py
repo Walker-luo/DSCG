@@ -96,7 +96,7 @@ class _TaskPipelineProbe:
                 return
             for element in getattr(node, 'elements', ()):
                 visit(element)
-            # Baseline contains native LLM elements; DSCG's executor exposes llm.
+            # Baseline contains native LLM elements; GrantBind's executor exposes llm.
             # Do not traverse audit small_llm or arbitrary model/client state.
             llm = getattr(node, 'llm', None)
             if llm is not None:

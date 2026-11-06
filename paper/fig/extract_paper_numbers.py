@@ -26,6 +26,7 @@ MODELS = {
     "qwen35": ("qwen3.5-flash", "v3.7"),
     "qwen": ("qwen3.7-flash", "v3.6.3"),
     "deepseek": ("deepseek-flash", "v3.6.3"),
+    "qwen38": ("qwen3.8-flash", "v3.7"),
 }
 SUITES = ("workspace", "travel", "banking", "slack")
 
@@ -82,12 +83,13 @@ def load_attack(model: str, arm: str) -> dict[tuple[str, str, str, str], dict]:
 
 def load_clean(model: str, arm: str) -> dict[tuple[str, str], bool]:
     root = RESULTS / model / arm
+    bad = {(suite, user) for suite, _, user, _ in error_keys(model, arm)}
     records: dict[tuple[str, str], bool] = {}
     for path in root.glob("none/*/*/none.json"):
-        suite = path.parts[-3]
         rec = json.loads(path.read_text(encoding="utf-8"))
-        if rec.get("utility") is not None:
-            records[(suite, rec["user_task_id"])] = bool(rec["utility"])
+        key = (path.parts[-3], rec["user_task_id"])
+        if key not in bad and type(rec.get("utility")) is bool:
+            records[key] = rec["utility"]
     return records
 
 
@@ -104,11 +106,6 @@ def summary_cost(model: str, arm: str) -> dict:
     assert total + audit == recorded["known_total_tokens"]
     return {"tokens": total + audit, "main_tokens": total, "audit_tokens": audit,
             "audit_calls": calls, "unknown_usage_records": recorded["unknown_usage_records"]}
-
-
-def arm_stats(records: dict, key: tuple) -> tuple[bool, bool]:
-    rec = records[key]
-    return bool(rec["utility"]), bool(rec["security"])
 
 
 def paired_stats(model: str, defense_arm: str) -> dict:
@@ -155,9 +152,23 @@ def paired_stats(model: str, defense_arm: str) -> dict:
     b = sum(1 for k in common if base[k]["utility"] and not dscg[k]["utility"])
     c = sum(1 for k in common if dscg[k]["utility"] and not base[k]["utility"])
     total["utility_discordant"] = [b, c]
+    total["attack_discordant"] = [
+        sum(base[k]["security"] and not dscg[k]["security"] for k in common),
+        sum(dscg[k]["security"] and not base[k]["security"] for k in common),
+    ]
     total["mcnemar_p"] = round(mcnemar_exact(b, c), 4)
     total["asr_upper95"] = round(100 * wilson(total["dscg_asr"], total["n"])[1], 2)
-    return {"suites": suites, "total": total}
+    attacks = {}
+    for attack in sorted({k[1] for k in common}):
+        keys = [k for k in common if k[1] == attack]
+        attacks[attack] = {
+            "n": len(keys),
+            "base_tsr": sum(base[k]["utility"] for k in keys),
+            "dscg_tsr": sum(dscg[k]["utility"] for k in keys),
+            "base_asr": sum(base[k]["security"] for k in keys),
+            "dscg_asr": sum(dscg[k]["security"] for k in keys),
+        }
+    return {"suites": suites, "attacks": attacks, "total": total}
 
 
 def main() -> int:
@@ -184,7 +195,8 @@ def main() -> int:
                 "asr": sum(1 for k in valid if records[k]["security"]),
                 "errors": len(bad),
             }
-        clean_base = load_clean(model, "baseline_clean")
+        clean_baseline_arm = "clean" if short == "qwen38" else "baseline_clean"
+        clean_base = load_clean(model, clean_baseline_arm)
         clean_dscg = load_clean(model, f"{defense_arm}_clean")
         clean = {
             "baseline": {
@@ -201,6 +213,7 @@ def main() -> int:
             b = sum(1 for k in shared_clean if clean_base[k] and not clean_dscg[k])
             c = sum(1 for k in shared_clean if clean_dscg[k] and not clean_base[k])
             clean["paired_n"] = len(shared_clean)
+            clean["utility_discordant"] = [b, c]
             clean["mcnemar_p"] = round(mcnemar_exact(b, c), 4)
         cost = {
             "baseline": summary_cost(model, "baseline"),
@@ -209,20 +222,69 @@ def main() -> int:
         payload["models"][short] = {
             "model_id": model,
             "defense_run": defense_arm,
+            "clean_baseline_run": clean_baseline_arm if clean_base else None,
             "full": full,
             "paired": paired,
             "clean": clean,
             "cost": cost,
         }
 
+    model = MODELS["qwen35"][0]
+    mixed_arm = "audit_3.7-flash_clean"
+    clean_base = load_clean(model, "baseline_clean")
+    clean_dscg = load_clean(model, "v3.7_clean")
+    clean_mixed = load_clean(model, mixed_arm)
+    assert set(clean_base) == set(clean_dscg) == set(clean_mixed)
+    manifest = json.loads((RESULTS / model / mixed_arm / "run_manifest.json").read_text())["common"]
+    assert manifest["main_model"]["model_id"] == model
+    assert manifest["security_model"]["model_id"] == "qwen3.7-flash"
+    assert (manifest["task_view_wire"], manifest["permission_wire"]) == (
+        "anchored-task-view-flat-v3", "allowed-action-tools-v1"
+    )
+    mixed = {
+        "run": mixed_arm,
+        "security_model_id": manifest["security_model"]["model_id"],
+        "defense_version": manifest["defense_version"],
+        "task_view_wire": manifest["task_view_wire"],
+        "permission_wire": manifest["permission_wire"],
+        "n": len(clean_mixed),
+        "tsr": sum(clean_mixed.values()),
+        "suites": {
+            suite: {
+                "n": sum(k[0] == suite for k in clean_mixed),
+                "base_tsr": sum(v for k, v in clean_base.items() if k[0] == suite),
+                "dscg_tsr": sum(v for k, v in clean_dscg.items() if k[0] == suite),
+                "mixed_tsr": sum(v for k, v in clean_mixed.items() if k[0] == suite),
+            }
+            for suite in SUITES
+        },
+        "utility_discordant_vs_same_model": [
+            sum(clean_dscg[k] and not clean_mixed[k] for k in clean_mixed),
+            sum(clean_mixed[k] and not clean_dscg[k] for k in clean_mixed),
+        ],
+        "utility_discordant_vs_baseline": [
+            sum(clean_base[k] and not clean_mixed[k] for k in clean_mixed),
+            sum(clean_mixed[k] and not clean_base[k] for k in clean_mixed),
+        ],
+        "cost": summary_cost(model, mixed_arm),
+    }
+    payload["models"]["qwen35"]["clean"]["mixed"] = mixed
+
     # Headline assertions: fail loudly if the result trees change.
     q = payload["models"]["qwen"]["paired"]["total"]
     d = payload["models"]["deepseek"]["paired"]["total"]
     q35 = payload["models"]["qwen35"]["paired"]["total"]
+    q38 = payload["models"]["qwen38"]["paired"]["total"]
     assert (q["n"], q["base_tsr"], q["dscg_tsr"], q["base_asr"], q["dscg_asr"]) == (1943, 1425, 1540, 438, 0), q
     assert (d["n"], d["base_tsr"], d["dscg_tsr"], d["base_asr"], d["dscg_asr"]) == (1836, 1535, 1512, 38, 5), d
     assert (q35["n"], q35["base_tsr"], q35["dscg_tsr"], q35["base_asr"], q35["dscg_asr"]) == (2139, 1805, 1175, 221, 2), q35
-    assert payload["models"]["qwen"]["clean"]["dscg"]["tsr"] == 83
+    assert (q38["n"], q38["base_tsr"], q38["dscg_tsr"], q38["base_asr"], q38["dscg_asr"]) == (108, 91, 98, 2, 2), q38
+    assert q38["utility_discordant"] == [0, 7] and q38["attack_discordant"] == [2, 2]
+    q38_clean = payload["models"]["qwen38"]["clean"]
+    assert q38_clean["baseline"] == q38_clean["dscg"] == {"n": 97, "tsr": 83}
+    assert q38_clean["paired_n"] == 97 and q38_clean["utility_discordant"] == [7, 7]
+    assert (mixed["n"], mixed["tsr"], mixed["utility_discordant_vs_same_model"]) == (97, 82, [0, 29])
+    assert payload["models"]["qwen"]["clean"]["dscg"] == {"n": 95, "tsr": 82}
     assert payload["models"]["deepseek"]["clean"]["baseline"]["tsr"] == 88
     assert payload["models"]["deepseek"]["clean"]["dscg"]["tsr"] == 84
     assert payload["models"]["qwen35"]["clean"]["baseline"]["tsr"] == 90
@@ -230,7 +292,7 @@ def main() -> int:
 
     OUT_JSON.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
     with OUT_CSV.open("w", newline="", encoding="utf-8") as handle:
-        writer = csv.writer(handle)
+        writer = csv.writer(handle, lineterminator="\n")
         writer.writerow(
             ["model", "suite", "n", "base_tsr", "dscg_tsr", "base_asr", "dscg_asr", "delta_tsr_pp"]
         )

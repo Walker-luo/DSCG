@@ -1,6 +1,6 @@
-# 文档索引
+# GrantBind 文档索引
 
-当前代码为 **DSCG_v3.5.4／static-task-v354**。后续将当前工作区保存为**v3.6**，并以此继续优化；代码版本与profile标识尚未切换，历史结果不重标。单次授权对照用`--prompt-profile legacy`，实验名称不选择策略。
+当前框架为 **GrantBind v3.7**，默认 `static-task-v354`，运行记录的版本标识为 `DSCG_v3.7`。单次授权对照用`--prompt-profile legacy`，实验名称不选择策略。
 
 | 文档 | 内容 |
 | --- | --- |
@@ -15,4 +15,4 @@
 | [Dashboard](dashboard.md) | 启动、配置、历史对比与下载 |
 | [当前交接](framework_updates.md) | 已实施范围、遗留问题与历史入口 |
 
-[最新结果分析](../analysis/v3-5-4.md)和[DV_STATE](../DV_STATE.md)记录当前实验与工程状态。阶段过程保留在[completed](../workshop/completed/README.md)，旧材料见[archive](../workshop/archive/project_structure_20261008/README.md)。本目录只放使用说明；计划在workshop，agent产物在新的workshop/artifacts任务目录。
+[v3.7 结果分析](../analysis/v3.7.md)和[DV_STATE](../DV_STATE.md)记录当前实验与工程状态。阶段过程保留在[completed](../workshop/completed/README.md)，旧材料见[archive](../workshop/archive/project_structure_20261008/README.md)。本目录只放使用说明；计划在workshop，agent产物在新的workshop/artifacts任务目录。

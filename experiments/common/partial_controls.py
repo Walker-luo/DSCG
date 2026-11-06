@@ -14,7 +14,7 @@ class RunConfigurationError(ValueError):
 
 def validate_controls(*, origin=False,use_security_checker=True,audit_retries=0,completion_prompt=False):
     if origin and (not use_security_checker or audit_retries or completion_prompt):
-        raise ValueError('native baseline cannot use DSCG ablation options')
+        raise ValueError('native baseline cannot use GrantBind ablation options')
     if audit_retries not in (0,1) or (not use_security_checker and audit_retries):
         raise ValueError('audit retries require checker and must be 0 or 1')
 

@@ -1,6 +1,6 @@
 # 模型、工具与运行配置
 
-当前代码为 **DSCG_v3.5.4**，后续保存为v3.6并在此基础上优化；现有`static-task-v354`名称保持可用，当前没有`static-task-v36`选项。命令从项目根执行；激活 `ipi` 或 `ipi-agentdyn` 自动识别实际后端。配置是宿主输入，模型返回不能修改它。
+当前框架为 **GrantBind v3.7**（运行标识 `DSCG_v3.7`），默认 `static-task-v354`。命令从项目根执行；激活 `ipi` 或 `ipi-agentdyn` 自动识别实际后端。配置是宿主输入，模型返回不能修改它。
 
 ## 1. 首次检查
 
@@ -67,7 +67,7 @@ print(security.public_dict())
 
 ### 消息角色兼容与请求排错
 
-公共客户端对DashScope将developer转换为system；DeepSeek另将确认的纯文本system块合并为字符串。baseline、DSCG、screen与Dashboard共用，不修改已安装后端。适配身份进入公开配置，更新请求身份后用新运行名；旧结果不重写。
+公共客户端对DashScope将developer转换为system；DeepSeek另将确认的纯文本system块合并为字符串。baseline、GrantBind、screen与Dashboard共用，不修改已安装后端。适配身份进入公开配置，更新请求身份后用新运行名；旧结果不重写。
 
 Qwen3.7-Flash／DashScope及DeepSeek默认关闭思考。`qwen3.5-flash`／`qwen3.7-plus`／`qwen3.8-flash` 的思考默认开启，由 `dscg/model_config.py` 的 `thinking_request_options` 显式发送 `extra_body.enable_thinking=false`（含同名日期快照）；其他组合请求字节不变，旧结果不迁移。generation的实际temperature取决于后端序列化，**不能把模型对象上的0等同于发送了0**；看诊断 `model_request` 中实际字段。SDK `max_retries=0`，原生generation仍可能自带重试，不承诺全链路单次传输。采样／思考不是本地模型TOML的任意扩展键。
 

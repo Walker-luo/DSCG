@@ -1,4 +1,4 @@
-"""Explicit risk metadata for tools crossing the DSCG execution boundary.
+"""Explicit risk metadata for tools crossing the GrantBind execution boundary.
 
 The registry is attached to a trusted ``FunctionsRuntime`` by the host.  Tool
 names and docstrings are never used to infer effects.  Missing metadata is

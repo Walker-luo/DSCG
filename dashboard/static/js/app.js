@@ -1,5 +1,5 @@
 /**
- * DSCG Dashboard - 前端应用逻辑
+ * GrantBind Dashboard - 前端应用逻辑
  * 实时日志 / 图表渲染 / 对比分析 / 报告生成
  */
 
@@ -148,6 +148,10 @@ function showConfigError(message) {
   $("#config-error").hidden = !message;
 }
 
+function formatFrameworkVersion(value) {
+  return String(value).replace(/^DSCG_/, "GrantBind ");
+}
+
 function escapeHtml(value) {
   return String(value ?? "").replace(/[&<>"']/g, char => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[char]));
 }
@@ -217,7 +221,7 @@ function updateRunPreview() {
   const toolView = sandbox && $('#planning-tool-view').checked;
   const delegated = sandbox && $('#delegated-tasks').checked;
   const benchmarkLabel = state.dashboardConfig?.benchmark_label || "基准未加载";
-  const frameworkVersion = state.dashboardConfig?.framework_version || document.body?.dataset.frameworkVersion || '版本未记录';
+  const frameworkVersion = formatFrameworkVersion(state.dashboardConfig?.framework_version || document.body?.dataset.frameworkVersion || '版本未记录');
   $("#use-input-isolation").disabled = isOrigin || !(sandbox || checker);
   $("#authorization-precheck").disabled = !sandbox;
   $("#sec-model-group").style.display = checker ? "block" : "none";
@@ -236,7 +240,7 @@ function updateRunPreview() {
     defenseLabel = [isolation && "L1", sandbox && "L2", checker && "L3"].filter(Boolean).join(" + ") || "关闭防御";
   }
   $("#layer-config-note").textContent = !(sandbox || checker)
-    ? "L2/L3 全关时 L1 随之关闭；该 DSCG 消融仍使用 Monitor，与原生 Baseline 的工具循环不同。"
+    ? "L2/L3 全关时 L1 随之关闭；该 GrantBind 消融仍使用 Monitor，与原生 Baseline 的工具循环不同。"
     : sandbox && !precheck ? "已关闭候选前置检查；工具授权仍由 Monitor 检查。重审 0 次，完成提示关闭。"
     : "Monitor 与一次性票据负责执行。L2 支持授权工具视图与显式任务来源展开；重审 0 次，完成提示关闭。";
   if (!isOrigin && $('#defense-preset').value === 'v2') {
@@ -250,12 +254,12 @@ function updateRunPreview() {
   $("#workspace-framework").textContent = isOrigin ? `${benchmarkLabel} 原生循环` : frameworkVersion;
   $("#workspace-mode").textContent = withAttack ? "对抗评测" : "良性效用评测";
   $("#framework-flow").textContent = isOrigin
-    ? `${benchmarkLabel} 原生规划与工具执行；DSCG 三层不参与运行。`
+    ? `${benchmarkLabel} 原生规划与工具执行；GrantBind 三层不参与运行。`
     : `${sandbox ? "任务授权 → " : ""}${toolView ? "已授权工具视图 → " : ""}主模型规划${isolation ? "（返回经 L1）" : ""} → ${precheck ? "L2 整批前置 → " : ""}${checker ? "L3 动作审计 → " : ""}Monitor / 票据执行`;
   $('#delegation-flow').hidden = !delegated;
   $('#preview-layer-l2 small').textContent = `${toolView ? '仅展示已授权工具' : '完整工具目录'}；${precheck ? '非法批次整体拒绝' : '执行前复核权限'}`;
   $('#workspace-audit-note').textContent = isOrigin
-    ? 'DSCG 控件不参与原生评测。'
+    ? 'GrantBind 控件不参与原生评测。'
     : checker ? '选择性路由默认 off，L3 仍启用；公开无外发读取沿用免审。'
     : '本配置关闭 L3；工具执行仍由 Monitor 与票据控制。';
 
@@ -668,7 +672,7 @@ async function loadOverview(runId) {
     const totalTokens = s => (s.overhead?.total_tokens || 0) + (s.sec_overhead?.total_tokens || 0);
     $("#overview-content").innerHTML = `
       <div class="result-heading"><div><h3>${escapeHtml(config.label || '运行结果')}</h3><p>${escapeHtml(config.benchmark?.id || '历史 / unknown')} · ${escapeHtml(runId)} · ${escapeHtml(run.completed_at ? new Date(run.completed_at).toLocaleString('zh-CN') : '未完成')}</p></div><span class="result-version">${escapeHtml(config.origin ? (config.benchmark?.id ? `${config.benchmark.id} 原生` : '历史原生循环') : framework?.framework_version || config.framework_version || '历史版本 · 未记录')}</span></div>
-      <div class="effective-config"><strong>本次实际配置</strong>${config.origin ? '<span>原生工具循环 · 无 DSCG 层</span>' :
+      <div class="effective-config"><strong>本次实际配置</strong>${config.origin ? '<span>原生工具循环 · 无 GrantBind 层</span>' :
         layerBadge('L1 返回隔离', layerFlag('input_isolation')) + layerBadge('L2 工具授权', layerFlag('use_sandbox')) +
         layerBadge('L2 前置检查', layerFlag('authorization_precheck')) +
         layerBadge('L2 工具视图', layerFlag('planning_tool_view')) +
@@ -1253,10 +1257,10 @@ async function loadReport() {
           <tr><td class="text-muted">测试套件</td><td>${escapeHtml((config.suites || []).join(", "))}</td></tr>
           <tr><td class="text-muted">攻击模式</td><td>${config.run_attack ? "启用" : "禁用"}</td></tr>
           <tr><td class="text-muted">攻击类型</td><td>${escapeHtml(config.run_attack === false ? "不适用" : config.attack_name || "未记录")}</td></tr>
-          <tr><td class="text-muted">框架</td><td>${config.origin ? "原始模型" : "DSCG"}</td></tr>
+          <tr><td class="text-muted">框架</td><td>${config.origin ? "原始模型" : "GrantBind"}</td></tr>
           ${config.defense ? `<tr><td class="text-muted">AgentDojo 防御</td><td>${escapeHtml(config.defense)}</td></tr>` : ""}
           ${!config.origin ? `
-            <tr><td class="text-muted">框架版本</td><td>${escapeHtml(config.framework_version || '未记录')}</td></tr>
+            <tr><td class="text-muted">框架版本</td><td>${escapeHtml(formatFrameworkVersion(config.framework_version || '未记录'))}</td></tr>
             ${[['input_isolation','L1 工具返回隔离'],['use_sandbox','L2 工具授权'],['authorization_precheck','L2 前置检查'],['planning_tool_view','L2 授权工具视图'],['delegated_tasks','显式任务来源展开'],['use_security_checker','L3 动作审计']].map(([key,label]) => `<tr><td class="text-muted">${label}</td><td>${typeof config[key] === 'boolean' ? config[key] ? '启用' : '关闭' : '未记录'}</td></tr>`).join('')}
           ` : ""}
         </table>

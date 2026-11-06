@@ -1645,7 +1645,7 @@ class OurFrameExecutor(agent_pipeline.BasePipelineElement):
             # Print a redacted summary even when the surrounding benchmark logger
             # is absent or an older AgentDojo version cannot persist custom fields.
             # print(
-            #     "[DSCG AUTHORIZATION] "
+            #     "[GrantBind AUTHORIZATION] "
             #     f"state={record.get('policy_state')} "
             #     f"contract={record.get('contract_version') or 'none'} "
             #     f"tools={record.get('allowed_tools', [])}"
@@ -2308,7 +2308,7 @@ class ReferenceMonitor(agent_pipeline.BasePipelineElement):
                                                     "POLICY_ALLOW" if approved_count==len(pending_actions) else "BATCH_DENY"))
             _sync_trace_context(extra_args)
         # print(
-        #     f"[DSCG MEDIATION] batch={batch_id} proposed={len(pending_actions)} "
+        #     f"[GrantBind MEDIATION] batch={batch_id} proposed={len(pending_actions)} "
         #     f"approved={approved_count} blocked={len(pending_actions) - approved_count}"
         # )
         return query, runtime, env, messages, extra_args
@@ -2439,7 +2439,7 @@ class TicketedToolsExecutor(agent_pipeline.BasePipelineElement):
 
 
 class TaskIsolatedPipeline(agent_pipeline.AgentPipeline):
-    """Create host-owned DSCG state once per outer task, retaining it in the loop.
+    """Create host-owned GrantBind state once per outer task, retaining it in the loop.
 
     Explicit caller dictionaries carry non-DSCG host options only. Reusing the
     returned dictionary is a new task, never an authorization resume operation.
@@ -2520,7 +2520,7 @@ class TaskIsolatedPipeline(agent_pipeline.AgentPipeline):
                     except Exception as exc:
                         context["dscg_trace_save_error"] = type(exc).__name__
                         if not task_failed: raise
-                        warnings.warn('DSCG diagnostic write failed during task failure: '+type(exc).__name__)
+                        warnings.warn('GrantBind diagnostic write failed during task failure: '+type(exc).__name__)
 
 
 class ActionSecurityChecker(agent_pipeline.BasePipelineElement):
@@ -3235,7 +3235,7 @@ def make_qwen_newFrame_pipeline(
     sec_model_config: ModelConfig | None = None,
 ):
     """
-    构建支持任意 OpenAI-compatible 模型的 DSCG 防御流水线。
+    构建支持任意 OpenAI-compatible 模型的 GrantBind 防御流水线。
 
     主模型与安全审计模型可以使用不同 provider。API key 和 base URL
     可直接传入，也可使用 ``DSCG_MAIN_*`` / ``DSCG_SEC_*`` 环境变量。

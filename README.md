@@ -1,10 +1,12 @@
-# DSCG
+# GrantBind
 
-DSCG 是工具使用型 LLM Agent 的间接提示词注入防御研究原型，支持 AgentDojo 与 AgentDyn，使用原生评分比较任务成功率（TSR）、攻击成功率（ASR）和模型开销。
+GrantBind 是工具使用型 LLM Agent 的间接提示词注入防御研究原型，支持 AgentDojo 与 AgentDyn，使用原生评分比较任务成功率（TSR）、攻击成功率（ASR）和模型开销。
+
+GrantBind 原名 DSCG。Python 导入路径 `dscg`、`DSCG_*` 配置变量，以及运行记录中的版本与诊断字段继续使用原标识，以兼容现有配置和历史结果。
 
 当前代码标识为 **DSCG_v3.7**，默认 **`prompt_profile=static-task-v354`**。v3.7 在 v3.6 之上只改两处**输入形态**，默认全部打开：①L2 工具编译输入紧凑化（`authorization_input=v3`，去掉可由参数 schema 推出的冗余字段，语义与覆盖不变）；②L3 审计证据补全（`audit_presentation=v3`，证据会截断时启用一次上限 32,768 字符的完整呈现，候选参数上限 8,192；超过仍截断、仍可 deny/abstain）。两者都写进 `run_manifest.json`，分别可用 `DSCG_AUTHORIZATION_INPUT=v2`／`DSCG_AUDIT_PRESENTATION=v2` 消融。`static-task-v361`（v3.6.1）经评估无净收益并已回退，保留为显式候选；`legacy` 为单次授权对照；运行名不选择策略。测试直接运行 benchmark 即可，不需要 `--prompt-profile` 或任何环境变量。见[v3.7 发版说明](workshop/completed/v37_release_20261103.md)、[框架更新](docs/framework_updates.md)。
 
-显式`static-task-v352`保留v3.5.3策略，`legacy`为单次授权对照。既有正式结果见[v3.5.4分析](analysis/v3-5-4.md)，本次入口与存储验证见[实施记录](workshop/completed/fliter_goal_20261030.md)。历史结果保留原版本名，不重标为v3.6。
+显式`static-task-v352`保留v3.5.3策略，`legacy`为单次授权对照。既有正式结果见[v3.7 分析](analysis/v3.7.md)，本次入口与存储验证见[实施记录](workshop/completed/fliter_goal_20261030.md)。历史结果保留原版本名，不重标为v3.6。
 
 ## 当前框架与工作流程
 

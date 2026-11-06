@@ -617,7 +617,7 @@ def _run_single_attack(
         attack = None if not run_attack or prepare_only else attacks.load_attack(attack_name, suite, pipeline)
         is_dos_attack = bool(run_attack and ATTACKS[attack_name].is_dos_attack)
 
-        # Share the same scope/IDs across baseline and DSCG; only partial is capped.
+        # Share the same scope/IDs across baseline and GrantBind; only partial is capped.
         selected_users, selected_injections = select_tasks(
             frozen_tasks, suite_name, user_task_ids, injection_task_ids, run_attack, is_dos_attack,
             task_scope=task_scope,
@@ -849,7 +849,7 @@ def cli(argv: list[str] | None = None, *, task_scope: str = 'partial', entrypoin
         raise ValueError('task scope must be partial or full')
     full = task_scope == 'full'
     parser = argparse.ArgumentParser(
-        description="运行 DSCG 的当前基准全量评测（所选场景全部用户/注入任务）。" if full else "运行 DSCG 的当前基准小批量回归评测，可指定场景。"
+        description="运行 GrantBind 的当前基准全量评测（所选场景全部用户/注入任务）。" if full else "运行 GrantBind 的当前基准小批量回归评测，可指定场景。"
     )
     parser.add_argument('--suites', nargs='+', metavar='SUITE', default=None,
                         help='选择当前环境支持的场景；默认全部场景，full保留所选场景全部任务。')
@@ -864,7 +864,7 @@ def cli(argv: list[str] | None = None, *, task_scope: str = 'partial', entrypoin
     parser.add_argument(
         "--baseline",
         action="store_true",
-        help="运行无防御原生基线；与默认 DSCG 使用相同任务范围和注入攻击。",
+        help="运行无防御原生基线；与默认 GrantBind 使用相同任务范围和注入攻击。",
     )
     parser.add_argument('--progress', action='store_true',
                         help='按攻击/场景显示进度条；分别计数原生GOAL预检与计分任务。')
@@ -886,7 +886,7 @@ def cli(argv: list[str] | None = None, *, task_scope: str = 'partial', entrypoin
         "--trace-level",
         choices=("summary", "standard", "full"),
         default=os.getenv("DSCG_TRACE_LEVEL", "summary"),
-        help="独立 DSCG 诊断文件详细度；默认 summary，任务 JSON 始终精简。",
+        help="独立 GrantBind 诊断文件详细度；默认 summary，任务 JSON 始终精简。",
     )
     parser.add_argument(
         "--include-extra-info",
@@ -918,9 +918,9 @@ def cli(argv: list[str] | None = None, *, task_scope: str = 'partial', entrypoin
                         help=f'默认{resolve_profile(None)}；baseline默认legacy；显式legacy保留单次授权对照')
     parser.add_argument('--l1-projection-mode', choices=('off','shadow','projected'), default='off',
                         help='L1有限交易投影，CLI默认off保留来源封装；shadow只观察，projected启用有限投影。')
-    # None selects the profile default below: DSCG shadow, baseline/NoChecker off.
+    # None selects the profile default below: GrantBind shadow, baseline/NoChecker off.
     parser.add_argument("--audit-router-mode", choices=("off", "shadow", "selective"), default=None,
-                        help="L3纯算法路由；DSCG CLI默认shadow，baseline/NoChecker默认off；可显式选择。")
+                        help="L3纯算法路由；GrantBind CLI默认shadow，baseline/NoChecker默认off；可显式选择。")
     parser.add_argument("--audit-router-artifact", help="已停用；请改用 --audit-router-threshold。")
     parser.add_argument("--audit-router-threshold", type=float, default=DEFAULT_THRESHOLD,
                         help="诊断阈值 [0,1]，默认0.70；read-purpose-v2按读取规则免审，不按分数阈值。")

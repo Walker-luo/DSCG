@@ -1,6 +1,6 @@
 # Workshop 工程索引
 
-当前代码为 **DSCG_v3.5.4 / static-task-v354**。本目录保存工程方案与阶段记录；运行方法和机制以[项目README](../README.md)、[当前框架](../docs/framework_updates.md)、[配置指南](../docs/model_tool_configuration.md)为准，进行中问题和验证状态见 [DV_STATE.md](../DV_STATE.md)。
+当前框架为 **GrantBind v3.7**（`static-task-v354`）。本目录保存工程方案与阶段记录；运行方法和机制以[项目README](../README.md)、[当前框架](../docs/framework_updates.md)、[配置指南](../docs/model_tool_configuration.md)为准，进行中问题和验证状态见 [DV_STATE.md](../DV_STATE.md)。
 
 ## 当前工作入口
 
