@@ -126,6 +126,7 @@ Use [README.md](README.md) for the framework, [model/tool configuration](docs/mo
 | `gb-nol2` | Qwen3.7-Flash workspace NoL2 rerun via `--no-sandbox` (finished 15:37) | 2026-11-06 | ended |
 | `gb-plus-cln` | Qwen3.7-Plus snapshot: clean arms (finished) | 2026-11-06 | ended, session closed |
 | `gb-ablate` | Qwen3.7-Flash workspace full + NoL3 ablation (finished) | 2026-11-06 | ended, session closed |
+| `gb-slack-abl` | Qwen3.7-Flash slack ablation: full then NoL3, new L1 marker | 2026-11-07 | active |
 
 ## Storage, reports and historical context
 
