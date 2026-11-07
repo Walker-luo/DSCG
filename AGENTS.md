@@ -127,7 +127,7 @@ Use [README.md](README.md) for the framework, [model/tool configuration](docs/mo
 | `gb-plus-cln` | Qwen3.7-Plus snapshot: clean arms (finished) | 2026-11-06 | ended, session closed |
 | `gb-ablate` | Qwen3.7-Flash workspace full + NoL3 ablation (finished) | 2026-11-06 | ended, session closed |
 | `gb-slack-abl` | Qwen3.7-Flash slack ablation: full then NoL3, new L1 marker (both arms finished 16:56) | 2026-11-07 | ended |
-| `gb-bank-abl` | Qwen3.7-Flash banking NoL3 ablation (full reference taken from the v3.6.3 run) | 2026-11-07 | active |
+| `gb-bank-abl` | Qwen3.7-Flash banking NoL3 ablation, 432 keys, finished 20:19 (full reference from the v3.6.3 run; no banking_full arm) | 2026-11-07 | ended |
 
 ## Storage, reports and historical context
 
