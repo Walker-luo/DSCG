@@ -24,9 +24,13 @@
       updateSelection();
     });
     document.querySelector("#history-run-list").addEventListener("change", updateSelection);
+    // Bind only the controls present in this page version: a cached template must not
+    // abort initialization and leave the run list empty.
     ["folder", "backend", "model", "attack"].forEach((key) => {
-      document.querySelector("#history-" + key + "-select").addEventListener("change", () => {
-        filters[key] = document.querySelector("#history-" + key + "-select").value;
+      const select = document.querySelector("#history-" + key + "-select");
+      if (!select) return;
+      select.addEventListener("change", () => {
+        filters[key] = select.value;
         refreshFilterResults(true);
       });
     });
@@ -119,7 +123,7 @@
       const title = document.createElement("strong");
       title.textContent = historyCharts.describeExperiment(run).label;
       const detail = document.createElement("small");
-      detail.textContent = model;
+      detail.textContent = model + (run && run.is_ablation ? " · 消融" : "");
       text.append(title, detail);
       label.append(checkbox, versionBadge(experimentStyles[run.id]), text);
       target.append(label);
@@ -178,7 +182,9 @@
       checkbox.checked = selected.has(run.id);
       const text = document.createElement("span");
       const title = document.createElement("strong");
-      title.textContent = historySelection.attackLabel(run.attack_name);
+      const runLabel = historyCharts.describeExperiment(run).label;
+      title.textContent = [run.is_ablation ? "消融" : "", runLabel,
+        historySelection.attackLabel(run.attack_name)].filter(Boolean).join(" · ");
       label.title = (run.label || "") + " · " + run.source;
       const detail = document.createElement("small");
       detail.textContent = (run.benchmark_id || "历史 / unknown") + " · " + (run.suites || []).map((item) => item.suite_name).join(", ");
@@ -373,7 +379,11 @@
     renderSummaryTable(experiments);
     renderOverview(experiments);
     if (!rows.length) {
-      showEmpty("没有可绘制的指标", "所选结果中没有与当前场景匹配的汇总数据。");
+      const picked = selectedRunIds().length;
+      const scenes = selectedSuiteNames().length;
+      showEmpty("没有可绘制的指标",
+        "已选 " + picked + " 项结果、" + scenes + " 个场景，但没有匹配的汇总数据；" +
+        "请确认这些结果包含当前勾选的场景（消融臂通常只有 workspace）。");
       return;
     }
     const { view, metrics, suites } = settings;
@@ -631,7 +641,10 @@
         article.append(name);
         if (!card.rows.length) {
           const empty = document.createElement("p");
-          empty.textContent = "所选场景无数据";
+          const known = (catalog.find(item => item.id === card.run.id)?.suites || []).map(item => item.suite_name);
+          empty.textContent = known.length
+            ? "所选场景无数据（该结果覆盖：" + known.join("、") + "）"
+            : "所选场景无数据";
           article.append(empty);
         } else {
           const table = document.createElement("table");

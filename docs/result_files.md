@@ -1,6 +1,6 @@
 # 结果文件与诊断
 
-适用于当前工作区，后续随v3.6保存；当前代码版本仍为v3.5.4，布局为`flat-v1`。运行名可用v36，但实际`defense_version`／profile以文件记录为准。历史结果保留各自配置和标签，不重标。CLI默认目录：
+适用于 **GrantBind v3.7**，默认 `static-task-v354 / DSCG_v3.7`，布局为 `flat-v1`。以 run_manifest.json 的实际配置判断运行身份，运行名只命名实验。CLI 默认目录如下。
 
 ```text
 results/{benchmarks,partial_benchmark}/<backend>/<model>/<name>/
@@ -17,6 +17,19 @@ results/{benchmarks,partial_benchmark}/<backend>/<model>/<name>/
     <user>/<injection>.dscg.jsonl
     <user>/<injection>.dscg.responses.jsonl
 ```
+
+消融臂完成并归档后放在固定归档位置，Dashboard 历史页把其中的`ablation`目录当作模型字段读取（`model`／`model_suffix`为`ablation`，臂名是运行名），并额外记录`is_ablation`／`ablation_arm`供专项分析：
+
+```text
+results/<folder>/<backend>/ablation/<arm>/
+  run_manifest.json
+  summary.json / summary.md
+  <attack>/<suite>/
+    summary.json / detailed_results.csv
+    <user>/<injection>.json
+```
+
+正式 workshop 测量指定 `--results-dir results/workshop`，路径为 `results/workshop/<backend>/<model>/<name>/`。agent 临时验证输出到新的 workshop/artifacts 任务目录。
 
 clean使用 `none/<suite>/<user>/none.json`。GOAL原生JSON也保留同名诊断sidecar；结果逐目标写入根summary.json的selection_report.goal_checks，续跑不重试已开始目标。筛选与GOAL排除不算任务缺失、失败或已计分样本。
 
@@ -52,19 +65,19 @@ trace = load_task_trace('/absolute/path/to/task.json')
 
 读取器在内存合并侧车，不写回原文件。跨分支历史intent／progress字段可读，**当前默认没有host意图进度FSM**。
 
-## 如何确认使用了两阶段L2
+## 如何确认使用了两阶段 L2
 
-历史正式v3.5.2为legacy：单次`authorization`。v3.5.3为static-task-v352，v3.5.4默认static-task-v354（视图协议v2）；均通常先记 `authorization_intents`，再记 `authorization_tools`，授权记录含static_task_view／protocol；规划与审计共享辅助视图。
+v3.7 默认通常先记录 `authorization_intents`，再记录 `authorization_tools`；授权记录包含 static_task_view／protocol，规划器和 L3 共享辅助任务视图。纯读目录和受限 host 路径可能有例外，缺诊断不能当作零调用。
 
-legacy的profile绑定可能为空，须联合版本、配置及实际调用核对；不要从目录名判断。纯读零调用或受限host路径可有例外，缺失诊断也不能当作零调用。
+核对根 manifest 的 defense_version、prompt_profile 绑定、authorization_input 和 audit_presentation，不能从目录名判断策略。当前默认后两项均为 v3。
 
-L2记录中tool_permissions／allowed_tools表示冻结工具权限；static_task_view的原文位置仅证明字面匹配，不证明语义完整或执行完成。历史authorization_steps及intent-evidence-v35的assessment按原协议解释，不能当作当前完成证据。
+L2 的 tool_permissions／allowed_tools 表示冻结工具权限；static_task_view 的原文位置证明字面匹配。具体条件、调用参数和任务完成情况仍需核对原生消息与 ledger，机制见 [架构说明](architecture.md)。
 
 ## 审计与请求诊断
 
 默认L3为 `dscg.audit-decision.v2`，四字段decision／violations／confidence／reason_code。协议、记录校验和回执交接失败分开统计；不能只凭AUDIT_SCHEMA_INVALID断定模型JSON格式失败。
 
-v3.5.2补充实际审计输入摘要／历史引用及 `model_request` 的实际采样字段；模型对象temperature=0不代表请求发送了0。公开模型配置记录sdk_max_retries=0，但原生generation可自带重试。
+`audit_request` 记录实际审计输入摘要／历史引用，`model_request` 记录实际请求字段。模型对象 temperature=0 不代表请求发送了 0。公开配置记录 sdk_max_retries=0，原生 generation 仍可能内部重试。
 
 L2_BLOCKED／L3_BLOCKED／MONITOR_BLOCKED区分来源，旧DSCG_BLOCKED继续可读。来源含注入、模型解释或一次allow都不是独立安全／完成证明；最终文本没有单独动作审计。
 
@@ -72,13 +85,13 @@ L2_BLOCKED／L3_BLOCKED／MONITOR_BLOCKED区分来源，旧DSCG_BLOCKED继续可
 
 当前sink-free-read-v4在三模式均固定免审授权、参数有效的无sink public/internal读取；其他调用继续审计。off不关闭L3，shadow也不是全量审计，阈值不改变免审。
 
-报告按实际策略／配置分组，区分固定免审、实际审计、Monitor决定、协议失败和未知覆盖。历史threshold-read-v1、read-purpose-v2、独立校准记录保留原含义，不重解释成当前规则。
+报告按实际策略／配置分组，区分固定免审、实际模型审计、Monitor 决定、协议失败和未知覆盖。audit_decision_final 也可能是固定免审的宿主判决，不能把判决条数直接当作 L3 模型调用次数，应同时核对 model_request 与成本记账。
 
 would_bypass／actual_bypass及审计分歧不是安全标签；已知候选审计Token只是相应范围小计，没有反事实就不报告实际节省。缺轨迹／usage为unknown，不能从零计数推断零成本。只统计声明计分任务，不混入GOAL、reuse快照或其他运行。
 
 ## 成本与评分
 
-TSR／ASR以原生标签的有效分母计算，错误／缺失／unsupported另列，clean ASR不适用。分别核对main（含L2）、security、计分与GOAL、invocation与缓存／整轮成本；不能重复累加路由Token或将未知usage补零。cost_comparison_ready=false时不算节省比例。
+TSR／ASR 以原生标签的有效分母计算，错误／缺失／unsupported 另列，clean ASR 不适用。总 Token 优先读取根 summary.json 的 cost_summary.scored.known_total_tokens 并同时报告 unknown_usage_records；不能仅用 overhead 的主模型用量代替总量。分别核对 main（含 L2）、security、计分与 GOAL、本次调用与缓存／整轮成本，避免重复累加。cost_comparison_ready=false 时不算节省比例。
 
 API／超时／输入和内部错误按基础设施错误处理；共享读取器合并当前attempt后，若已记账`failed_calls>0`，派生效用／安全标签为null，保留原生等级、实际效果与未知usage；旧attempt不污染新attempt。旧持久汇总不自动回写，未记账的失败无法推断。新投影策略绑定reuse身份，须使用新名称。协议阻断也不能仅凭“框架失败”删出TSR；保留原评分及实际效果。
 

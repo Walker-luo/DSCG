@@ -562,3 +562,36 @@ class DashboardHistoryTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+    def test_archived_ablation_arms_are_first_class_history_runs(self):
+        root = self.results_root / "workshop/agentdojo/ablation"
+        for arm, attack in (("workspace_full", "ignore_previous"),
+                            ("workspace_noL2", "important_instructions")):
+            data = summary("workspace", 0.5, 0.25, 0.75)
+            data.update(model_id="qwen3.7-flash", task_selection={"attack": attack})
+            write_json(root / arm / attack / "workspace/summary.json", data)
+        normal = summary("workspace", 0.6, 0.1, 0.9)
+        normal.update(model_id="qwen3.7-flash", task_selection={"attack": "ignore_previous"})
+        write_json(self.results_root / "workshop/agentdojo/qwen3.7-flash/baseline/ignore_previous/workspace/summary.json", normal)
+        with patch("dashboard.app.RESULTS_DIR", self.results_root):
+            catalog = self.client.get("/api/history/catalog").get_json()
+        ablations = [item for item in catalog if item["source"].startswith("workshop/agentdojo/ablation/")]
+        self.assertEqual(len(ablations), 2)
+        for item in ablations:
+            self.assertTrue(item["is_ablation"])
+            # "ablation" is a model-slot value, not a grouping folder on top of a model.
+            self.assertEqual(item["model"], "ablation")
+            self.assertEqual(item["model_group"], "agentdojo/ablation")
+            self.assertEqual(item["run_name"], item["ablation_arm"])
+            self.assertEqual(item["model_suffix"], "ablation")
+            self.assertEqual(item["run_key"], "agentdojo/ablation/" + item["ablation_arm"])
+        self.assertEqual({item["ablation_arm"] for item in ablations}, {"workspace_full", "workspace_noL2"})
+        normal_item = next(item for item in catalog if item["source"].startswith("workshop/agentdojo/qwen3.7-flash/"))
+        self.assertFalse(normal_item["is_ablation"])
+        self.assertEqual(normal_item["ablation_arm"], "")
+        self.assertEqual(normal_item["model_group"], "agentdojo/qwen3.7-flash")
+        with patch("dashboard.app.RESULTS_DIR", self.results_root):
+            result = self.client.post("/api/history/analyze",
+                                      json={"run_ids": [ablations[0]["id"], normal_item["id"]]}).get_json()
+        self.assertIn("experiments", result)
+        self.assertEqual({item["is_ablation"] for item in result["experiments"]}, {True, False})

@@ -322,6 +322,14 @@
         return context.dataset.label + "：" + (value === null ? "无数据" : value + (context.dataset.metricKey === "total_tokens" ? " K tokens" : "%"));
       },
     };
+    // One scene places every run in its own category, so a single category holds one real
+    // value and empty cells for the other runs. Index-mode tooltips would then list those
+    // empty cells as "无数据"; keep only real values and hover the nearest bar.
+    chartOptions.plugins.tooltip.filter = (item) => item.raw !== null && item.raw !== undefined;
+    if (!byScenario && view !== "radar") {
+      chartOptions.plugins.tooltip.mode = "nearest";
+      chartOptions.plugins.tooltip.intersect = true;
+    }
     if (view === "radar") {
       chartOptions.scales = {
         r: {
@@ -335,7 +343,7 @@
         },
       };
     } else {
-      chartOptions.interaction = { mode: "index", intersect: false };
+      chartOptions.interaction = byScenario ? { mode: "index", intersect: false } : { mode: "nearest", intersect: true };
       chartOptions.datasets = { bar: { categoryPercentage: 0.66, barPercentage: 0.58, maxBarThickness: 24 } };
       chartOptions.scales = {
         x: { offset: true, ticks: { color: theme.text, maxRotation: 0, autoSkip: false }, grid: { display: false } },

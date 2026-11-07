@@ -301,3 +301,19 @@ test('AgentDyn and recorded future suites are charted without a static suite lis
   assert.deepEqual(new Set(chart.data.labels), new Set(['shopping', 'github', 'recorded_future']));
   assert.equal(chart.data.datasets[0].data.length, 3);
 });
+
+test('single-scene bars no longer list empty matrix cells as 无数据', () => {
+  const runs = experiments.slice(0, 3).map((run, index) => ({...run, id: 'matrix-' + index, attack_name: 'ignore_previous'}));
+  const config = charts.metricConfigs(runs, {...selection, view: 'bar', suite: 'workspace'})[0].config;
+  const tooltip = config.options.plugins.tooltip;
+  assert.equal(tooltip.mode, 'nearest');
+  assert.equal(tooltip.intersect, true);
+  assert.equal(tooltip.filter({raw: null}), false);
+  assert.equal(tooltip.filter({raw: undefined}), false);
+  assert.equal(tooltip.filter({raw: 12}), true);
+  assert.equal(config.options.interaction.mode, 'nearest');
+  const all = charts.metricConfigs(runs, {...selection, view: 'bar', suite: 'all'})[0].config;
+  assert.equal(all.options.plugins.tooltip.mode, undefined);
+  assert.equal(all.options.interaction.mode, 'index');
+  assert.equal(all.options.plugins.tooltip.filter({raw: null}), false);
+});

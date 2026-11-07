@@ -857,12 +857,24 @@ def _history_group_metadata(entry: dict) -> dict:
     # Layouts: <folder>/<backend>/<model>/<name>, <folder>/<backend>/<model>_<name>,
     # and the oldest <folder>/<model>_<backend>_<name>. The model dimension must not drift
     # to the run name, so a recorded model_id always wins and nesting is explicit.
-    nested = len(model_parts) == 3
+    # Archived ablation arms live at <folder>/<backend>/ablation/<arm>/...; "ablation" is a
+    # grouping folder, never a model, so the arm name becomes the suffix and run name.
+    is_ablation = len(model_parts) >= 3 and model_parts[1] == "ablation"
+    nested = len(model_parts) == 3 and not is_ablation
     recorded_model = str(entry.get("model_id") or "").strip()
-    path_model = model_parts[1] if nested else (model_parts[-1] if model_parts else parts[0])
-    model = recorded_model or path_model
-    group = "/".join(model_parts[:2]) if nested else "/".join(model_parts) or parts[0]
-    run_name = model_parts[2] if nested else ""
+    if is_ablation:
+        # "ablation" occupies the model slot like a model name; the arm is the run name.
+        # Ablation-specific reading is a separate concern and is not folded into model_id.
+        arm = "/".join(model_parts[2:])
+        group = model_parts[0] + "/ablation"
+        model = path_model = "ablation"
+        run_name = arm
+    else:
+        arm = ""
+        path_model = model_parts[1] if nested else (model_parts[-1] if model_parts else parts[0])
+        model = recorded_model or path_model
+        group = "/".join(model_parts[:2]) if nested else "/".join(model_parts) or parts[0]
+        run_name = model_parts[2] if nested else ""
     return {
         "result_folder": parts[0],
         "model": model,
@@ -870,6 +882,8 @@ def _history_group_metadata(entry: dict) -> dict:
         "run_key": group + "/" + run_name if run_name else group,
         "model_suffix": path_model,
         "run_name": run_name,
+        "is_ablation": is_ablation,
+        "ablation_arm": arm,
         "attack_name": attack_name,
         "attack_names": sorted(attacks),
         "attack_kind": next(iter(kinds)) if len(kinds) == 1 else "unknown",
@@ -1247,6 +1261,7 @@ def _build_history_analysis(payload):
             "benchmark_id": entry["benchmark_id"],
             **{key: entry[key] for key in (
                 "result_folder", "model", "model_group", "run_key", "model_suffix", "run_name",
+                "is_ablation", "ablation_arm",
                 "attack_name", "attack_names", "attack_kind",
             )},
             "updated_at": entry["updated_at"],

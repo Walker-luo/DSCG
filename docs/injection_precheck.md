@@ -1,10 +1,8 @@
-# 注入目标排除与GOAL检查
+# v3.7 注入目标筛选与 GOAL 检查
 
-本说明覆盖后续v3.6归档基线的筛选行为；当前代码标识仍为v3.5.4。测量入口使用`--fliter PATH`，拼写固定为`fliter`；默认不检查GOAL，按需加`--goal`。旧`--cohort`和旧benchmark转发子命令已拒绝，历史名单与结果保留读取兼容，不迁移、不重新解释原判定。
+测量入口使用 `--fliter PATH`，拼写固定为 fliter。默认按名单筛选而不检查 GOAL；需要当前测量框架预检时显式添加 `--goal`。
 
 ## 最小排除文件
-
-文件只绑定后端和排除ID，不携带模型、证据路径、旧筛选配置或成功名单：
 
 ```json
 {
@@ -20,37 +18,42 @@
 }
 ```
 
-AgentDyn须使用实际后端id与固定revision；用`python -m dscg.benchmark_catalog`离线核对。未知后端／场景／ID、重复键／ID及额外字段在模型调用前拒绝。未列场景不排除；不验证或认证旧筛选证据。排除保留原注册顺序，partial只从原前3目标删除，不补位。
+文件仅保存后端身份和排除 ID。名单读取一次，未知后端／场景／ID、重复键或 ID、额外字段在调用前拒绝。未列场景不排除，原输入文件不修改；partial 从原前 3 目标中删除，不补位。
 
-```bash
-python -m experiments.run_partial_benchmark --suites banking slack \
-  --fliter /absolute/path/to/fliter.json --name filtered_partial_01
-```
+消费名单只核对后端及目标绑定，不重读筛选证据或重新认证原判定。旧 `--cohort`／cohort.json 输入已拒绝，已有结果的读取兼容保留。
 
-## 测量时可选GOAL
+## 独立生成名单
 
-```bash
-python -m experiments.run_partial_benchmark --suites banking slack \
-  --fliter /absolute/path/to/fliter.json --goal --name goal_partial_01
-```
-
-先应用fliter，再给每个剩余目标执行一次直接GOAL，使用**当前测量pipeline**：baseline是原生无防御，GrantBind使用当前防御配置。每目标一条完整轨迹，可含多次模型请求；结果跨攻击共享。通过才进入计分，失败排除，错误／中断分开记录；不重试已开始目标。
-
-GOAL是直接目标可完成性检查，不是间接注入攻击或正常用户clean任务，不进入TSR／ASR分母。不同pipeline可能保留不同集合；比较须报告实际范围与共同任务键，不能把排除当作防御成功。
-
-轨迹在`goal/<suite>/<injection>.json`；根`summary.json`的`selection_report.goal_checks`持久保存开始／结束状态和成本。根`summary.md`只给出一条筛选总述及加粗排除行，GOAL失败与错误分别列出。`--reuse`保持原fliter／goal和全部有效配置，已开始GOAL不补跑；未知usage保留未知。
-
-## 独立预检生成排除表
-
-`screen`仍使用当前后端原生无防御循环，将每个注入目标GOAL直接作为请求执行。以下命令会调用真实模型：
+screen 使用原生无防御循环，把每个注入目标的 GOAL 直接作为请求。先配置同一 main 模型，再运行以下真实在线命令。
 
 ```bash
 python -m experiments.run_injection_precheck screen \
-  --model-config config/models.local.toml --name injection_screen_01
+  --model-config config/models.local.toml \
+  --results-dir results/workshop --name v37_screen_doc01
 ```
 
-默认覆盖当前后端全部注入目标，可用`--suites`选择子集。**仅依据第一次完整轨迹：通过保留，未通过直接剔除，不等第二次失败，也不做补测。**每GOAL只跑一次完整轨迹；失败、错误／中断目标进入`fliter.json`，错误另外报告且退出1，不以基础设施错误证明目标不可完成。成功保留；已完成／已开始尝试不重试。输出位于`results/injection_precheck/<backend>/<model>_<name>/`，新运行只用根`run_manifest.json`保存筛选配置（schema为`dscg.fliter-screen.v1`），根`summary.json`保存计数与`selection_report.goal_checks`，并生成`fliter.json`和`summary.md`；GOAL原生轨迹在`goal/<suite>/<injection>.json`。每目标状态为`passed`／`failed`／`error`，成本为`{"models": [api_accounting]}`或未知`null`，不在汇总重复完整模型配置。`attempts/`仅保存开始／结束、绑定摘要、证据引用与记账，供中断恢复，不复制轨迹。
+默认覆盖全部后端注入目标，`--suites` 可选子集。每个 GOAL 只运行一条完整轨迹，可以包含多次模型请求。首次成功保留，失败直接排除；错误／中断同样从计分集合中跳过，但单列状态，不能用来证明目标不可完成。有错误退出 1，续跑只处理尚未开始目标，不补测已开始或完成目标。
 
-同配置／name／输出根续跑仅处理尚未开始目标；全新筛选使用新名称。历史已冻结名单及证据保留原字节／规则；含旧`screen_manifest.json`／`status.json`的目录拒绝写入续跑，不自动迁移。`--reuse-from /absolute/path/to/source_run`只读复用兼容的旧原生baseline证据或新`goal/`证据；来源可为旧筛选配置或新的单一根配置，但测量GOAL须确认为相同模型配置的原生无防御baseline。GrantBind或其他防御测量的GOAL不能作为独立baseline筛选证据。独立无防御screen与测量当前pipeline GOAL是不同范围，成本分开记账。
+输出位于 `<results-dir>/<backend>/<model>/<name>/`，包含根 run_manifest.json、summary.json／summary.md、fliter.json、goal/<suite>/<injection>.json。summary 的 goal_checks 保存判定、轨迹引用和成本；attempts/ 保存一次执行及恢复所需状态。
 
-完整测量、partial及结果字段分别见[完整指南](benchmark.md)、[partial指南](partial_benchmark.md)和[结果文件](result_files.md)。agent临时检查显式使用新的`--results-dir workshop/artifacts/<YYYYMMDD>_<task>/injection_precheck`。
+baseline 与防御攻击测试使用同一份冻结名单，仅添加 `--fliter` 即可，详见 [完整测试](benchmark.md)。不同模型分别生成名单，并报告实际任务集合。
+
+## 测量时可选 GOAL
+
+```bash
+python -m experiments.run_partial_benchmark --suites banking slack \
+  --fliter /absolute/path/to/fliter.json --goal \
+  --results-dir results/workshop --name v3.7_goal_doc01
+```
+
+先按名单排除，再用当前测量 pipeline 对剩余目标各执行一条 GOAL 轨迹。baseline 为原生无防御，v3.7 为当前防御配置，所有攻击共享判定。只有成功目标进入计分；失败排除，错误跳过且非零退出，中断保存进度，已开始目标不重试。
+
+GOAL 轨迹存于 goal/<suite>/<injection>.json，根 summary.json 的 selection_report.goal_checks 用于恢复。GOAL 新排除项不合并进输入 fliter.json。GOAL 成本单列并进入总报告，不进入 TSR／ASR；全部排除时计分指标为 N/A。
+
+不同框架参与 GOAL 筛选可能产生不同测试集合，比较须使用共同任务键。clean／DoS 不接受 fliter 和 goal。筛选本身不能计作防御成功。
+
+## 续跑与证据复用
+
+相同 name、输出根和配置的续跑仅处理未开始目标。`--reuse-from /absolute/path/to/source_run` 可只读复用兼容的原生无防御证据；配置和证据须通过 screen 的校验，防御 GOAL 不能作为 baseline screen 证据。
+
+新运行仅生成单一根 manifest 和汇总。旧筛选目录保留原格式，拒绝写入迁移式续跑。成本、错误和恢复细节见 [结果文件](result_files.md)。

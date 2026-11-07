@@ -1,94 +1,58 @@
-# GrantBind
+# GrantBind v3.7
 
-GrantBind 是工具使用型 LLM Agent 的间接提示词注入防御研究原型，支持 AgentDojo 与 AgentDyn，使用原生评分比较任务成功率（TSR）、攻击成功率（ASR）和模型开销。
+GrantBind 用于防御工具调用智能体遇到的间接提示注入。L1 隔离规划输入，L2 从可信任务编译工具权限，L3 审计实际调用，Monitor 在执行前统一检查授权和审计结果。
 
-GrantBind 原名 DSCG。Python 导入路径 `dscg`、`DSCG_*` 配置变量，以及运行记录中的版本与诊断字段继续使用原标识，以兼容现有配置和历史结果。
-
-当前代码标识为 **DSCG_v3.7**，默认 **`prompt_profile=static-task-v354`**。v3.7 在 v3.6 之上只改两处**输入形态**，默认全部打开：①L2 工具编译输入紧凑化（`authorization_input=v3`，去掉可由参数 schema 推出的冗余字段，语义与覆盖不变）；②L3 审计证据补全（`audit_presentation=v3`，证据会截断时启用一次上限 32,768 字符的完整呈现，候选参数上限 8,192；超过仍截断、仍可 deny/abstain）。两者都写进 `run_manifest.json`，分别可用 `DSCG_AUTHORIZATION_INPUT=v2`／`DSCG_AUDIT_PRESENTATION=v2` 消融。`static-task-v361`（v3.6.1）经评估无净收益并已回退，保留为显式候选；`legacy` 为单次授权对照；运行名不选择策略。测试直接运行 benchmark 即可，不需要 `--prompt-profile` 或任何环境变量。见[v3.7 发版说明](workshop/completed/v37_release_20261103.md)、[框架更新](docs/framework_updates.md)。
-
-显式`static-task-v352`保留v3.5.3策略，`legacy`为单次授权对照。既有正式结果见[v3.7 分析](analysis/v3.7.md)，本次入口与存储验证见[实施记录](workshop/completed/fliter_goal_20261030.md)。历史结果保留原版本名，不重标为v3.6。
+默认策略为 `static-task-v354`，运行版本记录为 `DSCG_v3.7`。`dscg` 导入路径、`DSCG_*` 环境变量和诊断字段沿用现有标识。正常测试直接运行 benchmark，无需额外选择 profile。
 
 ## 当前框架与工作流程
 
-| 部分 | 当前行为 | 模型调用 |
+| 组件 | 处理内容 | 输出与调用开销 |
 | --- | --- | --- |
-| L1 | 从原始历史重建规划视图；有限银行月支出任务保留全部交易的六个结构字段，其余使用来源封装。原始返回保留供审计和日志读取。 | 无独立调用 |
-| L2 | 根据完整可信任务与原生工具定义编译、冻结工具授权；默认先提取静态任务视图，再返回全局动作工具布尔表并合并自动读取权限。只展示已授权工具，候选整批复核。 | 普通动作任务通常2次；显式legacy通常1次 |
-| L3 | 对当前实际工具参数与任务约束、有限成功证据进行审计；外发同时检查正文和目的地，返回严格四字段判决。 | 非免审批次通常1次 |
-| Monitor | 执行前复核整批候选、授权、审计回执和一次性票据，保持原生调用顺序。 | 无独立调用 |
+| L1 输入隔离 | 每轮从原始历史复制规划视图，标记工具返回为不可信数据并转义边界标记 | 仅改变主模型看到的内容，无独立模型调用 |
+| L2 任务授权 | 完整可信请求 → 静态任务视图 → 全局动作工具权限，合并已注册读取工具 | 冻结授权和目录，向主模型展示已授权工具；普通动作任务通常两次 main 调用 |
+| L3 动作审计 | 核对当前工具参数、原生 schema／效果、完整可信请求及相关原始返回 | 严格四字段判决；非免审批次通常一次 security 调用 |
+| Monitor 执行监控 | 复核整批候选、目录、任务、授权、审计记录及一次性执行票据 | 按原生顺序执行或阻断，无独立模型调用 |
 
-L2 与 L3 的**模型输入**由两个可消融形态控制（v3.7 默认均开启）：L2 用紧凑 JSON 且不带可由 `parameters` 推出的字段名列表；L3 在证据原本会被截断时，按同一预算规则完整呈现相关返回与候选正文（上限 32,768／8,192 字符），超过上限仍标截断。两者都不改变工具集合、权限校验、执行 schema、评分或原生调用顺序。
+层间共享由宿主代码完成。L2 的静态任务视图供主模型和 L3 参考，冻结授权供前置检查与 Monitor 使用。工具原始返回分别进入 L1 规划视图和 L3 证据选择器；L3 使用原始历史，不使用 L1 投影后的正文。阻断经工具错误反馈给主模型，普通工具内容不能新增任务或权限。
 
-```mermaid
-flowchart LR
-    U[可信任务] --> C[L2编译授权]
-    C --> M[主模型规划]
-    M --> P[L2整批检查]
-    P --> A[固定读取免审或L3审计]
-    A --> V[Monitor与一次性票据]
-    V --> E[工具执行]
-    E --> L[L1规划视图]
-    L --> M
-    M --> F[最终回答]
-```
+详细机制、数据流和边界见 [v3.7 架构说明](docs/architecture.md)。
 
-`sink-free-read-v4`：已注册、已授权、参数有效的 `effect=read`、`sensitivity=public/internal`、**`sink=none`** 调用固定免审，在off/shadow/selective中一致。`get_webpage`等外部接收方读取、personal/secret读取及效果动作仍审计；混合批次只审计非免审部分，整批执行检查保留。有效deny／abstain不会被私人读取例外覆盖。
+## 默认配置
 
-CLI默认router shadow，API/factory默认off；**off仍运行L3**。关闭整个L3使用NoChecker对照。阈值只作诊断，旧artifact已停用。
-
-### 默认与可选两阶段L2
-
-| `prompt_profile` | L2路径 | 使用状态 |
-| --- | --- | --- |
-| `legacy` | 完整任务 → 一次全局工具授权 | 显式单次授权对照 |
-| `static-task-v354` | 完整任务 → 片段ID视图 → 全局工具授权 | 当前默认；宿主映射原文位置，条件使用互斥分支 |
-| `static-task-v352` | 完整任务 → 逐字引用视图 → 全局工具授权 | v3.5.3策略对照 |
-
-静态视图是可能出错的辅助摘要，原始请求仍为依据；它不验证条件、参数或完成状态，不增加动态授权或自动恢复。2026-10-26正式v3.5.2结果使用默认legacy，**没有测试该两阶段候选**。历史profile见[候选与诊断](docs/qwen_utility.md)。
-
-### L1 优化：任务限定的结构化投影
-
-`banking-monthly-spending-v1`只覆盖明确原生银行月支出请求及兼容交易返回：保留全部记录、顺序和id/sender/recipient/amount/date/recurring六字段，省略subject。解析失败、歧义或不适用时回退来源封装；没有为AgentDyn新增投影。来源标记与结构字段都不认证事实。
+- L1 输入隔离开启。CLI 的 `l1_projection_mode=off` 仍做来源封装；factory/API 默认 `projected`。结构化投影仅覆盖匹配的银行月支出任务，保留全部交易和六个结构字段。
+- L2 默认两阶段，`authorization_input=v3` 使用紧凑工具目录。自动授权读取与 L3 免审是两个判定，私人读取仍需审计。
+- L3 默认 `audit_presentation=v3`。相关返回的共享字符预算通常为 8192，需要时在同一次审计输入内扩至 32768，候选参数文本上限 8192；超限仍明确截断。
+- 已注册、已授权、schema 有效的 `read + public/internal + sink=none` 调用固定免审。其他动作继续交给 L3。CLI router 默认 `shadow`，factory/API 默认 `off`，两者均保留此规则，`off` 仍运行 L3。
+- 两种输入形态及其他有效配置进入 `run_manifest.json` 和缓存身份。普通运行保持 `audit_retries=0`、`completion_prompt=false`。
 
 ## 安装与配置
 
-首次创建所需环境，已有环境和本地配置保留：
+在项目根执行。已有环境和本地配置按原配置使用。
 
 ```bash
-conda env create -f environment.yml             # AgentDojo / ipi
-conda env create -f environment-agentdyn.yml    # AgentDyn / ipi-agentdyn
-conda activate ipi                             # 或 ipi-agentdyn
-python -m dscg.benchmark_catalog                # 离线检查，无模型调用
+conda env create -f environment.yml
+conda activate ipi
+python -m dscg.benchmark_catalog
 ```
 
-| 环境 | 实际后端 | 场景 |
-| --- | --- | --- |
-| `ipi` | AgentDojo 0.1.35 / v1.2 | workspace、travel、banking、slack |
-| `ipi-agentdyn` | AgentDyn v1.2，固定revision | shopping、github、dailylife |
+工作站 AgentDojo 环境为 `ipi`，测试服务器环境为 `DSCG`。服务器非交互终端使用 `~/miniconda3/bin/conda run -n DSCG ...`。当前评测使用 AgentDojo 0.1.35 / v1.2，包含 workspace、travel、banking、slack；后端身份由实际安装读取。
 
-后端按实际导入路径、安装来源、版本和revision识别；当前为metadata-only，不认证源码／服务等价性。无需额外后端参数。
-
-在线测试统一使用`qwen3.7-flash`，覆盖主模型、授权、审计与GOAL；主／审计配置分别读取。首次参考[模型模板](config/models.example.toml)，配置及Key留在本地文件／环境变量；工具风险目录按后端自动选择。详见[配置指南](docs/model_tool_configuration.md)。
+首次配置参考 [模型模板](config/models.example.toml)。`main` 负责规划、L2 和最终回答，`security` 负责 L3。日常在线验证统一使用真实 `qwen3.7-flash`，其他模型需当轮明确授权。连接地址、Key、工具风险目录和请求设置见 [配置指南](docs/model_tool_configuration.md)。
 
 ## 运行测试
 
-以下命令会调用真实模型，从项目根执行，使用未用过的新名称：
+以下命令会调用真实模型。先选择未使用的运行名，再运行匹配的 baseline clean 与 v3.7 clean。
 
 ```bash
-# 同范围的原生baseline与当前策略；v36仅为预定归档版本的运行名
-python -m experiments.run_partial_benchmark --baseline --name baseline_partial_01 --progress
-python -m experiments.run_partial_benchmark --name v36_static_partial_01 --progress
-
-# 显式选择单次授权对照；AgentDojo示例
-python -m experiments.run_partial_benchmark --suites banking slack \
-  --prompt-profile legacy --name v36_legacy_partial_01 --progress
+python -m experiments.run_partial_benchmark --baseline --clean \
+  --results-dir results/workshop --name baseline_doc01_clean --progress
+python -m experiments.run_partial_benchmark --clean \
+  --results-dir results/workshop --name v3.7_doc01_clean --progress
 ```
 
-partial是每场景注册前3用户×前3注入目标，不能覆盖全部问题任务。正式完整范围用 `experiments.run_benchmark`；无攻击加 `--clean`；排除注入目标加 `--fliter PATH`，需要按当前测量pipeline检查目标时加 `--goal`（默认关闭）。具体范围、攻击与续跑见[全量指南](docs/benchmark.md)、[partial指南](docs/partial_benchmark.md)和[预检指南](docs/injection_precheck.md)。
+partial 固定每场景注册前 3 用户 × 前 3 注入目标，clean 只取用户前缀。完整所选场景使用 `experiments.run_benchmark`。攻击测试先用独立 `screen` 生成 `fliter.json`，再给 baseline 与 v3.7 使用同一名单；`--goal` 默认关闭，仅在需要当前框架再次筛选目标时添加。用法见 [评测入口](docs/evaluation.md)、[完整测试](docs/benchmark.md)、[小批量测试](docs/partial_benchmark.md)和 [筛选指南](docs/injection_precheck.md)。
 
-独立生成名单使用`python -m experiments.run_injection_precheck screen --suites banking slack --name v36_screen_01`：每个GOAL仅跑一次完整轨迹，成功保留，失败或错误直接列入`fliter.json`，续跑不重测已开始目标。测量只加`--fliter`时直接消费排除表，不重复预检；仅在需要当前框架重新判断时加`--goal`。clean／DoS不接受这两个参数。
-
-结果位于 `results/{benchmarks,partial_benchmark}/<backend>/<model>_<name>/`。根 `run_manifest.json`绑定配置，`summary.json`记录筛选与GOAL checkpoint。任务使用 `<attack>/<suite>/<user>/<injection>.json`；先看 `summary.md`，再通过 `failure_cases.jsonl` 定位原始轨迹；主JSON保留原生交互／评分，防御诊断和原始审计回复存同名JSONL。详见[结果文件](docs/result_files.md)。
+指定上述输出根时，结果位于 `results/workshop/<backend>/<model>/<name>/`。先看根 `summary.md`，再通过 `failure_cases.jsonl` 定位轨迹。原生任务路径为 `<attack>/<suite>/<user>/<injection>.json`，防御诊断与完整 L3 回复使用同名 JSONL。成本同时核对 main 和 security，详情见 [结果文件](docs/result_files.md)。
 
 ## Dashboard
 
@@ -96,27 +60,24 @@ partial是每场景注册前3用户×前3注入目标，不能覆盖全部问题
 python -m dashboard.app
 ```
 
-打开[实验配置](http://127.0.0.1:8888/)或[历史分析](http://127.0.0.1:8888/history)。切换环境后重启服务；普通网页默认使用static，目前没有profile选择控件。API可显式传profile，详见[Dashboard指南](docs/dashboard.md)。
+打开 [实验配置](http://127.0.0.1:8888/) 或 [历史分析](http://127.0.0.1:8888/history)。页面使用当前默认策略，运行名只命名实验。API、历史对比及下载说明见 [Dashboard 指南](docs/dashboard.md)。
 
-## 当前限制与验证
+## 当前限制
 
-本次筛选与存储验证：Qwen在线13个有效计分键、0计分错误；另3个GOAL中1通过、1有效失败、1连接错误。错误目标已跳过、未重试，材料保留。两后端相关离线合并回归各298项无失败（含既有跳过），只验证入口、目录与统计，不证明TSR提升或完整安全性。
+授权范围是工具级；静态任务视图与风险标签不能认证事实、对象隐私、条件成立或任务完成。最终文本没有独立动作审计，模型仍可能漏做、误判参数或交付不完整。
 
-既有v3.5.4正式结果仍存在银行漏做／日期错误、合法动作误拒和部分最终交付问题，见[结果分析](analysis/v3-5-4.md)与[具体案例](analysis/details.md)。这些问题作为后续v3.6优化起点，不能因版本归档视为已解决。
-
-授权与审计约束候选工具动作，不保证任务完成、事实／日期正确或最终文本无污染。工具级标签不提供对象／参数硬授权；internal工具可能访问私密对象，URL可能携带敏感参数。离线回归仍有已知I3失败；E0 pending、I3 partial（24有效探针／8范围缺口）、I2 locked。操作与边界见[当前交接](docs/framework_updates.md)。
+最新 workspace 消融中，完整组与 NoL3 均为零攻击命中；NoL2 路径同时丢失工具元数据，导致 L3 大量 `MISSING_EVIDENCE` 阻断。该缺陷尚未修复，当前结果须结合这一干扰解释，见 [当前问题](docs/framework_updates.md)。
 
 ## 文档与目录
 
-[文档索引](docs/README.md) · [评测入口](docs/evaluation.md) · [项目状态](DV_STATE.md) · [协作规则](AGENTS.md)
+[文档索引](docs/README.md) · [架构与层间通信](docs/architecture.md) · [项目状态](DV_STATE.md) · [协作规则](AGENTS.md)
 
 | 路径 | 用途 |
 | --- | --- |
-| `dscg/`、`config/` | 框架实现与配置模板／风险目录 |
-| `experiments/`、`tests/`、`dashboard/` | 测量入口、测试源码与界面 |
-| `analysis/` | 当前结果分析 |
-| `workshop/` | 待实施方案；completed保存阶段报告，archive保存历史材料 |
-| `workshop/artifacts/<YYYYMMDD>_<task>/` | 新agent检查／测试产物；运行时显式设置results-dir到这里 |
-| `results/`、`download/` | 用户正式原始结果与分析导出，保留原样 |
+| `dscg/`、`config/` | 框架与配置 |
+| `experiments/`、`tests/`、`dashboard/` | 评测入口、回归与界面 |
+| `analysis/`、`workshop/` | 分析、工程方案及阶段记录 |
+| `workshop/artifacts/<YYYYMMDD>_<task>/` | 新建的 agent 检查与临时验证产物 |
+| `results/`、`download/` | 正式原始结果与分析导出 |
 
-正式研究路线由兄弟仓库[technical_route.md](../research/technical_route.md)维护。历史实验不因当前版本更新而重标。
+研究路线见兄弟仓库的 [technical_route.md](../research/technical_route.md)。

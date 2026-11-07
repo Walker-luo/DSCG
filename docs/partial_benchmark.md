@@ -1,74 +1,52 @@
-# 小批量测试
+# v3.7 小批量测试
 
-当前代码为v3.5.4，后续保存为v3.6并作为优化基线；使用 `experiments.run_partial_benchmark`。安装、模型连接和公共参数见[完整指南](benchmark.md)及[配置](model_tool_configuration.md)。以下运行命令会调用真实模型。
+使用 `experiments.run_partial_benchmark`，默认 `static-task-v354 / DSCG_v3.7`。模型、攻击、错误处理及运行控制与 [完整测试](benchmark.md) 共用，以下命令会调用真实模型。
 
 ## 默认任务范围
 
-每个所选场景取**注册顺序前3用户×前3注入目标**，seed不改变该前缀。AgentDojo默认clean12、typical108组合；AgentDyn为clean9、typical81计划／72可执行，其dailylife的tool_knowledge组不支持。
+每场景固定取注册顺序前 3 用户 × 前 3 注入目标，seed 不改变前缀。AgentDojo 四场景 clean 计划 12 例，typical 计划 108 例，筛选后按实际范围报告。
 
-`--suites`仅选当前后端场景。partial不能覆盖banking u11／u15、Slack u13／u17等后续任务，不能当作这些问题已验证。完整所选任务使用run_benchmark。
+先取前缀，再应用 fliter 和可选 GOAL；被排除目标不补位。partial 无法覆盖后续用户任务，专项问题须选择真正包含它们的评测范围。
 
 ## 对照与输出
 
-```bash
-# 同一环境／主模型／范围，新名称
-python -m experiments.run_partial_benchmark --baseline --name baseline_partial_01 --progress
-python -m experiments.run_partial_benchmark --name v36_static_partial_01 --progress
+使用同一环境、主模型与范围，选择未使用的运行名。
 
-# 显式单次授权对照；AgentDojo示例
+```bash
+python -m experiments.run_partial_benchmark --baseline --clean \
+  --results-dir results/workshop --name baseline_partial_doc01_clean
+python -m experiments.run_partial_benchmark --clean \
+  --results-dir results/workshop --name v3.7_partial_doc01_clean
+```
+
+无攻击时不运行 GOAL，ASR 不适用。默认框架自动启用两阶段 L2，无需额外传 profile。消融入口与已知 NoL2 干扰见 [配置](model_tool_configuration.md#消融与默认值)。
+
+默认输出为 `results/partial_benchmark/<backend>/<model>/<name>/`；上述命令写入 `results/workshop/<backend>/<model>/<name>/`。agent 临时验证指定新的 workshop/artifacts 任务目录。根 summary 和失败索引说明见 [结果文件](result_files.md)。
+
+## 筛选注入目标
+
+先用 [独立预检](injection_precheck.md) 生成名单，baseline 和 v3.7 使用同一文件。
+
+```bash
 python -m experiments.run_partial_benchmark --suites banking slack \
-  --prompt-profile legacy --name v36_legacy_bs_01 --progress
+  --fliter /absolute/path/to/fliter.json \
+  --results-dir results/workshop --name v3.7_partial_doc01 --progress
 ```
 
-默认static先抽任务视图再编译权限；单次授权用显式legacy。运行名不选择策略。static支持NoL2／NoChecker消融（路由设off），baseline仍原生legacy；其他历史候选要求L2／L3；详见[profile说明](qwen_utility.md)。
-
-结果为 `results/partial_benchmark/<backend>/<model>/<name>/`；旧目录按 `<model>_<name>` 原地续跑，不迁移。agent临时测试另设新的 `--results-dir workshop/artifacts/<YYYYMMDD>_<task>/partial_benchmark`。先看根summary和failure_cases，字段见[结果文件](result_files.md)。
-
-## 干净任务对照
-
-```bash
-python -m experiments.run_partial_benchmark --baseline --clean --name baseline_partial_clean_01
-python -m experiments.run_partial_benchmark --clean --name v36_partial_clean_01
-```
-
-无攻击／GOAL预检，ASR不适用；范围仍是前3用户，不代表全部97／60任务。
-
-## 筛选injection目标
-
-使用最小排除文件（格式见[预检指南](injection_precheck.md)）：
-
-```bash
-python -m experiments.run_partial_benchmark --baseline --suites banking slack \
-  --fliter /absolute/path/to/fliter.json --name baseline_partial_filtered_01
-python -m experiments.run_partial_benchmark --suites banking slack \
-  --fliter /absolute/path/to/fliter.json --goal --name v36_partial_goal_01
-```
-
-先取原前3用户×原前3目标，再应用排除表；不补位。`--goal`默认关闭；开启后，每个保留目标按当前测量pipeline运行一次直接GOAL，跨攻击共享结果，只有通过目标进入计分。失败排除，错误单独跳过并退出1；均不计TSR／ASR，已开始GOAL不重试。全部剔除时不计分、指标N/A；baseline与GrantBind的GOAL可能保留不同集合，配对比较须使用实际共同任务键。旧`--cohort`已拒绝，历史结果仍可读取，不迁移。
+仅传 fliter 不重做预检。需要当前测量框架筛选时再加 `--goal`，每目标一条完整轨迹，跨攻击共用判定；失败排除，错误另列且非零退出，已开始目标不重试。全被筛除时指标为 N/A。clean／DoS 不接受这两个参数。
 
 <a id="并发运行"></a>
 
 ## 按攻击并行运行
 
-多个攻击分独立进程，攻击内顺序执行，单攻击／clean仍顺序；`--progress`只控制显示。默认CLI router shadow，但无sink非敏感读取在三模式均固定免审，off不关闭L3。攻击选择、配置、错误隔离和退出码共用[完整指南](benchmark.md)。
+多个攻击各用独立进程，攻击内顺序执行，单攻击和 clean 顺序执行。`--progress` 只控制显示；有效／错误／未完成数量以报告为准。CLI router 默认 shadow，off 仍审计非免审批次。
 
 ## 中断续跑
 
 ```bash
-python -m experiments.run_partial_benchmark --reuse --name v36_static_partial_01
+python -m experiments.run_partial_benchmark --reuse \
+  --fliter /absolute/path/to/fliter.json \
+  --results-dir results/workshop --name v3.7_partial_doc01
 ```
 
-保留模型／profile／name／输出根及有效配置；未给攻击／场景恢复原计划，baseline／clean及fliter／goal仍需保留对应选项。reuse与force-rerun互斥，完整错误缓存不自动重试；策略变更使用新名称。详情见[续跑](benchmark.md#显式续跑示例)。
-
-## AgentDyn低TSR／ASR只读诊断
-
-```bash
-python -m experiments.diagnostics.agentdyn_zero_rates \
-  --run-dir /absolute/path/to/run --output-dir "workshop/artifacts/<YYYYMMDD>_<task>/diagnosis"
-```
-
-输出须新目录；只读原始标签、授权差集、阻挡、GOAL及注入文本重合。参考工具路径不是唯一完成路径，文本重合不证明模型遵循攻击。
-
-## 工具参数JSON错误
-
-当前任务整批不执行，记基础设施错误，后续任务继续；不修补参数或自动重发。有效TSR／ASR排除该例，GOAL错误另计，有错误退出1，详见[错误处理](benchmark.md#工具参数-json-解析错误)。
+保留有效配置和输出根，未给场景／攻击时恢复原计划；baseline／clean／goal 仍需原参数。完整错误缓存不自动重试，配置变化使用新名称。主模型参数 JSON 错误会终止当前任务并排除有效分母，后续任务继续，详见 [完整测试](benchmark.md)。
