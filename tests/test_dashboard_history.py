@@ -560,8 +560,26 @@ class DashboardHistoryTests(unittest.TestCase):
         self.assertTrue(rows[0]["label"].startswith("'="))
 
 
-if __name__ == "__main__":
-    unittest.main()
+    def test_variant_layout_groups_suites_into_one_run(self):
+        root = self.results_root / "workshop/agentdojo/ablation"
+        for variant in ("full", "noL3"):
+            for suite in ("workspace", "slack", "banking"):
+                data = summary(suite, 0.5, 0.0, 1.0)
+                data.update(model_id="qwen3.7-flash", task_selection={"attack": "ignore_previous"})
+                write_json(root / variant / "ignore_previous" / suite / "summary.json", data)
+            write_json(root / variant / "_arms/workspace/summary.arm.json",
+                       summary("workspace", 0.5, 0.0, 1.0))
+        with patch("dashboard.app.RESULTS_DIR", self.results_root):
+            catalog = self.client.get("/api/history/catalog").get_json()
+        entries = [item for item in catalog if item["source"].startswith("workshop/agentdojo/ablation/")]
+        self.assertEqual({item["run_name"] for item in entries}, {"full", "noL3"})
+        for item in entries:
+            self.assertTrue(item["is_ablation"])
+            self.assertEqual(item["model"], "ablation")
+            self.assertEqual(item["run_key"], "agentdojo/ablation/" + item["run_name"])
+            self.assertEqual([suite["suite_name"] for suite in item["suites"]],
+                             ["banking", "slack", "workspace"])
+        self.assertEqual(len(entries), 2)
 
     def test_archived_ablation_arms_are_first_class_history_runs(self):
         root = self.results_root / "workshop/agentdojo/ablation"
@@ -595,3 +613,7 @@ if __name__ == "__main__":
                                       json={"run_ids": [ablations[0]["id"], normal_item["id"]]}).get_json()
         self.assertIn("experiments", result)
         self.assertEqual({item["is_ablation"] for item in result["experiments"]}, {True, False})
+
+
+if __name__ == "__main__":
+    unittest.main()

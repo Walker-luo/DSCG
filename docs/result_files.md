@@ -18,16 +18,25 @@ results/{benchmarks,partial_benchmark}/<backend>/<model>/<name>/
     <user>/<injection>.dscg.responses.jsonl
 ```
 
-消融臂完成并归档后放在固定归档位置，Dashboard 历史页把其中的`ablation`目录当作模型字段读取（`model`／`model_suffix`为`ablation`，臂名是运行名），并额外记录`is_ablation`／`ablation_arm`供专项分析：
+消融归档按**变体**（`full`／`noL3`／`noL2`）归并，与普通运行同样按攻击／场景展开；Dashboard 把 `ablation` 当作模型字段，变体名就是运行名（`model=ablation`、`run_name=full|noL3`），并额外记录 `is_ablation`／`ablation_arm`：
 
 ```text
-results/<folder>/<backend>/ablation/<arm>/
-  run_manifest.json
-  summary.json / summary.md
-  <attack>/<suite>/
+results/<folder>/<backend>/ablation/<variant>/
+  README.md                 # 变体说明、来源臂与版本注意事项
+  derived_provenance.json   # 来源臂、commit、逐文件 sha256
+  summary.json              # 聚合视图（derived=true），不是新运行
+  <attack>/<suite>/         # 各臂数据原样移入
     summary.json / detailed_results.csv
     <user>/<injection>.json
+  _arms/<suite>/            # 原臂根文件，改名 *.arm.* 以免被当成场景摘要
+    summary.arm.json / run_manifest.arm.json / failure_cases.arm.jsonl / execution/
 ```
+
+约束：
+
+- 各臂数据原样移动，不重算、不改标签；不合成 `run_manifest.json`（来源不同，合成等于造记录），原始 manifest 保存在 `_arms/<suite>/`。
+- 派生参考臂（例如从 `qwen3.7-flash/v3.6.3` 复制的 banking 子集）放在所属变体的 `_arms/<suite>/` 并带 `README.md`／`derived_provenance.json`；报告与 Dashboard 说明必须标注"派生"与源版本。
+- 归档臂不可按旧路径 `--reuse` 续跑。
 
 正式 workshop 测量指定 `--results-dir results/workshop`，路径为 `results/workshop/<backend>/<model>/<name>/`。agent 临时验证输出到新的 workshop/artifacts 任务目录。
 

@@ -183,8 +183,10 @@
       const text = document.createElement("span");
       const title = document.createElement("strong");
       const runLabel = historyCharts.describeExperiment(run).label;
+      const suiteCount = (run.suites || []).length;
       title.textContent = [run.is_ablation ? "消融" : "", runLabel,
-        historySelection.attackLabel(run.attack_name)].filter(Boolean).join(" · ");
+        historySelection.attackLabel(run.attack_name)].filter(Boolean).join(" · ")
+        + (run.is_ablation && suiteCount > 1 ? "（" + suiteCount + " 场景）" : "");
       label.title = (run.label || "") + " · " + run.source;
       const detail = document.createElement("small");
       detail.textContent = (run.benchmark_id || "历史 / unknown") + " · " + (run.suites || []).map((item) => item.suite_name).join(", ");

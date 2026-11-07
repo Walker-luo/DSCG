@@ -2,15 +2,15 @@
 
 > 2026-11-06 更名为 **GrantBind**。论文、图表、文档与 Dashboard 统一使用新名。导入路径 `dscg`、环境变量前缀、历史运行与诊断协议沿用既有标识。工作站路径为 `/Users/luo/Desktop/AgentDefence/GrantBind`，更名提交以 `workshop@3605467` 的 v3.7 为基线。
 
-> 2026-11-07（Asia/Shanghai）。当前 **v3.7**，默认 **static-task-v354 / authorization_input=v3 / audit_presentation=v3**。README 与 docs 仅说明 v3.7；历史实验保留原身份，v3.8 不再启动新测试。本轮更新 Dashboard 历史页的消融归档读取与文档，未修改框架或调用模型。
+> 2026-11-07（Asia/Shanghai）。当前 **v3.7**，默认 **static-task-v354 / authorization_input=v3 / audit_presentation=v3**。README 与 docs 仅说明 v3.7；历史实验保留原身份，v3.8 不再启动新测试。本轮把消融归档重构为按变体归并（`ablation/full`、`ablation/noL3`），并同步 Dashboard 历史页显示。
 
 ## 1. 工作区与当前任务
 
 | 项目 | 状态 |
 | --- | --- |
-| 目录／分支／开始HEAD | GrantBind／workshop／f386d07；本轮提交 Dashboard 与文档改动，未切换分支 |
-| 本次任务 | 精简 README／docs 为 v3.7、新增架构说明；Dashboard 历史页支持 `ablation/<arm>`（`ablation` 占模型字段）并修复单场景柱状图空位提示 |
-| 初始脏文件 | dashboard/app.py、static/js/history.js、templates/history.html、docs/dashboard.md、docs/result_files.md、paper/plan.md、tests/test_dashboard_history.py；保留既有修改，两份脏文档仅定点更新过时说明 |
+| 目录／分支／开始HEAD | GrantBind／workshop／7d8c490；本轮提交消融归档重构与 Dashboard 更新，未切换分支 |
+| 本次任务 | 把平铺消融臂重构为 `ablation/<variant>/<attack>/<suite>/`（变体 full／noL3），保留 `_arms/` 原始根文件与派生存证；Dashboard 历史页按变体显示（每条含多场景） |
+| 初始脏文件 | paper/plan.md，保留原有修改；新增未跟踪 analysis/ablation.md 保留 |
 | 当前默认 | `static-task-v354`（DSCG_v3.7、L2输入v3／审计呈现v3）；legacy为显式单阶段对照，baseline走原生循环 |
 | 版本基线 | v3.7输入形态已发布；ca7739f保留为v3.6历史归档。v3.6.1整包提示不作为当前默认 |
 | 在线授权 | 默认仅真实 qwen3.7-flash；其他模型按当轮明确授权及 AGENTS 约定执行。本次仅文档，无模型调用 |
@@ -36,6 +36,8 @@
 - **未新增：**host意图进度FSM、完成闸门、恢复、动态扩权、参数修补、对象／数据／参数硬授权或最终文本审计。
 
 ## 3. 最新实施与验证
+
+- **消融正式复核（2026-11-07，仅分析）：**workshop@8135fe1，五组3150份计分轨迹、0新增模型调用。workspace full／NoL3 为772／765成功且ASR均0；Slack full／NoL3 为224／233成功、命中0／6，总Token full高55.25%。六个差值均为I:3，仅1键有对应URL直接拦截，另5键未提议该URL。Slack68次非allow均无字符截断，频道标识／排名／TODO合法动作误拒有具体证据；NoL2元数据缺失干扰仍未修复。报告 [analysis/ablation.md](analysis/ablation.md)，原始结果保留。
 
 - **v3.7 文档整理（2026-11-07）：**README／docs 移除旧版本交接与候选说明，新增 [架构与层间通信](docs/architecture.md)，明确 L1 副本与 L3 原始证据、L2 共享视图／冻结权限、Monitor 执行绑定。配置、测试路径、筛选及成本说明同步；保留两份已有脏文档的消融新增段落。工作站 workshop@f386d07，仅文档，无新模型调用；链接、命令语法与 diff 检查见本轮核验。
 
