@@ -9,10 +9,14 @@ No API key is ever included in ``public_dict`` or log-friendly descriptions.
 from __future__ import annotations
 
 import os
+import re
 from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
+from dscg.request_compatibility import (
+    DASHSCOPE_ADAPTER, DEEPSEEK_ADAPTER, SystemRoleChatClient, DeepSeekChatClient,
+)
 
 
 class ModelConfigurationError(ValueError):
@@ -34,8 +38,20 @@ ROLE_CONFIG_SECTIONS = {
     "DSCG_MAIN": ("main",),
     "DSCG_SEC": ("security", "sec", "audit"),
 }
-DEFAULT_MAIN_MODEL_ID = "deepseek-flash"
+DEFAULT_MAIN_MODEL_ID = "qwen3.7-flash"
 DEEPSEEK_MODEL_IDS = ("deepseek-flash", "deepseek-v4-pro")
+# DashScope Qwen models whose thinking defaults to on.  They need the explicit
+# enable_thinking=false switch in extra_body; the recorded reasoning_effort=none
+# of qwen3.7-flash is not a documented switch for them.  Dated snapshots share
+# the same prefix and inherit the switch.
+DASHSCOPE_NON_THINKING_MODEL_IDS = ("qwen3.5-flash", "qwen3.7-plus", "qwen3.8-flash")
+# DashScope Qwen models allowed to use strict JSON Schema for L2/L3.  The host
+# still validates every decision; this only selects the request format.
+DASHSCOPE_STRICT_SCHEMA_MODEL_IDS = frozenset({
+    "qwen3.7-flash", "qwen3.5-flash", "qwen3.7-plus", "qwen3.8-flash",
+    # The qwen3.7-plus alias is not provisioned on the 2026-11 test endpoint (403);
+    # the pinned snapshot below is the tested, working id.
+    "qwen3.7-plus-2026-05-26"})
 
 
 @dataclass(frozen=True)
@@ -48,23 +64,31 @@ class ModelConfig:
     provider: str
     api_key_env: str | None = None
 
-    def client_kwargs(self) -> dict[str, str]:
+    def client_kwargs(self) -> dict[str, str | int]:
         """Return arguments accepted by ``openai.OpenAI``."""
 
-        kwargs = {"api_key": self.api_key}
+        kwargs = {"api_key": self.api_key, "max_retries": 0}
         if self.base_url:
             kwargs["base_url"] = self.base_url
         return kwargs
 
-    def public_dict(self) -> dict[str, str | None]:
+    def public_dict(self) -> dict[str, str | int | dict[str, bool] | None]:
         """Return safe metadata suitable for experiment results and logs."""
 
-        return {
+        adapter = {'dashscope': DASHSCOPE_ADAPTER, 'deepseek': DEEPSEEK_ADAPTER}.get(self.provider)
+        public = {
             "model_id": self.model_id,
             "provider": self.provider,
             "base_url": self.base_url,
             "api_key_env": self.api_key_env,
+            "reasoning_effort": reasoning_effort_for_config(self),
+            "sdk_max_retries": 0,
+            **({'chat_request_adapter': adapter} if adapter else {}),
         }
+        options = thinking_request_options(self)
+        if options:
+            public['enable_thinking'] = options['extra_body']['enable_thinking']
+        return public
 
 
 def reasoning_effort_for_config(config: ModelConfig) -> str | None:
@@ -76,9 +100,26 @@ def reasoning_effort_for_config(config: ModelConfig) -> str | None:
     thinking until the message adapter explicitly round-trips that field.
     """
 
-    if config.provider == "deepseek":
+    if config.provider == "deepseek" or (
+        config.provider == "dashscope" and config.model_id.startswith('qwen3.7-flash')
+    ):
         return "none"
     return None
+
+
+def thinking_request_options(config: ModelConfig) -> dict[str, dict[str, bool]]:
+    """Return the explicit non-thinking switch for DashScope Qwen models.
+
+    Models whose thinking defaults to on need ``enable_thinking=false`` in
+    ``extra_body``. Passing it explicitly keeps their requests comparable with
+    the recorded qwen3.7-flash configuration instead of silently enabling
+    thinking. Other models keep their existing request bytes unchanged.
+    """
+
+    if config.provider == 'dashscope' and config.model_id.startswith(
+            DASHSCOPE_NON_THINKING_MODEL_IDS):
+        return {'extra_body': {'enable_thinking': False}}
+    return {}
 
 
 PROVIDER_PRESETS: dict[str, ProviderPreset] = {
@@ -356,6 +397,8 @@ def resolve_model_config(
         resolved_key_env = preset.api_key_env
     if resolved_key_env is None and fallback and resolved_model_id == fallback.model_id:
         resolved_key_env = fallback.api_key_env
+    if resolved_key_env is not None and not re.fullmatch(r'[A-Za-z_][A-Za-z0-9_]*', resolved_key_env):
+        raise ModelConfigurationError('api_key_env must be an environment variable name; put the credential in api_key instead.')
 
     resolved_api_key = _clean(api_key) or _env(environ, f"{prefix}_API_KEY")
     if resolved_api_key is None:
@@ -391,4 +434,10 @@ def create_openai_client(config: ModelConfig):
 
     import openai
 
-    return openai.OpenAI(**config.client_kwargs())
+    client = openai.OpenAI(**config.client_kwargs())
+    options = thinking_request_options(config)
+    if config.provider == 'dashscope':
+        return SystemRoleChatClient(client, request_options=options)
+    if config.provider == 'deepseek':
+        return DeepSeekChatClient(client, request_options=options)
+    return client

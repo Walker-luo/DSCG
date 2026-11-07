@@ -1,0 +1,36 @@
+[
+  {
+    "command": "conda run -n ipi python -m unittest discover -s tests -v > examples/results/i3_p0_stress/20261006_01a10fca/tests.log 2>&1",
+    "exit_code": 0,
+    "summary": "Ran 102 tests; OK; I3 18 tests, state matrix 25 subcases"
+  },
+  {
+    "command": "conda run -n ipi python -m experiments.i3_p0_stress --output examples/results/i3_p0_stress/20261006_01a10fca/report.json > examples/results/i3_p0_stress/20261006_01a10fca/fixture.log 2>&1",
+    "exit_code": 1,
+    "summary": "partial; total=24 valid=24 invalid=0 error=0 skipped=0 scope_violations=8"
+  },
+  {
+    "command": "conda run -n ipi python examples/results/i3_p0_stress/20261006_01a10fca/replay_before_fix.py > examples/results/i3_p0_stress/20261006_01a10fca/before_fix.log 2>&1",
+    "exit_code": 2,
+    "summary": "Fixed base revision; total=24 valid=22 error=2, both concurrent duplicate probes fail"
+  },
+  {
+    "command": "conda run -n ipi python -m experiments.harness_audit --fixture tests/fixtures/harness_audit_cases.json --output examples/results/i3_p0_stress/20261006_01a10fca/e0_harness_report.json > examples/results/i3_p0_stress/20261006_01a10fca/e0_harness.log 2>&1",
+    "exit_code": 0,
+    "summary": "E0 synthetic self-check: valid=1 tool_error=1 infrastructure_error=4"
+  },
+  {
+    "command": "git diff --check",
+    "exit_code": 0
+  },
+  {
+    "command": "shasum -a 256 -c examples/results/i3_p0_stress/20261006_01a10fca/artifacts.sha256",
+    "exit_code": 0,
+    "summary": "All 16 artifacts matched at validation time; commands.json then extended to include this validation."
+  },
+  {
+    "command": "git apply --check --reverse examples/results/i3_p0_stress/20261006_01a10fca/implementation.patch",
+    "exit_code": 0,
+    "summary": "Patch matches current implementation working tree; no files changed."
+  }
+]

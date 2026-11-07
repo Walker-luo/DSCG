@@ -1,0 +1,54 @@
+{
+  "base_commit": "e4862aeaaa4c2e674b02877c7bec9fb7fe983727",
+  "working_tree": "dirty",
+  "files": {
+    "dashboard/static/js/history.js": "3c06b53aea5a0156877784f5a45e83fa9550ed1a7ad65df1a040cf572cd3aeab",
+    "dashboard/static/js/history_charts.js": "eb0afbd70e5620c8cc93f7acba3ec349ffe727017cb80e47fb9de1ba4a906b40",
+    "dashboard/static/css/style.css": "cbad07579ae19064bed2cff799e7e7e0279704a5a3c982c1bd224d3bc03eb6c6",
+    "dashboard/templates/index.html": "3d39ba45e37c7f1cd00132f554926a155ee1734a5f6eeae941962dd655d416fa",
+    "tests/test_history_charts.cjs": "0e9fc89d4451815f45c0ea99da1ad75d9ad07fb53aaf75f9e22cffa4f21932e9",
+    "README.md": "6611639424fc2758a23e5321649933cb007be25695c9a8a705987adc8e90ff44",
+    "docs/history_separate_report.md": "b5fa46f581ffa0e13b1234773ae0973f3fc15a0fde670a6595dd61b698daa540"
+  },
+  "code_working_tree_sha256": "9f052c1852d52fbca9e49eb795123f3188c238517cbd8bb0c0aa8bda565b403b",
+  "hash_definition": "SHA256 of canonical sorted compact JSON of base_commit, working_tree and files before metadata additions; identifies UI change, excluding unrelated baseline changes.",
+  "working_tree_status": [
+    " M AGENTS.md",
+    " M README.md",
+    " M dashboard/app.py",
+    " M dashboard/static/css/style.css",
+    " M dashboard/static/js/history.js",
+    " M dashboard/templates/index.html",
+    " M experiments/run_partial_benchmark.py",
+    " M tests/test_dashboard_history.py",
+    "?? dashboard/history_export.py",
+    "?? dashboard/static/js/history_charts.js",
+    "?? docs/history_export_report.md",
+    "?? docs/history_metrics_report.md",
+    "?? docs/history_separate_report.md",
+    "?? examples/results/history_export/",
+    "?? examples/results/history_metrics/",
+    "?? examples/results/history_separate/",
+    "?? tests/test_history_charts.cjs",
+    "?? tests/test_partial_baseline.py"
+  ],
+  "related_baseline_files": {
+    "experiments/run_partial_benchmark.py": "683b4f82217c0e4a721ecc1ebaa8dce78fdb7aab52f4228c1a8f116d9d329123",
+    "tests/test_partial_baseline.py": "9119966e7bbd6dd50d660a5a28542aacb7dfcfa124ae8a4fcdc61300ce243b14",
+    "AGENTS.md": "13d9e0c96e2797b4c8fbd863ce455b5ad29cc4ece12ce1d7722c347a88503a19"
+  },
+  "input_files": {
+    "results/partial_benchmark/deepseek-flash_baseline_new/workspace/summary.json": "7673ab14f28d089d351702c7c46befd52dc241d90fd9e77a97f30cbf41ed2d8a",
+    "results/partial_benchmark/deepseek-flash_baseline_new/travel/summary.json": "14aaa3a2a3c3345a28763b033fae9fc7c4dca07366680cf55cb6f2d99c8774ca",
+    "results/partial_benchmark/deepseek-flash_baseline_new/banking/summary.json": "1363996a955efae1c02692c3bce2cb7a55038486106028d2d13a4a083d47bbaf",
+    "results/partial_benchmark/deepseek-flash_baseline_new/slack/summary.json": "5d83d083af2a86c813d88df6369993486373f6d3c162da2c9753839ba30b9cc4",
+    "results/partial_benchmark/deepseek-flash_workshop_2.0/workspace/summary.json": "4396c7828767bcb40503d3e96bc59b8123c3e2bece51adf8182554c19ef962d9",
+    "results/partial_benchmark/deepseek-flash_workshop_2.0/travel/summary.json": "ebd39226873d55043adbeff93d90c12f920a032e65e37a7825412d6356acf17d",
+    "results/partial_benchmark/deepseek-flash_workshop_2.0/banking/summary.json": "97652bc0977dd9fe42869a0be05aabb27b5d2a80f23153bb40defdc7eac51f17",
+    "results/partial_benchmark/deepseek-flash_workshop_2.0/slack/summary.json": "f2682c2e76633549ac2e3c9d2d8f14d42cbf592dc9958d891b6e37f1f107b3f4",
+    "results/partial_benchmark/deepseek-flash_workshop_1.1/workspace/summary.json": "3419dbcf5e89c4b5de3f677edd69db5aa6bde7517457e97468cf5a12c7328318",
+    "results/partial_benchmark/deepseek-flash_workshop_1.1/travel/summary.json": "6ae126f987566876c79c4e9be882de8a4c2b41c35f0540dabbacb07ed7836c29",
+    "results/partial_benchmark/deepseek-flash_workshop_1.1/banking/summary.json": "72eb4fe5422fa955cf50bc447d3d588639b797c7b4c10702629994f8f3e9b957",
+    "results/partial_benchmark/deepseek-flash_workshop_1.1/slack/summary.json": "b6a4c56a1d2eca45cc7d23a31c845f99a631bab5f97fef30f8f309073bc796a1"
+  }
+}

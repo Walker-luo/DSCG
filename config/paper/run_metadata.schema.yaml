@@ -1,0 +1,29 @@
+schema_id: dscg.paper.run-metadata.v1
+required:
+  - run_id
+  - protocol_id
+  - git_commit
+  - environment
+  - model
+  - security_model
+  - benchmark
+  - suite
+  - task_ids
+  - attack
+  - defense
+  - seed
+  - budget
+  - trace_level
+  - start_time
+  - end_time
+  - status_counts
+  - artifact_paths
+status_counts:
+  allowed: [valid, model_error, policy_error, tool_error, timeout, infrastructure_error]
+artifact_paths:
+  required: [candidate_actions, normalized_arguments, contract_version, policy_input, raw_trace, summary]
+invariants:
+  - git_commit_must_match_code_used_for_run
+  - task_ids_must_match_manifest
+  - non_valid_records_must_remain_in_denominator
+  - formal_runs_must_not_reuse_old_results_without_force_rerun

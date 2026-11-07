@@ -1,0 +1,70 @@
+{
+  "status": "pass",
+  "scope": "document links, primary-source catalog consistency and unchanged runtime/route; not literature reproduction or benchmark validation",
+  "base_dscg_commit": "5e382f946b4554162fcd84eaec26b1d8c60332ce",
+  "validation_dscg_head": "5e382f946b4554162fcd84eaec26b1d8c60332ce",
+  "validation_research_head": "aae0e7f93437a70c5b84067e6d137f5de5217ce2",
+  "verified_primary_papers": 11,
+  "checked_local_links": [
+    {
+      "source": "/Users/luo/Desktop/AgentDefence/research/paper/3_layer_opt.md",
+      "target": "/Users/luo/Desktop/AgentDefence/research/technical_route.md"
+    },
+    {
+      "source": "/Users/luo/Desktop/AgentDefence/research/paper/3_layer_opt.md",
+      "target": "/Users/luo/Desktop/AgentDefence/DSCG/README.md"
+    },
+    {
+      "source": "/Users/luo/Desktop/AgentDefence/research/paper/3_layer_opt.md",
+      "target": "/Users/luo/Desktop/AgentDefence/DSCG/dscg/pipelines/defended.py"
+    },
+    {
+      "source": "/Users/luo/Desktop/AgentDefence/research/paper/3_layer_opt.md",
+      "target": "/Users/luo/Desktop/AgentDefence/DSCG/docs/framework_v2_followup_report.md"
+    },
+    {
+      "source": "/Users/luo/Desktop/AgentDefence/research/paper/3_layer_opt.md",
+      "target": "/Users/luo/Desktop/AgentDefence/DSCG/download/dscg-history-analysis-20261007T153203Z/analysis.json"
+    },
+    {
+      "source": "/Users/luo/Desktop/AgentDefence/research/paper/3_layer_opt.md",
+      "target": "/Users/luo/Desktop/AgentDefence/research/paper/3_layer_sources_20261008.json"
+    },
+    {
+      "source": "/Users/luo/Desktop/AgentDefence/DSCG/README.md",
+      "target": "/Users/luo/Desktop/AgentDefence/research/paper/3_layer_opt.md"
+    },
+    {
+      "source": "/Users/luo/Desktop/AgentDefence/DSCG/AGENTS.md",
+      "target": "/Users/luo/Desktop/AgentDefence/research/paper/3_layer_opt.md"
+    },
+    {
+      "source": "/Users/luo/Desktop/AgentDefence/DSCG/AGENTS.md",
+      "target": "/Users/luo/Desktop/AgentDefence/research/paper/3_layer_sources_20261008.json"
+    }
+  ],
+  "new_model_calls": 0,
+  "new_benchmark_samples": 0,
+  "runtime_tests_run": 0,
+  "runtime_sha256_unchanged": "75583be0d62b2a478f9d070f79b7aa84dffd71b12a21931e60c696273163f7b0",
+  "changed_tracked_dscg_files_since_base": [
+    "AGENTS.md",
+    "README.md"
+  ],
+  "dscg_worktree_at_validation": " M AGENTS.md\n M README.md\n",
+  "research_worktree_at_validation": " M README.md\n M contrast.md\n M paper/implementation_status.md\n?? Top4/\n?? agents.md\n?? paper/framework_optimization_20261007.md\n?? paper/framework_optimization_direction_20261007.md\n?? paper/framework_optimization_review_20261007.md\n?? paper/framework_optimization_v2_proposal_20261007.md\n",
+  "artifacts_sha256": {
+    "/Users/luo/Desktop/AgentDefence/research/paper/3_layer_opt.md": "e82b6d445b4053225086d2b1be06f7a2105d4f2073ef9d4ee5bfd3a4d1ce105c",
+    "/Users/luo/Desktop/AgentDefence/research/paper/3_layer_sources_20261008.json": "623cbdefd07e2264b9e6aea620ba8f4f11a3f5e87fd0e286dd3e0f3066c75a37",
+    "/Users/luo/Desktop/AgentDefence/DSCG/README.md": "2d34adcbb86d6c6bbc888d0110c64c2df798a0efa8745efaa64640748bb9d654",
+    "/Users/luo/Desktop/AgentDefence/DSCG/AGENTS.md": "82b001b76c88a3b09105f92add9d00a07ff9091d5e36be0f2dc5cb5e190eb22f",
+    "/Users/luo/Desktop/AgentDefence/DSCG/examples/results/framework_optimization/20261008_three_layer_research/verify_research.py": "8fcb2172a5a994538aabfa308a3586f00dbaad7981cc20e6e56d3e62cc86a009",
+    "/Users/luo/Desktop/AgentDefence/research/technical_route.md": "952705e7c89e1fa96803fe0b51d784cde7165644eeceac995eafca907bead59c"
+  },
+  "limitations": [
+    "Checks do not independently reproduce paper experiments or validate source completeness.",
+    "No third layer has been implemented; I3 remains partial and real E0 remains pending.",
+    "Historical benchmark counts are cited, not newly measured.",
+    "Research repository had unrelated dirty changes before this phase; only new research files are staged."
+  ]
+}

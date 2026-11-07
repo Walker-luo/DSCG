@@ -1,0 +1,23 @@
+{
+  "originals": {
+    "dscg/input_isolation.py": "e22a2bf7ff1301e91f34e25c6224240801a9e09e9cb91358a3512f51f89c7db0",
+    "dscg/pipelines/defended.py": "264db3857d8a08bc886e3e1461be909f93f2a9cf6143ff0eb806bc2b8199961a",
+    "README.md": "6ad97891d027a6fc88e37c4311ca9e208a6671840ee4132f3128e5897ca4c139",
+    "AGENTS.md": "1c0c7d77a5838028388b2c97245b060903c63bdfc4a1e7613e213d90b0e3798f",
+    "workshop/README.md": "298beac086d23ee4cb60d0136fabb10fcdf74540a189e02fb6bcb7667c1df850",
+    "workshop/completed/README.md": "661717005dbec0db89e1579cadbe60eda01193abc71d6bb5ce4fdaf1264ce36c"
+  },
+  "after": {
+    "dscg/input_isolation.py": "81355ecc59240300421735e0851a0c13051b9862bbef778ebf15f6e7c2636b23",
+    "dscg/pipelines/defended.py": "40dc1386286faf22728cc4b6c803abfb348de9137dc6dbf5a6a325057e73273c",
+    "experiments/payload_reporting_probe.py": "cfe5b33eaef71e789804326175c1d314205c1742db15cdeca7bd441932d555d7",
+    "experiments/payload_reporting_frozen_cases.py": "8fa65316051340e6b3df02f328327b9861ccc18d0234deb92107d3aefdf9e43f",
+    "tests/fixtures/payload_reporting_regression.json": "fbdbe7bcc64f4929bff460395dbd6fdba2a136dff098cbe2b14eeeb772ae01af",
+    "README.md": "d238f0016ad42670d611e9eabd5144943d93e1c383816642a240b3d78b5cbaa0",
+    "AGENTS.md": "569af5ea992f5c1ff851ecc4ea9411d4a6be9af427907e6b796911b66c2dd7fd",
+    "workshop/README.md": "d5d505fd4dfdcbd6df3bb8f9b2b42bb05b8e803325b2fe77783d4d46f07ac545",
+    "workshop/completed/README.md": "b81fce55e6a4516951199e888e731f7048912a64438e56cce252cb3b6e519919",
+    "workshop/completed/defense_regression_analysis_20261012.md": "3b18565bba4de2433dc5538cab3678c56ea2f6e2631f40e7c373bead7488d1d0"
+  },
+  "evidence_sha256": "668732b09a5304b62e97c683126fed9cbba01b790c8cfe1dda8e00482812dcd8"
+}

@@ -1,0 +1,17 @@
+{
+  "task": "clean_controls_docs_20261015",
+  "original_document": {
+    "path": "workshop/archive/clean_controls_20261015/originals/docs/full_benchmark.md",
+    "sha256": "553e7e02886f2a738d7ce5c7d37f4248196c40117b7194604ec70e68e0204146"
+  },
+  "current_document": {
+    "path": "docs/full_benchmark.md",
+    "sha256": "3d6ea992b0dc618a0151494db189a5133c60ce0e48df4da2924662f5b99daa4d"
+  },
+  "validation": {
+    "path": "workshop/artifacts/20261015_clean_controls_docs/validation.json",
+    "sha256": "f512972b8c851aa3fea02227f0eabcf68611748f17deb1ec5675672eedb72353"
+  },
+  "validation_log_sha256": "fc3930139802c86ff7fdfd1ddf5c4c20138972d26ac41ee607cc193640116027",
+  "historical_evidence": "Unmodified; this is a separate documentation revision"
+}

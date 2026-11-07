@@ -1,0 +1,327 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-17",
+  "task": "EXPERIMENTS-LAYOUT",
+  "base_revision": "8c591e27390c77614dbf4d1ff46f98428c8b5e30",
+  "initial_working_tree": " M AGENTS.md\n M L3_plan.md\n M README.md\n M docs/README.md\n M docs/dashboard.md\n M docs/evaluation.md\n M docs/framework_updates.md\n D docs/framework_v2_followup_report.md\n D docs/full_benchmark.md\n D docs/i3_p0_stress_report.md\n M docs/injection_precheck.md\n M docs/model_tool_configuration.md\n M experiments/README.md\n M experiments/injection_cohort_compatibility.json\n M experiments/run_partial_benchmark.py\n M tests/test_full_benchmark.py\n M workshop/L2_opt.md\n M workshop/README.md\n M workshop/completed/README.md\n M workshop/completed/configuration_docs_20261013.md\n M workshop/completed/full_benchmark_20261015.md\n M workshop/completed/full_suites_20261017.md\n M workshop/completed/partial_cohort_20261017.md\n M workshop/completed/partial_reporting_20261010.md\n M workshop/completed/partial_suites_20261017.md\n M workshop/completed/workshop_optimization_report.md\n?? docs/benchmark.md\n?? docs/partial_benchmark.md\n?? tests/test_cli_router_defaults.py\n?? workshop/archive/docs_benchmark_structure_20261017/\n?? workshop/completed/docs_benchmark_structure_20261017.md\n",
+  "moves": {
+    "experiments/partial_controls.py": "experiments/common/partial_controls.py",
+    "experiments/partial_reporting.py": "experiments/common/partial_reporting.py",
+    "experiments/injection_cohort.py": "experiments/common/injection_cohort.py",
+    "experiments/injection_cohort_compatibility.json": "experiments/common/injection_cohort_compatibility.json",
+    "experiments/harness_audit.py": "experiments/diagnostics/harness_audit.py",
+    "experiments/i3_p0_stress.py": "experiments/diagnostics/i3_p0_stress.py",
+    "experiments/trace_diagnostics.py": "experiments/diagnostics/trace_diagnostics.py",
+    "experiments/l3_router_dataset.py": "experiments/calibration/l3_router_dataset.py",
+    "experiments/calibrate_l3_router.py": "experiments/calibration/calibrate_l3_router.py",
+    "experiments/generate_tool_metadata.py": "experiments/tools/generate_tool_metadata.py"
+  },
+  "originals": [
+    {
+      "original_path": "tests/test_injection_precheck.py",
+      "current_path": "tests/test_injection_precheck.py",
+      "original_storage": "workshop/archive/experiments_layout_20261017/originals/tests/test_injection_precheck.py",
+      "sha256_before": "1f70a5afe3facf586b9f1ee091f18651ea33bc0f4ad8e8d30df8d844f448ccd4",
+      "sha256_after": "5dd64a79579887e164978f6832ac1ea4b87e6edd04b48d4325018d6e1c11968c"
+    },
+    {
+      "original_path": "experiments/partial_controls.py",
+      "current_path": "experiments/common/partial_controls.py",
+      "original_storage": "workshop/archive/experiments_layout_20261017/originals/experiments/partial_controls.py",
+      "sha256_before": "4a5b8264ae1b906d621730b78a329c583f36cfd05226040280c6786939dc4bde",
+      "sha256_after": "0a636f0c11b9d034d03d388063a2aef3a159dc67e855747835682435f6f470af"
+    },
+    {
+      "original_path": "experiments/partial_reporting.py",
+      "current_path": "experiments/common/partial_reporting.py",
+      "original_storage": "workshop/archive/experiments_layout_20261017/originals/experiments/partial_reporting.py",
+      "sha256_before": "e17620ccb0d0a6af625a8da35ffb570fc7adc502658afbf49ca5c7b9fa3d52ef",
+      "sha256_after": "fbd90a0f1c55b7b54c1f8e6e3bb46448b53baf39bc62ae91cef2acc8d6d1974b"
+    },
+    {
+      "original_path": "experiments/injection_cohort.py",
+      "current_path": "experiments/common/injection_cohort.py",
+      "original_storage": "workshop/archive/experiments_layout_20261017/originals/experiments/injection_cohort.py",
+      "sha256_before": "501494510da724e51920f5a894ba35191987f36df4454a2afcaeaa7869a9f79c",
+      "sha256_after": "d25d996ead1098a4f6d3b8816da6ce11af11f7c6e817f50f7f7f6954aaa9c7de"
+    },
+    {
+      "original_path": "experiments/injection_cohort_compatibility.json",
+      "current_path": "experiments/common/injection_cohort_compatibility.json",
+      "original_storage": "workshop/archive/experiments_layout_20261017/originals/experiments/injection_cohort_compatibility.json",
+      "sha256_before": "0d3f6f60616ca52d47c487e25d655534722e9b42131761817332fdaacd19e667",
+      "sha256_after": "6f22ba9c886cba74bfc17f017666bd9332747823ea8f2dff4a319c403541aeab"
+    },
+    {
+      "original_path": "experiments/harness_audit.py",
+      "current_path": "experiments/diagnostics/harness_audit.py",
+      "original_storage": "workshop/archive/experiments_layout_20261017/originals/experiments/harness_audit.py",
+      "sha256_before": "1ca4b7a26e0855cb466ea908a363c790ab46a6de9c9af49bd1d95e1a75e7b534",
+      "sha256_after": "1ca4b7a26e0855cb466ea908a363c790ab46a6de9c9af49bd1d95e1a75e7b534"
+    },
+    {
+      "original_path": "experiments/i3_p0_stress.py",
+      "current_path": "experiments/diagnostics/i3_p0_stress.py",
+      "original_storage": "workshop/archive/experiments_layout_20261017/originals/experiments/i3_p0_stress.py",
+      "sha256_before": "cbd7d126dafc2246353fd841a11fd7596301a0d89efc2adbc5df7af64f5d2945",
+      "sha256_after": "67aefc9e4638bbcc1f38de8822b52a005693d93fda862cffe65a8515b33b4b7b"
+    },
+    {
+      "original_path": "experiments/trace_diagnostics.py",
+      "current_path": "experiments/diagnostics/trace_diagnostics.py",
+      "original_storage": "workshop/archive/experiments_layout_20261017/originals/experiments/trace_diagnostics.py",
+      "sha256_before": "dd6da037739ea0c016a33cf007c7fc97a0ad5c680e02d20a162d4c3bec954994",
+      "sha256_after": "dd6da037739ea0c016a33cf007c7fc97a0ad5c680e02d20a162d4c3bec954994"
+    },
+    {
+      "original_path": "experiments/l3_router_dataset.py",
+      "current_path": "experiments/calibration/l3_router_dataset.py",
+      "original_storage": "workshop/archive/experiments_layout_20261017/originals/experiments/l3_router_dataset.py",
+      "sha256_before": "6e5bd43e8e4d28f8d4436f60dcbd23d2c1a6a6f79025023b05d737f9f41c7463",
+      "sha256_after": "6e5bd43e8e4d28f8d4436f60dcbd23d2c1a6a6f79025023b05d737f9f41c7463"
+    },
+    {
+      "original_path": "experiments/calibrate_l3_router.py",
+      "current_path": "experiments/calibration/calibrate_l3_router.py",
+      "original_storage": "workshop/archive/experiments_layout_20261017/originals/experiments/calibrate_l3_router.py",
+      "sha256_before": "f53ab2a8ba450e6c7b10714880adcb98cbed53639aa69cc94764f9bdf470af7c",
+      "sha256_after": "f53ab2a8ba450e6c7b10714880adcb98cbed53639aa69cc94764f9bdf470af7c"
+    },
+    {
+      "original_path": "experiments/generate_tool_metadata.py",
+      "current_path": "experiments/tools/generate_tool_metadata.py",
+      "original_storage": "workshop/archive/experiments_layout_20261017/originals/experiments/generate_tool_metadata.py",
+      "sha256_before": "efb9c73b8d5f0d7fb3d8789414c9127588e01a5b75c2c70f4d56d8b2424ce181",
+      "sha256_after": "efb9c73b8d5f0d7fb3d8789414c9127588e01a5b75c2c70f4d56d8b2424ce181"
+    },
+    {
+      "original_path": "experiments/run_partial_benchmark.py",
+      "current_path": "experiments/run_partial_benchmark.py",
+      "original_storage": "workshop/archive/experiments_layout_20261017/originals/experiments/run_partial_benchmark.py",
+      "sha256_before": "23141f4ac84d7c3d4b211abb6d03bb03b51cc93a26c49ba0c7cfba5dc1dbb6a1",
+      "sha256_after": "e7a8a4961df88fa9183782d416da129fae7ef868b17ac6b00a5a300d52335690"
+    },
+    {
+      "original_path": "experiments/run_benchmark.py",
+      "current_path": "experiments/run_benchmark.py",
+      "original_storage": "workshop/archive/experiments_layout_20261017/originals/experiments/run_benchmark.py",
+      "sha256_before": "2de1422ee54ae7fc327d9bfbd76d93b107d8647238ecd33c15cb52c685c59640",
+      "sha256_after": "3adef3d419d36c68f7b7e6a57bdce56aeddf613277304b30f604b41c1f981644"
+    },
+    {
+      "original_path": "experiments/run_injection_precheck.py",
+      "current_path": "experiments/run_injection_precheck.py",
+      "original_storage": "workshop/archive/experiments_layout_20261017/originals/experiments/run_injection_precheck.py",
+      "sha256_before": "f045f75aeb39ca922e8098c38057aeb1b72ab74cd99e907d6e2072589d842488",
+      "sha256_after": "60b73202a366288482651c6a441e6e7609ca2634f97106bb3198e47ffa349bba"
+    },
+    {
+      "original_path": "tests/test_tool_metadata.py",
+      "current_path": "tests/test_tool_metadata.py",
+      "original_storage": "workshop/archive/experiments_layout_20261017/originals/tests/test_tool_metadata.py",
+      "sha256_before": "9b62b2618fae65b84bfc341c17e2ca58789229c3d989b992ccbbce2313631f77",
+      "sha256_after": "319a2b0649d0aa02d67c9ab11c50810467f57cb8f9db5fbbee5233d49e157905"
+    },
+    {
+      "original_path": "tests/test_harness_audit.py",
+      "current_path": "tests/test_harness_audit.py",
+      "original_storage": "workshop/archive/experiments_layout_20261017/originals/tests/test_harness_audit.py",
+      "sha256_before": "3eaee4fda57e631001d031134b61689253d9dd076ab0946d56fb05758ebd5934",
+      "sha256_after": "3608e34cc55b8c15af8cd323ba232bc8aa862d42ac1b4254f50af967c8eb8eb5"
+    },
+    {
+      "original_path": "tests/test_partial_ablation.py",
+      "current_path": "tests/test_partial_ablation.py",
+      "original_storage": "workshop/archive/experiments_layout_20261017/originals/tests/test_partial_ablation.py",
+      "sha256_before": "a86c5c36c285e58f75c83e14ab3f829d36f5c7c947fb6a4f01dbb4384ace17fe",
+      "sha256_after": "125f0ff921824e75fc366549ec0159fe4ab3509f73c541485798615dee078408"
+    },
+    {
+      "original_path": "tests/test_optimization_costs.py",
+      "current_path": "tests/test_optimization_costs.py",
+      "original_storage": "workshop/archive/experiments_layout_20261017/originals/tests/test_optimization_costs.py",
+      "sha256_before": "d472962e9c0d63ee7fc9b051044b15586a0f6d7c13b722e54b99486e7c740d1b",
+      "sha256_after": "98991406bdfb338ac2b942aac411762f84e276a273df1e8b2231d31c0a977ddc"
+    },
+    {
+      "original_path": "tests/test_i3_p0_stress.py",
+      "current_path": "tests/test_i3_p0_stress.py",
+      "original_storage": "workshop/archive/experiments_layout_20261017/originals/tests/test_i3_p0_stress.py",
+      "sha256_before": "d65b9c389e109f1c6fa74db3a31700543a9d5c8dba6ceee7cb3e5fcdde1f5fd7",
+      "sha256_after": "2c8651a8e4afa2f33fbc2406769172a73677729f1a39deb8514e59763b0b6ded"
+    },
+    {
+      "original_path": "tests/test_l3_router_dataset.py",
+      "current_path": "tests/test_l3_router_dataset.py",
+      "original_storage": "workshop/archive/experiments_layout_20261017/originals/tests/test_l3_router_dataset.py",
+      "sha256_before": "9f3605fb003e0b2c95a424df21bd80b5430b8ab321f27f6a4706a7d00388b1e7",
+      "sha256_after": "14dd6741db52021c847c20825ded140e2b30c5edd70d7e2e51913407bc2f3490"
+    },
+    {
+      "original_path": "tests/test_full_benchmark.py",
+      "current_path": "tests/test_full_benchmark.py",
+      "original_storage": "workshop/archive/experiments_layout_20261017/originals/tests/test_full_benchmark.py",
+      "sha256_before": "8c222e8ac2aab1d2645876610858d513ea9849098dc38b60c60550c95c471a22",
+      "sha256_after": "22de4dcf45d69c32a3e01c9871fd3794bf4ec03a4324d2ec9c77dc69e65e5132"
+    },
+    {
+      "original_path": "tests/test_harness_audit_replay.py",
+      "current_path": "tests/test_harness_audit_replay.py",
+      "original_storage": "workshop/archive/experiments_layout_20261017/originals/tests/test_harness_audit_replay.py",
+      "sha256_before": "13e607b2e66461f86dc3e271ab2ed59e246d39a118fd7c4f9fbc08cffc30901e",
+      "sha256_after": "ddff24b001402ceabc929108048df1ea5ea2a310cd59488f6418513252c92f89"
+    },
+    {
+      "original_path": "tests/test_partial_cohort.py",
+      "current_path": "tests/test_partial_cohort.py",
+      "original_storage": "workshop/archive/experiments_layout_20261017/originals/tests/test_partial_cohort.py",
+      "sha256_before": "7c9321d877441e5ed9fd803a05b85fd1fc70ad63c0854d081d8afb9fb095723b",
+      "sha256_after": "2eac32ce1dffa6296eb67a85908d9d3149fd3bdf79773d4e5014d48e47f97af4"
+    },
+    {
+      "original_path": "dashboard/app.py",
+      "current_path": "dashboard/app.py",
+      "original_storage": "workshop/archive/experiments_layout_20261017/originals/dashboard/app.py",
+      "sha256_before": "77371fd2adcbfab1bdc2baf2c81d220a0075f02cc1d5cf38cc43015baaae74ed",
+      "sha256_after": "69cae8d1e14b80bbb1e525582138e35efff4f5d05d9cb5400a28d3a248be81d9"
+    },
+    {
+      "original_path": "README.md",
+      "current_path": "README.md",
+      "original_storage": "workshop/archive/experiments_layout_20261017/originals/README.md",
+      "sha256_before": "46756b73c2420db935415adfca8bd2e79cfe0c90970205dc94eb4255edb566b9",
+      "sha256_after": "7faca5f2c3bcf9e390a2b9d716a3b27c77f1b2529c6a3e78c378c4bf542f3714"
+    },
+    {
+      "original_path": "AGENTS.md",
+      "current_path": "AGENTS.md",
+      "original_storage": "workshop/archive/experiments_layout_20261017/originals/AGENTS.md",
+      "sha256_before": "960d016ebac72ffc4b2635c828e02930daad04895006fc3521d2cd1b1eef1d58",
+      "sha256_after": "a45cac001ccfd525c98f25c87cfc717ec1c4748dc1f14de133fc3e92a8a4a487"
+    },
+    {
+      "original_path": "L3_plan.md",
+      "current_path": "L3_plan.md",
+      "original_storage": "workshop/archive/experiments_layout_20261017/originals/L3_plan.md",
+      "sha256_before": "6db4302289b1023b12a452705fa2e23c1446363daea6944bd2bcfa8b691f2481",
+      "sha256_after": "29e3183a69cf34ae4fc243d0b69b720b516b97d76220b8518083fbf07197e137"
+    },
+    {
+      "original_path": "docs/model_tool_configuration.md",
+      "current_path": "docs/model_tool_configuration.md",
+      "original_storage": "workshop/archive/experiments_layout_20261017/originals/docs/model_tool_configuration.md",
+      "sha256_before": "848665ff991f29a10a91936469f079e3e74984134a76755236b609c59b8229d5",
+      "sha256_after": "ed385b27636df9a0312da1d179199679ab77936af994a21d3ce4f3aea58e8aea"
+    },
+    {
+      "original_path": "docs/evaluation.md",
+      "current_path": "docs/evaluation.md",
+      "original_storage": "workshop/archive/experiments_layout_20261017/originals/docs/evaluation.md",
+      "sha256_before": "211a605603b50b5023a4b5398560637cf5a1d893ffede03c20ec4e9191495f6b",
+      "sha256_after": "ba7b27e964b15015f17c6a0bb2e1807d2782fa5fe99660c90d5f02d1c7b74dfe"
+    },
+    {
+      "original_path": "workshop/L3_checker_opt.md",
+      "current_path": "workshop/L3_checker_opt.md",
+      "original_storage": "workshop/archive/experiments_layout_20261017/originals/workshop/L3_checker_opt.md",
+      "sha256_before": "7a3c961d5c1b9d4ccc13f142b3e85e33cf59c7c1c4eec44d1deb45f886623513",
+      "sha256_after": "9274f6a4cd3fe2860708261bc1acb6e27bea974955d2822c8303bfbf23358575"
+    },
+    {
+      "original_path": "workshop/completed/partial_reporting_20261010.md",
+      "current_path": "workshop/completed/partial_reporting_20261010.md",
+      "original_storage": "workshop/archive/experiments_layout_20261017/originals/workshop/completed/partial_reporting_20261010.md",
+      "sha256_before": "6f19d381a66beb0971c14f73384dcb672550f4916f52d5736b0caa0ef6341046",
+      "sha256_after": "3abcd1137cff911099a981e303c924a526d18b6d8c6c0c6990192f33c0499f85"
+    },
+    {
+      "original_path": "workshop/completed/l3_algorithm_implementation_20261010.md",
+      "current_path": "workshop/completed/l3_algorithm_implementation_20261010.md",
+      "original_storage": "workshop/archive/experiments_layout_20261017/originals/workshop/completed/l3_algorithm_implementation_20261010.md",
+      "sha256_before": "590edb4efd68af19a8e51a8247de4b222837dcc3d048f91b93e7928b516fbe27",
+      "sha256_after": "e79d9337e6ecbf9efef1afbede0f595796feb767eece19b0869c7c06cfe91e13"
+    },
+    {
+      "original_path": "workshop/completed/injection_progress_20261016.md",
+      "current_path": "workshop/completed/injection_progress_20261016.md",
+      "original_storage": "workshop/archive/experiments_layout_20261017/originals/workshop/completed/injection_progress_20261016.md",
+      "sha256_before": "e065e2dfa445a85e34ee4cca0e097a1f757e8c9a1f91104e7486e247b6ae4980",
+      "sha256_after": "ca30461635e0783cbdc7623b808e238ae009d5e7785460c1e98f292f8870fbdc"
+    },
+    {
+      "original_path": "config/paper/task_manifest.yaml",
+      "current_path": "config/paper/task_manifest.yaml",
+      "original_storage": "workshop/archive/experiments_layout_20261017/originals/config/paper/task_manifest.yaml",
+      "sha256_before": "fd5284c5e2497fe151a0b30670524c0c8f1670ee909bff07079a04937c33edbe",
+      "sha256_after": "1067c658965bac2eeef12b397ad724b88d2456245c63a51ebc9315ef694b422f"
+    },
+    {
+      "original_path": "experiments/README.md",
+      "current_path": "experiments/README.md",
+      "original_storage": "workshop/archive/experiments_layout_20261017/originals/experiments/README.md",
+      "sha256_before": "373f31283f2a1b3d3eeab4df24d4044eb85e8afdf7535636bd48fb170caa6457",
+      "sha256_after": "03a57171d3de46e641bcd75760ad87c0ca5577748fb95c8cfc8046e4a0d61351"
+    },
+    {
+      "original_path": "docs/injection_precheck.md",
+      "current_path": "docs/injection_precheck.md",
+      "original_storage": "workshop/archive/experiments_layout_20261017/originals/docs/injection_precheck.md",
+      "sha256_before": "f82e5b29c5360efb8d9d05dde88f45248404f11780e1400310480342a30549f6",
+      "sha256_after": "d4e8f20e3991611175a65c0cf288919e6b5dfa3b943a0b987a181e5cb9de27c3"
+    },
+    {
+      "original_path": "workshop/README.md",
+      "current_path": "workshop/README.md",
+      "original_storage": "workshop/archive/experiments_layout_20261017/originals/workshop/README.md",
+      "sha256_before": "703689d69afdb0f90f50b4d684e5e97e0864189f821950e28cdb43ee56218568",
+      "sha256_after": "fa7a78950e56ae9caaa6f5232abdd03c3d40254a0412eedb4569b6df31fb692d"
+    },
+    {
+      "original_path": "workshop/completed/README.md",
+      "current_path": "workshop/completed/README.md",
+      "original_storage": "workshop/archive/experiments_layout_20261017/originals/workshop/completed/README.md",
+      "sha256_before": "9b8f1aae9a3aef555ace0c00c96f336b9ba7e82df25397e672e6e416c5920622",
+      "sha256_after": "cbbfff98226c95a085cc6cb8a60c9cdca108f80c948a42726683e391dea39a36"
+    }
+  ],
+  "new_files": [
+    {
+      "path": "experiments/common/__init__.py",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "experiments/diagnostics/__init__.py",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "experiments/calibration/__init__.py",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "experiments/tools/__init__.py",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "tests/test_experiments_layout.py",
+      "sha256": "d6ef5867121d29384edac19b233f9701e1002c006368def32cda26e1e62eeec8"
+    },
+    {
+      "path": "tests/fixtures/experiments_layout_source_20261017.json",
+      "sha256": "774a52485745cdb47cf11bb383173f40afad0acacb764132754d8499bd04ed67"
+    },
+    {
+      "path": "workshop/completed/experiments_layout_20261017.md",
+      "sha256": "ac7081b9014e54ea476f7ff4398dc1d8e3ec0ff70405ea03f13b3efdeca35243"
+    },
+    {
+      "path": "workshop/completed/experiments_layout_20261017_plan.md",
+      "sha256": "40ef39a39e6476316a1cc065d9b6ad4505a905786840e77c283e3e64de944209"
+    },
+    {
+      "path": "workshop/archive/experiments_layout_20261017/README.md",
+      "sha256": "295ed88a1ea3c9449797a914ca2c9326641c4b66ab34dffcac4712349242f74e"
+    }
+  ],
+  "historical_evidence": "All existing archive/result bytes preserved; dated commands keep their context.",
+  "limits": "Relocation only; no defense, task-scope, default or model changes; explicit old precheck source transitions only."
+}

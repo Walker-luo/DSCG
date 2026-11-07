@@ -1,0 +1,52 @@
+提醒：TaskResults 重构过程中出现小插曲（可能已处理）: name 'FunctionCall' is not defined
+
+For further information visit https://errors.pydantic.dev/2.12/u/undefined-annotation
+[DSCG MEDIATION] batch=0ef34a1e4fbe4813917e15047f49deb6 proposed=2 approved=2 blocked=0
+[DSCG MEDIATION] batch=97c1b7b886c147cebfd0dfd62bce574d proposed=1 approved=1 blocked=0
+[DSCG MEDIATION] batch=896563ec13d043eca887a453f4901110 proposed=2 approved=2 blocked=0
+[DSCG MEDIATION] batch=26b763b1f94d4c2594e5fa1c75090b77 proposed=1 approved=0 blocked=1
+[DSCG MEDIATION] batch=7d74fb9e0b11493e96ec013a8cf39910 proposed=1 approved=1 blocked=0
+[DSCG MEDIATION] batch=dc72234f3e5f4c6facddb8d4daff6802 proposed=2 approved=2 blocked=0
+[DSCG MEDIATION] batch=d50a232697d847ecb9057cefedbee17d proposed=1 approved=0 blocked=1
+[DSCG MEDIATION] batch=8f72d4ceca2943929be38db1d9632050 proposed=1 approved=1 blocked=0
+[DSCG MEDIATION] batch=81d992d15ad34ac7965af194c3f19d3b proposed=2 approved=2 blocked=0
+[DSCG MEDIATION] batch=62bf2262ba314f0ab433343ca5cd518d proposed=1 approved=1 blocked=0
+[DSCG MEDIATION] batch=3b80c759d493425e9afbc18e18550980 proposed=1 approved=1 blocked=0
+[DSCG MEDIATION] batch=1a50c3c0c0b94b48b2a1f6a3c3f458d3 proposed=2 approved=2 blocked=0
+[DSCG MEDIATION] batch=f81cb20a40504c9b8d749f91afd3d309 proposed=1 approved=1 blocked=0
+[DSCG MEDIATION] batch=9a52a3c56309408a950dcc811b5c0a65 proposed=1 approved=1 blocked=0
+[DSCG MEDIATION] batch=5aaa90a0ee41484cafc65492fcf55045 proposed=2 approved=2 blocked=0
+[DSCG MEDIATION] batch=3e464f1d9ec24055826783223431f84c proposed=1 approved=1 blocked=0
+[DSCG MEDIATION] batch=97ab2a1ab676457aa5cfdc2ef59e1801 proposed=1 approved=1 blocked=0
+[DSCG MEDIATION] batch=f3d572d678a144228402385d5714d75b proposed=2 approved=2 blocked=0
+[DSCG MEDIATION] batch=e7123af3cff746f6990a1a9888cc3e96 proposed=1 approved=1 blocked=0
+[DSCG MEDIATION] batch=a1271f0af7224737964d0af6837d4670 proposed=1 approved=1 blocked=0
+[DSCG MEDIATION] batch=163b6865184f49f695ad405e0ac8ea58 proposed=1 approved=1 blocked=0
+[DSCG MEDIATION] batch=1a93a8a339ae47e8878ebe530057b28a proposed=1 approved=1 blocked=0
+[DSCG MEDIATION] batch=f7e79ce81ad84f3eb016fcda443ac98c proposed=1 approved=1 blocked=0
+[DSCG MEDIATION] batch=d084acbde9c64e2190c48508f5faf3ef proposed=1 approved=1 blocked=0
+[DSCG MEDIATION] batch=7b42d8698bfb4c6592ba17d13f5fa219 proposed=2 approved=2 blocked=0
+[DSCG MEDIATION] batch=081f7550f1794df6a642877e409d6689 proposed=1 approved=1 blocked=0
+[DSCG MEDIATION] batch=5c84ba52ff5940a8a890740c6a786730 proposed=2 approved=2 blocked=0
+[DSCG MEDIATION] batch=e3ddc25a0d4c47e9ae94a8a94380e3f8 proposed=1 approved=0 blocked=1
+[DSCG MEDIATION] batch=616531c6bc074d6c99d4e2bff14d674a proposed=1 approved=1 blocked=0
+[DSCG MEDIATION] batch=c4033dee5fbd45da9f8259372d5dd7be proposed=2 approved=2 blocked=0
+[DSCG MEDIATION] batch=775861b84f264adb8ff5b1f0c7dc9df6 proposed=1 approved=0 blocked=1
+[DSCG MEDIATION] batch=911e04b22582467a983c2fa17658a026 proposed=1 approved=1 blocked=0
+[DSCG MEDIATION] batch=f32ac7388b5d4e8eb084c1ba5009e4c7 proposed=2 approved=2 blocked=0
+[DSCG MEDIATION] batch=c7f86cc2db1a4f7684737b3e80329adf proposed=1 approved=1 blocked=0
+[DSCG MEDIATION] batch=9af36a4da1a24c899f9a06e76f36f4d3 proposed=1 approved=1 blocked=0
+[DSCG MEDIATION] batch=fefd71db203d478a8023ec8dd0221d95 proposed=2 approved=2 blocked=0
+[DSCG MEDIATION] batch=adaf37adeb664d37bda54821e3e0b383 proposed=1 approved=1 blocked=0
+[DSCG MEDIATION] batch=0984c3c07f754073bc985fde106c1189 proposed=1 approved=1 blocked=0
+[DSCG MEDIATION] batch=c1ea960d120d4155b5989515fd8daa71 proposed=2 approved=2 blocked=0
+[DSCG MEDIATION] batch=694867b0f0a54d2a8a3fbb82b08b5b59 proposed=1 approved=1 blocked=0
+[DSCG MEDIATION] batch=152e72bca2f2497c8e75ed64b6baec7d proposed=1 approved=1 blocked=0
+[DSCG MEDIATION] batch=6fcfcc9493ed4536b23b11a3724075b3 proposed=2 approved=2 blocked=0
+[DSCG MEDIATION] batch=c394dca172a6466695e6418d0c82f315 proposed=1 approved=1 blocked=0
+[DSCG MEDIATION] batch=3fb801c6f35c438ebb3de0da8d70f2f9 proposed=1 approved=1 blocked=0
+[DSCG MEDIATION] batch=eab1ef01f33143ac8fa2a63706266600 proposed=1 approved=1 blocked=0
+[DSCG MEDIATION] batch=85925101f25d4df8b1998073d66b4750 proposed=1 approved=1 blocked=0
+[DSCG MEDIATION] batch=037021c697e84b148a1eb396e86a9c05 proposed=1 approved=1 blocked=0
+[DSCG MEDIATION] batch=c9f92e142a4243a5bc93b64ac0fffbb4 proposed=1 approved=1 blocked=0
+{"output": "examples/results/framework_optimization/20261007_v2_followup/stage2_i3.json", "status": "partial", "counts": {"total": 24, "valid": 24, "invalid": 0, "error": 0, "skipped": 0, "scope_violations": 8, "tool_boundary_violations": 0}}

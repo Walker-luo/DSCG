@@ -1,0 +1,10 @@
+{
+  "base_commit": "354cdf54ff1190d443ff3859b600c30ddf068c46",
+  "files": {
+    "dscg/pipelines/defended.py": "9754bba9ecd3a62e46e95df6992412de1ad5a62e0e70380b13ecccc0e9e2cb0c",
+    "experiments/i3_p0_stress.py": "cbd7d126dafc2246353fd841a11fd7596301a0d89efc2adbc5df7af64f5d2945",
+    "tests/fixtures/i3_p0_stress_cases.json": "f50a804e0438fce50f634ff763d2da949e0bc6719d210ad96f491ab700c8e4be",
+    "tests/test_i3_p0_stress.py": "d65b9c389e109f1c6fa74db3a31700543a9d5c8dba6ceee7cb3e5fcdde1f5fd7"
+  },
+  "code_working_tree_sha256": "0e779c35eaecf702d583d55be4d79b0525ca41b96d42780014a0aa91a9c8f3a2"
+}

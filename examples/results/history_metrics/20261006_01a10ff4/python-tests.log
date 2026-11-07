@@ -1,0 +1,218 @@
+test_log_redaction_covers_provider_error_messages (test_dashboard_config.DashboardConfigTests) ... ok
+test_redaction_removes_raw_credentials_from_public_config (test_dashboard_config.DashboardConfigTests) ... ok
+test_start_run_stores_redacted_config_but_passes_secret_to_worker (test_dashboard_config.DashboardConfigTests) ... ok
+test_analysis_rejects_unmapped_ids_and_invalid_suites (test_dashboard_history.DashboardHistoryTests) ... ok
+test_analyze_loads_task_records_only_for_selected_results (test_dashboard_history.DashboardHistoryTests) ... ok
+test_catalog_discovers_result_layouts_and_normalizes_rates (test_dashboard_history.DashboardHistoryTests) ... ok
+test_dashboard_exposes_the_history_analysis_view (test_dashboard_history.DashboardHistoryTests) ... ok
+test_export_contains_selected_comparison_metrics_and_task_records (test_dashboard_history.DashboardHistoryTests) ... ok
+test_export_csv_neutralizes_formula_labels_without_changing_json (test_dashboard_history.DashboardHistoryTests) ... ok
+test_export_deduplicates_selection_and_rejects_empty_suite_match (test_dashboard_history.DashboardHistoryTests) ... ok
+test_export_excludes_policy_errors_and_timeouts_even_with_boolean_outcomes (test_dashboard_history.DashboardHistoryTests) ... ok
+test_export_keeps_missing_and_error_results_out_of_observed_denominators (test_dashboard_history.DashboardHistoryTests) ... ok
+test_export_marks_every_suite_affected_by_global_record_limit (test_dashboard_history.DashboardHistoryTests) ... ok
+test_export_reads_csv_only_experiments_and_flags_legacy_status (test_dashboard_history.DashboardHistoryTests) ... ok
+test_export_rejects_invalid_or_disappeared_selections (test_dashboard_history.DashboardHistoryTests) ... ok
+test_export_respects_suite_filter_and_csv_rates_use_percent_units (test_dashboard_history.DashboardHistoryTests) ... ok
+test_fixture_audit_preserves_error_denominators (test_harness_audit.HarnessAuditTests) ... ok
+test_manifest_hash_uses_one_canonical_run_manifest (test_harness_audit.HarnessAuditTests) ... ok
+test_missing_security_result_is_infrastructure_error (test_harness_audit.HarnessAuditTests) ... ok
+test_payload_delivery_requires_payload_text_in_messages (test_harness_audit.HarnessAuditTests) ... ok
+test_predicate_replay_uses_final_state_oracle (test_harness_audit.HarnessAuditTests) ... ok
+test_security_result_fields_never_default_missing_to_safe (test_harness_audit.HarnessAuditTests) ... ok
+test_sha256_ranking_is_stable_and_seeded (test_harness_audit.HarnessAuditTests) ... ok
+test_fixture_report_is_replayable_and_compact (test_harness_audit_replay.HarnessAuditReplayTests) ... ok
+test_accepts_all_declared_statuses (test_harness_records.HarnessRecordTests) ... ok
+test_compact_dict_is_allowlisted_and_bounded (test_harness_records.HarnessRecordTests) ... ok
+test_compact_final_state_does_not_leak_deep_sensitive_objects (test_harness_records.HarnessRecordTests) ... ok
+test_full_dict_is_opt_in_but_details_remain_bounded (test_harness_records.HarnessRecordTests) ... ok
+test_missing_security_results_remain_missing_for_non_valid_sample (test_harness_records.HarnessRecordTests) ... ok
+test_rejects_unknown_status (test_harness_records.HarnessRecordTests) ... ok
+test_run_record_counts_each_status_without_coercing_results (test_harness_records.HarnessRecordTests) ... ok
+test_cli_retains_report_and_exits_nonzero_for_scope_violation (test_i3_p0_stress.I3P0StressTests) ... ok
+test_concurrency_fixture_overlaps_and_preserves_original_action (test_i3_p0_stress.I3P0StressTests) ... ok
+test_error_feedback_reaches_recovery_and_preserves_tool_contract (test_i3_p0_stress.I3P0StressTests) ... ok
+test_error_report_preserves_partial_effects_and_ledger (test_i3_p0_stress.I3P0StressTests) ... ok
+test_fixture_cannot_drop_duplicate_or_misclassify_a_case (test_i3_p0_stress.I3P0StressTests) ... ok
+test_fixture_contains_all_required_recovery_paths (test_i3_p0_stress.I3P0StressTests) ... ok
+test_no_go_requires_all_samples_and_assertions_to_pass (test_i3_p0_stress.I3P0StressTests) ... ok
+test_report_is_compact_and_serializable (test_i3_p0_stress.I3P0StressTests) ... ok
+test_report_records_actual_fresh_ticket_for_the_successful_recovery (test_i3_p0_stress.I3P0StressTests) ... ok
+test_retry_is_a_new_action_and_failed_ticket_is_not_reused (test_i3_p0_stress.I3P0StressTests) ... ok
+test_same_id_argument_tampering_is_blocked_without_runtime_effect (test_i3_p0_stress.I3P0StressTests) ... ok
+test_sample_errors_are_retained_and_never_become_no_go (test_i3_p0_stress.I3P0StressTests) ... ok
+test_scope_oracle_reports_fresh_call_gaps_instead_of_false_no_go (test_i3_p0_stress.I3P0StressTests) ... ok
+test_ticket_fixture_runtime_forwards_object_and_destination_arguments (test_i3_p0_stress.I3P0StressTests) ... ok
+test_tool_swap_and_forged_role_are_blocked_then_missing_work_recovers (test_i3_p0_stress.I3P0StressTests) ... ok
+test_duplicate_ticket_during_execution_cannot_fail_the_winning_action (test_i3_p0_stress.I3StateTransitionTests) ... ok
+test_failed_action_ticket_is_spent_and_retry_needs_fresh_approval (test_i3_p0_stress.I3StateTransitionTests) ... ok
+test_legal_paths_and_all_illegal_transitions (test_i3_p0_stress.I3StateTransitionTests) ... ok
+test_deepseek_catalog_uses_current_model_ids (test_model_config.ModelConfigTests) ... ok
+test_deepseek_thinking_is_disabled_for_agentdojo_compatibility (test_model_config.ModelConfigTests) ... ok
+test_env_overrides_local_config (test_model_config.ModelConfigTests) ... ok
+test_explicit_args_override_env_and_local_config (test_model_config.ModelConfigTests) ... ok
+test_loads_local_toml_and_redacts_api_key (test_model_config.ModelConfigTests) ... ok
+test_main_and_security_models_can_use_different_providers (test_model_config.ModelConfigTests) ... ok
+test_missing_security_config_reuses_primary_config (test_model_config.ModelConfigTests) ... ok
+test_baseline_and_dscg_use_identical_actual_catalog_subsets (test_partial_baseline.PartialBaselineTests) ... ok
+test_baseline_does_not_load_defense_metadata_or_security_pipeline (test_partial_baseline.PartialBaselineTests) ... ok
+test_cli_baseline_retains_attack_and_forces_rerun (test_partial_baseline.PartialBaselineTests) ... ok
+test_cli_configuration_failure_returns_nonzero (test_partial_baseline.PartialBaselineTests) ... ok
+test_cli_default_keeps_dscg_and_cache_policy (test_partial_baseline.PartialBaselineTests) ... ok
+test_cli_retains_force_rerun_environment_switch (test_partial_baseline.PartialBaselineTests) ... ok
+test_original_pipeline_uses_native_tool_loop_without_defense (test_partial_baseline.PartialBaselineTests) ... ok
+test_error_state_blocks_all_actions (test_permission_sandbox.PermissionSandboxTests) ... ok
+test_intent_parser_exception_sets_error_state_before_execution (test_permission_sandbox.PermissionSandboxTests) ... ok
+test_mixed_batch_prunes_unknown_action_and_keeps_authorized_action (test_permission_sandbox.PermissionSandboxTests) ... ok
+test_none_and_empty_allowlist_are_distinct_and_fail_closed (test_permission_sandbox.PermissionSandboxTests) ... ok
+test_unknown_tool_is_blocked_even_when_allowlisted (test_permission_sandbox.PermissionSandboxTests) ... ok
+test_action_ledger_rejects_illegal_terminal_transition (test_sandbox_execution.SandboxExecutionTests) ... ok
+test_allowlist_cannot_be_mutated_through_input_or_getter (test_sandbox_execution.SandboxExecutionTests) ... ok
+test_audit_allow_cannot_override_deterministic_sandbox (test_sandbox_execution.SandboxExecutionTests) ... ok
+test_audit_packet_bounds_history_and_neutralizes_unicode_controls (test_sandbox_execution.SandboxExecutionTests) ... ok
+test_audit_timeout_abstains_and_is_recorded_without_raw_response (test_sandbox_execution.SandboxExecutionTests) ... ok
+test_authorization_precedes_generation_and_first_candidate_cannot_grant_itself (test_sandbox_execution.SandboxExecutionTests) ... ok
+test_batch_is_decided_before_any_member_executes (test_sandbox_execution.SandboxExecutionTests) ... ok
+test_candidate_calls_cannot_be_installed_as_contract_and_grant_is_immutable (test_sandbox_execution.SandboxExecutionTests) ... ok
+test_checker_denial_and_unauthorized_replan_are_both_mediated (test_sandbox_execution.SandboxExecutionTests) ... ok
+test_compilation_failure_revokes_installed_contract_before_generation (test_sandbox_execution.SandboxExecutionTests) ... ok
+test_compiler_isolated_from_history_and_tool_feedback_cannot_expand_grant (test_sandbox_execution.SandboxExecutionTests) ... ok
+test_contract_version_stable_for_same_inputs_and_changes_with_policy_or_grant (test_sandbox_execution.SandboxExecutionTests) ... ok
+test_empty_compilation_blocks_first_candidate (test_sandbox_execution.SandboxExecutionTests) ... ok
+test_empty_policies_with_bound_model_never_execute_or_retry (test_sandbox_execution.SandboxExecutionTests) ... ok
+test_empty_user_or_absent_messages_does_not_fall_back_to_query (test_sandbox_execution.SandboxExecutionTests) ... ok
+test_explicit_public_read_metadata_records_implicit_read_without_model_call (test_sandbox_execution.SandboxExecutionTests) ... ok
+test_factory_uses_single_ticketed_execution_path (test_sandbox_execution.SandboxExecutionTests) ... ok
+test_invalid_metadata_is_reported_as_critical (test_sandbox_execution.SandboxExecutionTests) ... ok
+test_invalid_policy_update_revokes_old_permissions (test_sandbox_execution.SandboxExecutionTests) ... ok
+test_malformed_catalog_entry_is_fail_closed_not_compiler_crash (test_sandbox_execution.SandboxExecutionTests) ... ok
+test_malformed_or_abstaining_audit_defaults_to_block_for_action (test_sandbox_execution.SandboxExecutionTests) ... ok
+test_missing_tool_metadata_is_critical_and_never_implicit_read (test_sandbox_execution.SandboxExecutionTests) ... ok
+test_mixed_batches_execute_only_authorized_actions (test_sandbox_execution.SandboxExecutionTests) ... ok
+test_new_text_only_turn_compiles_empty_policy_and_clears_old_permissions (test_sandbox_execution.SandboxExecutionTests) ... ok
+test_new_user_turn_replaces_grant_and_version (test_sandbox_execution.SandboxExecutionTests) ... ok
+test_no_sandbox_ablation_skips_authorization (test_sandbox_execution.SandboxExecutionTests) ... ok
+test_parser_failures_clear_existing_policy_and_cannot_execute (test_sandbox_execution.SandboxExecutionTests) ... ok
+test_parser_valid_object_and_legacy_array (test_sandbox_execution.SandboxExecutionTests) ... ok
+test_reference_monitor_issues_one_shot_ticket_and_records_execution (test_sandbox_execution.SandboxExecutionTests) ... ok
+test_reference_monitor_rejects_incomplete_forged_allow_record (test_sandbox_execution.SandboxExecutionTests) ... ok
+test_same_trusted_turn_reuses_authorization_contract (test_sandbox_execution.SandboxExecutionTests) ... ok
+test_sensitive_read_deny_does_not_block_source_read (test_sandbox_execution.SandboxExecutionTests) ... ok
+test_sensitive_read_is_allowed_but_not_implicit_and_skips_intent_compiler (test_sandbox_execution.SandboxExecutionTests) ... ok
+test_shared_catalog_can_cover_multiple_suites_without_current_runtime_failure (test_sandbox_execution.SandboxExecutionTests) ... ok
+test_structured_audit_uses_normalized_json_input_and_redacted_metadata (test_sandbox_execution.SandboxExecutionTests) ... ok
+test_task_json_projection_keeps_only_contract_and_runtime_state (test_sandbox_execution.SandboxExecutionTests) ... ok
+test_ticketed_executor_rejects_unmediated_calls (test_sandbox_execution.SandboxExecutionTests) ... ok
+test_trace_level_compacts_task_json_and_full_mode_writes_sidecar (test_sandbox_execution.SandboxExecutionTests) ... ok
+test_trace_persists_authorization_before_generation_without_raw_request (test_sandbox_execution.SandboxExecutionTests) ... ok
+test_unregistered_tool_is_recorded_as_critical (test_sandbox_execution.SandboxExecutionTests) ... ok
+test_valid_empty_parser_response_is_not_an_error (test_sandbox_execution.SandboxExecutionTests) ... ok
+test_catalog_must_reference_registered_tools (test_tool_metadata.ToolMetadataTests) ... ok
+test_catalog_rejects_missing_classification (test_tool_metadata.ToolMetadataTests) ... ok
+test_explicit_missing_catalog_is_rejected (test_tool_metadata.ToolMetadataTests) ... ok
+test_generated_catalog_covers_all_agentdojo_suites (test_tool_metadata.ToolMetadataTests) ... ok
+test_invalid_cross_field_metadata_is_rejected (test_tool_metadata.ToolMetadataTests) ... ok
+test_missing_metadata_is_explicitly_critical (test_tool_metadata.ToolMetadataTests) ... ok
+test_schema_classifies_risk_and_confirmation (test_tool_metadata.ToolMetadataTests) ... ok
+test_sink_prevents_public_read_fast_path (test_tool_metadata.ToolMetadataTests) ... ok
+test_toml_loader_reads_tools_table (test_tool_metadata.ToolMetadataTests) ... ok
+
+----------------------------------------------------------------------
+Ran 118 tests in 0.219s
+
+OK
+意图解析失败，沙箱进入安全失败状态: ValueError
+存在违规action
+🛑 [SANDBOX FULL BLOCK] Sandbox Violation: All attempted actions blocked. Reasons: POLICY_ERROR: tool 'safe_tool'
+意图解析失败，沙箱进入安全失败状态: TimeoutError
+存在违规action
+🛑 [SANDBOX FULL BLOCK] Sandbox Violation: All attempted actions blocked. Reasons: POLICY_ERROR: tool 'send_message'
+存在违规action
+✂️ [SANDBOX PRUNING] 裁剪违规动作: ["UNKNOWN_TOOL: tool 'unknown_tool'"]，保留合法动作。
+存在违规action
+🛑 [SANDBOX FULL BLOCK] Sandbox Violation: All attempted actions blocked. Reasons: POLICY_UNINITIALIZED: tool 'read_profile'
+存在违规action
+🛑 [SANDBOX FULL BLOCK] Sandbox Violation: All attempted actions blocked. Reasons: POLICY_INITIALIZED_EMPTY: tool 'read_profile'
+存在违规action
+🛑 [SANDBOX FULL BLOCK] Sandbox Violation: All attempted actions blocked. Reasons: UNKNOWN_TOOL: tool 'ghost_tool'
+存在违规action
+🛑 [SANDBOX FULL BLOCK] Sandbox Violation: All attempted actions blocked. Reasons: TOOL_NOT_ALLOWED: tool 'forbidden_tool'
+[DSCG MEDIATION] batch=fb4040f5c37b42468744cb4f521193c0 proposed=1 approved=0 blocked=1
+存在违规action
+✂️ [SANDBOX PRUNING] 裁剪违规动作: ["TOOL_NOT_ALLOWED: tool 'forbidden_tool'"]，保留合法动作。
+[DSCG MEDIATION] batch=b39af2f63be447b1bca7e52945b12c7c proposed=2 approved=1 blocked=1
+[DSCG MEDIATION] batch=c923ca6cc6a547d38557bb88cca021a9 proposed=1 approved=0 blocked=1
+[DSCG MEDIATION] batch=3e3465226e2c4e69a08c0de0a8a543a7 proposed=1 approved=0 blocked=1
+意图解析失败，沙箱进入安全失败状态: TimeoutError
+存在违规action
+🛑 [SANDBOX FULL BLOCK] Sandbox Violation: All attempted actions blocked. Reasons: POLICY_ERROR: tool 'safe_tool'
+存在违规action
+🛑 [SANDBOX FULL BLOCK] Sandbox Violation: All attempted actions blocked. Reasons: TOOL_NOT_ALLOWED: tool 'forbidden_tool'
+存在违规action
+🛑 [SANDBOX FULL BLOCK] Sandbox Violation: All attempted actions blocked. Reasons: POLICY_INITIALIZED_EMPTY: tool 'safe_tool'
+存在违规action
+🛑 [SANDBOX FULL BLOCK] Sandbox Violation: All attempted actions blocked. Reasons: POLICY_UNINITIALIZED: tool 'safe_tool'
+存在违规action
+🛑 [SANDBOX FULL BLOCK] Sandbox Violation: All attempted actions blocked. Reasons: POLICY_INITIALIZED_EMPTY: tool 'safe_tool'
+意图解析失败，沙箱进入安全失败状态: ValueError
+存在违规action
+🛑 [SANDBOX FULL BLOCK] Sandbox Violation: All attempted actions blocked. Reasons: POLICY_ERROR: tool 'safe_tool'
+意图解析失败，沙箱进入安全失败状态: ValueError
+存在违规action
+🛑 [SANDBOX FULL BLOCK] Sandbox Violation: All attempted actions blocked. Reasons: POLICY_ERROR: tool 'safe_tool'
+存在违规action
+🛑 [SANDBOX FULL BLOCK] Sandbox Violation: All attempted actions blocked. Reasons: POLICY_ERROR: tool 'safe_tool'
+存在违规action
+🛑 [SANDBOX FULL BLOCK] Sandbox Violation: All attempted actions blocked. Reasons: POLICY_ERROR: tool 'safe_tool'
+存在违规action
+🛑 [SANDBOX FULL BLOCK] Sandbox Violation: All attempted actions blocked. Reasons: POLICY_ERROR: tool 'safe_tool'
+[DSCG MEDIATION] batch=1b071f0e20794c88b6912ec11380e01d proposed=1 approved=0 blocked=1
+[DSCG MEDIATION] batch=4bb096689bd64cc69f90e03d8fdbf388 proposed=1 approved=0 blocked=1
+[DSCG MEDIATION] batch=cb91095b444f4b4fa9079bb824e2bf60 proposed=1 approved=0 blocked=1
+存在违规action
+✂️ [SANDBOX PRUNING] 裁剪违规动作: ["UNKNOWN_TOOL: tool 'ghost_tool'"]，保留合法动作。
+存在违规action
+✂️ [SANDBOX PRUNING] 裁剪违规动作: ["TOOL_NOT_ALLOWED: tool 'forbidden_tool'"]，保留合法动作。
+存在违规action
+🛑 [SANDBOX FULL BLOCK] Sandbox Violation: All attempted actions blocked. Reasons: POLICY_INITIALIZED_EMPTY: tool 'safe_tool'
+存在违规action
+🛑 [SANDBOX FULL BLOCK] Sandbox Violation: All attempted actions blocked. Reasons: TOOL_NOT_ALLOWED: tool 'safe_tool'
+意图解析失败，沙箱进入安全失败状态: JSONDecodeError
+存在违规action
+🛑 [SANDBOX FULL BLOCK] Sandbox Violation: All attempted actions blocked. Reasons: POLICY_ERROR: tool 'safe_tool'
+意图解析失败，沙箱进入安全失败状态: TypeError
+存在违规action
+🛑 [SANDBOX FULL BLOCK] Sandbox Violation: All attempted actions blocked. Reasons: POLICY_ERROR: tool 'safe_tool'
+意图解析失败，沙箱进入安全失败状态: ValueError
+存在违规action
+🛑 [SANDBOX FULL BLOCK] Sandbox Violation: All attempted actions blocked. Reasons: POLICY_ERROR: tool 'safe_tool'
+意图解析失败，沙箱进入安全失败状态: ValueError
+存在违规action
+🛑 [SANDBOX FULL BLOCK] Sandbox Violation: All attempted actions blocked. Reasons: POLICY_ERROR: tool 'safe_tool'
+意图解析失败，沙箱进入安全失败状态: ValueError
+存在违规action
+🛑 [SANDBOX FULL BLOCK] Sandbox Violation: All attempted actions blocked. Reasons: POLICY_ERROR: tool 'safe_tool'
+意图解析失败，沙箱进入安全失败状态: ValueError
+存在违规action
+🛑 [SANDBOX FULL BLOCK] Sandbox Violation: All attempted actions blocked. Reasons: POLICY_ERROR: tool 'safe_tool'
+意图解析失败，沙箱进入安全失败状态: ValueError
+存在违规action
+🛑 [SANDBOX FULL BLOCK] Sandbox Violation: All attempted actions blocked. Reasons: POLICY_ERROR: tool 'safe_tool'
+意图解析失败，沙箱进入安全失败状态: ValueError
+存在违规action
+🛑 [SANDBOX FULL BLOCK] Sandbox Violation: All attempted actions blocked. Reasons: POLICY_ERROR: tool 'safe_tool'
+意图解析失败，沙箱进入安全失败状态: ValueError
+存在违规action
+🛑 [SANDBOX FULL BLOCK] Sandbox Violation: All attempted actions blocked. Reasons: POLICY_ERROR: tool 'safe_tool'
+意图解析失败，沙箱进入安全失败状态: ValueError
+存在违规action
+🛑 [SANDBOX FULL BLOCK] Sandbox Violation: All attempted actions blocked. Reasons: POLICY_ERROR: tool 'safe_tool'
+意图解析失败，沙箱进入安全失败状态: TimeoutError
+存在违规action
+🛑 [SANDBOX FULL BLOCK] Sandbox Violation: All attempted actions blocked. Reasons: POLICY_ERROR: tool 'safe_tool'
+[DSCG MEDIATION] batch=51e98dc419d34507ac9c811652fbb448 proposed=1 approved=1 blocked=0
+[DSCG MEDIATION] batch=94c2c3b8161845d3b75120622cbd4279 proposed=1 approved=0 blocked=1
+[DSCG MEDIATION] batch=702a69befd094b7b95d2ea0c5fb0b30b proposed=1 approved=1 blocked=0
+存在违规action
+🛑 [SANDBOX FULL BLOCK] Sandbox Violation: All attempted actions blocked. Reasons: POLICY_INITIALIZED_EMPTY: tool 'safe_tool'
+Generated /var/folders/l1/104fhcjs6zx059cf921k8fk00000gn/T/tmp8642skas/tools.toml with 69 classified tools

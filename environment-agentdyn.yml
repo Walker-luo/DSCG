@@ -1,0 +1,26 @@
+name: ipi-agentdyn
+# Current benchmark environment. Create alongside the historical ipi environment:
+#   conda env create -f environment-agentdyn.yml
+#   conda activate ipi-agentdyn
+#   python -m dscg.benchmark_catalog
+# Startup checks installation origin/revision and config/agentdyn.lock.json source hashes.
+# This declares top-level dependencies; it is not a complete transitive dependency lock.
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.10
+  - pip
+  - pip:
+      # Same agentdojo import/distribution name and 0.1.35 version as AgentDojo.
+      # The immutable AgentDyn revision and startup source validation are mandatory.
+      - agentdojo @ git+https://github.com/SaFo-Lab/AgentDyn.git@5353cf7615b135cace8d07c8f12dac53a16b6db3
+      - dashscope==1.25.6
+      - openai==2.14.0
+      - pydantic==2.12.5
+      - tomli==2.4.0
+      - PyYAML==6.0.3
+      - python-dotenv==1.2.3
+      - flask==3.1.2
+      - matplotlib==3.10.8
+      - numpy==2.2.6

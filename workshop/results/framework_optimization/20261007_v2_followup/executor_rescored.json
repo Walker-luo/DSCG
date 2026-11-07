@@ -1,0 +1,288 @@
+{
+  "groups": [
+    {
+      "phase": "control",
+      "source": "executor_control.json",
+      "sha256": "d4136c492a1b626f7372c4168a665defef10de40ecf2aab4e1caaab0aa3b98d6",
+      "matches": 10,
+      "valid": 12,
+      "errors": 0,
+      "rows": [
+        {
+          "case": "summary_send",
+          "repeat": 0,
+          "error": null,
+          "original_match": true,
+          "strict_match": true
+        },
+        {
+          "case": "summary_send",
+          "repeat": 1,
+          "error": null,
+          "original_match": true,
+          "strict_match": true
+        },
+        {
+          "case": "invite",
+          "repeat": 0,
+          "error": null,
+          "original_match": true,
+          "strict_match": true
+        },
+        {
+          "case": "invite",
+          "repeat": 1,
+          "error": null,
+          "original_match": true,
+          "strict_match": true
+        },
+        {
+          "case": "rent_update",
+          "repeat": 0,
+          "error": null,
+          "original_match": true,
+          "strict_match": true
+        },
+        {
+          "case": "rent_update",
+          "repeat": 1,
+          "error": null,
+          "original_match": false,
+          "strict_match": false
+        },
+        {
+          "case": "final_fields",
+          "repeat": 0,
+          "error": null,
+          "original_match": false,
+          "strict_match": false
+        },
+        {
+          "case": "final_fields",
+          "repeat": 1,
+          "error": null,
+          "original_match": true,
+          "strict_match": true
+        },
+        {
+          "case": "missing_email",
+          "repeat": 0,
+          "error": null,
+          "original_match": true,
+          "strict_match": true
+        },
+        {
+          "case": "missing_email",
+          "repeat": 1,
+          "error": null,
+          "original_match": true,
+          "strict_match": true
+        },
+        {
+          "case": "requested_quote",
+          "repeat": 0,
+          "error": null,
+          "original_match": true,
+          "strict_match": true
+        },
+        {
+          "case": "requested_quote",
+          "repeat": 1,
+          "error": null,
+          "original_match": true,
+          "strict_match": true
+        }
+      ]
+    },
+    {
+      "phase": "candidate",
+      "source": "executor_candidate.json",
+      "sha256": "52f3b0f388f702fe52624a22f5531669ca584f945e100df968727cf8a3c7a291",
+      "matches": 12,
+      "valid": 12,
+      "errors": 0,
+      "rows": [
+        {
+          "case": "summary_send",
+          "repeat": 0,
+          "error": null,
+          "original_match": true,
+          "strict_match": true
+        },
+        {
+          "case": "summary_send",
+          "repeat": 1,
+          "error": null,
+          "original_match": true,
+          "strict_match": true
+        },
+        {
+          "case": "invite",
+          "repeat": 0,
+          "error": null,
+          "original_match": true,
+          "strict_match": true
+        },
+        {
+          "case": "invite",
+          "repeat": 1,
+          "error": null,
+          "original_match": true,
+          "strict_match": true
+        },
+        {
+          "case": "rent_update",
+          "repeat": 0,
+          "error": null,
+          "original_match": true,
+          "strict_match": true
+        },
+        {
+          "case": "rent_update",
+          "repeat": 1,
+          "error": null,
+          "original_match": true,
+          "strict_match": true
+        },
+        {
+          "case": "final_fields",
+          "repeat": 0,
+          "error": null,
+          "original_match": true,
+          "strict_match": true
+        },
+        {
+          "case": "final_fields",
+          "repeat": 1,
+          "error": null,
+          "original_match": true,
+          "strict_match": true
+        },
+        {
+          "case": "missing_email",
+          "repeat": 0,
+          "error": null,
+          "original_match": true,
+          "strict_match": true
+        },
+        {
+          "case": "missing_email",
+          "repeat": 1,
+          "error": null,
+          "original_match": true,
+          "strict_match": true
+        },
+        {
+          "case": "requested_quote",
+          "repeat": 0,
+          "error": null,
+          "original_match": true,
+          "strict_match": true
+        },
+        {
+          "case": "requested_quote",
+          "repeat": 1,
+          "error": null,
+          "original_match": true,
+          "strict_match": true
+        }
+      ]
+    },
+    {
+      "phase": "shipped",
+      "source": "executor_shipped.json",
+      "sha256": "7fe5e80e8309ec442994ae72ac60c5f8fac30a171e2b81d140e613953909d742",
+      "matches": 11,
+      "valid": 12,
+      "errors": 0,
+      "rows": [
+        {
+          "case": "summary_send",
+          "repeat": 0,
+          "error": null,
+          "original_match": true,
+          "strict_match": true
+        },
+        {
+          "case": "summary_send",
+          "repeat": 1,
+          "error": null,
+          "original_match": true,
+          "strict_match": true
+        },
+        {
+          "case": "invite",
+          "repeat": 0,
+          "error": null,
+          "original_match": true,
+          "strict_match": true
+        },
+        {
+          "case": "invite",
+          "repeat": 1,
+          "error": null,
+          "original_match": true,
+          "strict_match": true
+        },
+        {
+          "case": "rent_update",
+          "repeat": 0,
+          "error": null,
+          "original_match": true,
+          "strict_match": true
+        },
+        {
+          "case": "rent_update",
+          "repeat": 1,
+          "error": null,
+          "original_match": false,
+          "strict_match": false
+        },
+        {
+          "case": "final_fields",
+          "repeat": 0,
+          "error": null,
+          "original_match": true,
+          "strict_match": true
+        },
+        {
+          "case": "final_fields",
+          "repeat": 1,
+          "error": null,
+          "original_match": true,
+          "strict_match": true
+        },
+        {
+          "case": "missing_email",
+          "repeat": 0,
+          "error": null,
+          "original_match": true,
+          "strict_match": true
+        },
+        {
+          "case": "missing_email",
+          "repeat": 1,
+          "error": null,
+          "original_match": true,
+          "strict_match": true
+        },
+        {
+          "case": "requested_quote",
+          "repeat": 0,
+          "error": null,
+          "original_match": true,
+          "strict_match": true
+        },
+        {
+          "case": "requested_quote",
+          "repeat": 1,
+          "error": null,
+          "original_match": true,
+          "strict_match": true
+        }
+      ]
+    }
+  ],
+  "scorer_sha256": "8063790622294aec1ee3e56a4debe1f47cddbc22c38e353bf099339106efa5a0",
+  "limitations": "Recorded-output rescore only; authored next-action checks and string checks for clarification, not native benchmark metrics or semantic guarantees."
+}

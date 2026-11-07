@@ -1,0 +1,56 @@
+{
+  "status": "pass",
+  "scope": "UI display only, no new defense behavior",
+  "commands": [
+    {
+      "argv": [
+        "/opt/miniconda3/envs/ipi/bin/python",
+        "-c",
+        "import unittest; from pathlib import Path; import dscg.paths as paths; paths.DASHBOARD_RESULTS_DIR=Path('workshop/artifacts/20261008_dashboard_defense_structure/dashboard_runs').resolve(); result=unittest.TextTestRunner(verbosity=2).run(unittest.defaultTestLoader.discover('tests',pattern='test_dashboard*.py')); raise SystemExit(not result.wasSuccessful())"
+      ],
+      "exit_code": 0,
+      "log": "dashboard_tests_final.log"
+    },
+    {
+      "argv": [
+        "git",
+        "diff",
+        "--check"
+      ],
+      "exit_code": 0,
+      "log": "diff_check.log"
+    },
+    {
+      "argv": [
+        "/opt/miniconda3/envs/ipi/bin/python",
+        "workshop/verify_migration.py"
+      ],
+      "exit_code": 0,
+      "log": "migration_check_final.log"
+    }
+  ],
+  "protected_files": 63,
+  "presentation_files": 3,
+  "form_ids_preserved": true,
+  "runtime_constants": {
+    "AUDIT_MAX_TOOL_RESULTS": 4,
+    "AUDIT_MAX_TOOL_RESULT_LENGTH": 2048,
+    "AUDIT_MAX_TOOL_DESCRIPTION_LENGTH": 512
+  },
+  "runtime_defaults": {
+    "audit_retries": 0,
+    "completion_prompt": false
+  },
+  "dashboard_tests_passed": 20,
+  "browser": {
+    "defenseLayers": 2,
+    "executionInfrastructure": 1,
+    "horizontalOverflow": false,
+    "notes": "\n            已生效 · 授权按可信任务授权工具目录排序、温度 0；识别用户已提出的条件任务，必要准备读取与后续写入分别判断。授权错误默认拒绝。\n            已生效 · 审计输入补充有限任务上下文审计读取当前任务最近 4 条工具返回，每条最多 2,048 字符，明确标为不可信；仅提供候选工具的宿主描述，最多 512 字符。\n            已生效 · 读取判断准备读取与外传分开允许查询尚未知的任务事实；具体目标与目的地需要任务证据。已授权且无输出目的地的只读来源，语义拒绝可按元数据放行；后续发送、支付仍单独审核。无效或不确定审计默认阻断。\n            当前能力边界工具级约束对象、目的地、参数与数据权限尚未强制约束。三层架构、授权对照校准均未实施；执行提示候选已撤回。\n          ",
+    "title": "DSCG 两层防御结构",
+    "visible": true
+  },
+  "screenshot_sha256": "1dfadcff37c36acd372fbf7a3978c73f67e194e39348b65261996661a3d60372",
+  "new_model_calls": 0,
+  "new_benchmark_samples": 0
+}

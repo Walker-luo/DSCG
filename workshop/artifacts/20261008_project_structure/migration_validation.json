@@ -1,0 +1,440 @@
+{
+  "status": "pass",
+  "scope": "workshop material relocation, not benchmark efficacy",
+  "document_count": 11,
+  "artifact_count": 282,
+  "moved_file_hashes_checked": 293,
+  "original_bytes_and_legacy_hashes_checked": 293,
+  "retired_legacy_aliases_checked": 4,
+  "structure_manifest_sha256": "5177cc942528dd69a330bd2d7f7148502b7056c964c1f1ed7afbd24161aff884",
+  "historical_documents_archived": 3,
+  "local_links_checked": 93,
+  "preexisting_missing_document_links": [
+    {
+      "document": "workshop/framework_optimization_review_20261007.md",
+      "target": "../../DSCG/results/partial_benchmark/deepseek-flash_workshop_opt/tool_knowledge/slack/user_task_1/tool_knowledge/injection_task_3.json"
+    },
+    {
+      "document": "workshop/framework_optimization_review_20261007.md",
+      "target": "../../DSCG/results/partial_benchmark/deepseek-flash_workshop_opt/tool_knowledge/banking/user_task_2/tool_knowledge/injection_task_0.json"
+    },
+    {
+      "document": "workshop/framework_optimization_review_20261007.md",
+      "target": "../../DSCG/results/partial_benchmark/deepseek-flash_workshop_opt/important_instructions/travel/user_task_0/important_instructions/injection_task_1.json"
+    }
+  ],
+  "python_artifact_syntax_checked": 41,
+  "script_root_depths_checked": 22,
+  "runtime_changed": false,
+  "research_route_changed": false,
+  "raw_result_roots_moved": 0,
+  "new_model_calls": 0,
+  "new_benchmark_samples": 0,
+  "runtime_sha256": "75583be0d62b2a478f9d070f79b7aa84dffd71b12a21931e60c696273163f7b0",
+  "migration_manifest_sha256": "e07b46db274dd462874d9c16309ec99f36056e27028b7ff99e2fa58a8bc1a568",
+  "verifier_sha256": "989c08c52de03dd2782dd807cb3fbbf1615822dd9c2b0caf65b7ed046567e987",
+  "checked_links": [
+    {
+      "document": "workshop/workshop_optimization_report.md",
+      "target": "/Users/luo/Desktop/AgentDefence/DSCG/docs/i3_p0_stress_report.md"
+    },
+    {
+      "document": "workshop/framework_v2_followup_report.md",
+      "target": "/Users/luo/Desktop/AgentDefence/DSCG/workshop/results/framework_optimization/20261007_v2_followup"
+    },
+    {
+      "document": "workshop/framework_optimization_20261007.md",
+      "target": "/Users/luo/Desktop/AgentDefence/DSCG/download/dscg-history-analysis-20261007T075255Z"
+    },
+    {
+      "document": "workshop/framework_optimization_20261007.md",
+      "target": "/Users/luo/Desktop/AgentDefence/DSCG/workshop/results/framework_optimization/20261007_export_review"
+    },
+    {
+      "document": "workshop/framework_optimization_review_20261007.md",
+      "target": "/Users/luo/Desktop/AgentDefence/DSCG/workshop/results/framework_optimization/20261007_optimized_review"
+    },
+    {
+      "document": "workshop/framework_optimization_v2_proposal_20261007.md",
+      "target": "/Users/luo/Desktop/AgentDefence/DSCG/workshop/framework_optimization_review_20261007.md"
+    },
+    {
+      "document": "workshop/framework_optimization_v2_proposal_20261007.md",
+      "target": "/Users/luo/Desktop/AgentDefence/DSCG/workshop/framework_optimization_direction_20261007.md"
+    },
+    {
+      "document": "workshop/3_layer_opt.md",
+      "target": "/Users/luo/Desktop/AgentDefence/research/technical_route.md"
+    },
+    {
+      "document": "workshop/3_layer_opt.md",
+      "target": "/Users/luo/Desktop/AgentDefence/DSCG/README.md"
+    },
+    {
+      "document": "workshop/3_layer_opt.md",
+      "target": "/Users/luo/Desktop/AgentDefence/DSCG/dscg/pipelines/defended.py"
+    },
+    {
+      "document": "workshop/3_layer_opt.md",
+      "target": "/Users/luo/Desktop/AgentDefence/DSCG/workshop/archive/original_documents/DSCG/docs/framework_v2_followup_report.md"
+    },
+    {
+      "document": "workshop/3_layer_opt.md",
+      "target": "/Users/luo/Desktop/AgentDefence/DSCG/download/dscg-history-analysis-20261007T153203Z/analysis.json"
+    },
+    {
+      "document": "workshop/3_layer_opt.md",
+      "target": "/Users/luo/Desktop/AgentDefence/DSCG/workshop/3_layer_sources_20261008.json"
+    },
+    {
+      "document": "README.md",
+      "target": "/Users/luo/Desktop/AgentDefence/DSCG/dscg/pipelines/defended.py"
+    },
+    {
+      "document": "README.md",
+      "target": "/Users/luo/Desktop/AgentDefence/DSCG/workshop/README.md"
+    },
+    {
+      "document": "README.md",
+      "target": "/Users/luo/Desktop/AgentDefence/DSCG/docs/i3_p0_stress_report.md"
+    },
+    {
+      "document": "README.md",
+      "target": "/Users/luo/Desktop/AgentDefence/research/technical_route.md"
+    },
+    {
+      "document": "README.md",
+      "target": "/Users/luo/Desktop/AgentDefence/DSCG/config/models.example.toml"
+    },
+    {
+      "document": "README.md",
+      "target": "/Users/luo/Desktop/AgentDefence/DSCG/docs/evaluation.md"
+    },
+    {
+      "document": "README.md",
+      "target": "/Users/luo/Desktop/AgentDefence/DSCG/docs/evaluation.md"
+    },
+    {
+      "document": "README.md",
+      "target": "/Users/luo/Desktop/AgentDefence/DSCG/docs/dashboard.md"
+    },
+    {
+      "document": "README.md",
+      "target": "/Users/luo/Desktop/AgentDefence/DSCG/docs/README.md"
+    },
+    {
+      "document": "README.md",
+      "target": "/Users/luo/Desktop/AgentDefence/DSCG/workshop/README.md"
+    },
+    {
+      "document": "README.md",
+      "target": "/Users/luo/Desktop/AgentDefence/DSCG/AGENTS.md"
+    },
+    {
+      "document": "README.md",
+      "target": "/Users/luo/Desktop/AgentDefence/research/technical_route.md"
+    },
+    {
+      "document": "README.md",
+      "target": "/Users/luo/Desktop/AgentDefence/research/paper/implementation_status.md"
+    },
+    {
+      "document": "RESEARCH_STATUS.md",
+      "target": "/Users/luo/Desktop/AgentDefence/research"
+    },
+    {
+      "document": "RESEARCH_STATUS.md",
+      "target": "/Users/luo/Desktop/AgentDefence/research/technical_route.md"
+    },
+    {
+      "document": "RESEARCH_STATUS.md",
+      "target": "/Users/luo/Desktop/AgentDefence/research/paper/implementation_status.md"
+    },
+    {
+      "document": "RESEARCH_STATUS.md",
+      "target": "/Users/luo/Desktop/AgentDefence/DSCG/workshop/README.md"
+    },
+    {
+      "document": "RESEARCH_STATUS.md",
+      "target": "/Users/luo/Desktop/AgentDefence/DSCG/AGENTS.md"
+    },
+    {
+      "document": "RESEARCH_STATUS.md",
+      "target": "/Users/luo/Desktop/AgentDefence/research/paper/Paper_TODO.md"
+    },
+    {
+      "document": "workshop/README.md",
+      "target": "/Users/luo/Desktop/AgentDefence/research/technical_route.md"
+    },
+    {
+      "document": "workshop/README.md",
+      "target": "/Users/luo/Desktop/AgentDefence/DSCG/workshop/framework_v2_followup_report.md"
+    },
+    {
+      "document": "workshop/README.md",
+      "target": "/Users/luo/Desktop/AgentDefence/DSCG/workshop/framework_v2_report.md"
+    },
+    {
+      "document": "workshop/README.md",
+      "target": "/Users/luo/Desktop/AgentDefence/DSCG/workshop/3_layer_opt.md"
+    },
+    {
+      "document": "workshop/README.md",
+      "target": "/Users/luo/Desktop/AgentDefence/DSCG/workshop/3_layer_sources_20261008.json"
+    },
+    {
+      "document": "workshop/README.md",
+      "target": "/Users/luo/Desktop/AgentDefence/DSCG/workshop/project_structure_20261008.md"
+    },
+    {
+      "document": "workshop/README.md",
+      "target": "/Users/luo/Desktop/AgentDefence/DSCG/results"
+    },
+    {
+      "document": "workshop/README.md",
+      "target": "/Users/luo/Desktop/AgentDefence/DSCG/download"
+    },
+    {
+      "document": "workshop/README.md",
+      "target": "/Users/luo/Desktop/AgentDefence/DSCG/AGENTS.md"
+    },
+    {
+      "document": "workshop/README.md",
+      "target": "/Users/luo/Desktop/AgentDefence/DSCG/workshop/framework_optimization_report.md"
+    },
+    {
+      "document": "workshop/README.md",
+      "target": "/Users/luo/Desktop/AgentDefence/DSCG/workshop/framework_optimization_20261007.md"
+    },
+    {
+      "document": "workshop/README.md",
+      "target": "/Users/luo/Desktop/AgentDefence/DSCG/workshop/framework_optimization_review_20261007.md"
+    },
+    {
+      "document": "workshop/README.md",
+      "target": "/Users/luo/Desktop/AgentDefence/DSCG/workshop/framework_optimization_direction_20261007.md"
+    },
+    {
+      "document": "workshop/README.md",
+      "target": "/Users/luo/Desktop/AgentDefence/DSCG/workshop/framework_optimization_v2_proposal_20261007.md"
+    },
+    {
+      "document": "workshop/README.md",
+      "target": "/Users/luo/Desktop/AgentDefence/DSCG/workshop/workshop_optimization_report.md"
+    },
+    {
+      "document": "workshop/README.md",
+      "target": "/Users/luo/Desktop/AgentDefence/DSCG/workshop/2026-10-05-workshop-engineering-optimization.md"
+    },
+    {
+      "document": "workshop/README.md",
+      "target": "/Users/luo/Desktop/AgentDefence/DSCG/workshop/ALMML_sub.md"
+    },
+    {
+      "document": "workshop/README.md",
+      "target": "/Users/luo/Desktop/AgentDefence/DSCG/workshop/references/AIMLL WS.pdf"
+    },
+    {
+      "document": "workshop/README.md",
+      "target": "/Users/luo/Desktop/AgentDefence/DSCG/workshop/archive/project_structure_20261008/README.md"
+    },
+    {
+      "document": "workshop/README.md",
+      "target": "/Users/luo/Desktop/AgentDefence/DSCG/workshop/results/framework_optimization"
+    },
+    {
+      "document": "workshop/README.md",
+      "target": "/Users/luo/Desktop/AgentDefence/DSCG/workshop/results/materials_migration_20261008/migration_manifest.json"
+    },
+    {
+      "document": "workshop/README.md",
+      "target": "/Users/luo/Desktop/AgentDefence/DSCG/workshop/artifacts/20261008_project_structure/structure_manifest.json"
+    },
+    {
+      "document": "docs/README.md",
+      "target": "/Users/luo/Desktop/AgentDefence/DSCG/README.md"
+    },
+    {
+      "document": "docs/README.md",
+      "target": "/Users/luo/Desktop/AgentDefence/DSCG/docs/evaluation.md"
+    },
+    {
+      "document": "docs/README.md",
+      "target": "/Users/luo/Desktop/AgentDefence/DSCG/docs/dashboard.md"
+    },
+    {
+      "document": "docs/README.md",
+      "target": "/Users/luo/Desktop/AgentDefence/DSCG/docs/i3_p0_stress_report.md"
+    },
+    {
+      "document": "docs/README.md",
+      "target": "/Users/luo/Desktop/AgentDefence/DSCG/docs/figures/README.md"
+    },
+    {
+      "document": "docs/README.md",
+      "target": "/Users/luo/Desktop/AgentDefence/DSCG/workshop/README.md"
+    },
+    {
+      "document": "docs/README.md",
+      "target": "/Users/luo/Desktop/AgentDefence/DSCG/workshop/archive/project_structure_20261008/README.md"
+    },
+    {
+      "document": "docs/README.md",
+      "target": "/Users/luo/Desktop/AgentDefence/DSCG/workshop/framework_v2_followup_report.md"
+    },
+    {
+      "document": "docs/README.md",
+      "target": "/Users/luo/Desktop/AgentDefence/DSCG/workshop/artifacts/20261008_project_structure/structure_manifest.json"
+    },
+    {
+      "document": "docs/dashboard.md",
+      "target": "/Users/luo/Desktop/AgentDefence/DSCG/workshop/archive/project_structure_20261008/README.md"
+    },
+    {
+      "document": "docs/dashboard.md",
+      "target": "/Users/luo/Desktop/AgentDefence/DSCG/dashboard"
+    },
+    {
+      "document": "docs/evaluation.md",
+      "target": "/Users/luo/Desktop/AgentDefence/DSCG/config/models.example.toml"
+    },
+    {
+      "document": "docs/evaluation.md",
+      "target": "/Users/luo/Desktop/AgentDefence/DSCG/dscg/model_config.py"
+    },
+    {
+      "document": "docs/evaluation.md",
+      "target": "/Users/luo/Desktop/AgentDefence/DSCG/config/tools.agentdojo-v1.2.toml"
+    },
+    {
+      "document": "docs/evaluation.md",
+      "target": "/Users/luo/Desktop/AgentDefence/DSCG/README.md"
+    },
+    {
+      "document": "docs/evaluation.md",
+      "target": "/Users/luo/Desktop/AgentDefence/DSCG/docs/i3_p0_stress_report.md"
+    },
+    {
+      "document": "docs/evaluation.md",
+      "target": "/Users/luo/Desktop/AgentDefence/DSCG/workshop/framework_v2_followup_report.md"
+    },
+    {
+      "document": "docs/figures/README.md",
+      "target": "/Users/luo/Desktop/AgentDefence/DSCG/experiments/plots"
+    },
+    {
+      "document": "docs/figures/README.md",
+      "target": "/Users/luo/Desktop/AgentDefence/DSCG/workshop/archive/project_structure_20261008/docs/figures"
+    },
+    {
+      "document": "docs/i3_p0_stress_report.md",
+      "target": "/Users/luo/Desktop/AgentDefence/DSCG/tests/fixtures/i3_p0_stress_cases.json"
+    },
+    {
+      "document": "docs/i3_p0_stress_report.md",
+      "target": "/Users/luo/Desktop/AgentDefence/DSCG/examples/results/i3_p0_stress/20261006_01a10fca"
+    },
+    {
+      "document": "workshop/archive/project_structure_20261008/README.md",
+      "target": "/Users/luo/Desktop/AgentDefence/DSCG/workshop/archive/project_structure_20261008/docs/history_version_identity_report.md"
+    },
+    {
+      "document": "workshop/archive/project_structure_20261008/README.md",
+      "target": "/Users/luo/Desktop/AgentDefence/DSCG/workshop/archive/project_structure_20261008/docs/history_multiselect_page_report.md"
+    },
+    {
+      "document": "workshop/archive/project_structure_20261008/README.md",
+      "target": "/Users/luo/Desktop/AgentDefence/DSCG/workshop/archive/project_structure_20261008/docs/history_attack_filter_report.md"
+    },
+    {
+      "document": "workshop/archive/project_structure_20261008/README.md",
+      "target": "/Users/luo/Desktop/AgentDefence/DSCG/workshop/archive/project_structure_20261008/docs/history_export_report.md"
+    },
+    {
+      "document": "workshop/archive/project_structure_20261008/README.md",
+      "target": "/Users/luo/Desktop/AgentDefence/DSCG/workshop/archive/project_structure_20261008/docs/history_separate_report.md"
+    },
+    {
+      "document": "workshop/archive/project_structure_20261008/README.md",
+      "target": "/Users/luo/Desktop/AgentDefence/DSCG/workshop/archive/project_structure_20261008/docs/history_metrics_report.md"
+    },
+    {
+      "document": "workshop/archive/project_structure_20261008/README.md",
+      "target": "/Users/luo/Desktop/AgentDefence/DSCG/workshop/archive/project_structure_20261008/docs/partial_attack_report.md"
+    },
+    {
+      "document": "workshop/archive/project_structure_20261008/README.md",
+      "target": "/Users/luo/Desktop/AgentDefence/DSCG/workshop/archive/project_structure_20261008/docs/DSCG项目介绍.md"
+    },
+    {
+      "document": "workshop/archive/project_structure_20261008/README.md",
+      "target": "/Users/luo/Desktop/AgentDefence/DSCG/workshop/archive/project_structure_20261008/docs/DSCG项目介绍.docx"
+    },
+    {
+      "document": "workshop/archive/project_structure_20261008/README.md",
+      "target": "/Users/luo/Desktop/AgentDefence/DSCG/workshop/archive/project_structure_20261008/docs/notes/提示词草稿.txt"
+    },
+    {
+      "document": "workshop/archive/project_structure_20261008/README.md",
+      "target": "/Users/luo/Desktop/AgentDefence/DSCG/workshop/archive/project_structure_20261008/docs/figures"
+    },
+    {
+      "document": "workshop/archive/project_structure_20261008/README.md",
+      "target": "/Users/luo/Desktop/AgentDefence/DSCG/workshop/archive/project_structure_20261008/Paper_TODO.md"
+    },
+    {
+      "document": "workshop/archive/project_structure_20261008/README.md",
+      "target": "/Users/luo/Desktop/AgentDefence/DSCG/workshop/archive/project_structure_20261008/before"
+    },
+    {
+      "document": "workshop/archive/project_structure_20261008/README.md",
+      "target": "/Users/luo/Desktop/AgentDefence/DSCG/workshop/ALMML_sub.md"
+    },
+    {
+      "document": "workshop/archive/project_structure_20261008/README.md",
+      "target": "/Users/luo/Desktop/AgentDefence/DSCG/workshop/references"
+    },
+    {
+      "document": "workshop/archive/project_structure_20261008/README.md",
+      "target": "/Users/luo/Desktop/AgentDefence/DSCG/workshop/artifacts/20261008_project_structure/structure_manifest.json"
+    },
+    {
+      "document": "workshop/archive/project_structure_20261008/README.md",
+      "target": "/Users/luo/Desktop/AgentDefence/DSCG/docs/README.md"
+    },
+    {
+      "document": "workshop/archive/project_structure_20261008/README.md",
+      "target": "/Users/luo/Desktop/AgentDefence/DSCG/workshop/README.md"
+    }
+  ],
+  "root_depth_scripts": [
+    "workshop/results/framework_optimization/20261007_export_review/probe_state_isolation.py",
+    "workshop/results/framework_optimization/20261007_implementation/P2_index_check.py",
+    "workshop/results/framework_optimization/20261007_implementation/verify_inputs.py",
+    "workshop/results/framework_optimization/20261007_readme_comparison/verify_comparison.py",
+    "workshop/results/framework_optimization/20261007_readme_sync/verify_readme.py",
+    "workshop/results/framework_optimization/20261007_v2_followup/analyze_controls.py",
+    "workshop/results/framework_optimization/20261007_v2_followup/audit_probe.py",
+    "workshop/results/framework_optimization/20261007_v2_followup/denial_probe.py",
+    "workshop/results/framework_optimization/20261007_v2_followup/diagnose_history.py",
+    "workshop/results/framework_optimization/20261007_v2_followup/diagnose_history_v2.py",
+    "workshop/results/framework_optimization/20261007_v2_followup/executor_probe.py",
+    "workshop/results/framework_optimization/20261007_v2_followup/verify_followup.py",
+    "workshop/results/framework_optimization/20261007_v2_implementation/analyze_controls.py",
+    "workshop/results/framework_optimization/20261007_v2_implementation/analyze_final_controls.py",
+    "workshop/results/framework_optimization/20261007_v2_implementation/audit_probe.py",
+    "workshop/results/framework_optimization/20261007_v2_implementation/audit_probe_read_refinement.py",
+    "workshop/results/framework_optimization/20261007_v2_implementation/authorization_probe.py",
+    "workshop/results/framework_optimization/20261007_v2_implementation/read_step_probe.py",
+    "workshop/results/framework_optimization/20261007_v2_implementation/url_evidence_probe.py",
+    "workshop/results/framework_optimization/20261007_v2_implementation/verify_artifacts.py",
+    "workshop/results/framework_optimization/20261007_v2_implementation/verify_defaults.py",
+    "workshop/results/framework_optimization/20261008_three_layer_research/verify_research.py"
+  ],
+  "limitations": [
+    "Original evidence includes previously missing input files; relocation does not reconstruct or certify them.",
+    "Historical diagnostic scripts may require their recorded code revision or candidate patch; only syntax and root depth are checked here.",
+    "Retained compatibility paths read original bytes; four retired docs aliases are explicitly recorded in the structure manifest.",
+    "No model/benchmark was run and no security/research gate status changed."
+  ]
+}

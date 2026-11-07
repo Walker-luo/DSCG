@@ -1,0 +1,39 @@
+{
+  "task": "full_benchmark_20261015",
+  "originals": {
+    "workshop/archive/full_benchmark_20261015/originals/experiments/run_benchmark.py": "3951b5325d593275b4a5397a92c538c5c52f0928a6e0aaa3a9ad76f570a1c693",
+    "workshop/archive/full_benchmark_20261015/originals/experiments/run_partial_benchmark.py": "c78c200f49314b65380eb0b09f0b5f7d6e92f139ca9e1cbb5c6edf20e87bd28a",
+    "workshop/archive/full_benchmark_20261015/originals/experiments/partial_controls.py": "9cd1ad321543082d807c4e4d41728f51db629f5a90d8c7f690879f1913fd1788",
+    "workshop/archive/full_benchmark_20261015/originals/README.md": "9a2724ca7a73df45746decf2e1884042a54ea2488c7904e9aeb8d74de2f5e25d",
+    "workshop/archive/full_benchmark_20261015/originals/AGENTS.md": "175bb221d996fd3636f04b70b838074dc4e79c19d2364a3f1ba3d439c34b1e5b",
+    "workshop/archive/full_benchmark_20261015/originals/docs/README.md": "55ad89abf07e37027c6209b625152082f72e7da70227d95cae4f0b686d179008",
+    "workshop/archive/full_benchmark_20261015/originals/docs/evaluation.md": "4c3eac9f4d6ccb95485468136570f977bf55b5c3723b2e828bb25ad8e58e8e16",
+    "workshop/archive/full_benchmark_20261015/originals/docs/model_tool_configuration.md": "38fadae7e62900feafca28fc60fd9f8d5e4f89e441c238a38da22bb9e7ec8b0d",
+    "workshop/archive/full_benchmark_20261015/originals/workshop/README.md": "c2fba06990deb120155c39859ad8e24bf0fd551853704e4acc0cfed6685e1158",
+    "workshop/archive/full_benchmark_20261015/originals/workshop/completed/README.md": "37e28890f9af61f5e148851da4e8592a1439f9dedcc296726064916a3d32bdde"
+  },
+  "current_files": {
+    "README.md": "3413c46e0cc113b75695c3b775bccee373fed47e9324f11225390dbc76fb7e9e",
+    "AGENTS.md": "3bf6bed504c49271021cb46af1981695fa1eacfaef674795a7a145121b98ed8d",
+    "docs/README.md": "0625f8e09581fd305418273f79ec79de4cbe850327239495d8e004c38acb07a0",
+    "docs/evaluation.md": "ab9e52932aaa69b02e756ec3345a0a5e09e95e4d325a525154f025fd714ae074",
+    "docs/model_tool_configuration.md": "fc827080a230cf9ea50733c8bfb12080ae2108daa10fedcca4c93fa9777419d7",
+    "docs/full_benchmark.md": "553e7e02886f2a738d7ce5c7d37f4248196c40117b7194604ec70e68e0204146",
+    "workshop/README.md": "84ab414a562a982bba5821e130dc6ac752d70b70a3bc907347c7769314aa85a2",
+    "workshop/completed/README.md": "1a19adba3edd09d6537eabdac540fdcea7fef0c093325c845c22ad7aa2c810dc",
+    "workshop/completed/full_benchmark_20261015.md": "9de6fb860b41fd05bbf2fc498299cbc93468fcc819d4d486363d3f51c75d5b31",
+    "experiments/run_benchmark.py": "f98a850b2acea2fb6b2458306110436d500abbedec09ca014d16a962f7650114",
+    "experiments/run_partial_benchmark.py": "0ecad9d8d4c4180dc50b928fe2b7b84bb67cc6c7ff5277c677d947ddb5b5e29e",
+    "experiments/partial_controls.py": "3f73da12c1ac06f13ec4379c95f76c098cbdced4950d4a26917a1545d531cdb1",
+    "tests/test_full_benchmark.py": "0d23fd7c0b4d47392431047d112560b75b8f35c75a5faecfb8c46d5e6dcd5202"
+  },
+  "validation": {
+    "path": "workshop/artifacts/20261015_full_benchmark/validation.json",
+    "sha256": "640a5ec35a3a62af1677d01cf8ee572d88bca213a7413dc90029384dcae34cd0"
+  },
+  "commands": {
+    "path": "workshop/artifacts/20261015_full_benchmark/commands.json",
+    "sha256": "e0e7b83d107e58c63eeb0686d39c6c83025f0341618ea55d206730e941afa2e9"
+  },
+  "note": "Separate current revision record; old evidence and relocation expectations unchanged"
+}

@@ -1,0 +1,44 @@
+{
+  "date": "2026-10-12",
+  "task": "L2 subsequent-task and tool-extension candidate clarification; unimplemented",
+  "base_revision": "4d61149f55f71eb6d1091ea431b95d1abb6d172e",
+  "previous_manifest": "workshop/archive/l2_design_20261011/revision_manifest.json",
+  "previous_manifest_sha256": "7d1daa081f49ae0d554d57ceabd46edf93d79c965bb6459f7f53b626a2e0cbcf",
+  "entries": [
+    {
+      "path": "workshop/L2_opt.md",
+      "original_storage": "workshop/archive/l2_tool_extension_20261012/originals/workshop/L2_opt.md",
+      "sha256_before": "71b6fc6c00ee549b4ae56612116a07faea938241338372a31026a0e622e81701",
+      "sha256_after": "f1ef7269e6ddbe205f1aeb3a62404c45a703bb2c89d50c16174cae0bb457faee"
+    },
+    {
+      "path": "workshop/README.md",
+      "original_storage": "workshop/archive/l2_tool_extension_20261012/originals/workshop/README.md",
+      "sha256_before": "bb62cdb2714d03c55175eedcc9b51a42e4a0aed154a903839727ea0e80dd723d",
+      "sha256_after": "d1a3526831a5e279c801d149fd2d7f06e1e1a82252c8db477c0af01308f8ea8a"
+    },
+    {
+      "path": "AGENTS.md",
+      "original_storage": "workshop/archive/l2_tool_extension_20261012/originals/AGENTS.md",
+      "sha256_before": "a6e2c48c92e3bad150a6566ca0db8584df1cfce8403ce956eebbe49734cca12d",
+      "sha256_after": "c56158fe8867cc08476bd7ef938774fd46533490059117baa8da4b9e3292be90"
+    }
+  ],
+  "created_files": {},
+  "current_documents": [
+    "workshop/L2_opt.md",
+    "workshop/README.md",
+    "AGENTS.md"
+  ],
+  "validator": "workshop/artifacts/20261012_l2_tool_extension/validate_l2_extension_doc.py",
+  "validator_sha256": "b1f509661e529113618377d742e6c3d7c79f7ca8cb9a761c7e0f903edb988ec3",
+  "runtime_changed": false,
+  "formal_route_changed": false,
+  "model_calls": 0,
+  "benchmark_rollouts": 0,
+  "fixtures_created": 0,
+  "historical_full_migration_certified": false,
+  "out_of_scope_documents": {
+    "report/report.md": "Preserved current bytes; report image assets and previous report revisions remain outside this check."
+  }
+}

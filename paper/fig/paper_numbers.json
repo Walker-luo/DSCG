@@ -1,0 +1,653 @@
+{
+  "source": "results/workshop/agentdojo",
+  "models": {
+    "qwen35": {
+      "model_id": "qwen3.5-flash",
+      "defense_run": "v3.7",
+      "clean_baseline_run": "baseline_clean",
+      "full": {
+        "baseline": {
+          "valid": 2139,
+          "tsr": 1805,
+          "asr": 221,
+          "errors": 0
+        },
+        "v3.7": {
+          "valid": 2139,
+          "tsr": 1175,
+          "asr": 2,
+          "errors": 0
+        }
+      },
+      "paired": {
+        "suites": {
+          "workspace": {
+            "n": 1080,
+            "base_tsr": 993,
+            "dscg_tsr": 752,
+            "base_asr": 1,
+            "dscg_asr": 0,
+            "base_tsr_pct": 91.94,
+            "dscg_tsr_pct": 69.63,
+            "base_asr_pct": 0.09,
+            "dscg_asr_pct": 0.0,
+            "delta_tsr_pp": -22.31,
+            "mcnemar_p": 0.0
+          },
+          "travel": {
+            "n": 360,
+            "base_tsr": 285,
+            "dscg_tsr": 165,
+            "base_asr": 60,
+            "dscg_asr": 2,
+            "base_tsr_pct": 79.17,
+            "dscg_tsr_pct": 45.83,
+            "base_asr_pct": 16.67,
+            "dscg_asr_pct": 0.56,
+            "delta_tsr_pp": -33.33,
+            "mcnemar_p": 0.0
+          },
+          "banking": {
+            "n": 384,
+            "base_tsr": 303,
+            "dscg_tsr": 131,
+            "base_asr": 54,
+            "dscg_asr": 0,
+            "base_tsr_pct": 78.91,
+            "dscg_tsr_pct": 34.11,
+            "base_asr_pct": 14.06,
+            "dscg_asr_pct": 0.0,
+            "delta_tsr_pp": -44.79,
+            "mcnemar_p": 0.0
+          },
+          "slack": {
+            "n": 315,
+            "base_tsr": 224,
+            "dscg_tsr": 127,
+            "base_asr": 106,
+            "dscg_asr": 0,
+            "base_tsr_pct": 71.11,
+            "dscg_tsr_pct": 40.32,
+            "base_asr_pct": 33.65,
+            "dscg_asr_pct": 0.0,
+            "delta_tsr_pp": -30.79,
+            "mcnemar_p": 0.0
+          }
+        },
+        "attacks": {
+          "ignore_previous": {
+            "n": 713,
+            "base_tsr": 618,
+            "dscg_tsr": 381,
+            "base_asr": 2,
+            "dscg_asr": 0
+          },
+          "important_instructions": {
+            "n": 713,
+            "base_tsr": 596,
+            "dscg_tsr": 399,
+            "base_asr": 108,
+            "dscg_asr": 1
+          },
+          "tool_knowledge": {
+            "n": 713,
+            "base_tsr": 591,
+            "dscg_tsr": 395,
+            "base_asr": 111,
+            "dscg_asr": 1
+          }
+        },
+        "total": {
+          "n": 2139,
+          "base_tsr": 1805,
+          "dscg_tsr": 1175,
+          "base_asr": 221,
+          "dscg_asr": 2,
+          "base_tsr_pct": 84.39,
+          "dscg_tsr_pct": 54.93,
+          "base_asr_pct": 10.33,
+          "dscg_asr_pct": 0.09,
+          "utility_discordant": [
+            719,
+            89
+          ],
+          "attack_discordant": [
+            219,
+            0
+          ],
+          "mcnemar_p": 0.0,
+          "asr_upper95": 0.34
+        }
+      },
+      "clean": {
+        "baseline": {
+          "n": 97,
+          "tsr": 90
+        },
+        "dscg": {
+          "n": 97,
+          "tsr": 53
+        },
+        "paired_n": 97,
+        "utility_discordant": [
+          39,
+          2
+        ],
+        "mcnemar_p": 0.0,
+        "mixed": {
+          "run": "audit_3.7-flash_clean",
+          "security_model_id": "qwen3.7-flash",
+          "defense_version": "DSCG_v3.7",
+          "task_view_wire": "anchored-task-view-flat-v3",
+          "permission_wire": "allowed-action-tools-v1",
+          "n": 97,
+          "tsr": 82,
+          "suites": {
+            "workspace": {
+              "n": 40,
+              "base_tsr": 38,
+              "dscg_tsr": 26,
+              "mixed_tsr": 39
+            },
+            "travel": {
+              "n": 20,
+              "base_tsr": 18,
+              "dscg_tsr": 11,
+              "mixed_tsr": 16
+            },
+            "banking": {
+              "n": 16,
+              "base_tsr": 14,
+              "dscg_tsr": 5,
+              "mixed_tsr": 8
+            },
+            "slack": {
+              "n": 21,
+              "base_tsr": 20,
+              "dscg_tsr": 11,
+              "mixed_tsr": 19
+            }
+          },
+          "utility_discordant_vs_same_model": [
+            0,
+            29
+          ],
+          "utility_discordant_vs_baseline": [
+            11,
+            3
+          ],
+          "cost": {
+            "tokens": 2480936,
+            "main_tokens": 2007205,
+            "audit_tokens": 473731,
+            "audit_calls": 142,
+            "unknown_usage_records": 0
+          }
+        }
+      },
+      "cost": {
+        "baseline": {
+          "tokens": 45285777,
+          "main_tokens": 45285777,
+          "audit_tokens": 0,
+          "audit_calls": 0,
+          "unknown_usage_records": 1
+        },
+        "dscg": {
+          "tokens": 48659388,
+          "main_tokens": 37997320,
+          "audit_tokens": 10662068,
+          "audit_calls": 3049,
+          "unknown_usage_records": 0
+        }
+      }
+    },
+    "qwen": {
+      "model_id": "qwen3.7-flash",
+      "defense_run": "v3.6.3",
+      "clean_baseline_run": null,
+      "full": {
+        "baseline": {
+          "valid": 1944,
+          "tsr": 1426,
+          "asr": 438,
+          "errors": 3
+        },
+        "v3.6.3": {
+          "valid": 1946,
+          "tsr": 1541,
+          "asr": 0,
+          "errors": 1
+        }
+      },
+      "paired": {
+        "suites": {
+          "workspace": {
+            "n": 838,
+            "base_tsr": 684,
+            "dscg_tsr": 772,
+            "base_asr": 31,
+            "dscg_asr": 0,
+            "base_tsr_pct": 81.62,
+            "dscg_tsr_pct": 92.12,
+            "base_asr_pct": 3.7,
+            "dscg_asr_pct": 0.0,
+            "delta_tsr_pp": 10.5,
+            "mcnemar_p": 0.0
+          },
+          "travel": {
+            "n": 360,
+            "base_tsr": 218,
+            "dscg_tsr": 299,
+            "base_asr": 99,
+            "dscg_asr": 0,
+            "base_tsr_pct": 60.56,
+            "dscg_tsr_pct": 83.06,
+            "base_asr_pct": 27.5,
+            "dscg_asr_pct": 0.0,
+            "delta_tsr_pp": 22.5,
+            "mcnemar_p": 0.0
+          },
+          "banking": {
+            "n": 431,
+            "base_tsr": 303,
+            "dscg_tsr": 255,
+            "base_asr": 124,
+            "dscg_asr": 0,
+            "base_tsr_pct": 70.3,
+            "dscg_tsr_pct": 59.16,
+            "base_asr_pct": 28.77,
+            "dscg_asr_pct": 0.0,
+            "delta_tsr_pp": -11.14,
+            "mcnemar_p": 0.0
+          },
+          "slack": {
+            "n": 314,
+            "base_tsr": 220,
+            "dscg_tsr": 214,
+            "base_asr": 184,
+            "dscg_asr": 0,
+            "base_tsr_pct": 70.06,
+            "dscg_tsr_pct": 68.15,
+            "base_asr_pct": 58.6,
+            "dscg_asr_pct": 0.0,
+            "delta_tsr_pp": -1.91,
+            "mcnemar_p": 0.3915
+          }
+        },
+        "attacks": {
+          "ignore_previous": {
+            "n": 648,
+            "base_tsr": 515,
+            "dscg_tsr": 510,
+            "base_asr": 27,
+            "dscg_asr": 0
+          },
+          "important_instructions": {
+            "n": 648,
+            "base_tsr": 451,
+            "dscg_tsr": 517,
+            "base_asr": 223,
+            "dscg_asr": 0
+          },
+          "tool_knowledge": {
+            "n": 647,
+            "base_tsr": 459,
+            "dscg_tsr": 513,
+            "base_asr": 188,
+            "dscg_asr": 0
+          }
+        },
+        "total": {
+          "n": 1943,
+          "base_tsr": 1425,
+          "dscg_tsr": 1540,
+          "base_asr": 438,
+          "dscg_asr": 0,
+          "base_tsr_pct": 73.34,
+          "dscg_tsr_pct": 79.26,
+          "base_asr_pct": 22.54,
+          "dscg_asr_pct": 0.0,
+          "utility_discordant": [
+            147,
+            262
+          ],
+          "attack_discordant": [
+            438,
+            0
+          ],
+          "mcnemar_p": 0.0,
+          "asr_upper95": 0.2
+        }
+      },
+      "clean": {
+        "baseline": {
+          "n": 0,
+          "tsr": 0
+        },
+        "dscg": {
+          "n": 95,
+          "tsr": 82
+        }
+      },
+      "cost": {
+        "baseline": {
+          "tokens": 41367629,
+          "main_tokens": 41367629,
+          "audit_tokens": 0,
+          "audit_calls": 0,
+          "unknown_usage_records": 0
+        },
+        "dscg": {
+          "tokens": 51254188,
+          "main_tokens": 39980871,
+          "audit_tokens": 11273317,
+          "audit_calls": 3144,
+          "unknown_usage_records": 1
+        }
+      }
+    },
+    "deepseek": {
+      "model_id": "deepseek-flash",
+      "defense_run": "v3.6.3",
+      "clean_baseline_run": "baseline_clean",
+      "full": {
+        "baseline": {
+          "valid": 1836,
+          "tsr": 1535,
+          "asr": 38,
+          "errors": 0
+        },
+        "v3.6.3": {
+          "valid": 1836,
+          "tsr": 1512,
+          "asr": 5,
+          "errors": 0
+        }
+      },
+      "paired": {
+        "suites": {
+          "workspace": {
+            "n": 960,
+            "base_tsr": 935,
+            "dscg_tsr": 927,
+            "base_asr": 0,
+            "dscg_asr": 0,
+            "base_tsr_pct": 97.4,
+            "dscg_tsr_pct": 96.56,
+            "base_asr_pct": 0.0,
+            "dscg_asr_pct": 0.0,
+            "delta_tsr_pp": -0.83,
+            "mcnemar_p": 0.302
+          },
+          "travel": {
+            "n": 240,
+            "base_tsr": 186,
+            "dscg_tsr": 188,
+            "base_asr": 37,
+            "dscg_asr": 5,
+            "base_tsr_pct": 77.5,
+            "dscg_tsr_pct": 78.33,
+            "base_asr_pct": 15.42,
+            "dscg_asr_pct": 2.08,
+            "delta_tsr_pp": 0.83,
+            "mcnemar_p": 0.8506
+          },
+          "banking": {
+            "n": 384,
+            "base_tsr": 219,
+            "dscg_tsr": 215,
+            "base_asr": 0,
+            "dscg_asr": 0,
+            "base_tsr_pct": 57.03,
+            "dscg_tsr_pct": 55.99,
+            "base_asr_pct": 0.0,
+            "dscg_asr_pct": 0.0,
+            "delta_tsr_pp": -1.04,
+            "mcnemar_p": 0.708
+          },
+          "slack": {
+            "n": 252,
+            "base_tsr": 195,
+            "dscg_tsr": 182,
+            "base_asr": 1,
+            "dscg_asr": 0,
+            "base_tsr_pct": 77.38,
+            "dscg_tsr_pct": 72.22,
+            "base_asr_pct": 0.4,
+            "dscg_asr_pct": 0.0,
+            "delta_tsr_pp": -5.16,
+            "mcnemar_p": 0.0072
+          }
+        },
+        "attacks": {
+          "ignore_previous": {
+            "n": 612,
+            "base_tsr": 515,
+            "dscg_tsr": 510,
+            "base_asr": 12,
+            "dscg_asr": 1
+          },
+          "important_instructions": {
+            "n": 612,
+            "base_tsr": 509,
+            "dscg_tsr": 501,
+            "base_asr": 14,
+            "dscg_asr": 1
+          },
+          "tool_knowledge": {
+            "n": 612,
+            "base_tsr": 511,
+            "dscg_tsr": 501,
+            "base_asr": 12,
+            "dscg_asr": 3
+          }
+        },
+        "total": {
+          "n": 1836,
+          "base_tsr": 1535,
+          "dscg_tsr": 1512,
+          "base_asr": 38,
+          "dscg_asr": 5,
+          "base_tsr_pct": 83.61,
+          "dscg_tsr_pct": 82.35,
+          "base_asr_pct": 2.07,
+          "dscg_asr_pct": 0.27,
+          "utility_discordant": [
+            91,
+            68
+          ],
+          "attack_discordant": [
+            33,
+            0
+          ],
+          "mcnemar_p": 0.0807,
+          "asr_upper95": 0.64
+        }
+      },
+      "clean": {
+        "baseline": {
+          "n": 97,
+          "tsr": 88
+        },
+        "dscg": {
+          "n": 97,
+          "tsr": 84
+        },
+        "paired_n": 97,
+        "utility_discordant": [
+          8,
+          4
+        ],
+        "mcnemar_p": 0.3877
+      },
+      "cost": {
+        "baseline": {
+          "tokens": 26391271,
+          "main_tokens": 26391271,
+          "audit_tokens": 0,
+          "audit_calls": 0,
+          "unknown_usage_records": 0
+        },
+        "dscg": {
+          "tokens": 44081158,
+          "main_tokens": 33286716,
+          "audit_tokens": 10794442,
+          "audit_calls": 2700,
+          "unknown_usage_records": 0
+        }
+      }
+    },
+    "qwen38": {
+      "model_id": "qwen3.8-flash",
+      "defense_run": "v3.7",
+      "clean_baseline_run": "clean",
+      "full": {
+        "baseline": {
+          "valid": 108,
+          "tsr": 91,
+          "asr": 2,
+          "errors": 0
+        },
+        "v3.7": {
+          "valid": 108,
+          "tsr": 98,
+          "asr": 2,
+          "errors": 0
+        }
+      },
+      "paired": {
+        "suites": {
+          "workspace": {
+            "n": 27,
+            "base_tsr": 26,
+            "dscg_tsr": 27,
+            "base_asr": 0,
+            "dscg_asr": 0,
+            "base_tsr_pct": 96.3,
+            "dscg_tsr_pct": 100.0,
+            "base_asr_pct": 0.0,
+            "dscg_asr_pct": 0.0,
+            "delta_tsr_pp": 3.7,
+            "mcnemar_p": 1.0
+          },
+          "travel": {
+            "n": 27,
+            "base_tsr": 27,
+            "dscg_tsr": 27,
+            "base_asr": 0,
+            "dscg_asr": 0,
+            "base_tsr_pct": 100.0,
+            "dscg_tsr_pct": 100.0,
+            "base_asr_pct": 0.0,
+            "dscg_asr_pct": 0.0,
+            "delta_tsr_pp": 0.0,
+            "mcnemar_p": 1.0
+          },
+          "banking": {
+            "n": 27,
+            "base_tsr": 11,
+            "dscg_tsr": 17,
+            "base_asr": 0,
+            "dscg_asr": 0,
+            "base_tsr_pct": 40.74,
+            "dscg_tsr_pct": 62.96,
+            "base_asr_pct": 0.0,
+            "dscg_asr_pct": 0.0,
+            "delta_tsr_pp": 22.22,
+            "mcnemar_p": 0.0312
+          },
+          "slack": {
+            "n": 27,
+            "base_tsr": 27,
+            "dscg_tsr": 27,
+            "base_asr": 2,
+            "dscg_asr": 2,
+            "base_tsr_pct": 100.0,
+            "dscg_tsr_pct": 100.0,
+            "base_asr_pct": 7.41,
+            "dscg_asr_pct": 7.41,
+            "delta_tsr_pp": 0.0,
+            "mcnemar_p": 1.0
+          }
+        },
+        "attacks": {
+          "ignore_previous": {
+            "n": 36,
+            "base_tsr": 32,
+            "dscg_tsr": 32,
+            "base_asr": 1,
+            "dscg_asr": 0
+          },
+          "important_instructions": {
+            "n": 36,
+            "base_tsr": 29,
+            "dscg_tsr": 33,
+            "base_asr": 1,
+            "dscg_asr": 1
+          },
+          "tool_knowledge": {
+            "n": 36,
+            "base_tsr": 30,
+            "dscg_tsr": 33,
+            "base_asr": 0,
+            "dscg_asr": 1
+          }
+        },
+        "total": {
+          "n": 108,
+          "base_tsr": 91,
+          "dscg_tsr": 98,
+          "base_asr": 2,
+          "dscg_asr": 2,
+          "base_tsr_pct": 84.26,
+          "dscg_tsr_pct": 90.74,
+          "base_asr_pct": 1.85,
+          "dscg_asr_pct": 1.85,
+          "utility_discordant": [
+            0,
+            7
+          ],
+          "attack_discordant": [
+            2,
+            2
+          ],
+          "mcnemar_p": 0.0156,
+          "asr_upper95": 6.5
+        }
+      },
+      "clean": {
+        "baseline": {
+          "n": 97,
+          "tsr": 83
+        },
+        "dscg": {
+          "n": 97,
+          "tsr": 83
+        },
+        "paired_n": 97,
+        "utility_discordant": [
+          7,
+          7
+        ],
+        "mcnemar_p": 1.0
+      },
+      "cost": {
+        "baseline": {
+          "tokens": 1410125,
+          "main_tokens": 1410125,
+          "audit_tokens": 0,
+          "audit_calls": 0,
+          "unknown_usage_records": 0
+        },
+        "dscg": {
+          "tokens": 2013223,
+          "main_tokens": 1561856,
+          "audit_tokens": 451367,
+          "audit_calls": 176,
+          "unknown_usage_records": 0
+        }
+      }
+    }
+  }
+}

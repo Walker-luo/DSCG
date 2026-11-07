@@ -1,0 +1,60 @@
+{
+  "task": "20261021_attack_parallel",
+  "commit": "99d2117647d0e3b0ed8b5ad038891df7eb790013",
+  "working_tree": " M AGENTS.md\n M README.md\n M docs/benchmark.md\n M docs/framework_updates.md\n M docs/model_tool_configuration.md\n M docs/partial_benchmark.md\n M docs/qwen_utility.md\n M dscg/pipelines/defended.py\n M dscg/prompt_profiles.py\n M experiments/common/benchmark_progress.py\n M experiments/run_partial_benchmark.py\n M plan.md\n M tests/serial_fixture.py\n M tests/test_partial_agentdyn.py\n M tests/test_serial_runner.py\n M workshop/README.md\n M workshop/completed/README.md\n M workshop/qwen_utility_20261019.md\n?? experiments/common/attack_execution.py\n?? experiments/diagnostics/utility_collect.py\n?? experiments/diagnostics/utility_stages.py\n?? tests/attack_parallel_fixture.py\n?? tests/fixtures/authorization_utility_cases.json\n?? tests/fixtures/banking_utility_cases.json\n?? tests/test_attack_execution.py\n?? tests/test_attack_parallel_native.py\n?? tests/test_task_alignment.py\n?? tests/test_utility_collect.py\n?? tests/test_utility_stages.py\n?? workshop/completed/attack_parallel_20261021.md\n?? workshop/completed/task_alignment_20261021.md\n?? workshop/completed/utility_collection_20261021.md\n?? workshop/completed/utility_diagnosis_20261021.md\n?? workshop/completed/utility_stages_20261021.md\n",
+  "verification": {
+    "ipi": {
+      "tests": 642,
+      "skipped": 10,
+      "exit_code": 0
+    },
+    "ipi-agentdyn": {
+      "tests": 646,
+      "skipped": 1,
+      "exit_code": 0
+    },
+    "node": {
+      "tests": 47,
+      "exit_code": 0
+    },
+    "paid_model_calls": 0,
+    "independent_review": "not completed; reviewer account usage limit; manual review performed"
+  },
+  "files_sha256": {
+    "experiments/common/attack_execution.py": "a9fd9d0dcf1d28c3d28ca77cd661d3a115f68dc67231628b989318d609e88745",
+    "experiments/common/benchmark_progress.py": "b34d7572fa91bd95e6e8e4ca1ce7c8b7df7e3093a2fc125128180f42d944c04e",
+    "experiments/run_partial_benchmark.py": "e9c9b4701a8119d13ac7c51d2a30f3334d27b767563ba1bb3acb9141ddaf80af",
+    "tests/attack_parallel_fixture.py": "2260c493614041dc3497dde96201ea5ca726d95252ad86a1bc775b71a9b04712",
+    "tests/serial_fixture.py": "0293a04c49063ff4f2efdf24d86c6f80c6b04aff8cd97792b4ef8bcfbccf66cf",
+    "tests/test_attack_execution.py": "f3e58439d891cbacb3196a4ec5bec8626fd677ffbf53d2935f66c3d44cf1cf15",
+    "tests/test_attack_parallel_native.py": "3bad32e1d1da5765824956003698ab628d175a6a15b8258ce92c9f2d45c5cd43",
+    "tests/test_partial_agentdyn.py": "a75368c473c22d69f966081521b982863ac628229538a05fab09a9f538f2192f",
+    "tests/test_serial_runner.py": "d2229be308338c14eaf47a6f253ab7bc20f57903ee57bf67af316fbf97c504ef",
+    "AGENTS.md": "6f98590c477e16e1f735ab2a42fd91d31783abf118459786e8a917eca9b2fe57",
+    "README.md": "a2ab0ae34ef14f4c5b631f7b73acbda5fe07d5a32ea85e05d39ffce846d95463",
+    "docs/benchmark.md": "8a8a12c9e49e64d7a0b5a00c72c9b7572e7fb9a6eaa754d498fb9e0d9bec9748",
+    "docs/partial_benchmark.md": "5b7ac374b2b6e1bcbfa6865429d3af9b1295053c8cef8bf14b185220b2120e86",
+    "docs/model_tool_configuration.md": "9c5607f91f39f3b340a2a09f18dfab7021f11e75d1cd4df4601984b2cf88b6e5",
+    "workshop/README.md": "c2e9bebfc03a2a9aecf9dbc191f16094a9a375e2ad441ae8aeda0bb855f9e117",
+    "workshop/completed/README.md": "5fc77810c69032840ebff04a468dea8ba52cb2cdd83959d6b1014531a9cf0489",
+    "workshop/completed/attack_parallel_20261021.md": "13cfd32da2bfe042c7729837fe2b8ef528a3c24be80226bd8e8186385150a2a0"
+  },
+  "evidence_sha256": {
+    "workshop/artifacts/20261021_attack_parallel/before.json": "01de851a7885a5b70d921b537bd961d8cf7fd899a9fb3c12b955c7e39fe8eaad",
+    "workshop/artifacts/20261021_attack_parallel/ledger.md": "fe71c5541d3f680573de59e7ab55de4b2b2516a6b1d83096246f7c763e70d869",
+    "workshop/artifacts/20261021_attack_parallel/ipi_accepted.log": "e4b2c351c0f5d6242a08baa297b1f1cee36e9ba765763393290da608b490f9a4",
+    "workshop/artifacts/20261021_attack_parallel/agentdyn_accepted.log": "c1b3394a735e46f156c43407e536b45e746f52b0b122fee965c6e63743cb3cfe",
+    "workshop/artifacts/20261021_attack_parallel/node_verified.log": "b9071d4e06582139639d75662c2d35d17493b1448d3170c6018539a8b291cd14",
+    "workshop/artifacts/20261021_attack_parallel/delivery_validation.json": "dc970d14d5a9c814b0a5a302e97748a6889a504410f06c6ac3b3b84914aea498",
+    "workshop/artifacts/20261021_attack_parallel/demonstration_agentdojo.json": "5f298f2bb5141d6efa5bf218ab9322010afc7bf3b3ce5557c363c81ab3d774ca",
+    "workshop/artifacts/20261021_attack_parallel/demonstration_agentdyn.json": "34d052aa4a1252ecfc21fe3785d06a269f2252ac47361e7cd4148e0110a081c5",
+    "workshop/artifacts/20261021_attack_parallel/full_help.log": "234fb5317e931ad5d10eb4470d639b2e0d481e31d2a192b2d6fec81c01f901cd",
+    "workshop/artifacts/20261021_attack_parallel/partial_help.log": "c2a32c693c2dc878ddd594adc7d058052796fbd1d6bab385b5898d2206250bce",
+    "workshop/artifacts/20261021_attack_parallel/full_help_agentdyn.log": "234fb5317e931ad5d10eb4470d639b2e0d481e31d2a192b2d6fec81c01f901cd",
+    "workshop/artifacts/20261021_attack_parallel/partial_help_agentdojo.log": "c2a32c693c2dc878ddd594adc7d058052796fbd1d6bab385b5898d2206250bce"
+  },
+  "limitations": [
+    "synthetic model results only; no server speed or efficacy claim",
+    "four pre-existing missing report/report.md documentation links"
+  ]
+}

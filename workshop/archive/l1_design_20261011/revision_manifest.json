@@ -1,0 +1,50 @@
+{
+  "date": "2026-10-11",
+  "task": "L1 structured projection candidate memo; unimplemented",
+  "base_revision": "7d1e1ed27791cc87685bc512ba1b8fb5c1182d25",
+  "previous_manifest": "workshop/archive/framework_report_20261011/revision_manifest.json",
+  "previous_manifest_sha256": "289d7fc8a00deade89c6c7c19707dcdb5676dfd65157ae751a0f5fdb8d115ebb",
+  "entries": [
+    {
+      "path": "workshop/README.md",
+      "original_storage": "workshop/archive/l1_design_20261011/originals/workshop/README.md",
+      "sha256_before": "75f8be24e0075fe9a29b8699affd7f9542e50aea62f9a05d13d932c1d5eb6b0c",
+      "sha256_after": "0537f409e68c879180db517b1ec17b623ffd1affc8dbe004139169685f8a9986"
+    },
+    {
+      "path": "AGENTS.md",
+      "original_storage": "workshop/archive/l1_design_20261011/originals/AGENTS.md",
+      "sha256_before": "39328e8c940c8620f2d3a57179db0ad678c143329ba1e4d0b6efb1547ebd5ebf",
+      "sha256_after": "fe8c3027d3c8bb9eb48e3f70869c2a4a19003205b385a0212c4c192d7c164f83"
+    }
+  ],
+  "created_files": {
+    "workshop/L1_opt.md": "6571d7cf9e90498b430e98fc2a84bdcbc8e99dbb0593217e254aa532a013849f"
+  },
+  "current_documents": [
+    "workshop/L1_opt.md",
+    "workshop/README.md",
+    "AGENTS.md"
+  ],
+  "validator": "workshop/artifacts/20261011_l1_design/validate_l1_doc.py",
+  "validator_sha256": "d57c3f2ef230350a3d245c86c1a645c0edc61cc28c6124ca6a3ce155695a83bd",
+  "runtime_changed": false,
+  "formal_route_changed": false,
+  "model_calls": 0,
+  "benchmark_rollouts": 0,
+  "fixtures_created": 0,
+  "historical_full_migration_certified": false,
+  "intervening_files": {
+    "report/report.md": {
+      "previous_expected_sha256": "d7722a0969356554ca72f23e4f339c34aa25e096abd97e6be223b6e3ffbc7835",
+      "snapshot_storage": "workshop/archive/l1_design_20261011/intervening_snapshots/report/report.md",
+      "current_sha256": "7c96686aadf3924cef4f0f49e449404fa0833775376d694bcfe17d7560e16aeb",
+      "scope": "Current report differs from previous dated manifest; not edited by this L1 task. Snapshot preserves current bytes, not the missing prior version."
+    }
+  },
+  "out_of_scope_documents": {
+    "report/report.md": {
+      "reason": "Pre-existing report edit contains unresolved history_analysis.png image reference. Preserve it; L1 memo validation does not certify report image assets."
+    }
+  }
+}

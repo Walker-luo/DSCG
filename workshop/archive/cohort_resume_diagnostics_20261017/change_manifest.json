@@ -1,0 +1,70 @@
+{
+  "task": "COHORT-RESUME-DIAGNOSTICS",
+  "base_revision": "31b932e2cccb6265f24345be8a103562a2ae51be",
+  "originals": [
+    {
+      "path": "experiments/common/benchmark_reuse.py",
+      "sha256": "5aa0f44cb9c4b7603d9bb6432e28407181c0d20040dd8d07b0a1c458d2e77703",
+      "archive_path": "workshop/archive/cohort_resume_diagnostics_20261017/originals/experiments/common/benchmark_reuse.py",
+      "sha256_after": "6da07db4261ff83e050c526ae096de3754633f00a7c3a923bbfb808e353b7d2d"
+    },
+    {
+      "path": "experiments/common/injection_cohort.py",
+      "sha256": "d1505dc5d3994dfcc172137625f2f6b91625a64df22f019be30d612bb81b96da",
+      "archive_path": "workshop/archive/cohort_resume_diagnostics_20261017/originals/experiments/common/injection_cohort.py",
+      "sha256_after": "828386cee6f00ef22509ca0e76a4d5889620841e38ab3621522aabcd6e02adde"
+    },
+    {
+      "path": "experiments/run_partial_benchmark.py",
+      "sha256": "f5e81729b76eb4e9350a66cadcbb3b911ea746a65076b93fa6587dfe48159de4",
+      "archive_path": "workshop/archive/cohort_resume_diagnostics_20261017/originals/experiments/run_partial_benchmark.py",
+      "sha256_after": "7c76e3927ec65e04669a63e5468c35892512fe9017b639c616d6e165405d80b2"
+    },
+    {
+      "path": "experiments/run_injection_precheck.py",
+      "sha256": "60b73202a366288482651c6a441e6e7609ca2634f97106bb3198e47ffa349bba",
+      "archive_path": "workshop/archive/cohort_resume_diagnostics_20261017/originals/experiments/run_injection_precheck.py",
+      "sha256_after": "836cc96a3404fa2a13eb32ba928ed290c4e82c02b09c4ca55658c8f2210a149c"
+    },
+    {
+      "path": "experiments/common/injection_cohort_compatibility.json",
+      "sha256": "505dd2e79bd18b590c4a4fb28661e83f5156cd9761a3497a892cecac12c5f774",
+      "archive_path": "workshop/archive/cohort_resume_diagnostics_20261017/originals/experiments/common/injection_cohort_compatibility.json",
+      "sha256_after": "e0d830e6cd02a732061b46f9d481b6b41f820d985c2c3b0b9c6505428f837973"
+    },
+    {
+      "path": "experiments/common/benchmark_reuse_compatibility.json",
+      "sha256": "e644e30c5270a2feac0f10a206b101a2762ec528e965d71a3945f327b5e47fe7",
+      "archive_path": "workshop/archive/cohort_resume_diagnostics_20261017/originals/experiments/common/benchmark_reuse_compatibility.json",
+      "sha256_after": "2460289b53bf828a691eee0527912cffa36526566c7808ed08a9d98e984fb5c8"
+    },
+    {
+      "path": "docs/benchmark.md",
+      "sha256": "a869c9f940c61e01d164a2e3bac4119504a25781f0d21c5bea6f5489c7c58d27",
+      "archive_path": "workshop/archive/cohort_resume_diagnostics_20261017/originals/docs/benchmark.md",
+      "sha256_after": "354bd2161365f6f15a30d2ac7377b978af4ab72cb85139663010c4664ee1e640"
+    },
+    {
+      "path": "docs/partial_benchmark.md",
+      "sha256": "d4d699b427150a10dec35548f53c8ca0fb8f9f4989c080fb6b37e68af351bafc",
+      "archive_path": "workshop/archive/cohort_resume_diagnostics_20261017/originals/docs/partial_benchmark.md",
+      "sha256_after": "b5977193c332ccbbe87e7a601d52b4e2a55e4a901fd2b9db512dce34ff95c769"
+    },
+    {
+      "path": "workshop/README.md",
+      "sha256": "397375629da9b73cdb2359589e74d3e9d293457ce799418942535c1e5ffd23f7",
+      "archive_path": "workshop/archive/cohort_resume_diagnostics_20261017/originals/workshop/README.md",
+      "sha256_after": "032b1d7a2517046480949f6d1a56273c1cd280c6a7aa8c465966348a53aa6594"
+    },
+    {
+      "path": "workshop/completed/README.md",
+      "sha256": "f9d161883571a325faebc1ad35a6eed74a9865a75b5fcbc630b91a9dc68b75db",
+      "archive_path": "workshop/archive/cohort_resume_diagnostics_20261017/originals/workshop/completed/README.md",
+      "sha256_after": "5ff1ed9a3f0a6a102a513419656021418cbffaa58a1b0029ffc60a807067bebe"
+    }
+  ],
+  "report": {
+    "path": "workshop/completed/cohort_resume_diagnostics_20261017.md",
+    "sha256": "5d7d69d7d2b96e923f55272c34c68f28af18df8241dc08d4cccbfca9438cf133"
+  }
+}

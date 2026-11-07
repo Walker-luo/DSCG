@@ -1,0 +1,1 @@
+{"output": "examples/results/framework_optimization/20261007_v2_followup/final_e0.json", "sample_counts": {"valid": 1, "model_error": 0, "policy_error": 0, "tool_error": 1, "timeout": 0, "infrastructure_error": 4, "skipped": 0}, "manifest_hash": "98ff96d873a6ce336ed97c71f5335cf2e0b239b1748166b8cdde18e17f7a4317"}

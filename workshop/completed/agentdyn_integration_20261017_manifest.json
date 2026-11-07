@@ -1,0 +1,150 @@
+{
+  "task": "AgentDyn engineering integration",
+  "date": "2026-10-17",
+  "status": "implemented; offline validated; real-model evaluation pending",
+  "base_revision": "2a2b17ce1275b9c8372814935989df5e6d9161e7",
+  "working_tree": "dirty on workshop; uncommitted integration; no push/merge",
+  "benchmark": {
+    "id": "agentdyn",
+    "repository": "https://github.com/SaFo-Lab/AgentDyn",
+    "revision": "5353cf7615b135cace8d07c8f12dac53a16b6db3",
+    "suite_version": "v1.2",
+    "implementation_sha256": "1e77628087f338da47a1e577951890c55996ab47f8b55ba15dbeeae95a4723d5",
+    "catalog_sha256": "ee06e0ae6bc7c4ff57cd6fc9e4b53d55982ea77cec700746568450c377281869",
+    "tasks_sha256": "e9441cec065c5615692b5416f8bfcc8f102d92c1cc19158c45bc2880de6595b5",
+    "environments_sha256": "bae3d82be80a62c2bdb9f40970ca5a76e74e4e92742d593f82cde59fc8f4faf7",
+    "attacks_sha256": "bac1b932d19b75d897d250cadcf7ef21b4056b39da2ca2d3e7558c41419c4b3d",
+    "tools_sha256": "64fbb7024c6aee83e0ff9eb95b26b0e637ad96071f5eeae7a5faa74203d0b35b"
+  },
+  "validation": {
+    "python": {
+      "passed": 451,
+      "total": 451,
+      "skipped": 0,
+      "log": "python_delivery_final.log",
+      "exit_code": 0
+    },
+    "node": {
+      "passed": 39,
+      "total": 39,
+      "log": "node_delivery_final.log",
+      "exit_code": 0
+    },
+    "native_test_methods_included": 7,
+    "paid_model_requests": 0,
+    "formal_model_rollouts": 0,
+    "protected_user_files": 6674,
+    "documentation_links": 183,
+    "new_broken_links": 0,
+    "preexisting_missing_links_preserved": [
+      [
+        "README.md",
+        "./plan.md"
+      ],
+      [
+        "README.md",
+        "./report/report.md"
+      ],
+      [
+        "README.md",
+        "./plan.md"
+      ],
+      [
+        "README.md",
+        "./report/report.md"
+      ],
+      [
+        "AGENTS.md",
+        "./report/report.md"
+      ]
+    ]
+  },
+  "files_sha256": {
+    "AGENTS.md": "904183896ea273cf67cd4c70c131e792c7327f02166ab5d6f3076527b9bf51f0",
+    "README.md": "58e1414fbda14dc87934b784ddac6018fb1893bfac1fdad9d0f35db09ebbfd81",
+    "config/agentdyn.lock.json": "5558b900dcdf09f72cb3698b420301333e950f066572d663f63945ae6092a2e1",
+    "config/tools.agentdyn-v1.2.toml": "0e53e4593f1b8a497f5f47ee6dc5fb246b0cfe55750fd328741ba2bfa0564762",
+    "dashboard/app.py": "a75acd7218da8ed22cc1b6a2b9bf0ecfb26fe851299ff21bda8b319adb6e829e",
+    "dashboard/evaluation.py": "4706260b8831f244390c2258431c99fafd9d4d571f3e48940a672bc09bbb8276",
+    "dashboard/history_export.py": "64816203251ef84da598cff00ed17f68c5511220ba229dcf7e5e72094b5e7979",
+    "dashboard/static/js/app.js": "41819995e1dcc696b2a8ef02e474b6fd73646bde7671cde766127ec796047f7f",
+    "dashboard/static/js/history.js": "808e283ad7a0ab8f0ee63c779be60c8b262dba72a7da6ad1eacd3a6090df2df6",
+    "dashboard/static/js/history_charts.js": "6666ddcc33615a2f14f1d9b100617b113567faed9c7c391251a2d091c4157758",
+    "dashboard/templates/index.html": "e98dc010c91b96d998051632625ab33261b43216349018f833ac68248952cda5",
+    "docs/README.md": "44a01388df962bb2c0eefe57ae383decb70d80b706b62b2b19e02b78a57cb88f",
+    "docs/benchmark.md": "040ab94dc44ba877f33bf73f56b74363ce15be7a2f7033fc1057b8905a8875be",
+    "docs/dashboard.md": "2a82f564f052663a8f75a7b11dd71de3c88bb73c75f82e81308d76c3d5f07398",
+    "docs/evaluation.md": "b8f4048e45c858db507f281c7f0307a833522cdc55e7839bddf42aba7e64ff54",
+    "docs/framework_updates.md": "494959e6af40c05350d3cc6b4a68804bd1efc45393f424a3e291b88b8fc9c949",
+    "docs/injection_precheck.md": "968ec71c3ce8e1d9e6e98b548c61e02c0688bffbd5578495cdcef8fc4572ab0f",
+    "docs/model_tool_configuration.md": "759261ce9c394288ae6b4f48d12ff07e131367740688a8c21dd04c6fa241fee1",
+    "docs/partial_benchmark.md": "62337215d272243f847d5b20074a8d03751c4a6d64e3d16da503852eb554df60",
+    "dscg/benchmark_catalog.py": "2004536cc45e9c4fbc9aa3b1a8021f7055a9d037908a9a11f972dd4aea40dfb4",
+    "dscg/tool_metadata.py": "3a6b02287e54bc432481b2dad31d49906a05232ff8b93fb363de54267f6992d9",
+    "environment-agentdyn.yml": "4c275fb55ac3784f2dbc3d1af12c809500d2133d0970bd0f7802a49ff50534c0",
+    "experiments/README.md": "1c235cd8e2b9672dc717fd59dabd22db5684d57bc756399e9320eae4af3a8ae6",
+    "experiments/common/benchmark_outcomes.py": "a9d7afdf3d44e65680bf17503991e84c35b7c473b4b3c5174b9f60b1b55ea306",
+    "experiments/common/benchmark_reuse.py": "ea9483424dcf8e0a3fabf041d1d5aca79f4d47781e8bab76cc21c92f92c96574",
+    "experiments/common/injection_cohort.py": "7f33c2768fcaacaf83cb523bbf7b1ecddbefe835fa2f66ef5227f334de1feda3",
+    "experiments/common/partial_controls.py": "319a17488c0ae54c2764435e0f9226475000a88a9e05f62b3b32220038f1b2dd",
+    "experiments/common/partial_reporting.py": "c9a647f64752dda00326ea18d27299d56165510ed63ba97f6b9ba135afd09302",
+    "experiments/run_benchmark.py": "e71cb91b1c72f7948c0353dbc820a94bfded649d1ac5493487e3333225b3d8a8",
+    "experiments/run_injection_precheck.py": "30f71fa846afe07a1a15b2a8950d4d1b46988e4347e7d21d4f0b8888249ebf94",
+    "experiments/run_partial_benchmark.py": "ddc4216bb37c41823957535fde861738c04a01fb72dba9a05be86ddc3a9156c3",
+    "experiments/tools/generate_tool_metadata.py": "97511915bb78d8861d9ab80b96a6b3771f0624f66b8a3a99a9115480cce294ba",
+    "tests/test_agentdyn_catalog.py": "a564ea7a54ad54bd411b003fc512c6b2aef0761f9df4d5e31e38446435f733e8",
+    "tests/test_agentdyn_native.py": "7bb955602b34f8fdbd4a8305639f13c1ada2afc55bf4d5076ff2af16cd266720",
+    "tests/test_agentdyn_outcomes.py": "17df241d714b092d6b838378cc26d7f345565d5bd680be43bfae63d30d6f95f2",
+    "tests/test_audit_tool_context.py": "79f0beab279c6971785f7656a6f75190c144e7fd0896f660e9da526375fa1ccd",
+    "tests/test_benchmark_reuse.py": "92aa25ab79db1b3c4e8655254a25c5c43cbbf9b2e2c1fd3d52b371a4e1d18048",
+    "tests/test_dashboard_config.py": "293f44aa4247ed05827f3008b526ad229392a308a1510ec9042c2951566fd57a",
+    "tests/test_dashboard_evaluation.py": "17fca02efe733822d2badf9e59833adc9718d5d1c5903ad54cea1cfa6ce6da86",
+    "tests/test_dashboard_history.py": "51c656cd4e62480fc0a4e7a3f9f6e11fad821974feade068f0d4b7fa85ee553e",
+    "tests/test_dashboard_ui.cjs": "d16aba63bdd689dc6bd2955ecb079860456c5be41be9b63a5799fd20e66b9b69",
+    "tests/test_full_benchmark.py": "28d3742f8ca2e79f27a300dad82f1c3d9f182fa9265ac10bddbc47f616c07287",
+    "tests/test_full_suites.py": "2bc334a2d78fab06895524b9c372ea90629c06dcfaa9c9df3dee3403be5da565",
+    "tests/test_history_charts.cjs": "e1d38156f430ff20299f7983b52af8267d9811b3d27782f775d0865b4ea1af1f",
+    "tests/test_injection_precheck.py": "40c081518172282f2843194acf3e23a6093e478a117e9c289d0db042b93306f5",
+    "tests/test_l1_projection_controls.py": "3028ca835dc5efcfb9e2aa34acb5f0fdd17ea685696d9307840c8dd3103436ec",
+    "tests/test_l2_controls.py": "b8bb0c0c30ca0bb21b7eacf22ddb014fd447cf0705040402d4b2c89d2347309e",
+    "tests/test_partial_ablation.py": "105bb3b4ce1908daa3b3eff0d9a065afacf6736fa0b7aa2bd781ed829785bb9c",
+    "tests/test_partial_agentdyn.py": "b70ffa953a25cb56975cf9e044920d4cbcaced7ed4b7e256103be20fc18d7aa3",
+    "tests/test_partial_attacks.py": "4702fbf8f3c1579d9b7d032111b6ef139606f88923ef9b4c7f099ac89ea4e9cf",
+    "tests/test_partial_baseline.py": "57cae5d7f71fd765277462383fc38b8c2ce3a641f2e822ccb7f22f18b2f8f723",
+    "tests/test_partial_cohort.py": "b030ce03d436f002487a750d448955fef8cf24d43febcc599c1985c3ee7a7863",
+    "tests/test_partial_reporting.py": "c22c59f06ca1bae6743c305f4c796292b8f2ca9be4a7e2cf71101c9b21b6a68a",
+    "tests/test_partial_router.py": "31c598f780452c05e55d6aa77e45d3db37707be6cc6dd53088d58f118536f481",
+    "tests/test_partial_suites.py": "d16ff6390e21b480c3fd072e37dc3951206ab979a6e610c24be0616ff06c6ec2",
+    "tests/test_resume_diagnostics.py": "f005837162f7abbb6866719c4022e13e65914e6d6a071cf4775fb15f3fa74c43",
+    "tests/test_tool_metadata.py": "e95dc6de2ad639b03595978c228472227282e9fbe1c655de3adba3052a0d1c49",
+    "workshop/README.md": "876e57fc8143868beaf775c9d45cc5b2018143438083e2ace446486085f12aba",
+    "workshop/completed/README.md": "81d9d4d27bfe9f766b666f11d3ba8962c494205271ad72e136ffe9476c8c8d1c",
+    "workshop/completed/agentdyn_integration_20261017.md": "4dee367d6ca64d2573dd3001dbd4ec52ea96b875d4ac5ed4aeafcdc790311671",
+    "workshop/completed/agentdyn_integration_plan_20261017.md": "eea2d05728134d72eae1c51fd2ae2e041d593057469db1314d1c0f7062251704"
+  },
+  "artifacts_sha256": {
+    "before.json": "a09910e6c9ab3529d6a4e0828a07b9993c317762e815ff373a40a4f5fa520ea4",
+    "baseline.log": "6645124e5713682d0faf6dc05caa7cfdb380d84e36f1678ded072f5097b94817",
+    "environment_clone.log": "9b13a89bba47e31c5dbe45ccd03148f4e114b3c40bc035edddc91b5f9be357a8",
+    "agentdyn_install.log": "1d54225647405883e0d4da2574015f7803090bbdc3dcee939a3d627f09545293",
+    "catalog_final.json": "c18e2445c23210ba54d93ccf2ba8520d04979ba16d28e23f0633c8a624a674ee",
+    "full_tasks_final.json": "25cc2112aaca210cd2612dcf961c427147f2e6fa102a38ccec960a6110a83f8d",
+    "partial_tasks_final.json": "5f58a5a513a7c17765872a7e682412d0d262eb07c7b8f229d2c10936ab1f0dcc",
+    "python_delivery_final.log": "d90b4613afac9a76dc01c2e22bdbd42ef2c24c75478f42aeb6e90f133b2a6318",
+    "node_delivery_final.log": "682983bee164840cf2406d0f197dabdb924391e9c08cc001b1a822c2ad11aefe",
+    "wrong_backend_final.log": "b9c08e88cdefc77fd8e9ad5660e0c3adaf1897d80e3a965de0ca49ec64a3073b",
+    "native_dashboard_final.log": "5edbf2c207fbe4e2909036345a3c8eef0d8fd2c5bc83cd13f5ac1c5a109756b3",
+    "delivery_checks.json": "ea657b5e970e9025fda7eb26d3fc0158798336eed8c640e20cdfca5526db4203",
+    "verify_delivery.py": "a84f589536cb7d3ae9584e70a5cef4e86cedae179ff7ae622ff824d351c46bb8",
+    "working_tree.patch": "0e887563924e69f0553f805eb9b615cfc138ad10de0c0fc287956bac5f8b5ff9",
+    "working_tree_status.txt": "eb7bf190cb71ef3e480d4a508635349a3c9d8f27c28be51ad35636d3346792f3",
+    "diff_check.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "limitations": [
+    "No paid model requests or efficacy estimates",
+    "No graphical browser visual QA",
+    "No fresh transitive dependency resolution beyond clone plus pinned fork install",
+    "Native oracle/reference-call defects retained",
+    "Tool-level controls only; research gates unchanged"
+  ]
+}

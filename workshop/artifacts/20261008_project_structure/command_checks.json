@@ -1,0 +1,17 @@
+[
+  {
+    "command": "/opt/miniconda3/envs/ipi/bin/python -m experiments.run_partial_benchmark --help",
+    "exit_code": 0,
+    "output": "usage: run_partial_benchmark.py [-h] [--attack ATTACK [ATTACK ...]]\n                                [--baseline] [--force-rerun] [--name NAME]\n                                [--trace-level {summary,standard,full}]\n                                [--include-extra-info] [--tool-metadata PATH]\n                                [--model-config PATH] [--results-dir DIR]\n                                [--no-checker] [--audit-retries {0,1}]\n                                [--completion-prompt] [--clean]\n                                [--task-manifest TASK_MANIFEST_PATH]\n                                [--write-task-manifest PATH]\n\n运行 DSCG 的四场景小批量 AgentDojo 回归评测。\n\noptions:\n  -h, --help            show this help message and exit\n  --attack ATTACK [ATTACK ...]\n                        默认 typical（4 种典型目标型攻击）；all 运行全部自动攻击，也可指定具体名称。\n  --baseline            运行无防御 AgentDojo 基线；与默认 DSCG 使用相同任务子集和注入攻击。\n  --force-rerun         重新执行任务，不复用已有结果；也可设置 DSCG_FORCE_RERUN=1。\n  --name NAME           本次运行名称；结果保存于 --results-dir 指定目录下的 <model_id>_<NAME>/。\n  --trace-level {summary,standard,full}\n                        任务 JSON 中 DSCG 记录级别；默认 summary，full 会额外保存压缩审计侧车。\n  --include-extra-info  兼容快捷开关，等同于 --trace-level full，将完整审计/动作记录写入 JSON。\n  --tool-metadata PATH  显式工具风险元数据 TOML；缺省时未分类工具按 critical 处理。\n  --model-config PATH   模型配置 TOML；缺省使用 config/models.local.toml。\n  --results-dir DIR     结果根目录；缺省使用 results/partial_benchmark/。\n  --no-checker          P0 消融：保留授权/monitor/ticket，关闭语义审计。\n  --audit-retries {0,1}\n                        语义 abstain 有界重审次数；默认 0。\n  --completion-prompt   启用通用任务完成提示；默认关闭。\n  --clean               用相同用户任务运行无攻击效用控制。\n  --task-manifest TASK_MANIFEST_PATH\n                        读取冻结 v1.2 任务 ID 清单。\n  --write-task-manifest PATH\n                        离线导出当前任务 ID 清单并退出，不调用模型。\n"
+  },
+  {
+    "command": "/opt/miniconda3/envs/ipi/bin/python -m experiments.run_benchmark --help",
+    "exit_code": 0,
+    "output": "usage: run_benchmark.py [-h] [--name NAME]\n                        [--trace-level {summary,standard,full}]\n                        [--include-extra-info] [--tool-metadata PATH]\n\n运行 DSCG 的四场景全量 AgentDojo 评测。\n\noptions:\n  -h, --help            show this help message and exit\n  --name NAME           本次优化/消融实验名称；结果保存为\n                        results/benchmarks/<model_id>_<NAME>/。\n  --trace-level {summary,standard,full}\n                        任务 JSON 中 DSCG 记录级别；默认 summary，full 会额外保存压缩审计侧车。\n  --include-extra-info  兼容快捷开关，等同于 --trace-level full，将完整审计/动作记录写入 JSON。\n  --tool-metadata PATH  显式工具风险元数据 TOML；缺省时未分类工具按 critical 处理。\n"
+  },
+  {
+    "command": "git diff --check",
+    "exit_code": 0,
+    "output": ""
+  }
+]

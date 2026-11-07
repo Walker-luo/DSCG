@@ -1,0 +1,124 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="183.0mm" height="99.57mm" viewBox="0 0 544 296" role="img" aria-labelledby="system-architecture-title system-architecture-desc" id="system-architecture-root">
+<title id="system-architecture-title">GrantBind execution mediation path</title>
+<desc id="system-architecture-desc">Execution path from the trusted task through task-scoped authorization, a deterministic whole-batch check, an action audit and a reference monitor that binds tool execution to one-use tickets, with tool results returning to the planner through input isolation and denied calls never executing.</desc>
+<defs>
+      <style>#system-architecture-root { color: #162a38; font-family: Arial,Helvetica,sans-serif; }
+      #system-architecture-root p.sub { margin:0 0 22px;font-size:13px;color:#46596a }
+      #system-architecture-root .diagram-container { width:100%;overflow-x:auto;border-top:1px solid #cfd8e0;padding-top:18px }
+      #system-architecture-root .diagram-container svg { display:block;width:100%;min-width:544px;height:auto }
+      @media print {
+#system-architecture-root .diagram-container { overflow-x:visible }
+      #system-architecture-root .diagram-container svg { min-width:0 }
+}</style>
+<marker id="system-architecture-arrow-control" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#35576f"/></marker>
+<marker id="system-architecture-arrow-return" markerWidth="7" markerHeight="5" refX="6.4" refY="2.5" orient="auto"><polygon points="0 0, 7 2.5, 0 5" fill="#667789"/></marker>
+<g id="system-architecture-icon-task" fill="none" stroke="#35576f" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3 1.5h6l3 3v10H3z M9 1.5v3h3 M5 8h5 M5 11h5"/></g>
+<g id="system-architecture-icon-l2" fill="none" stroke="#35576f" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M8 1.5 13 3.4v4.1c0 3-2.2 5.4-5 6.8-2.8-1.4-5-3.8-5-6.8V3.4z M5.4 7.8l1.6 1.6 3.6-3.6"/></g>
+<g id="system-architecture-icon-model" fill="none" stroke="#35576f" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="3.5" width="9" height="9" rx="1.5"/><rect x="6.2" y="6.2" width="3.6" height="3.6" rx=".5"/><path d="M6 1v2.5 M10 1v2.5 M6 12.5V15 M10 12.5V15 M1 6h2.5 M1 10h2.5 M12.5 6H15 M12.5 10H15"/></g>
+<g id="system-architecture-icon-audit" fill="none" stroke="#35576f" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="6.5" cy="6.5" r="4.5"/><path d="m10 10 3.8 3.8 M4.5 6.5l1.3 1.3 2.7-2.7"/></g>
+<g id="system-architecture-icon-l1" fill="none" stroke="#35576f" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="12" height="10" rx="1.5"/><path d="M5 1v4 M11 1v4 M5.2 8h5.6 M8 5.8v4.4"/></g>
+<g id="system-architecture-icon-tools" fill="none" stroke="#35576f" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><rect x="1.5" y="2.5" width="13" height="11" rx="1.3"/><path d="m4.2 5.5 2 2-2 2 M8 10h3.5"/></g>
+<g id="system-architecture-icon-monitor" fill="none" stroke="#35576f" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M8 1.5 13 3.4v4.1c0 3-2.2 5.4-5 6.8-2.8-1.4-5-3.8-5-6.8V3.4z"/><circle cx="8" cy="6.8" r="1.2"/><path d="M8 8v2"/></g>
+<g id="system-architecture-icon-response" fill="none" stroke="#35576f" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M2 2.5h12v8H8l-3.5 3v-3H2z M4.5 5h7 M4.5 7.5h5"/></g>
+</defs>
+<rect width="544" height="296" fill="#ffffff"/>
+<path d="M104,92 H116" fill="none" stroke="#35576f" stroke-width="1.1" stroke-linecap="butt" stroke-linejoin="round" marker-end="url(#system-architecture-arrow-control)"/>
+<path d="M212,92 H224" fill="none" stroke="#35576f" stroke-width="1.1" stroke-linecap="butt" stroke-linejoin="round" marker-end="url(#system-architecture-arrow-control)"/>
+<path d="M320,92 H332" fill="none" stroke="#35576f" stroke-width="1.1" stroke-linecap="butt" stroke-linejoin="round" marker-end="url(#system-architecture-arrow-control)"/>
+<path d="M428,92 H440" fill="none" stroke="#35576f" stroke-width="1.1" stroke-linecap="butt" stroke-linejoin="round" marker-end="url(#system-architecture-arrow-control)"/>
+<path d="M488,124 V180" fill="none" stroke="#35576f" stroke-width="1.1" stroke-linecap="butt" stroke-linejoin="round" marker-end="url(#system-architecture-arrow-control)"/>
+<path d="M440,212 H428" fill="none" stroke="#35576f" stroke-width="1.1" stroke-linecap="butt" stroke-linejoin="round" marker-end="url(#system-architecture-arrow-control)"/>
+<path d="M332,212 H320" fill="none" stroke="#667789" stroke-width="0.85" stroke-linecap="butt" stroke-linejoin="round" marker-end="url(#system-architecture-arrow-return)"/>
+<path d="M272,180 V124" fill="none" stroke="#667789" stroke-width="0.85" stroke-linecap="butt" stroke-linejoin="round" marker-end="url(#system-architecture-arrow-return)"/>
+<path d="M272,60 V40" fill="none" stroke="#35576f" stroke-width="1.1" stroke-linecap="butt" stroke-linejoin="round" marker-end="url(#system-architecture-arrow-control)"/>
+<path d="M164,124 V146 H264 a8,8 0 0 1 16,0 H380 V124" fill="none" stroke="#667789" stroke-width="0.85" stroke-linecap="butt" stroke-linejoin="round" stroke-dasharray="5,4" marker-end="url(#system-architecture-arrow-return)"/>
+<path d="M400,180 V160 H464 V124" fill="none" stroke="#667789" stroke-width="0.85" stroke-linecap="butt" stroke-linejoin="round" stroke-dasharray="5,4" marker-end="url(#system-architecture-arrow-return)"/>
+<path d="M488,244 V254" fill="none" stroke="#a63d2f" stroke-width="1.1" stroke-linecap="butt"/>
+<path d="M480,254 H496" fill="none" stroke="#a63d2f" stroke-width="2.2" stroke-linecap="round"/>
+<g id="node-trusted-task">
+<rect x="8" y="60" width="96" height="64" rx="4" fill="#f7f8fa" stroke="#8d9aa5" stroke-width="0.9"/>
+<use href="#system-architecture-icon-task" x="48" y="63"/>
+<text x="56" y="86" font-family="Arial, Helvetica, sans-serif" font-size="7.97" fill="#162a38" text-anchor="middle" font-weight="600">Trusted task</text>
+<text x="56" y="101" font-family="Arial, Helvetica, sans-serif" font-size="6.9" fill="#46596a" text-anchor="middle">user request +</text>
+<text x="56" y="113" font-family="Arial, Helvetica, sans-serif" font-size="6.9" fill="#46596a" text-anchor="middle">native tool definitions</text>
+</g>
+<g id="node-l2-authorization">
+<rect x="116" y="60" width="96" height="64" rx="4" fill="#e6f0f9" stroke="#5f87ab" stroke-width="0.9"/>
+<use href="#system-architecture-icon-l2" x="156" y="63"/>
+<text x="164" y="86" font-family="Arial, Helvetica, sans-serif" font-size="7.97" fill="#162a38" text-anchor="middle" font-weight="600">L2 · Authorization</text>
+<text x="164" y="101" font-family="Arial, Helvetica, sans-serif" font-size="6.9" fill="#46596a" text-anchor="middle">task view + tool grants</text>
+<text x="164" y="113" font-family="Arial, Helvetica, sans-serif" font-size="6.9" fill="#46596a" text-anchor="middle">compile as needed</text>
+</g>
+<g id="node-main-model">
+<rect x="224" y="60" width="96" height="64" rx="4" fill="#f7f8fa" stroke="#8d9aa5" stroke-width="0.9"/>
+<use href="#system-architecture-icon-model" x="264" y="63"/>
+<text x="272" y="86" font-family="Arial, Helvetica, sans-serif" font-size="7.97" fill="#162a38" text-anchor="middle" font-weight="600">Main model</text>
+<text x="272" y="101" font-family="Arial, Helvetica, sans-serif" font-size="6.9" fill="#46596a" text-anchor="middle">planning view + grants</text>
+<text x="272" y="113" font-family="Arial, Helvetica, sans-serif" font-size="6.9" fill="#46596a" text-anchor="middle">one batch per round</text>
+</g>
+<g id="node-l2-batch-check">
+<rect x="332" y="60" width="96" height="64" rx="4" fill="#e6f0f9" stroke="#5f87ab" stroke-width="0.9"/>
+<use href="#system-architecture-icon-l2" x="372" y="63"/>
+<text x="380" y="86" font-family="Arial, Helvetica, sans-serif" font-size="7.97" fill="#162a38" text-anchor="middle" font-weight="600">L2 · Batch check</text>
+<text x="380" y="101" font-family="Arial, Helvetica, sans-serif" font-size="6.9" fill="#46596a" text-anchor="middle">whole batch vs. grants</text>
+<text x="380" y="113" font-family="Arial, Helvetica, sans-serif" font-size="6.9" fill="#46596a" text-anchor="middle">0 model calls</text>
+</g>
+<g id="node-l3-action-audit">
+<rect x="440" y="60" width="96" height="64" rx="4" fill="#f1edf8" stroke="#8a76a3" stroke-width="0.9"/>
+<use href="#system-architecture-icon-audit" x="480" y="63"/>
+<text x="488" y="86" font-family="Arial, Helvetica, sans-serif" font-size="7.97" fill="#162a38" text-anchor="middle" font-weight="600">L3 · Action audit</text>
+<text x="488" y="101" font-family="Arial, Helvetica, sans-serif" font-size="6.9" fill="#46596a" text-anchor="middle">allow / deny / abstain</text>
+<text x="488" y="113" font-family="Arial, Helvetica, sans-serif" font-size="6.9" fill="#46596a" text-anchor="middle">nonexempt calls only</text>
+</g>
+<g id="node-l1-isolation">
+<rect x="224" y="180" width="96" height="64" rx="4" fill="#e9f4ef" stroke="#6e9c8a" stroke-width="0.9"/>
+<use href="#system-architecture-icon-l1" x="264" y="183"/>
+<text x="272" y="206" font-family="Arial, Helvetica, sans-serif" font-size="7.97" fill="#162a38" text-anchor="middle" font-weight="600">L1 · Input isolation</text>
+<text x="272" y="221" font-family="Arial, Helvetica, sans-serif" font-size="6.9" fill="#46596a" text-anchor="middle">wrap or project returns</text>
+<text x="272" y="233" font-family="Arial, Helvetica, sans-serif" font-size="6.9" fill="#46596a" text-anchor="middle">raw history kept</text>
+</g>
+<g id="node-tool-execution">
+<rect x="332" y="180" width="96" height="64" rx="4" fill="#f7f8fa" stroke="#8d9aa5" stroke-width="0.9"/>
+<use href="#system-architecture-icon-tools" x="372" y="183"/>
+<text x="380" y="206" font-family="Arial, Helvetica, sans-serif" font-size="7.97" fill="#162a38" text-anchor="middle" font-weight="600">Tool execution</text>
+<text x="380" y="221" font-family="Arial, Helvetica, sans-serif" font-size="6.9" fill="#46596a" text-anchor="middle">ticketed, native order</text>
+<text x="380" y="233" font-family="Arial, Helvetica, sans-serif" font-size="6.9" fill="#46596a" text-anchor="middle">host side effects</text>
+</g>
+<g id="node-reference-monitor">
+<rect x="440" y="180" width="96" height="64" rx="4" fill="#edf2f7" stroke="#48647c" stroke-width="0.9"/>
+<use href="#system-architecture-icon-monitor" x="480" y="183"/>
+<text x="488" y="206" font-family="Arial, Helvetica, sans-serif" font-size="7.97" fill="#162a38" text-anchor="middle" font-weight="600">Reference Monitor</text>
+<text x="488" y="221" font-family="Arial, Helvetica, sans-serif" font-size="6.9" fill="#46596a" text-anchor="middle">one-use tickets</text>
+<text x="488" y="233" font-family="Arial, Helvetica, sans-serif" font-size="6.9" fill="#46596a" text-anchor="middle">deny: no ticket</text>
+</g>
+<g id="node-final-response">
+<rect x="224" y="8" width="96" height="32" rx="4" fill="#f7f8fa" stroke="#8d9aa5" stroke-width="0.9"/>
+<use href="#system-architecture-icon-response" x="231" y="16"/>
+<text x="280" y="26.6" font-family="Arial, Helvetica, sans-serif" font-size="7.97" fill="#162a38" text-anchor="middle" font-weight="600">Final response</text>
+</g>
+<rect x="299.53" y="130" width="62.47" height="10" rx="1.5" fill="#ffffff"/>
+<text x="359" y="138" font-family="Arial, Helvetica, sans-serif" font-size="6.6" fill="#5f7183" text-anchor="end" letter-spacing="0.06em">FROZEN GRANTS</text>
+<rect x="278" y="152" width="58.44" height="10" rx="1.5" fill="#ffffff"/>
+<text x="281" y="160" font-family="Arial, Helvetica, sans-serif" font-size="6.6" fill="#5f7183" letter-spacing="0.06em">PLANNING VIEW</text>
+<rect x="392.261" y="166" width="39.74" height="10" rx="1.5" fill="#ffffff"/>
+<text x="429" y="174" font-family="Arial, Helvetica, sans-serif" font-size="6.6" fill="#5f7183" text-anchor="end" letter-spacing="0.06em">EVIDENCE</text>
+<rect x="415.933" y="249" width="58.07" height="10" rx="1.5" fill="#ffffff"/>
+<text x="471" y="257" font-family="Arial, Helvetica, sans-serif" font-size="6.6" fill="#5f7183" text-anchor="end" letter-spacing="0.06em">DENY / ABSTAIN</text>
+<path d="M8,190 V234" fill="none" stroke="#cfd8e0" stroke-width="1.4"/>
+<text x="20" y="197" font-family="Arial, Helvetica, sans-serif" font-size="6.3" fill="#5f7183" letter-spacing="0.14em">MODEL INPUT FORMS</text>
+<text x="20" y="215" font-family="Arial, Helvetica, sans-serif" font-size="7" fill="#162a38">L2: compact tool catalogue.</text>
+<text x="20" y="229" font-family="Arial, Helvetica, sans-serif" font-size="7" fill="#162a38">L3: tool-return evidence ≤32,768 chars.</text>
+<path d="M8,270 H536" fill="none" stroke="#cfd8e0" stroke-width="0.8"/>
+<path d="M8,283 H38" fill="none" stroke="#35576f" stroke-width="1.1" stroke-linecap="butt"/>
+<polygon points="38,283 32,280.5 32,285.5" fill="#35576f"/>
+<text x="44" y="285" font-family="Arial, Helvetica, sans-serif" font-size="6.5" fill="#46596a">task, control, ticket</text>
+<path d="M146.714,283 H176.714" fill="none" stroke="#667789" stroke-width="0.85" stroke-linecap="butt"/>
+<polygon points="176.714,283 170.714,280.5 170.714,285.5" fill="#667789"/>
+<text x="182.714" y="285" font-family="Arial, Helvetica, sans-serif" font-size="6.5" fill="#46596a">tool return, planning view</text>
+<path d="M303.855,283 H343.855" fill="none" stroke="#667789" stroke-width="0.85" stroke-linecap="butt" stroke-dasharray="5,4"/>
+<polygon points="343.855,283 337.855,280.5 337.855,285.5" fill="#667789"/>
+<text x="349.855" y="285" font-family="Arial, Helvetica, sans-serif" font-size="6.5" fill="#46596a">frozen grants, evidence</text>
+<path d="M467.303,277 V289" fill="none" stroke="#a63d2f" stroke-width="2.2" stroke-linecap="round"/>
+<text x="476.303" y="285" font-family="Arial, Helvetica, sans-serif" font-size="6.5" fill="#46596a">deny / abstain blocks</text>
+</svg>

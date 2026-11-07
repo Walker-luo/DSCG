@@ -2,25 +2,22 @@
 # config/models.local.toml is ignored by Git.
 
 [main]
-provider = "deepseek"
-model_id = "deepseek-flash"
-base_url = "https://api.deepseek.com"
-api_key_env = "DEEPSEEK_API_KEY"
-# api_key = "sk-b8a564e77a0849c0a9b5d473e72325a3"  # Optional local-only secret; prefer api_key_env for shared machines.
+provider = "dashscope"
+model_id = "qwen3.7-flash"
+# api_key = "YOUR_API_KEY"  # Optional local-only secret; prefer api_key_env for shared machines.
 
 [security]
 provider = "dashscope"
-model_id = "qwen-plus"
-base_url = "https://dashscope.aliyuncs.com/compatible-mode/v1"
-api_key_env = "DASHSCOPE_API_KEY"
+model_id = "qwen3.7-flash"
 
 [providers.deepseek]
 base_url = "https://api.deepseek.com"
 api_key_env = "DEEPSEEK_API_KEY"
 
 [providers.dashscope]
-base_url = "https://dashscope.aliyuncs.com/compatible-mode/v1"
+base_url = "https://llm-mlss3za0e68dhn8x.cn-beijing.maas.aliyuncs.com/compatible-mode/v1"
 api_key_env = "DASHSCOPE_API_KEY"
+# api_key = "YOUR_DASHSCOPE_API_KEY"
 
 [providers.openai]
 base_url = "https://api.openai.com/v1"
