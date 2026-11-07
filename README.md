@@ -66,7 +66,7 @@ python -m dashboard.app
 
 授权范围是工具级；静态任务视图与风险标签不能认证事实、对象隐私、条件成立或任务完成。最终文本没有独立动作审计，模型仍可能漏做、误判参数或交付不完整。
 
-最新 workspace 消融中，完整组与 NoL3 均为零攻击命中；NoL2 路径同时丢失工具元数据，导致 L3 大量 `MISSING_EVIDENCE` 阻断。该缺陷尚未修复，当前结果须结合这一干扰解释，见 [当前问题](docs/framework_updates.md)。
+最新 workspace 消融中，完整组与 NoL3 均为零攻击命中；NoL2 路径同时丢失工具元数据，导致 L3 大量 `MISSING_EVIDENCE` 阻断。该缺陷尚未修复，当前结果须结合这一干扰解释，见 [当前问题](docs/framework_updates.md)。消融原始结果归档在 `results/workshop/agentdojo/ablation/`，Dashboard 历史页把 `ablation` 作为模型值直接选择。
 
 ## 文档与目录
 
