@@ -8,7 +8,7 @@ import argparse
 import os
 
 from dscg.paths import RESULTS_DIR
-from experiments import run_benchmark as benchmark_runner
+from experiments import run_partial_benchmark as benchmark_runner
 
 DEFENSES = ("spotlighting_with_delimiting", "tool_filter")
 
@@ -56,6 +56,7 @@ def main(argv=None):
         audit_router_mode="off",
         config_path=args.config_path,
         force_rerun=args.force_rerun,
+        task_scope="partial",
     )
 
 
