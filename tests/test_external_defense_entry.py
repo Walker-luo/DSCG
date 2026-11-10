@@ -33,6 +33,17 @@ class ExternalDefenseEntryTests(unittest.TestCase):
         self.assertEqual(seen["audit_router_mode"], "off")
         self.assertTrue(str(seen["results_dir"]).endswith("workshop"))
 
+    def test_full_scope_forwarding(self):
+        rc, seen = self.capture([
+            "--defense", "spotlighting_with_delimiting", "--name", "spotlighting_full",
+            "--task-scope", "full", "--task-manifest", "/tmp/full.json",
+            "--fliter", "/tmp/fliter.json",
+        ])
+        self.assertEqual(rc, 0)
+        self.assertEqual(seen["task_scope"], "full")
+        self.assertTrue(seen["origin"])
+        self.assertEqual(seen["defense"], "spotlighting_with_delimiting")
+
     def test_clean_arm_drops_selection(self):
         rc, seen = self.capture(["--defense", "tool_filter", "--name", "tool_filter_clean", "--clean"])
         self.assertEqual(rc, 0)

@@ -18,6 +18,8 @@ def build_parser():
         description="Run an AgentDojo built-in defense arm (native loop) on the recorded comparison grid."
     )
     parser.add_argument("--defense", required=True, choices=DEFENSES)
+    parser.add_argument("--task-scope", choices=("partial", "full"), default="partial",
+                        help="partial=108-key frozen grid；full=全部注册任务（配合 full manifest/fliter）。")
     parser.add_argument("--suites", nargs="+", metavar="SUITE", default=None)
     parser.add_argument("--attack", nargs="+", action="extend", default=None,
                         help="默认 typical（3 种目标型攻击）；clean 模式忽略该参数。")
@@ -56,7 +58,7 @@ def main(argv=None):
         audit_router_mode="off",
         config_path=args.config_path,
         force_rerun=args.force_rerun,
-        task_scope="partial",
+        task_scope=args.task_scope,
     )
 
 
