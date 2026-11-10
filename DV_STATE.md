@@ -2,15 +2,15 @@
 
 > 2026-11-06 更名为 **GrantBind**。论文、图表、文档与 Dashboard 统一使用新名。导入路径 `dscg`、环境变量前缀、历史运行与诊断协议沿用既有标识。工作站路径为 `/Users/luo/Desktop/AgentDefence/GrantBind`，更名提交以 `workshop@3605467` 的 v3.7 为基线。
 
-> 2026-11-07（Asia/Shanghai）。当前 **v3.7**，默认 **static-task-v354 / authorization_input=v3 / audit_presentation=v3**。README 与 docs 仅说明 v3.7；历史实验保留原身份，v3.8 不再启动新测试。本轮更新三场景 L3 消融分析，核对 banking 历史派生参照、实际审计收益、误拒与成本。
+> 2026-11-08（Asia/Shanghai）。当前 **v3.7**，默认 **static-task-v354 / authorization_input=v3 / audit_presentation=v3**。本轮细化 docs/architecture.md，拆分各层机制、实际提示组成和输入输出，并逐项给出 JSON 示例；无框架变更或模型调用。
 
 ## 1. 工作区与当前任务
 
 | 项目 | 状态 |
 | --- | --- |
-| 目录／分支／开始HEAD | GrantBind／workshop／f9a6fe5；本轮仅分析与状态更新，未暂存／提交／切换分支 |
-| 本次任务 | 更新 analysis/ablation.md，复核六个场景臂3174份轨迹；区分正确阻断、同键ASR差值、合法动作误拒及对照配置干扰 |
-| 初始脏文件 | paper/plan.md，保留原有修改；新增未跟踪 analysis/ablation.md 保留 |
+| 目录／分支／开始HEAD | GrantBind／workshop／2e973a4；本轮仅文档与状态更新，未暂存／提交／切换分支 |
+| 本次任务 | 按环节细化架构说明，展示 L2 原文片段／摘要／权限输入输出及 L3 策略／提示／证据／判决，每项附 JSON 示例 |
+| 初始脏文件 | paper/ 下24项既有删除，包括 plan.md 和稿件／图表文件，均保留原样 |
 | 当前默认 | `static-task-v354`（DSCG_v3.7、L2输入v3／审计呈现v3）；legacy为显式单阶段对照，baseline走原生循环 |
 | 版本基线 | v3.7输入形态已发布；ca7739f保留为v3.6历史归档。v3.6.1整包提示不作为当前默认 |
 | 在线授权 | 默认仅真实 qwen3.7-flash；其他模型按当轮明确授权及 AGENTS 约定执行。本次仅文档，无模型调用 |
@@ -36,6 +36,10 @@
 - **未新增：**host意图进度FSM、完成闸门、恢复、动态扩权、参数修补、对象／数据／参数硬授权或最终文本审计。
 
 ## 3. 最新实施与验证
+
+- **对比实验完成（2026-11-10，qwen3.7-flash only）：**workshop@dfd0555，108 键网格（4 suites × users 0-2 × 3 injections × 3 attacks）+ 12 键 clean，全部真实 API。TSR/ASR：baseline 82/108、41/108；GrantBind v3.7 94/108、0/108；Spotlighting 78/108、27/108；MELON 70/108、1/108（clean 9/12）；IPIGuard 59/98、8/98（clean 6/11，v1.1.2 交集、1 错误）；Tool Filter 0/108 且 clean 0/12，判定为实现不兼容（qwen 过滤选择返回纯文本、后续无 tool call），仅作失败证据、不作防御结论。新增在线调用约 2,896 次 chat + 203 次 embedding（MELON 514 / IPIGuard 553 / 其余 DSCG 记账），token 约 22.8M。B 臂在 DSCG 仓库外 `/home/yuxin_luo/{MELON,IPIGuard}`，MELON embedding 换 DashScope text-embedding-v4，IPIGuard 用自带 0.1.23 fork。详见[报告](workshop/completed/20261110_comparison_arms.md)与聚合表 `workshop/artifacts/20261109_comparison_run/tables/comparison.md`。
+
+- **架构细节说明（2026-11-08，仅文档）：**workshop@2e973a4，重写 [architecture.md](docs/architecture.md)，逐项说明来源包装／转义／投影、片段ID任务视图／关系／权限编译／委托、L3提示组成／输入包／免审／证据预算／四字段判决、Monitor绑定与反馈。15个JSON示例解析及现有函数契约核对通过，银行投影与L3提示摘录匹配源码；README/docs共94个本地链接与锚点、git diff --check通过。主机LuodeMacBook-Air.local，ipi Python3.10.21离线检查exit0，新增模型调用0，不构成在线效果验证。
 
 - **最新消融复核（2026-11-07，仅分析）：**workshop@f9a6fe5，当前 full／noL3 六个场景臂3174份轨迹、0新增模型调用。新增 banking full 为9cf1e8c的v3.6.3历史派生参照，NoL3为8135fe1，标记／路由等不同，不能作为严格净效应。banking成功255／261、命中0／1，唯一差值键full未提出付款；885次审计中701次纯读，50次拒绝无遗漏／截断，成本高58.66%，租金更新有误拒。Slack成功224／233、命中0／6，仅1键有对应URL直接拦截；workspace成功772／765、ASR均0。报告 [analysis/ablation.md](analysis/ablation.md)，当前归档不含NoL2，其既有元数据干扰仍单列。
 
