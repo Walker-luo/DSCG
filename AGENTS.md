@@ -134,10 +134,7 @@ Use [README.md](README.md) for the framework, [model/tool configuration](docs/mo
 | `gb-slack-abl` | Qwen3.7-Flash slack ablation: full then NoL3, new L1 marker (both arms finished 16:56) | 2026-11-07 | ended |
 | `gb-bank-abl` | Qwen3.7-Flash banking NoL3 ablation, 432 keys, finished 20:19 (full reference from the v3.6.3 run; no banking_full arm) | 2026-11-07 | ended |
 | `gb-travel-abl` | Qwen3.7-Flash travel NoL3 ablation, 360 keys (358 valid, 2 task errors), finished 14:43; full reference from the v3.6.3 travel subset (summary-only derivation) | 2026-11-08 | ended |
-| `cmp-tf-a` | Tier A tool_filter (workspace+banking) then clean | 2026-11-09 | active |
-| `cmp-tf-b` | Tier A tool_filter (travel+slack) then clean | 2026-11-09 | active |
-| `cmp-melon` | MELON comparison arm, 108-key grid, attack then clean | 2026-11-09 | active |
-| `cmp-ipiguard` | IPIGuard comparison arm (v1.1.2 grid intersection), attack then clean | 2026-11-09 | active |
+| `cmp-refs` | baseline_108 + v37_108 同网格参考臂（含 clean），11-10 11:02→11:13 全部 exit 0 | 2026-11-10 | ended, session closed |
 
 ## Storage, reports and historical context
 
