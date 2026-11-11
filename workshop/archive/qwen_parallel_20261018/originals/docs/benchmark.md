@@ -1,0 +1,203 @@
+# 完整任务测试：AgentDojo 与 AgentDyn
+
+同一份代码在两个conda环境中自动选择基准，正常测试不需要`--benchmark`或额外工具目录参数。模型/风险配置见 [配置指南](./model_tool_configuration.md)，小规模排错见 [partial](./partial_benchmark.md)。
+
+## 安装与依赖自检
+
+在DSCG目录首次创建所需环境；已有环境不覆盖：
+
+```bash
+conda env create -f environment.yml
+conda env create -f environment-agentdyn.yml
+```
+
+任选一个环境，后续测试命令完全相同：
+
+```bash
+conda activate ipi                      # AgentDojo
+# 或：conda activate ipi-agentdyn         # AgentDyn
+python -m dscg.benchmark_catalog
+```
+
+| 环境 | 实际后端身份 | 默认场景 |
+| --- | --- | --- |
+| ipi | 官方AgentDojo0.1.35发行包，suitev1.2 | workspace/travel/banking/slack |
+| ipi-agentdyn | AgentDyn提交5353cf7615b135cace8d07c8f12dac53a16b6db3，suitev1.2 | shopping/github/dailylife |
+
+两个包都声明agentdojo0.1.35，不能只看版本或环境名。启动按安装来源及完整文件集合/哈希识别；未知fork、提交、增删或修改源码在创建模型前拒绝。AgentDojo锁定官方wheel与112个源码/数据文件，身份使用PyPI发行标识而不虚构Git提交；AgentDyn保留1374文件的Git锁。环境定义固定顶层依赖，不是完整传递依赖锁。
+
+本机ipi的openai_llm.py与官方发行包只有一处角色适配：system消息发送为system而不是developer。此确切文件作为`reviewed-local-system-role-v1`单独校验和记录；干净发行版为official-release。不会修改环境或接受其他未知补丁。不同runtime_variant/实现哈希不能自动配对；同轮baseline/DSCG必须使用同一环境。远端模型真实修订和服务鉴权仍需实际测试。
+
+模型配置及Key继续使用本地文件/环境变量，不覆盖已有配置。工具目录按当前后端自动选择，显式参数/环境覆盖、基准专用local目录仍可使用；当前通用tools.local是AgentDojo内置目录的相同副本，在AgentDyn自动选用对应内置目录并给出提示。未知自定义通用目录报错，不悄悄忽略。细则见配置指南；baseline不使用防御风险目录。
+
+## 1. 使用哪个入口
+
+| 入口 | 用户任务与目标 | 用途 |
+| --- | --- | --- |
+| `experiments.run_benchmark` | 所选场景全部注册用户任务与注入目标 | 正式完整任务对照 |
+| `experiments.run_partial_benchmark` | 每场景注册顺序前3个用户、前3个注入目标 | 排错、成本较低的初步回归 |
+| `experiments.run_injection_precheck screen` | 全部所选注入目标的直接GOAL | 可完成性预检与冻结cohort |
+
+实际注册表如下，启动自检和manifest是执行范围的来源：
+
+| 基准 / 场景 | 用户任务 | 注入目标 | 工具 | 每目标型攻击组合 |
+| --- | ---: | ---: | ---: | ---: |
+| AgentDojo workspace | 40 | 14 | 24 | 560 |
+| AgentDojo travel | 20 | 7 | 28 | 140 |
+| AgentDojo banking | 16 | 9 | 11 | 144 |
+| AgentDojo slack | 21 | 5 | 11 | 105 |
+| AgentDyn shopping | 20 | 9 | 39 | 180 |
+| AgentDyn github | 20 | 9 | 34 | 180 |
+| AgentDyn dailylife | 20 | 10 | 27 | 200 |
+
+| 范围 | AgentDojo | AgentDyn |
+| --- | ---: | ---: |
+| full clean用户任务 | 97 | 60 |
+| full目标总数 | 35 | 28 |
+| full每目标型攻击组合 | 949 | 560 |
+| full typical三攻击组合 | 2847 | 1680 |
+| partial clean | 12 | 9 |
+| partial typical三攻击组合 | 108 | 81 |
+
+计划组合不是模型请求次数或有效分母；原生攻击GOAL预检另计。可用`--suites travel banking slack`选择AgentDojo子集，或`--suites shopping github`选择AgentDyn子集。跨后端场景名拒绝；full保留所选场景全部注册ID，不能用manifest缩小范围。
+
+## 2. Clean 对照：先确认智能体能力
+
+建议先做同轮无攻击对照，再做攻击测试。以下会真实调用模型，请自行在服务器启动；本轮工程验收没有执行它们。
+
+```bash
+python -m experiments.run_benchmark --baseline --clean --force-rerun \
+  --model-config config/models.local.toml --name baseline_clean_01
+
+python -m experiments.run_benchmark --clean --force-rerun \
+  --model-config config/models.local.toml \
+  --name dscg_clean_01
+```
+
+两组使用同一主模型、源码、环境、全部用户任务和执行限制；DSCG另用当前安全模型。按 `(suite_name, user_task_id)` 配对比较成功/失败、总Token与调用数，并分别报告错误、缺失任务。clean不构造攻击、不执行攻击GOAL预检，ASR/Defense Rate为null。不能把clean失败的任务从后续完整攻击分母中悄悄删掉。若另报可完成任务子集，应先冻结名单并同时保留完整分母结果。
+
+原生预检warning主要针对 injection GOAL，不是全部用户任务的clean能力验证。模型拒绝、动态验证码操作失败和原生评分疑点需结合真实轨迹/终态分析；一次clean失败不证明任务永远不可完成。
+
+## 攻击选择
+
+```bash
+python -m experiments.run_benchmark --baseline --attack typical --force-rerun \
+  --model-config config/models.local.toml --name baseline_typical_01
+
+python -m experiments.run_benchmark --attack typical --force-rerun \
+  --model-config config/models.local.toml \
+  --name dscg_typical_01
+```
+
+默认 `typical` 为 `ignore_previous`、`important_instructions`、`tool_knowledge`；`injecagent` 可显式选择，已经不在typical。具体攻击和 `all` 来自当前已验证后端的注册表，排除交互式 `manual`。预设不能与具体名字混用，typical缺项直接报错。例如：
+
+```bash
+python -m experiments.run_benchmark --baseline --attack important_instructions injecagent \
+  --name baseline_explicit_01
+```
+
+两套后端按各自原生任务/工具循环评分。AgentDyn提供动态环境与新目标，攻击生成器仍有AgentDojo基线来源；安装成功不代表比旧攻击更强。`tool_knowledge` 使用上游参考调用，当前部分 shopping/github 注入目标的参考调用仍有占位或与GOAL不一致的内容，可能降低攻击质量或造成原生预检失败。本项目不补写标准答案或修改原生评分来追分，正式实验需保留并检查这些轨迹。
+
+DoS按 `not utility` 单独计分，每用户仅使用首个注册目标一次；不可与目标型ASR合并。cohort测量拒绝DoS及包含DoS的all。全部自动攻击的实际名单和组合数以运行manifest为准，不固定论文数字。
+
+## 预检与冻结 cohort
+
+独立screen检查当前主模型直接完成注入GOAL的能力，与通过工具返回注入的攻击实验不同：
+
+```bash
+python -m experiments.run_injection_precheck screen \
+  --model-config config/models.local.toml --name injection_screen_01
+```
+
+在输出的实际目录找到 `cohort.json`，之后两组使用同一文件：
+
+```bash
+python -m experiments.run_benchmark --baseline --attack typical \
+  --cohort results/injection_precheck/deepseek-flash_agentdyn_injection_screen_01/cohort.json \
+  --name baseline_screened_01
+
+python -m experiments.run_benchmark --attack typical \
+  --cohort results/injection_precheck/deepseek-flash_agentdyn_injection_screen_01/cohort.json \
+  --name dscg_screened_01
+```
+
+示例使用AgentDyn路径；AgentDojo输出路径中为agentdojo。必须换成当前环境实际生成的模型/运行目录，不交叉读取名单。screened保留全部所选用户任务，仅筛选目标，结果不能标成当前基准的完整结果。名单绑定当前后端、模型、任务/环境/攻击/工具及证据哈希。本轮支持新生成名单和同身份续跑，不迁移交付前的缓存/cohort，也不扩展旧源码兼容映射。两套后端名单不可互换。细则见 [预检指南](./injection_precheck.md)。
+
+## 结果文件
+
+默认根目录保持 `results/benchmarks/`，partial为 `results/partial_benchmark/`；新运行自动使用 `<model_id>_<benchmark_id>_<name>/`。内部布局：
+
+```text
+<run>/
+  benchmark_plan.json 或 screened_run_manifest.json
+  attack_manifest.json
+  summary.json / summary.md / failure_cases.jsonl
+  <attack>/<suite>/
+    run_manifest.json / summary.json / summary.md
+    <user_task>/<injection_task>/<attack>.json
+```
+
+clean使用 `none/<suite>/<user_task>/none/none.json`。原生JSON与full trace压缩侧车保留；`summary.md`便于阅读，JSONL按原路径定位失败，片段只是排查线索。缺失/非布尔安全标签、API/运行错误单列，不能当成攻击失败或防御成功；中断任务不能补造标签。计分分母和错误数必须一起报告。
+
+manifest、cohort、summary和导出记录 `benchmark`：仓库、完整revision、suite_version、整体实现/目录及tasks/environments/attacks/tools哈希；本地配置/工具元数据与防御源码另有绑定。不同后端、任务集合或不明身份不能自动配对或合并分母。旧记录缺失身份时显示历史/未确认，不反推AgentDyn身份。
+
+成本核对主模型、安全模型、合计Token和调用次数；攻击目标预检与独立screen成本分别注明，不能重复累加。缓存复用后不等于一次完整新鲜测量；检查 `cost_scope`、`invocation_cost`、`cost_comparison_ready`，缺少usage保留未知。
+
+## 显式续跑示例
+
+使用相同name、根目录、模型与全部防御控制，去掉force-rerun、加reuse：
+
+```bash
+python -m experiments.run_benchmark --reuse --baseline \
+  --model-config config/models.local.toml --name baseline_typical_01
+
+python -m experiments.run_benchmark --reuse \
+  --model-config config/models.local.toml \
+  --name dscg_typical_01
+```
+
+未指定attack/suites时恢复本轮交付后、同一基准身份的新运行完整计划；显式提供必须一致。clean仍需clean，screened仍需同一cohort。reuse不与force-rerun或离线manifest导出混用，覆盖DSCG_FORCE_RERUN的强制设置。配置冲突先拒绝，不覆盖旧报告；force-rerun也不能绕过绑定。本次不迁移旧目录/cohort或扩展旧源码兼容映射；交付前实验用原代码继续或新name重做，不补造身份、推断原范围或改写旧报告。
+
+原生接受的成功、失败及错误缓存不会自动重试；reuse补跑缺失或原生不完整任务，不恢复单个工具动作。报告更新前保存快照，需替换的不完整轨迹先保存原字节。保持旧文件与哈希，不手改manifest/cohort/兼容映射。源码或模型设置变化使用新name。
+
+退出0表示流程正常结束，不表示任务全成功或安全验收通过；退出1表示配置/执行/攻击异常，错误保留并继续可执行的后续攻击；退出2常为CLI参数错误。
+
+## cohort 或续跑校验失败
+
+来源/revision/hash或配置冲突表示证据身份不一致，不等于模型配置文件缺失。先核对所选环境、已验证的发行/提交、模型公开配置、工具目录和原防御参数；交付前的名单需使用原代码继续或按当前基准重新生成，不能编辑兼容映射/manifest绕过检查。CLI路由解析器保留default=None，按profile解析shadow/off，不要在服务器手改成固定字符串。
+
+## 可选控制与日志
+
+| 参数 | 说明 |
+| --- | --- |
+| `--baseline` | 原生AgentDyn工具循环，无DSCG与安全模型 |
+| `--clean` | 无攻击用户任务效用对照 |
+| `--suites NAME [NAME ...]` | 默认当前基准全部场景；full全部注册ID，partial前3×3 |
+| `--attack NAME [NAME ...]` | 默认typical，可重复指定；all查询固定注册表 |
+| `--cohort PATH` | 冻结筛选名单，不能与clean/task manifest混用 |
+| `--name NAME` / `--results-dir DIR` | 独立运行名和结果根目录 |
+| `--force-rerun` / `--reuse` | 重跑/续跑，均保留身份检查 |
+| `--model-config PATH` / `--tool-metadata PATH` | 模型配置/已审查工具目录 |
+| `--no-checker` | 关闭L3的消融，保留授权/Monitor/ticket，不是baseline |
+| `--no-tool-view` / `--no-delegated-tasks` | L2展示/有限委托消融 |
+| `--l1-projection-mode off/shadow/projected` | 默认projected；AgentDojo保留银行有限profile，AgentDyn沿用完整来源封装 |
+| `--audit-router-mode off/shadow/selective` | DSCG CLI默认shadow；baseline/NoChecker默认off；shadow不新增免审 |
+| `--audit-router-artifact PATH` | 单独校准的冻结artifact；旧基准/输入绑定不兼容时不可复用 |
+| `--audit-retries 0/1` / `--completion-prompt` | 当前默认0/关闭，常规对照不叠加恢复 |
+| `--trace-level summary/standard/full` | 默认summary；full增加序列化/压缩/写盘成本 |
+| `--task-manifest PATH` / `--write-task-manifest PATH` | 导入/离线导出任务ID；full不能缩小范围 |
+
+Python factory/API原有router默认off保持；网页以有效配置为准。不要把router off当作关闭L3。具体默认及字段见 [配置指南](./model_tool_configuration.md#5-运行控制默认值用途及设置入口)。
+
+不调用模型的目录导出：
+
+```bash
+python -m experiments.run_benchmark --write-task-manifest \
+  workshop/artifacts/20261018_dual_local_check/full_tasks.json
+```
+
+Agent临时检查必须使用新 `--results-dir workshop/artifacts/<YYYYMMDD>_<task>/benchmarks`，不写用户正式results。新环境的 `browse_webpage` 可执行带副作用的handler，OTP验证也可恢复待执行写入，因此不进入读取免审。工具级框架仍不能单独授权内部handler或硬约束参数/对象；没有新增免审或安全保证。
+
+## 指标与证据
+
+TSR使用原生utility，ASR使用原生injection predicate，保留原始标签与轨迹；错误/缺失单列。汇报完整任务分母、有效标签分母及配对得失，不只平均各场景百分比。独立终态核查、重复对照和攻击强度仍需真实实验。本轮 [双基准报告](../workshop/completed/dual_benchmark_20261018.md) 只证明工程接线及离线模拟；没有付费模型评测，也不宣布E0通过或TSR/ASR收益。

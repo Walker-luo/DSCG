@@ -1,0 +1,47 @@
+{
+  "purpose": "Original superseded plans; inert historical evidence, not current handoff instructions. Relative links inside snapshots retain their original document context.",
+  "files": [
+    {
+      "source": "workshop/L2_L3_optimization_20261022.md",
+      "snapshot": "L2_L3_optimization_20261022.md",
+      "sha256": "92f37fd638f1fa5d157e74d4d10f06c4e3f722c147b69ce7ca1ea6b7643ed691",
+      "bytes": 16291
+    },
+    {
+      "source": "workshop/L2_L3_v35_live_iterations_20261023.md",
+      "snapshot": "L2_L3_v35_live_iterations_20261023.md",
+      "sha256": "913dd4c3b00ba6476d89106497ab51c7e74e6ebbc8e3a95cc1ae1573c20e182d",
+      "bytes": 1460
+    },
+    {
+      "source": "workshop/L2_L3_v35_followup_20261023.md",
+      "snapshot": "L2_L3_v35_followup_20261023.md",
+      "sha256": "37ff115b53038711baa524458d1df8e6ff696d59f1483c44cfacc45d33ccaba7",
+      "bytes": 2044
+    },
+    {
+      "source": "workshop/qwen_utility_20261019.md",
+      "snapshot": "qwen_utility_20261019.md",
+      "sha256": "889d9e4519de962019a4e31323b2ba83ee98a33fe53f10e3d561e05fe62259ed",
+      "bytes": 3006
+    },
+    {
+      "source": "workshop/v34_utility_optimization_20261025.md",
+      "snapshot": "v34_utility_optimization_20261025.md",
+      "sha256": "132266d8a456060ae102d294b91ab8f97fc80b46690558d0d1d75375af0cb845",
+      "bytes": 5082
+    },
+    {
+      "source": "workshop/v35_optimization_20261026.md",
+      "snapshot": "v35_optimization_20261026.md",
+      "sha256": "631da62d2591afb12cfb2651002a048400ad90b6b59ae9972ce6b059de3e05bf",
+      "bytes": 3160
+    },
+    {
+      "source": "workshop/v351_next_optimization_20261026.md",
+      "snapshot": "v351_next_optimization_20261026.md",
+      "sha256": "5436f8707c292887dfa9643e6ccfc3605ccb15663d2e82a997f1294cbac0648e",
+      "bytes": 8903
+    }
+  ]
+}

@@ -1,0 +1,45 @@
+{
+  "date": "2026-10-12",
+  "task": "Explicitly user-delegated order.txt task candidate; unimplemented",
+  "base_revision": "4d61149f55f71eb6d1091ea431b95d1abb6d172e",
+  "previous_manifest": "workshop/archive/l2_tool_extension_20261012/revision_manifest.json",
+  "previous_manifest_sha256": "47176c242e29f7bca7ffac3f27fbe6b35453da9d32cba4346dde67430eab8e05",
+  "entries": [
+    {
+      "path": "workshop/L2_opt.md",
+      "original_storage": "workshop/archive/l2_delegated_order_20261012/originals/workshop/L2_opt.md",
+      "sha256_before": "f1ef7269e6ddbe205f1aeb3a62404c45a703bb2c89d50c16174cae0bb457faee",
+      "sha256_after": "4a26264ed60d6662b708a55decef25e637a7f1a8478a27025b189c23f124771a"
+    },
+    {
+      "path": "workshop/README.md",
+      "original_storage": "workshop/archive/l2_delegated_order_20261012/originals/workshop/README.md",
+      "sha256_before": "d1a3526831a5e279c801d149fd2d7f06e1e1a82252c8db477c0af01308f8ea8a",
+      "sha256_after": "bce4e6bc27293301b9179852b5d8e3c7d2c186d118edcea9ab1607eb5ed11630"
+    },
+    {
+      "path": "AGENTS.md",
+      "original_storage": "workshop/archive/l2_delegated_order_20261012/originals/AGENTS.md",
+      "sha256_before": "c56158fe8867cc08476bd7ef938774fd46533490059117baa8da4b9e3292be90",
+      "sha256_after": "202fdd50afca850f4bc59a390ced57cf7a3370390ef25a8af31b399546388f85"
+    }
+  ],
+  "created_files": {},
+  "current_documents": [
+    "workshop/L2_opt.md",
+    "workshop/README.md",
+    "AGENTS.md"
+  ],
+  "validator": "workshop/artifacts/20261012_l2_delegated_order/validate_delegated_order_doc.py",
+  "validator_sha256": "00c120959e32d7031ffa3c0333c8da219b5127dd977ccc06a0cf5ddea6ef1799",
+  "runtime_changed": false,
+  "formal_route_changed": false,
+  "model_calls": 0,
+  "benchmark_rollouts": 0,
+  "fixtures_created": 0,
+  "historical_full_migration_certified": false,
+  "user_scope_assumption": "Polluted order.txt after explicit user task confirmation is excluded; no contamination-detection or general provenance mechanism proposed.",
+  "out_of_scope_documents": {
+    "report/report.md": "Preserve current bytes; report image assets and old report revision are not certified."
+  }
+}

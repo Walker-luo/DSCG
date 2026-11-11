@@ -1,0 +1,49 @@
+{
+  "python": {
+    "command": "conda run -n ipi python -m unittest discover -s tests -v > /tmp/dscg-history-multi-python-tests.log 2>&1",
+    "exit_code": 0,
+    "passed": 118,
+    "total": 118
+  },
+  "charts": {
+    "command": "node --test tests/test_history_charts.cjs > examples/results/history_metrics/20261006_01a10ff4/chart-tests.log 2>&1",
+    "exit_code": 0,
+    "passed": 6,
+    "total": 6
+  },
+  "syntax": {
+    "commands": [
+      "node --check dashboard/static/js/history.js",
+      "node --check dashboard/static/js/history_charts.js"
+    ],
+    "exit_codes": [
+      0,
+      0
+    ]
+  },
+  "diff": {
+    "command": "git diff --check",
+    "exit_code": 0
+  },
+  "browser": {
+    "viewport": [
+      1280,
+      720
+    ],
+    "experiments": 2,
+    "suite_summaries": 8,
+    "new_benchmark_samples": 0,
+    "checked": [
+      "default TSR/ASR line with visible endpoint ticks and interior 0/100 markers",
+      "scatter padded in both axes",
+      "radar 110 outer ring",
+      "empty selection disables generation",
+      "scatter/heatmap fixed disabled metrics and enabled generation",
+      "return to line restores metrics and empty-selection disabled state",
+      "Token selection falls back from radar to bar",
+      "single travel suite shows TSR/ASR/Token and right token axis"
+    ],
+    "console_errors": [],
+    "console_warnings": []
+  }
+}

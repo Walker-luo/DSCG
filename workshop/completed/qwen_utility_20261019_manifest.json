@@ -1,0 +1,87 @@
+{
+  "status": "engineering_pass_model_validation_pending",
+  "revision": "e9b494e6c13fcc0d0fee9885f5eadbdc58147e85",
+  "working_tree": "uncommitted changes",
+  "checks": {
+    "ipi": {
+      "command": "conda run -n ipi python -B -m unittest discover -s tests -v",
+      "exit_code": 0,
+      "tests": 511,
+      "passed": 510,
+      "skipped": 1
+    },
+    "agentdyn": {
+      "command": "conda run -n ipi-agentdyn python -B -m unittest discover -s tests -v",
+      "exit_code": 0,
+      "tests": 515,
+      "passed": 514,
+      "skipped": 1
+    }
+  },
+  "node": {
+    "command": "node --test tests/*.cjs",
+    "exit_code": 0,
+    "passed": 45
+  },
+  "protected_size_mtime_files": 9930,
+  "protected_changes": [],
+  "preservation_limitation": "Snapshot established before final regressions, not at task start; size/mtime is not byte certification.",
+  "export_raw_labels_checked": 2334,
+  "export_raw_label_mismatches": [],
+  "sample_denominators": {
+    "authored_diagnostic_cases": 12,
+    "model_calls": 0,
+    "real_rollouts": 0,
+    "efficacy_samples": 0
+  },
+  "source_hashes": {
+    "AGENTS.md": "1663f695221722587dcf9c617ee6b8ed5f563ff09840911d8651c8929471dfd9",
+    "README.md": "f6e78afbda1b311f6f1dca405261bf6f7cb6994777ec37a9ee63e71c2f45b2a7",
+    "dashboard/app.py": "afe904012b90ae42d0e378b2e10788eed9704daa65a6b7a328a97777dfec0e21",
+    "dashboard/evaluation.py": "df306bc338c0cefce375fa6fda535bd894380190b8e3ce9082df1bd3e5869bc2",
+    "docs/benchmark.md": "f4b07e4b2dc1ff2f52114e60419ac9773d4f47d6bae8c61030ae0d6cf4ca1929",
+    "docs/framework_updates.md": "fcf097a7a4b0ff933ca6f563138fd68da897d891119c212bf8103ccb4a8a2a1e",
+    "docs/model_tool_configuration.md": "1fffd33f8a5e559c6d8a4667986f53044679c7c6259bb11dbe9f663c107a6837",
+    "docs/qwen_utility.md": "8904c0c86dec602554567262c421830a80316790996e0d3f967d6c6af743677b",
+    "dscg/pipelines/defended.py": "d53de7ba74d13f14d07cf8c47c4b7217a4cf95611d9d79279e2d69486a2c0054",
+    "dscg/prompt_profiles.py": "30e9f2db9ab19f9dafc4415cb9524983aa2f17751e72b8baf5d2ee27d747dca7",
+    "experiments/common/injection_cohort.py": "80a755b88d5d028ed6cdff878fd9b4a4e4ba875c569a8fbabf69b8865fdb8b19",
+    "experiments/diagnostics/utility_packets.py": "ff71defd2369a0eb37c30bd92ca29caac2da2c356f7548f5070eb23994236d4d",
+    "experiments/run_partial_benchmark.py": "2f1db4bf89ea2d7a52f1d5e4d844552e18b0dd5c37284d656efdfbfdfcf86927",
+    "tests/fixtures/qwen_utility_cases.json": "bc3acb51f1c312a31eed854dbae579d582252c738b9bd0334d8cea3d38df591c",
+    "tests/test_qwen_utility.py": "6d264deeaf15ddb10217dec7a227764757c530bccca3e7a3eabf9682cb0a11a4",
+    "workshop/README.md": "d080e243ac84d708de2b95c6efd1c566a527c2d6488490da26921c65d4b0f310",
+    "workshop/completed/qwen_utility_20261019.md": "fc5aaa62299f31ce243b0995984afce4b4308085ff95fae15cfd71f172ec21f7",
+    "workshop/qwen_utility_20261019.md": "1dd3ae6d7c8ef2ce90c101953d64638b17d194ab429ab00a75fc73f736526995"
+  },
+  "artifact_hashes": {
+    "workshop/artifacts/20261019_qwen_utility/baseline_ipi.log": "2168b0c64402df4f3e1e3aa0aded192ce0f71aca8da1e9a638f93f7917bf1865",
+    "workshop/artifacts/20261019_qwen_utility/bindings_green.log": "0269b265a3b101a1030fe828befe0dc3018afd480358bcfce1b49dde10e4844c",
+    "workshop/artifacts/20261019_qwen_utility/bindings_red.log": "463ab7a76a95e3512df1db1c0cc42b694f24005ba6e6d936e3d21305fd4130b9",
+    "workshop/artifacts/20261019_qwen_utility/edge_red.log": "006dc4c4105da88b8d1e3537e3b8e1a2f5169ebdd964a8a3131c3ef6a4c8ca05",
+    "workshop/artifacts/20261019_qwen_utility/edges_green.log": "e26ddf688ea23ee9decca33e5eee5693ecb46b981b4720def0f641cd94dd10a4",
+    "workshop/artifacts/20261019_qwen_utility/edges_green_fixed.log": "ba5102c50111fbc84521f247cc45bd712a009e8e53a7879bafd34efe1e150180",
+    "workshop/artifacts/20261019_qwen_utility/final_agentdyn.log": "7a494e4cf39e2a28018745fadf46200a16b7e51405b5f75105131fdc2a95ff23",
+    "workshop/artifacts/20261019_qwen_utility/final_ipi.log": "f2945711647cfc366c05cfd88dfbda487bf3a6537fd5fee2cfc7ce133883ff06",
+    "workshop/artifacts/20261019_qwen_utility/final_node.log": "360a5dae2a9cfbdbfb8fa466b1d8e154b9123eefd72f0effdf1dd33d0f80b709",
+    "workshop/artifacts/20261019_qwen_utility/node.log": "36265e6b9ea0f3e41d377eccb910ba417c2a5a7516117d6edd0db0c4311c28d6",
+    "workshop/artifacts/20261019_qwen_utility/preservation_before_final.json": "9f4818745068a1b44cb7ea066f43883420ee1f9af542cb2312b23c38e2007f2a",
+    "workshop/artifacts/20261019_qwen_utility/protocol_green.log": "f48077620f8a571467b9d487243e0cf3b41ce7e27b97e7baead1db15b91b3fb8",
+    "workshop/artifacts/20261019_qwen_utility/protocol_red.log": "32469c269e769746a0323064d26469b4190386e36b26ca8958ee5f9c256118ab",
+    "workshop/artifacts/20261019_qwen_utility/reviewer_qwen_tests_01.log": "5efd9e6c933ba0883d89ac3a378827d8cbe893c3beb248c8cb5961bd783a21c6",
+    "workshop/artifacts/20261019_qwen_utility/source_packets.json": "0d8f652b53030c5e80abf1a16ef3b3d1549fa78d79e3d393f41f2097bf6fca37",
+    "workshop/artifacts/20261019_qwen_utility/stages_agentdyn.log": "2f4026345d537f335c496f5afe30c31722930196dd3cdfc06c8fd63e550fde53",
+    "workshop/artifacts/20261019_qwen_utility/stages_ipi.log": "62f9c34e687068ed01e0bccf9a690bff72af0d142d47441c1b5aa38d443e76bc",
+    "workshop/artifacts/20261019_qwen_utility/validation.json": "8fb2810101568c7192ea7507821511ac8e9b5d90cba4e12726d87709c54530cc",
+    "workshop/artifacts/20261019_qwen_utility/verify_delivery.py": "2f45696606da837b40911a1e194e6636e8a793557b51e10d88076e533dab1173"
+  },
+  "input_hashes": {
+    "download/dscg-history-analysis-20261019T021115Z/README.md": "6f8dfdfad1bb67c9e0cb71acd16a37f85a73890311b694c960039c10ae2593f0",
+    "download/dscg-history-analysis-20261019T021115Z/analysis.json": "0f691c30dc6300c5898457acfefa580411db7fe6fcefe23fc0a2e863316f7822",
+    "download/dscg-history-analysis-20261019T021115Z/summary.csv": "dd4e6a2a3fb09b1a08a2acbf8ddfd660fb7557261eed79e40abd27bffa6d43ab",
+    "download/dscg-history-analysis-20261019T021115Z/task_records.csv": "842fa9cf1ef2c7a70edbe07311d7fbc8a9ea36ed144588748e73bc81e64b65fc"
+  },
+  "default": "legacy / three-layer-v3.1",
+  "gates": "E0 pending; I3 partial24valid/8scope; I2 locked",
+  "next_action": "Authorize limited paired model diagnostics before 37/97 clean and matched attacks."
+}

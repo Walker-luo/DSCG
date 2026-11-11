@@ -1,0 +1,45 @@
+{
+  "schema_version": 1,
+  "revision": "l3-checker-design-20261009",
+  "scope": "Third explicit workshop proposal revision; detailed design only.",
+  "base_revision": "7f16f19a33045a9c055230534d87b9e408a74649",
+  "previous_manifest": "workshop/archive/3_layer_low_cost_20261009/revision_manifest.json",
+  "previous_manifest_sha256": "e9ce24308f1c2eab4dc3418c66511d74572de1b7cea50c7400b13432b6a1b960",
+  "entries": [
+    {
+      "path": "workshop/3_layer_opt.md",
+      "original_storage": "workshop/archive/l3_checker_design_20261009/originals/workshop/3_layer_opt.md",
+      "sha256_before": "0ba032f4b01cca31e5fa90eb58201f121d04c7eb38adf84c32e0bc4170dbe38d",
+      "sha256_after": "c1608b96099f17d2284b7de5bc98b1173da398128099d5a51e416f6b5e245691"
+    },
+    {
+      "path": "workshop/3_layer_sources_20261008.json",
+      "original_storage": "workshop/archive/l3_checker_design_20261009/originals/workshop/3_layer_sources_20261008.json",
+      "sha256_before": "a2d988a244bce98d61af709e9b1f60eb78a8563e77653a2c8af5aa129d676ef6",
+      "sha256_after": "a2d988a244bce98d61af709e9b1f60eb78a8563e77653a2c8af5aa129d676ef6"
+    },
+    {
+      "path": "workshop/README.md",
+      "original_storage": "workshop/archive/l3_checker_design_20261009/originals/workshop/README.md",
+      "sha256_before": "29aea1a0a0c045295b011eef37bed96f887fc7efb7c26ae5a805204f95ab3926",
+      "sha256_after": "16611ea16262bfd90115700bcd5b034a014ad8e56fccedbf1907443dc41e5446"
+    },
+    {
+      "path": "AGENTS.md",
+      "original_storage": "workshop/archive/l3_checker_design_20261009/originals/AGENTS.md",
+      "sha256_before": "43683ef78f8d097b0de6c2adb599e52d82c792b6c6d2d2db51e545434472636e",
+      "sha256_after": "64fafc9ee5ebb30dfa693b68e1673435a4bc202d3c949a04b749369ebb70f9ba"
+    }
+  ],
+  "created_documents": [
+    {
+      "path": "workshop/L3_checker_opt.md",
+      "sha256_after": "c4ac8a37da26c7ef3149070e2bd11b7ab7e4ea53055550eb653c5fe75aa08813"
+    }
+  ],
+  "runtime_changes": 0,
+  "new_training_samples": 0,
+  "new_calibration_samples": 0,
+  "new_model_calls": 0,
+  "new_benchmark_samples": 0
+}

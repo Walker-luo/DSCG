@@ -1,0 +1,60 @@
+{
+  "date": "2026-10-11",
+  "task": "Framework report and L3 pending decisions, documentation only",
+  "base_revision": "7d1e1ed27791cc87685bc512ba1b8fb5c1182d25",
+  "previous_manifest": "workshop/archive/l3_selective_impl_20261010/revision_manifest.json",
+  "previous_manifest_sha256": "8ea6bf97d19e2b7bfef5d150301ae968ed8c5fe0a06a4f64c75ba4273d6ac06d",
+  "entries": [
+    {
+      "path": "README.md",
+      "original_storage": "workshop/archive/framework_report_20261011/originals/README.md",
+      "sha256_before": "128307bf4a9c9d3f7979f253fcfbb5c9be1c736614a7e6ffd1967f0c6c22b187",
+      "sha256_after": "2f2c75292fa45954d5251c42d4a927e2b7d8eebd9b1cf496a408ad13cc86ab9e"
+    },
+    {
+      "path": "AGENTS.md",
+      "original_storage": "workshop/archive/framework_report_20261011/originals/AGENTS.md",
+      "sha256_before": "72c98c029b485289a1753436178845f7b0d394e6f9a21ce95c657a0594a23fae",
+      "sha256_after": "39328e8c940c8620f2d3a57179db0ad678c143329ba1e4d0b6efb1547ebd5ebf"
+    },
+    {
+      "path": "docs/dashboard.md",
+      "original_storage": "workshop/archive/framework_report_20261011/originals/docs/dashboard.md",
+      "sha256_before": "b2619f3e42feaa01f4925d80797bca1d26452b551c09cf4b4e14118e39787cce",
+      "sha256_after": "bb460ad7cdbcecd48687ddb37b62100098d9fa73340b05b239049b5913f845fa"
+    },
+    {
+      "path": "workshop/README.md",
+      "original_storage": "workshop/archive/framework_report_20261011/originals/workshop/README.md",
+      "sha256_before": "69ae9a9021f436f3b0a41b8c5ce635abe296ebbb36a10e0ded45d8e6316477ae",
+      "sha256_after": "75f8be24e0075fe9a29b8699affd7f9542e50aea62f9a05d13d932c1d5eb6b0c"
+    },
+    {
+      "path": "workshop/completed/README.md",
+      "original_storage": "workshop/archive/framework_report_20261011/originals/workshop/completed/README.md",
+      "sha256_before": "c73373111d5d658aea368c3c4da315384f71869e3fd374a9c70d8e32ba66ed0c",
+      "sha256_after": "32d5acb01b03bda177fc89513395e07d6eccabe8a13bc3a812fd288308f43b30"
+    }
+  ],
+  "created_files": {
+    "report/report.md": "d7722a0969356554ca72f23e4f339c34aa25e096abd97e6be223b6e3ffbc7835"
+  },
+  "current_documents": [
+    "README.md",
+    "AGENTS.md",
+    "docs/dashboard.md",
+    "workshop/README.md",
+    "workshop/completed/README.md",
+    "report/report.md",
+    "workshop/L3_checker_opt.md",
+    "docs/framework_updates.md"
+  ],
+  "validator": "workshop/artifacts/20261011_framework_report/validate_report.py",
+  "validator_sha256": "d9bdb825d3f8c98023f584c623b7bd698258ce8c9c1fd94e1b3c0671dd53f435",
+  "runtime_changed": false,
+  "model_calls": 0,
+  "benchmark_rollouts": 0,
+  "real_calibration_groups": 0,
+  "main_presentation_pages": 10,
+  "historical_full_migration_certified": false
+}

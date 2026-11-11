@@ -1,0 +1,16 @@
+test_default_guidance_is_delivered_as_system_data_without_granting_tools (test_execution_policy.ExecutionPolicyTests) ... FAIL
+test_disabling_both_framework_layers_retains_original_system_message (test_execution_policy.ExecutionPolicyTests) ... ok
+test_native_baseline_retains_exact_original_system_message (test_execution_policy.ExecutionPolicyTests) ... ok
+
+======================================================================
+FAIL: test_default_guidance_is_delivered_as_system_data_without_granting_tools (test_execution_policy.ExecutionPolicyTests)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/luo/Desktop/AgentDefence/DSCG/tests/test_execution_policy.py", line 22, in test_default_guidance_is_delivered_as_system_data_without_granting_tools
+    self.assertGreater(len(content), len(load_system_message(None)))
+AssertionError: 469 not greater than 469
+
+----------------------------------------------------------------------
+Ran 3 tests in 0.002s
+
+FAILED (failures=1)

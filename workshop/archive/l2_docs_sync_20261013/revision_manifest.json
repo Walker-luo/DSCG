@@ -1,0 +1,78 @@
+{
+  "schema_version": "dscg.workshop-revision.v1",
+  "date": "2026-10-13",
+  "head": "c209c6ef35247bb646dcdff45a1c3207a1cd7185",
+  "task": "l2-documentation-recheck",
+  "previous_manifest": "workshop/archive/defense_regression_20261012/revision_manifest.json",
+  "previous_manifest_sha256": "7ef5d2051facd9026aeb7e122fb99d2c9d88df2fc189203200f63c3ebd7d3bd6",
+  "files": [
+    {
+      "path": "README.md",
+      "original": "workshop/archive/l2_docs_sync_20261013/originals/README.md",
+      "before_sha256": "d238f0016ad42670d611e9eabd5144943d93e1c383816642a240b3d78b5cbaa0",
+      "after_sha256": "9cb0879487697150181f163f50d6cd735eed427074ef79e4be03524bfc2fb63c"
+    },
+    {
+      "path": "AGENTS.md",
+      "original": "workshop/archive/l2_docs_sync_20261013/originals/AGENTS.md",
+      "before_sha256": "569af5ea992f5c1ff851ecc4ea9411d4a6be9af427907e6b796911b66c2dd7fd",
+      "after_sha256": "887c595f07f69bcccb41fe05324e0eef264c99c2cce0cfd65b798625246f7dee"
+    },
+    {
+      "path": "workshop/L2_opt.md",
+      "original": "workshop/archive/l2_docs_sync_20261013/originals/workshop/L2_opt.md",
+      "before_sha256": "76176c366b51bf037255bb6336b4516e821b42e10742cae268a9dffd74257906",
+      "after_sha256": "43fe92c2448c52f52cd6a35d5826da15b5d92400da25af78961aca5b92f4960d"
+    },
+    {
+      "path": "workshop/README.md",
+      "original": "workshop/archive/l2_docs_sync_20261013/originals/workshop/README.md",
+      "before_sha256": "d5d505fd4dfdcbd6df3bb8f9b2b42bb05b8e803325b2fe77783d4d46f07ac545",
+      "after_sha256": "765899ad8be97735693b1035e670d76d12cc2923b2d917d9ede8fbfeb50b62a4"
+    },
+    {
+      "path": "workshop/completed/README.md",
+      "original": "workshop/archive/l2_docs_sync_20261013/originals/workshop/completed/README.md",
+      "before_sha256": "b81fce55e6a4516951199e888e731f7048912a64438e56cce252cb3b6e519919",
+      "after_sha256": "19d059849f23a15e3dabf68561f3aea0b44d6e086ab68099076c4b4740de78d7"
+    },
+    {
+      "path": "docs/framework_updates.md",
+      "original": "workshop/archive/l2_docs_sync_20261013/originals/docs/framework_updates.md",
+      "before_sha256": "b703dd94e0b33d31a6f30c9968d59b95b47b8c9cf3e872800bce1ddf9e88edfa",
+      "after_sha256": "3e0a22a063ef925411f6b83d6db270f0710333e5a304a0b60069d552114f9128"
+    },
+    {
+      "path": "docs/dashboard.md",
+      "original": "workshop/archive/l2_docs_sync_20261013/originals/docs/dashboard.md",
+      "before_sha256": "122d9e39108f6d7403c67f3aa3109421f9e62bc3f5fc2998f3ec93c8be612a69",
+      "after_sha256": "3ebc16872c58b328ad6f9b9e5cbec5fe0e51ae5b62c9015036ab12b3893dc876"
+    },
+    {
+      "path": "docs/evaluation.md",
+      "original": "workshop/archive/l2_docs_sync_20261013/originals/docs/evaluation.md",
+      "before_sha256": "2e3737f4f71a95375abf7d3d3070401fb7ca74add3e2f1764f301c7e04a88238",
+      "after_sha256": "94e74d42712dee05108367acdee141ce58ff03f14ca25ba5d71475554a8332bf"
+    },
+    {
+      "path": "docs/README.md",
+      "original": "workshop/archive/l2_docs_sync_20261013/originals/docs/README.md",
+      "before_sha256": "6dbb31c68477078eac6fa661ae3d3e9204f2894b8015a972b00cee6fe91496bf",
+      "after_sha256": "15882aaf420b89b0a2942ba9e541522530edbab9103a07f02e3543450ed99aa6"
+    },
+    {
+      "path": "workshop/completed/l2_docs_sync_20261013.md",
+      "original": null,
+      "before_sha256": null,
+      "after_sha256": "d0629f9d92e2494c839a1646741f39108ab287d5c033cc1f55884c066afc9bae"
+    },
+    {
+      "path": "workshop/archive/l2_docs_sync_20261013/validate_docs.py",
+      "original": null,
+      "before_sha256": null,
+      "after_sha256": "bd2ecca51464eb621187f37afe34a0c3834108524893836a994cf60f29b32637"
+    }
+  ],
+  "scope": "documentation only; runtime and platform display source preserved",
+  "historical_expected_hashes_rewritten": false
+}

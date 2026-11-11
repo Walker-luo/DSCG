@@ -1,0 +1,514 @@
+{
+  "schema_version": 3,
+  "scope": "Low-cost AIMLL workshop three-layer systems candidate; targeted primary-source checks, not exhaustive survey",
+  "cutoff_date": "2026-10-09",
+  "primary_paper_count": 21,
+  "runtime_changes": 0,
+  "new_benchmark_samples": 0,
+  "new_defender_model_calls": 0,
+  "notes": [
+    "All prior 19 paper objects are preserved exactly; they are not claimed to be re-read in this revision.",
+    "Spotlighting v1 methods and delimiter limitations were rechecked; new CASCADE/BASIS records cover official abstracts and metadata only.",
+    "CASCADE primary_url pins v3: its title and evaluation scope changed from v1; v1 metrics are not treated as verified defense results.",
+    "Source marking, cascaded routing and three layer positions are prior concepts, not a novelty claim.",
+    "The cost target and 64/192 planned rollout counts are proposals; actual new samples and defender calls are zero.",
+    "No source ASR is DSCG efficacy; no method was independently reproduced.",
+    "Bibliography file name is retained for stable existing links; the cutoff date reflects this update."
+  ],
+  "sources": [
+    {
+      "id": "agentdojo",
+      "title": "AgentDojo: A Dynamic Environment to Evaluate Prompt Injection Attacks and Defenses for LLM Agents",
+      "authors_first_three": [
+        "Edoardo Debenedetti",
+        "Jie Zhang",
+        "Mislav Balunović"
+      ],
+      "additional_authors": true,
+      "first_year": 2024,
+      "publication_status": "NeurIPS 2024 Datasets and Benchmarks Track",
+      "read_version": "proceedings",
+      "primary_url": "https://papers.neurips.cc/paper_files/paper/2024/hash/97091a5177d8dc64b1da8bf3e1f6fb54-Abstract-Datasets_and_Benchmarks_Track.html",
+      "supplementary_primary_urls": [
+        "https://proceedings.neurips.cc/paper_files/paper/2024/file/97091a5177d8dc64b1da8bf3e1f6fb54-Paper-Datasets_and_Benchmarks_Track.pdf",
+        "https://github.com/ethz-spylab/agentdojo"
+      ],
+      "read_locations": "Evaluation design, attack/defense setup; official metadata",
+      "claim_support": "Dynamic task environment measures utility and security; native failures also occur without attack.",
+      "limitations": "Native predicates are not a universal independent injection oracle.",
+      "existence_and_claims_checked": true,
+      "verified_date": "2026-10-08",
+      "verification_method": "Primary paper/official venue page through web tool; cited methods and counterexamples inspected."
+    },
+    {
+      "id": "spotlighting",
+      "title": "Defending Against Indirect Prompt Injection Attacks With Spotlighting",
+      "authors_first_three": [
+        "Keegan Hines",
+        "Gary Lopez",
+        "Matthew Hall"
+      ],
+      "additional_authors": true,
+      "first_year": 2024,
+      "publication_status": "arXiv preprint",
+      "read_version": "2403.14720v1",
+      "primary_url": "https://arxiv.org/html/2403.14720v1",
+      "supplementary_primary_urls": [
+        "https://www.microsoft.com/en-us/research/publication/defending-against-indirect-prompt-injection-attacks-with-spotlighting/"
+      ],
+      "read_locations": "Methods: delimiting, datamarking, encoding; discussion",
+      "claim_support": "Source marking separates untrusted data from instructions without training.",
+      "limitations": "Prompt-based trust boundaries do not create object permissions or hard enforcement.",
+      "existence_and_claims_checked": true,
+      "verified_date": "2026-10-08",
+      "verification_method": "Primary paper/official venue page through web tool; cited methods and counterexamples inspected."
+    },
+    {
+      "id": "struq",
+      "title": "StruQ: Defending Against Prompt Injection with Structured Queries",
+      "authors_first_three": [
+        "Sizhe Chen",
+        "Julien Piet",
+        "Chawin Sitawarin"
+      ],
+      "additional_authors": true,
+      "first_year": 2025,
+      "publication_status": "USENIX Security 2025",
+      "read_version": "proceedings",
+      "primary_url": "https://www.usenix.org/conference/usenixsecurity25/presentation/chen-sizhe",
+      "supplementary_primary_urls": [
+        "https://www.usenix.org/system/files/usenixsecurity25-chen-sizhe.pdf",
+        "https://github.com/Sizhe-Chen/StruQ"
+      ],
+      "read_locations": "Secure frontend and structured instruction tuning; official metadata",
+      "claim_support": "The method combines a secure frontend with a specially trained model.",
+      "limitations": "A JSON wrapper with an unchanged API model is not a reproduction of StruQ.",
+      "existence_and_claims_checked": true,
+      "verified_date": "2026-10-08",
+      "verification_method": "Primary paper/official venue page through web tool; cited methods and counterexamples inspected."
+    },
+    {
+      "id": "promptarmor",
+      "title": "PromptArmor: Simple yet Effective Prompt Injection Defenses",
+      "authors_first_three": [
+        "Tianneng Shi",
+        "Kaijie Zhu",
+        "Zhun Wang"
+      ],
+      "additional_authors": true,
+      "first_year": 2025,
+      "publication_status": "arXiv preprint",
+      "read_version": "2507.15219v1",
+      "primary_url": "https://arxiv.org/html/2507.15219v1",
+      "supplementary_primary_urls": [
+        "https://arxiv.org/abs/2507.15219"
+      ],
+      "read_locations": "Section 3.1 and evaluation",
+      "claim_support": "Off-the-shelf LLM detection followed by extraction and fuzzy deletion before backend processing.",
+      "limitations": "Our proposed one-call exact-span deletion is a variant, not the paper method; no generic guarantee.",
+      "existence_and_claims_checked": true,
+      "verified_date": "2026-10-08",
+      "verification_method": "Primary paper/official venue page through web tool; cited methods and counterexamples inspected."
+    },
+    {
+      "id": "datafilter",
+      "title": "Defending Against Prompt Injection with DataFilter",
+      "authors_first_three": [
+        "Yizhu Wang",
+        "Sizhe Chen",
+        "Raghad Alkhudair"
+      ],
+      "additional_authors": true,
+      "first_year": 2025,
+      "publication_status": "arXiv preprint; read revision 2026-02-04",
+      "read_version": "2510.19207v2",
+      "primary_url": "https://arxiv.org/html/2510.19207v2",
+      "supplementary_primary_urls": [
+        "https://arxiv.org/abs/2510.19207"
+      ],
+      "read_locations": "Training/method, V-G Table VIII, V-H, Appendix C",
+      "claim_support": "Task-conditioned trained filtering; false negatives for task-consistent billing and false positives for recipe instructions. Table VIII reports PromptArmor 93% and DataFilter 83% ASR under its strong adaptive experiment.",
+      "limitations": "These are DataFilter authors' comparison results, not direct Nasr results or DSCG rates; cost/latency figures are estimates.",
+      "existence_and_claims_checked": true,
+      "verified_date": "2026-10-08",
+      "verification_method": "Primary paper/official venue page through web tool; cited methods and counterexamples inspected."
+    },
+    {
+      "id": "taskshield",
+      "title": "The Task Shield: Enforcing Task Alignment to Defend Against Indirect Prompt Injection in LLM Agents",
+      "authors_first_three": [
+        "Feiran Jia",
+        "Tong Wu",
+        "Xin Qin"
+      ],
+      "additional_authors": true,
+      "first_year": 2025,
+      "publication_status": "ACL 2025",
+      "read_version": "proceedings",
+      "primary_url": "https://aclanthology.org/2025.acl-long.1435/",
+      "supplementary_primary_urls": [
+        "https://aclanthology.org/2025.acl-long.1435.pdf"
+      ],
+      "read_locations": "Task extraction, contributes-to check, tool-call check and unfinished-task feedback/Figure 7",
+      "claim_support": "Task alignment checks and completion reminders are close prior mechanisms.",
+      "limitations": "A second task-necessity judge or ordinary completion feedback is not an independent new layer.",
+      "existence_and_claims_checked": true,
+      "verified_date": "2026-10-08",
+      "verification_method": "Primary paper/official venue page through web tool; cited methods and counterexamples inspected."
+    },
+    {
+      "id": "taubench",
+      "title": "τ-bench: A Benchmark for Tool-Agent-User Interaction in Real-World Domains",
+      "authors_first_three": [
+        "Shunyu Yao",
+        "Noah Shinn",
+        "Pedram Razavi"
+      ],
+      "additional_authors": true,
+      "first_year": 2024,
+      "publication_status": "arXiv preprint; no later venue asserted",
+      "read_version": "2406.12045v1",
+      "primary_url": "https://arxiv.org/abs/2406.12045",
+      "supplementary_primary_urls": [
+        "https://github.com/sierra-research/tau-bench/blob/main/tau_bench/envs/base.py"
+      ],
+      "read_locations": "Abstract/evaluation method; official envs/base.py reward calculation",
+      "claim_support": "Annotated goal database states and required-output checks evaluate completion.",
+      "limitations": "Evaluator-only truth is not deployable agent context; substring checks do not establish semantic accuracy.",
+      "existence_and_claims_checked": true,
+      "verified_date": "2026-10-08",
+      "verification_method": "Primary paper/official venue page through web tool; cited methods and counterexamples inspected."
+    },
+    {
+      "id": "camel",
+      "title": "Defeating Prompt Injections by Design",
+      "authors_first_three": [
+        "Edoardo Debenedetti",
+        "Ilia Shumailov",
+        "Tianqi Fan"
+      ],
+      "additional_authors": true,
+      "first_year": 2025,
+      "publication_status": "arXiv preprint",
+      "read_version": "2503.18813v1",
+      "primary_url": "https://arxiv.org/html/2503.18813v1",
+      "supplementary_primary_urls": [
+        "https://github.com/google-research/camel-prompt-injection"
+      ],
+      "read_locations": "Sections 2 and 3.1; architecture and non-goals",
+      "claim_support": "Privileged planning, quarantined extraction, interpreter and capability policies; isolated extraction can return attacker-specified targets.",
+      "limitations": "Larger architectural change adjacent to the closed data-flow route; not selected for implementation.",
+      "existence_and_claims_checked": true,
+      "verified_date": "2026-10-08",
+      "verification_method": "Primary paper/official venue page through web tool; cited methods and counterexamples inspected."
+    },
+    {
+      "id": "adaptive",
+      "title": "Adaptive Attacks Break Defenses Against Indirect Prompt Injection Attacks on LLM Agents",
+      "authors_first_three": [
+        "Qiusi Zhan",
+        "Richard Fang",
+        "Henil Shalin Panchal"
+      ],
+      "additional_authors": true,
+      "first_year": 2025,
+      "publication_status": "Findings of NAACL 2025",
+      "read_version": "proceedings",
+      "primary_url": "https://aclanthology.org/2025.findings-naacl.395/",
+      "supplementary_primary_urls": [
+        "https://aclanthology.org/2025.findings-naacl.395.pdf"
+      ],
+      "read_locations": "Threat model, eight-defense adaptive evaluation; official metadata",
+      "claim_support": "Defense-specific adaptive attacks bypass evaluated defenses.",
+      "limitations": "The evaluated defenses/models are different; no DSCG rate can be inferred.",
+      "existence_and_claims_checked": true,
+      "verified_date": "2026-10-08",
+      "verification_method": "Primary paper/official venue page through web tool; cited methods and counterexamples inspected."
+    },
+    {
+      "id": "attacker",
+      "title": "The Attacker Moves Second: Stronger Adaptive Attacks Bypass Defenses Against Llm Jailbreaks and Prompt Injections",
+      "authors_first_three": [
+        "Milad Nasr",
+        "Nicholas Carlini",
+        "Chawin Sitawarin"
+      ],
+      "additional_authors": true,
+      "first_year": 2025,
+      "publication_status": "arXiv preprint; read v1",
+      "read_version": "2510.09023v1",
+      "primary_url": "https://arxiv.org/html/2510.09023v1",
+      "supplementary_primary_urls": [
+        "https://arxiv.org/abs/2510.09023"
+      ],
+      "read_locations": "Abstract, adaptive attack setup and Spotlighting experiment",
+      "claim_support": "Larger defense-aware search budgets strengthen jailbreak and prompt-injection attacks.",
+      "limitations": "Mixed attack domains and budgets; PromptArmor/DataFilter 93/83 figures are not attributed directly to this paper.",
+      "existence_and_claims_checked": true,
+      "verified_date": "2026-10-08",
+      "verification_method": "Primary paper/official venue page through web tool; cited methods and counterexamples inspected."
+    },
+    {
+      "id": "autodojo",
+      "title": "AutoDojo: A Generative Benchmark for Evaluating Prompt Injection Defenses in LLM Agents",
+      "authors_first_three": [
+        "Xinhang Ma",
+        "Taoran Li",
+        "Chaowei Xiao"
+      ],
+      "additional_authors": true,
+      "first_year": 2026,
+      "publication_status": "arXiv preprint; read revision 2026-09-28",
+      "read_version": "2606.15057v3",
+      "primary_url": "https://arxiv.org/html/2606.15057v3",
+      "supplementary_primary_urls": [
+        "https://arxiv.org/abs/2606.15057",
+        "https://github.com/xhOwenMa/AutoDojo"
+      ],
+      "read_locations": "v3 abstract, introduction, threat model and finding on task under-specification",
+      "claim_support": "Black-box adaptive injections on AgentDojo/AgentDyn; task specification influences vulnerability.",
+      "limitations": "Use the v3 title, not the earlier v1 title; not implemented or run in DSCG.",
+      "existence_and_claims_checked": true,
+      "verified_date": "2026-10-08",
+      "verification_method": "Primary paper/official venue page through web tool; cited methods and counterexamples inspected."
+    },
+    {
+      "id": "attriguard",
+      "title": "AttriGuard: Defeating Indirect Prompt Injection in LLM Agents via Causal Attribution of Tool Invocations",
+      "authors_first_three": [
+        "Yu He",
+        "Haozhe Zhu",
+        "Yiming Li"
+      ],
+      "additional_authors": true,
+      "first_year": 2026,
+      "publication_status": "arXiv preprint; venue not asserted",
+      "read_version": "2603.10749v1",
+      "primary_url": "https://arxiv.org/html/2603.10749v1",
+      "supplementary_primary_urls": [],
+      "read_locations": "Sections 3 and 4; Algorithm 1; Appendix A.2",
+      "claim_support": "Control attenuation, synchronized shadow replay and fuzzy tool-call survival are existing mechanisms.",
+      "limitations": "The proposed fact-relation axis needs incremental evidence; causal replay itself is not novel.",
+      "existence_and_claims_checked": true,
+      "verified_date": "2026-10-08",
+      "verification_method": "Primary-source web retrieval at specified locations; metadata checked; not a reproduction.",
+      "added_in_revision": "third-layer-redesign-20261008"
+    },
+    {
+      "id": "agentsentry",
+      "title": "AgentSentry: Mitigating Indirect Prompt Injection in LLM Agents via Temporal Causal Diagnostics and Context Purification",
+      "authors_first_three": [
+        "Tian Zhang",
+        "Yiwei Xu",
+        "Juan Wang"
+      ],
+      "additional_authors": true,
+      "first_year": 2026,
+      "publication_status": "arXiv preprint; read v1; venue not asserted",
+      "read_version": "2602.22724v1",
+      "primary_url": "https://arxiv.org/html/2602.22724v1",
+      "supplementary_primary_urls": [],
+      "read_locations": "Sections 4.2–4.5 and Appendix B; arXiv author metadata",
+      "claim_support": "User-channel and mediator interventions, counterfactual proposals, effect estimates and context purification.",
+      "limitations": "Multi-axis intervention and a 2x2 design are already covered; no independent reproduction.",
+      "existence_and_claims_checked": true,
+      "verified_date": "2026-10-08",
+      "verification_method": "Primary-source web retrieval at specified locations; metadata checked; not a reproduction.",
+      "added_in_revision": "third-layer-redesign-20261008"
+    },
+    {
+      "id": "actguard",
+      "title": "ActGuard: Pre-execution Action Auditing against Indirect Prompt Injection in LLM Agents",
+      "authors_first_three": [
+        "Bingzheng Wang",
+        "Xiaoyan Gu",
+        "Wentao Wang"
+      ],
+      "additional_authors": true,
+      "first_year": 2026,
+      "publication_status": "arXiv preprint; venue not asserted",
+      "read_version": "2609.14987v1",
+      "primary_url": "https://arxiv.org/html/2609.14987v1",
+      "supplementary_primary_urls": [],
+      "read_locations": "Section 3, overview and method descriptions",
+      "claim_support": "State-adaptive tool prior, tool/argument evidence localization and verifier-guided sanitization.",
+      "limitations": "Stepwise prior or evidence repair cannot be relabeled as a new third layer; unreplicated.",
+      "existence_and_claims_checked": true,
+      "verified_date": "2026-10-08",
+      "verification_method": "Primary-source web retrieval at specified locations; metadata checked; not a reproduction.",
+      "added_in_revision": "third-layer-redesign-20261008"
+    },
+    {
+      "id": "planguard",
+      "title": "PlanGuard: Defending Agents against Indirect Prompt Injection via Planning-based Consistency Verification",
+      "authors_first_three": [
+        "Guangyu Gong",
+        "Zizhuang Deng"
+      ],
+      "additional_authors": false,
+      "first_year": 2026,
+      "publication_status": "arXiv preprint; venue not asserted",
+      "read_version": "2604.10134v1",
+      "primary_url": "https://arxiv.org/html/2604.10134v1",
+      "supplementary_primary_urls": [],
+      "read_locations": "Section IV and threat model",
+      "claim_support": "Isolated planner creates a reference action set followed by hierarchical verification.",
+      "limitations": "Frozen reference plans have a direct neighbor; numeric efficacy not transferred to DSCG.",
+      "existence_and_claims_checked": true,
+      "verified_date": "2026-10-08",
+      "verification_method": "Primary-source web retrieval at specified locations; metadata checked; not a reproduction.",
+      "added_in_revision": "third-layer-redesign-20261008"
+    },
+    {
+      "id": "checklist",
+      "title": "Beyond Accuracy: Behavioral Testing of NLP Models with CheckList",
+      "authors_first_three": [
+        "Marco Tulio Ribeiro",
+        "Tongshuang Wu",
+        "Carlos Guestrin"
+      ],
+      "additional_authors": true,
+      "first_year": 2020,
+      "publication_status": "ACL 2020",
+      "read_version": "proceedings, Section 2.2",
+      "primary_url": "https://aclanthology.org/2020.acl-main.442/",
+      "supplementary_primary_urls": [
+        "https://aclanthology.org/2020.acl-main.442.pdf"
+      ],
+      "read_locations": "Official proceedings metadata and PDF pp. 4903–4904, Section 2.2",
+      "claim_support": "Minimum functionality, invariance and directional expectation tests are established behavioral testing concepts.",
+      "limitations": "Runtime deployment alone may not be a method contribution; general metamorphic testing is prior art.",
+      "existence_and_claims_checked": true,
+      "verified_date": "2026-10-08",
+      "verification_method": "Primary-source web retrieval at specified locations; metadata checked; not a reproduction.",
+      "added_in_revision": "third-layer-redesign-20261008"
+    },
+    {
+      "id": "surfaceheuristics",
+      "title": "Defenses Against Prompt Attacks Learn Surface Heuristics",
+      "authors_first_three": [
+        "Li Li",
+        "Chenxiao Yu",
+        "Zhiyu Ni"
+      ],
+      "additional_authors": true,
+      "first_year": 2026,
+      "publication_status": "ACL 2026",
+      "read_version": "official proceedings metadata and abstract",
+      "primary_url": "https://aclanthology.org/2026.acl-long.502/",
+      "supplementary_primary_urls": [],
+      "read_locations": "Official abstract; metadata only for authors/venue",
+      "claim_support": "Controlled diagnostics identify surface shortcuts and false refusal risks in evaluated fine-tuned defenses.",
+      "limitations": "Abstract-level claim only; no inference that DSCG has the same defect or expected rate.",
+      "existence_and_claims_checked": true,
+      "verified_date": "2026-10-08",
+      "verification_method": "Primary-source web retrieval at specified locations; metadata checked; not a reproduction.",
+      "added_in_revision": "third-layer-redesign-20261008"
+    },
+    {
+      "id": "vigil",
+      "title": "VIGIL: Defending LLM Agents Against Tool Stream Injection via Verify-Before-Commit",
+      "authors_first_three": [
+        "Junda Lin",
+        "Zhaomeng Zhou",
+        "Zhi Zheng"
+      ],
+      "additional_authors": true,
+      "first_year": 2026,
+      "publication_status": "arXiv read version; later venue not relied on",
+      "read_version": "2601.05755v1",
+      "primary_url": "https://arxiv.org/html/2601.05755v1",
+      "supplementary_primary_urls": [],
+      "read_locations": "Sections 4.2–4.5",
+      "claim_support": "Speculative hypothesis generation, grounded compliance/entailment verification and backtracking.",
+      "limitations": "Verify-before-commit is prior art; its tool-stream scope is broader than the retained DSCG threat model.",
+      "existence_and_claims_checked": true,
+      "verified_date": "2026-10-08",
+      "verification_method": "Primary-source web retrieval at specified locations; metadata checked; not a reproduction.",
+      "added_in_revision": "third-layer-redesign-20261008"
+    },
+    {
+      "id": "rope",
+      "title": "ROPE: Routed Origin Policy Enforcement against Indirect Prompt Injection",
+      "authors_first_three": [
+        "Xinhang Ma",
+        "Chaowei Xiao",
+        "William Yeoh"
+      ],
+      "additional_authors": true,
+      "first_year": 2026,
+      "publication_status": "arXiv preprint; venue not asserted",
+      "read_version": "2608.27496v1",
+      "primary_url": "https://arxiv.org/html/2608.27496v1",
+      "supplementary_primary_urls": [],
+      "read_locations": "Abstract, introduction and Section 3 design outline",
+      "claim_support": "Task-conditioned origin enforcement over sensitive tool parameters uses structural sources.",
+      "limitations": "Closed provenance/source-to-sink route remains closed; behavioral relations do not establish provenance.",
+      "existence_and_claims_checked": true,
+      "verified_date": "2026-10-08",
+      "verification_method": "Primary-source web retrieval at specified locations; metadata checked; not a reproduction.",
+      "added_in_revision": "third-layer-redesign-20261008"
+    },
+    {
+      "additional_authors": false,
+      "first_year": 2026,
+      "publication_status": "arXiv preprint; no formal venue claim",
+      "existence_and_claims_checked": true,
+      "verified_date": "2026-10-09",
+      "verification_method": "Official arXiv abstract/version metadata through web tool; full body and results not independently audited.",
+      "id": "cascade",
+      "title": "Evaluating a Layered Prompt-Injection Defence for the Model Context Protocol: A Record-Level Audit of Decision Conventions, Corpus Provenance and Reproducibility",
+      "authors_first_three": [
+        "İpek Abasıkeleş Turgut",
+        "Edip Gümüş"
+      ],
+      "read_version": "2604.17125v3; v1 abstract/metadata checked for historical architecture",
+      "primary_url": "https://arxiv.org/abs/2604.17125v3",
+      "supplementary_primary_urls": [
+        "https://arxiv.org/abs/2604.17125v1"
+      ],
+      "read_locations": "v1/v3 official abstracts, titles, authors and submission history only",
+      "claim_support": "A local layered pipeline predates this proposal; the later audit highlights referral/denial scoring, corpus wrappers and reproducibility as material evaluation factors.",
+      "limitations": "v3 changes title and study framing; no v1 headline metric is reused as a validated outcome. MCP input detection is not DSCG action authorization."
+    },
+    {
+      "additional_authors": true,
+      "first_year": 2026,
+      "publication_status": "arXiv preprint; no formal venue claim",
+      "existence_and_claims_checked": true,
+      "verified_date": "2026-10-09",
+      "verification_method": "Official arXiv abstract/version metadata through web tool; full body and results not independently audited.",
+      "id": "basis",
+      "title": "BASIS: Breach-Aware Selective Prompt Injection Shielding with Prefill Attention Probes",
+      "authors_first_three": [
+        "Laiqiao Qin",
+        "Tianqing Zhu",
+        "Longxiang Gao"
+      ],
+      "read_version": "2608.08027v1",
+      "primary_url": "https://arxiv.org/abs/2608.08027v1",
+      "supplementary_primary_urls": [],
+      "read_locations": "Official abstract, authors and submission metadata only",
+      "claim_support": "The method trains sparse existence/breach probes from attention features and uses cascaded gating without additional LLM inference; selective low-cost shielding is prior art.",
+      "limitations": "Attention-feature access and trained probes differ from this host-metadata black-box proposal; abstract claims do not validate DSCG routing or its efficacy."
+    }
+  ],
+  "current_candidate": "task-conditioned decision relation verification; unimplemented hypothesis",
+  "revision": "third-layer-redesign-20261008",
+  "previous_revision_archive": "workshop/archive/3_layer_redesign_20261008/originals/workshop/3_layer_sources_20261008.json",
+  "sources_added_this_revision": 8,
+  "existing_source_records_preserved": 11,
+  "historical_catalog_notes": {
+    "date": "2026-10-08",
+    "notes": [
+      "No source ASR is treated as DSCG efficacy.",
+      "Read versions are explicit and may differ from a later version.",
+      "No full copyrighted paper text is stored; findings are paraphrased.",
+      "Bibliographic and claim checks are research notes, not independent reproductions.",
+      "Previous 11 source objects are preserved exactly; this revision does not claim to re-read all of them.",
+      "New methods are read at fixed arXiv versions or official proceedings; arXiv comments are not venue evidence.",
+      "32 planned inputs are design denominators only; actual benchmark samples and defender model calls remain zero.",
+      "Decision relations and a 2x2 intervention matrix are not independently novel concepts."
+    ]
+  }
+}

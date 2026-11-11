@@ -1,0 +1,46 @@
+TAP version 13
+# Subtest: multiple metrics preserve separate experiment series and missing values
+ok 1 - multiple metrics preserve separate experiment series and missing values
+  ---
+  duration_ms: 1.305208
+  type: 'test'
+  ...
+# Subtest: a selected suite compares experiments for every selected metric
+ok 2 - a selected suite compares experiments for every selected metric
+  ---
+  duration_ms: 0.161084
+  type: 'test'
+  ...
+# Subtest: percentage endpoints stay inside cartesian, radar and scatter plot bounds
+ok 3 - percentage endpoints stay inside cartesian, radar and scatter plot bounds
+  ---
+  duration_ms: 0.331584
+  type: 'test'
+  ...
+# Subtest: tokens use K units and an independent axis when mixed with percentages
+ok 4 - tokens use K units and an independent axis when mixed with percentages
+  ---
+  duration_ms: 0.551334
+  type: 'test'
+  ...
+# Subtest: unsupported radar combinations and empty metric selections are rejected
+ok 5 - unsupported radar combinations and empty metric selections are rejected
+  ---
+  duration_ms: 0.150375
+  type: 'test'
+  ...
+# Subtest: scatter skips missing metrics rather than presenting them as zero
+ok 6 - scatter skips missing metrics rather than presenting them as zero
+  ---
+  duration_ms: 0.056791
+  type: 'test'
+  ...
+1..6
+# tests 6
+# suites 0
+# pass 6
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 33.834584

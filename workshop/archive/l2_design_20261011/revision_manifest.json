@@ -1,0 +1,45 @@
+{
+  "date": "2026-10-11",
+  "task": "L2 authorization optimization candidate memo; unimplemented",
+  "base_revision": "7d1e1ed27791cc87685bc512ba1b8fb5c1182d25",
+  "previous_manifest": "workshop/archive/l1_design_20261011/revision_manifest.json",
+  "previous_manifest_sha256": "0866462b6adea676024b803e3dfbb949864a4b80fddf54e2948e0db34f2b7876",
+  "entries": [
+    {
+      "path": "AGENTS.md",
+      "original_storage": "workshop/archive/l2_design_20261011/originals/AGENTS.md",
+      "sha256_before": "fe8c3027d3c8bb9eb48e3f70869c2a4a19003205b385a0212c4c192d7c164f83",
+      "sha256_after": "a6e2c48c92e3bad150a6566ca0db8584df1cfce8403ce956eebbe49734cca12d"
+    },
+    {
+      "path": "workshop/README.md",
+      "original_storage": "workshop/archive/l2_design_20261011/originals/workshop/README.md",
+      "sha256_before": "0537f409e68c879180db517b1ec17b623ffd1affc8dbe004139169685f8a9986",
+      "sha256_after": "bb62cdb2714d03c55175eedcc9b51a42e4a0aed154a903839727ea0e80dd723d"
+    }
+  ],
+  "created_files": {
+    "workshop/L2_opt.md": "71b6fc6c00ee549b4ae56612116a07faea938241338372a31026a0e622e81701"
+  },
+  "current_documents": [
+    "workshop/L2_opt.md",
+    "workshop/README.md",
+    "AGENTS.md"
+  ],
+  "validator": "workshop/artifacts/20261011_l2_design/validate_l2_doc.py",
+  "validator_sha256": "5fa0eb3751a8ac169267e3e2b5b8770eee2d965ad052ab87fec271eb4dce5c76",
+  "runtime_changed": false,
+  "formal_route_changed": false,
+  "model_calls": 0,
+  "benchmark_rollouts": 0,
+  "fixtures_created": 0,
+  "historical_full_migration_certified": false,
+  "out_of_scope_documents": {
+    "report/report.md": "Current bytes are preserved; this L2 task does not certify report image assets or preceding report revision."
+  },
+  "initial_draft_manifest": {
+    "path": "workshop/artifacts/20261011_l2_design/revision_manifest_initial.json",
+    "sha256": "32eae15d34e53f922cb130f764e14a0417e7c952a78adcf95cca090c07aa5f21",
+    "reason": "Preserve the first checked draft before clarifying that originally zero-call read-only catalogues cannot add an authorization model call for free."
+  }
+}

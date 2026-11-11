@@ -1,0 +1,82 @@
+"""Factory wiring must apply the view and reject candidates before audit."""
+from copy import deepcopy
+import unittest
+from unittest.mock import Mock, patch
+from agentdojo.functions_runtime import FunctionsRuntime, FunctionCall
+from dscg.model_config import ModelConfig
+from dscg.pipelines.defended import make_defended_pipeline
+
+
+class Planner:
+    def __init__(self,call):self.views=[];self.call=call
+    def query(self,q,r,e,m,a):
+        self.views.append(deepcopy(m))
+        response={'role':'assistant','content':[],'tool_calls':[self.call]} if len(self.views)==1 else {
+            'role':'assistant','content':[{'type':'text','content':'final facts'}],'tool_calls':[]}
+        return q,r,e,[*m,response],a
+
+
+class ThreeLayerPipelineTests(unittest.TestCase):
+    def build(self,call,**flags):
+        self.config=ModelConfig(provider='custom',model_id='offline',api_key='fixture',base_url='http://offline')
+        self.client=Mock()
+        self.client.chat.completions.create.return_value=type('Response',(),{'choices':[
+            type('Choice',(),{'message':type('Message',(),{'content':'{"tools": []}','refusal':None})(),'finish_reason':'stop'})()]})()
+        with patch('dscg.pipelines.defended.create_openai_client',return_value=self.client):
+            pipeline,_,_=make_defended_pipeline(model_config=self.config,sec_model_config=self.config,**flags)
+        planner=Planner(call);pipeline.task_executor.llm=planner
+        return pipeline,planner
+    def runtime(self):
+        runtime=FunctionsRuntime();self.effects=[]
+        @runtime.register_function
+        def read_data() -> str:
+            """Read task data."""
+            self.effects.append('read');return '姓名张三 ID42 $3.40'
+        return runtime
+    def test_default_loop_exposes_marked_view_but_returns_raw_history(self):
+        runtime=self.runtime()
+        metadata={'read_data':dict(effect='read',source='local',sink='none',sensitivity='public',idempotent=True,reversible=False)}
+        pipeline,planner=self.build(FunctionCall(function='read_data',args={},id='1'),tool_metadata=metadata)
+        state=pipeline.query('Read the data',runtime)
+        self.assertEqual(self.effects,['read']);self.assertEqual(len(planner.views),2)
+        raw=next(m for m in state[3] if m['role']=='tool')
+        shown=next(m for m in planner.views[1] if m['role']=='tool')
+        self.assertEqual(raw['content'][0]['content'],'姓名张三 ID42 $3.40')
+        self.assertIn('trust=untrusted',shown['content'][0]['content'])
+        self.assertTrue(state[4]['dscg_framework']['input_isolation'])
+        self.assertTrue(state[4]['dscg_framework']['authorization_precheck'])
+        self.assertEqual(state[4]['dscg_layer_routing']['public_read_bypass_batches'],1)
+        self.assertEqual(state[4]['dscg_audit_decision']['semantic_attempt'],0)
+    def test_missing_metadata_candidate_reaches_gate_and_skips_real_auditor(self):
+        runtime=self.runtime();pipeline,planner=self.build(FunctionCall(function='read_data',args={},id='1'))
+        state=pipeline.query('Read the data',runtime)
+        self.assertEqual(self.effects,[])
+        self.assertEqual(state[4]['dscg_layer_routing']['precheck_rejected_batches'],1)
+        self.assertEqual(state[4]['dscg_audit_decision']['semantic_attempt'],0)
+        self.assertEqual(state[4]['dscg_action_ledger'][0]['state'],'blocked')
+    def test_v2_api_control_executes_with_original_view(self):
+        runtime=self.runtime();metadata={'read_data':dict(effect='read',source='local',sink='none',sensitivity='public',idempotent=True,reversible=False)}
+        pipeline,planner=self.build(FunctionCall(function='read_data',args={},id='1'),tool_metadata=metadata,
+                                    input_isolation=False,authorization_precheck=False)
+        state=pipeline.query('Read the data',runtime)
+        self.assertEqual(self.effects,['read'])
+        shown=next(m for m in planner.views[1] if m['role']=='tool')
+        self.assertEqual(shown['content'][0]['content'],'姓名张三 ID42 $3.40')
+        self.assertFalse(state[4]['dscg_framework']['input_isolation'])
+        self.assertFalse(state[4]['dscg_framework']['authorization_precheck'])
+    def test_all_old_switches_off_leave_no_input_layer(self):
+        runtime=self.runtime();pipeline,planner=self.build(FunctionCall(function='read_data',args={},id='1'),
+                                                          use_sandbox=False,use_security_checker=False)
+        state=pipeline.query('Read the data',runtime)
+        self.assertEqual(self.effects,['read'])
+        self.assertNotIn('dscg_input_isolation',state[4])
+        self.assertEqual(next(m for m in planner.views[1] if m['role']=='tool')['content'][0]['content'],'姓名张三 ID42 $3.40')
+    def test_default_cache_identity_binds_version_and_actual_layer_flags(self):
+        call=FunctionCall(function='read_data',args={},id='1')
+        names=[]
+        for l1,l2 in ((True,True),(False,True),(True,False),(False,False)):
+            pipeline,_=self.build(call,input_isolation=l1,authorization_precheck=l2)
+            names.append(pipeline.name)
+            if l1 or l2:self.assertIn('three-layer-v1',pipeline.name)
+        self.assertEqual(len(set(names)),4)
+        self.assertNotEqual(names[0],'offline-newFrame-OursFull')

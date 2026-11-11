@@ -1,0 +1,14 @@
+{
+  "status": "pass",
+  "user_roots": {
+    "results": {
+      "count": 913,
+      "sha256": "af26b33038c3592948dc592810526e1bbea9662b093a0069499a655ba0c7121e"
+    },
+    "download": {
+      "count": 13,
+      "sha256": "47540451e2722711d7c7cca4c9c1abdf46a05b2a8fb7bad91ac0b5810e21deb7"
+    }
+  },
+  "scope": "Name/size/mtime inventory only"
+}

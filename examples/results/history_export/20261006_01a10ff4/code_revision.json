@@ -1,0 +1,22 @@
+{
+  "base_commit": "e4862aeaaa4c2e674b02877c7bec9fb7fe983727",
+  "working_tree": "dirty",
+  "files": {
+    "dashboard/app.py": "ae72c3d80301ee171ab2e9711469e75f00ae866c1e5e425086ff8ee50b8dcb9c",
+    "dashboard/history_export.py": "3d88ee3172bf92275925251e5ec27598a33003a0303f266c95f9a65d7ea066d0",
+    "dashboard/static/js/history.js": "d1bd7ddff5d7f883f95059d61fa37924231c4063a153959eb6c5ea80730a9283",
+    "dashboard/static/css/style.css": "b2cd8d36b92a452e450e18dd9478af76f5a2e91813a991655ff89f199b88a259",
+    "dashboard/templates/index.html": "f9b340d189e6c594779e6fc1faf2b78640664f96e20ad1083579efe9ad111fab",
+    "tests/test_dashboard_history.py": "fa0554d6b9ccdd1bfdd1e7aa3c07b999ce51e4109c338a53916a87eab7bcb35e",
+    "README.md": "ad2e85e6e8f5a681ab0091c5d10e57df8476aabf0d0a956a9847a469e4e251d7",
+    "docs/history_export_report.md": "8cf7b9f5c09cbd992c23cdbf33c8d43061580322fc353e720f4e4608aa7656d3"
+  },
+  "code_working_tree_sha256": "d42ce3a694bfc457402eccf46eda778192c6c79aaca4a14429e519827866dde7",
+  "hash_definition": "SHA256 of canonical sorted compact JSON of base_commit, working_tree and files, before adding code_working_tree_sha256, hash_definition and input_files.",
+  "input_files": {
+    "results/partial_benchmark/deepseek-flash_workshop_2.0/workspace/summary.json": "4396c7828767bcb40503d3e96bc59b8123c3e2bece51adf8182554c19ef962d9",
+    "results/partial_benchmark/deepseek-flash_workshop_2.0/workspace/detailed_results.csv": "b011980c35c3003cde9b2a6fe509fa02c0268f56653a223d6006a1a7d5f955a7",
+    "results/partial_benchmark/deepseek-flash_workshop_1.1/workspace/summary.json": "3419dbcf5e89c4b5de3f677edd69db5aa6bde7517457e97468cf5a12c7328318",
+    "results/partial_benchmark/deepseek-flash_workshop_1.1/workspace/detailed_results.csv": "77858d23660bef2a66f95eb3b929d285ddfc0be053228e942659d472eb5fdf7c"
+  }
+}

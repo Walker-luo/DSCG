@@ -1,0 +1,65 @@
+{
+  "schema_version": "dscg.workshop-revision.v1",
+  "date": "2026-10-13",
+  "task": "configuration-docs",
+  "head": "0ec73ea4516e856468887a381335c60ff0dc71dc",
+  "previous_manifest": "workshop/archive/l2_docs_sync_20261013/revision_manifest.json",
+  "previous_manifest_sha256": "349cc3f4de220b7e859af31fa4224180c04cdc392712bee24ed16f9bec66fda4",
+  "files": [
+    {
+      "path": "README.md",
+      "original": "workshop/archive/configuration_docs_20261013/originals/README.md",
+      "before_sha256": "d0bbc7fd525e57ea23e1fe4a86e0601ef0e6116f7075b902ddd2fb13271c4889",
+      "after_sha256": "8ced38f04d9729aa9628c203388e3b2bf0afef775ec67ba5eff599eb38ce23a8"
+    },
+    {
+      "path": "docs/evaluation.md",
+      "original": "workshop/archive/configuration_docs_20261013/originals/docs/evaluation.md",
+      "before_sha256": "94e74d42712dee05108367acdee141ce58ff03f14ca25ba5d71475554a8332bf",
+      "after_sha256": "8b2fe0c588ead3bb224bceb765e806b05166842f92117953669bc205530bdb37"
+    },
+    {
+      "path": "docs/README.md",
+      "original": "workshop/archive/configuration_docs_20261013/originals/docs/README.md",
+      "before_sha256": "15882aaf420b89b0a2942ba9e541522530edbab9103a07f02e3543450ed99aa6",
+      "after_sha256": "dc4248d0e05a13a71d3820d18c4048b69bcb0abbe7190ecfff30e38d2b1a2844"
+    },
+    {
+      "path": "AGENTS.md",
+      "original": "workshop/archive/configuration_docs_20261013/originals/AGENTS.md",
+      "before_sha256": "a44230ca5fa03f9b48a1fc531db0d0a049ebf629417fba5324ae75e9c42d6109",
+      "after_sha256": "73e5c312a602ffe554a1c39771f2f7c88b04ca1ae1ac0255ec39cf58f7792d66"
+    },
+    {
+      "path": "workshop/README.md",
+      "original": "workshop/archive/configuration_docs_20261013/originals/workshop/README.md",
+      "before_sha256": "9c61c2f5f6e17a7662606437280c8fe15b6ed32a7826dd9478bedfa841171844",
+      "after_sha256": "a30ab84e8b937d4a15f6f29770861ed5f3b6fee5810290380ab9fa6c25091644"
+    },
+    {
+      "path": "workshop/completed/README.md",
+      "original": "workshop/archive/configuration_docs_20261013/originals/workshop/completed/README.md",
+      "before_sha256": "32b2a07aa54812a7a1fe1ad6c2d360f7906f280985da1f88b1c8204552581561",
+      "after_sha256": "61c9baa50d4d9f187dc022fa48134e3ddd6d13274e2088096c84cf6a73cde3db"
+    },
+    {
+      "path": "docs/model_tool_configuration.md",
+      "original": null,
+      "before_sha256": null,
+      "after_sha256": "08f63d490259a7037965fbc8f4a50d941ec1b88f7d70db417c92a939aa9838f0"
+    },
+    {
+      "path": "workshop/completed/configuration_docs_20261013.md",
+      "original": null,
+      "before_sha256": null,
+      "after_sha256": "9ebad484bfcd8ee5dfa334c0da05654b0c08754c9e8e588bce8e6260d8ee6473"
+    },
+    {
+      "path": "workshop/archive/configuration_docs_20261013/validate_docs.py",
+      "original": null,
+      "before_sha256": null,
+      "after_sha256": "346e8721ffc2facc6117f585b7697d704f92cb3ed2766c45649b31b5d1503f6f"
+    }
+  ],
+  "scope": "documentation only; no runtime/config/credential changes"
+}

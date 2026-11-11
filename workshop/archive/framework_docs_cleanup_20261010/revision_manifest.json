@@ -1,0 +1,167 @@
+{
+  "schema_version": 1,
+  "revision": "framework-docs-cleanup-20261010",
+  "scope": "Documentation and completed scheme relocation; existing dirty runtime/platform retained",
+  "base_revision": "8f608618171d4ffac8c8ec99d1278302282204fe",
+  "previous_manifest": "workshop/archive/three_layer_impl_20261010/revision_manifest.json",
+  "previous_manifest_sha256": "6fdba3f807d2b3b99619f7f383cccee15dac9d5dcfd332d6202acbbde496c5f1",
+  "entries": [
+    {
+      "path": "README.md",
+      "original_storage": "workshop/archive/framework_docs_cleanup_20261010/originals/README.md",
+      "sha256_before": "77011dde947e07839e4b2b8284c4e8dde47948d0c2e804e86c15c0e6a80898bd",
+      "new_path": "README.md",
+      "sha256_after": "2951bd601fd97d3095808758522b3b730a982c18d917b7e8e5423131028e0039"
+    },
+    {
+      "path": "AGENTS.md",
+      "original_storage": "workshop/archive/framework_docs_cleanup_20261010/originals/AGENTS.md",
+      "sha256_before": "78f704d674f89cdef4450c5ff1c6992f9ca3359472606bc6c9680a336b58a017",
+      "new_path": "AGENTS.md",
+      "sha256_after": "a4b672dfed518c56e4bb6b16712efbee330f5b94e612c0bd0e7cb680ccc413aa"
+    },
+    {
+      "path": "docs/framework_updates.md",
+      "original_storage": "workshop/archive/framework_docs_cleanup_20261010/originals/docs/framework_updates.md",
+      "sha256_before": "7c71a00c0c3b0738a2fceb1e81d82c42e5839ae6328362b6484ba8345b8b47b3",
+      "new_path": "docs/framework_updates.md",
+      "sha256_after": "c31e24bfca92132432bc1b2d383490e5edfe6db0029f46fb3ffca67e6349ccc9"
+    },
+    {
+      "path": "workshop/README.md",
+      "original_storage": "workshop/archive/framework_docs_cleanup_20261010/originals/workshop/README.md",
+      "sha256_before": "345ab437e00ec5610384a3e653ffc40c29bc74db6473366ca8b23e147d756b36",
+      "new_path": "workshop/README.md",
+      "sha256_after": "2bb7023d27e7f284b6092f81ae032741d7f9d403b238ee82420ae9e26b9d3002"
+    },
+    {
+      "path": "workshop/completed/README.md",
+      "original_storage": "workshop/archive/framework_docs_cleanup_20261010/originals/workshop/completed/README.md",
+      "sha256_before": "89ec3104203893daa242a3bada4e23bfb1fd818ffd31e9ada46a102dd43f3663",
+      "new_path": "workshop/completed/README.md",
+      "sha256_after": "369ea4fec9151ee46fe8f3bf023a3006b913ebbc628dc835820abe7fb74edb00"
+    },
+    {
+      "path": "workshop/3_layer_opt.md",
+      "original_storage": "workshop/archive/framework_docs_cleanup_20261010/originals/workshop/3_layer_opt.md",
+      "sha256_before": "5330b319d4189285838ac31bf21bed9331f781cb5b31eddb37947f3282c187cd",
+      "new_path": "workshop/completed/3_layer_opt.md",
+      "sha256_after": "d0e64f8685191e73da3f3864edd30d8759b27dae452fbcfae8e0070a0172ba4c"
+    },
+    {
+      "path": "workshop/L3_checker_opt.md",
+      "original_storage": "workshop/archive/framework_docs_cleanup_20261010/originals/workshop/L3_checker_opt.md",
+      "sha256_before": "d91ee2f927f41da3f1c42a26d415b6ba811c989af5b3fb45836c0dd2dd17bc1a",
+      "new_path": "workshop/L3_checker_opt.md",
+      "sha256_after": "d333977d9dbbe6724fbc7b0ddb16f2fd0dc2cc60514ba929e595bc9b218161f8"
+    },
+    {
+      "path": "workshop/original_framework_direction_20261008.md",
+      "original_storage": "workshop/archive/framework_docs_cleanup_20261010/originals/workshop/original_framework_direction_20261008.md",
+      "sha256_before": "28e29c9d28c226f36428b5d5ba19745002f0e4f33952b6286eb0c7394f35f257",
+      "new_path": "workshop/original_framework_direction_20261008.md",
+      "sha256_after": "20cb3db3c4ff31c143bcb073c203516779737bd67dcf60e74076c5ddedcf839c"
+    },
+    {
+      "path": "workshop/completed/three_layer_implementation_20261010.md",
+      "original_storage": "workshop/archive/framework_docs_cleanup_20261010/originals/workshop/completed/three_layer_implementation_20261010.md",
+      "sha256_before": "fb5b7beeef5d973a4a9c309d894e99c3a4d5913dfdba54d441dd431d90e5e0bf",
+      "new_path": "workshop/completed/three_layer_implementation_20261010.md",
+      "sha256_after": "309042d0437cba20f10f089c208a04597ca990c1391f052b99e6fc59fac90708"
+    },
+    {
+      "path": "workshop/completed/three_layer_implementation_plan_20261010.md",
+      "original_storage": "workshop/archive/framework_docs_cleanup_20261010/originals/workshop/completed/three_layer_implementation_plan_20261010.md",
+      "sha256_before": "1a0a7f8ea01fd367047b614b47a4f21980ce38a1e1018bb2eb5d72a9c7836edc",
+      "new_path": "workshop/completed/three_layer_implementation_plan_20261010.md",
+      "sha256_after": "a546cf4ddc2150340557ae35976ba1e7c9d9de6f1c997877fc9e99dd3a9fa602"
+    },
+    {
+      "path": "workshop/verify_migration.py",
+      "original_storage": "workshop/archive/framework_docs_cleanup_20261010/originals/workshop/verify_migration.py",
+      "sha256_before": "e70e1ee6820faa35df23a9e45a003c9605aa797d51e48c85a46318d4a0a93d31",
+      "new_path": "workshop/verify_migration.py",
+      "sha256_after": "7fa11a10bee613395f9c3d2e70e9998a733bab30781443507034582e82619692"
+    }
+  ],
+  "created_documents": [
+    {
+      "path": "workshop/completed/framework_docs_cleanup_20261010.md",
+      "sha256_after": "d7ae4944938f399c7753653c476c392d645cc84ba9d21b46669256a10805c2d2"
+    }
+  ],
+  "runtime_changed_in_this_followup": false,
+  "runtime_hashes": {
+    "dscg/harness_records.py": "679c446a89d2e668145ece1d7d5b82ac268580f9004e71c43b7bdbfc0fa405a7",
+    "dscg/model_config.py": "fb2d7bf48d6507dbcbb15ffc15f3f05582ceefd6e376a4e0d2d7b37f4f83f620",
+    "dscg/paths.py": "be9445576a972e722be89834b72b0717f4e1475adf12fd601803f8660187ae13",
+    "dscg/tool_metadata.py": "9802d5af6f1882b81ba747583fc612959fb5e68e89182ab24c4ecb51b9d441f1",
+    "dscg/__init__.py": "ac228319829d4f1c4b9e32d904efaa78065f7f7fd6da1086a5a181c7515bd961",
+    "dscg/token_tracking.py": "6518055d80f31145f539360c61ef403b55515cdd0832df01f8e56042dc604728",
+    "dscg/input_isolation.py": "9b57b94c58f29869158a97932e104e23428be2e28850c0c0e8a0256b67478e51",
+    "dscg/pipelines/defended.py": "d0517b32771acb7dc2a9c153fdfa21b6dc71a411af8b466926401518ace03711",
+    "dscg/pipelines/baseline.py": "253d8b1581749a30dec0c953e5f4bdafdf9693a5d5e42b291b1c2f2bc321cfcd",
+    "dscg/pipelines/__init__.py": "35dca586fe37f5229ec2c13805a2b46b46d342a272ed24ffde7df2cafc0b2209",
+    "tests/test_history_charts.cjs": "754654093098768c251d5f6e9450f1505fcc394f6a225a4b59269ea608aba56b",
+    "tests/test_tool_metadata.py": "9b62b2618fae65b84bfc341c17e2ca58789229c3d989b992ccbbce2313631f77",
+    "tests/test_dashboard_config.py": "c73d7ea2c6b5c31cee9ed2eb210d897f6edac362dd065575985dad84095d7ba7",
+    "tests/test_web_request_routing.py": "4c4f665f5adedc2562386075f3763d2512f9ce87ee62fd1ee37291cbb2ead276",
+    "tests/test_partial_baseline.py": "3e427cc9128dd2a006f830d6ba626c41afaf42b6de3036adbc49ad50a0503fca",
+    "tests/test_partial_reporting.py": "b0f818d56f296abd7e211bddc16d8b6964e88e7d69a4cba69771e6c88037acf1",
+    "tests/test_dashboard_history.py": "a7b7f529f93007d1fbb92850d0fbcd4db54567f855bc1ff48ce71e3fe7cc03d5",
+    "tests/test_task_isolation.py": "e179c5c5df14cf02b84fa6593e04ae34cc07cdb8e20903928e8afeb8f9b7c390",
+    "tests/test_partial_attacks.py": "0659d3da8f4c9372bc615fbc0300a0fd74245b1e0187d17cf277548b9b4b94dd",
+    "tests/test_permission_sandbox.py": "563364a4bf597430e7b2c7cc6a4461048c88288582e67674ee99f7e7422468c6",
+    "tests/test_audit_tool_context.py": "cafdd4599dfc7f6099edcb9092caad41a2fb7adab6aea9705c371902e380bdcd",
+    "tests/test_harness_audit.py": "3eaee4fda57e631001d031134b61689253d9dd076ab0946d56fb05758ebd5934",
+    "tests/test_three_layer_pipeline.py": "c3e20e82a086950924045825d9c3f8055b539de16badc4324d8abbfbea4745d6",
+    "tests/test_completion_prompt.py": "c53450f902bb27b2e6e6040eddae4fcce1c758677accdda8489ad6b50c4a24f8",
+    "tests/test_input_isolation.py": "1d8b630950369bd5fcae5eb8a8029b703e941f0e9a17b270d6daec5d014724e7",
+    "tests/test_partial_ablation.py": "a86c5c36c285e58f75c83e14ab3f829d36f5c7c947fb6a4f01dbb4384ace17fe",
+    "tests/test_harness_records.py": "5dcdb296d0c15e255d4a90b1a4fb7f220e7f819a19cf695ed3274949b3168adb",
+    "tests/test_optimization_costs.py": "d472962e9c0d63ee7fc9b051044b15586a0f6d7c13b722e54b99486e7c740d1b",
+    "tests/test_i3_p0_stress.py": "d65b9c389e109f1c6fa74db3a31700543a9d5c8dba6ceee7cb3e5fcdde1f5fd7",
+    "tests/test_authorization_defaults.py": "715d536a3869e1542546f58724dcecbb81740a795afe03ed372d96790ee50350",
+    "tests/test_history_ui_selection.cjs": "bbd20e44af46af01cdb0deeccc392d851730e220f4777302e163d40a866ac429",
+    "tests/test_bounded_reaudit.py": "858447308f1e1068716a3f6d1ff48c820fded3874fde994cf2ff631285a3c5d4",
+    "tests/test_harness_audit_replay.py": "13e607b2e66461f86dc3e271ab2ed59e246d39a118fd7c4f9fbc08cffc30901e",
+    "tests/test_authorization_precheck.py": "1e913d3b614fe2946b16267041f358a0a74846ec7cc1b21c1cbe005004c07330",
+    "tests/test_sandbox_execution.py": "9da28377ce062c80495631040e5aefc57c3b7bc235f89d65cf8fb729cc84bf3a",
+    "tests/test_history_selection.cjs": "69ed483d0d90bc4e890735c374deb5dfb6268961c4337c987f950fc147cad920",
+    "tests/test_model_config.py": "e614876684d94662931785dd85bc92f63e4b629a62034fed8e10c018b86cafef",
+    "experiments/run_partial_benchmark.py": "a13a979625f4880a56e254572f7a7b1eaceb277e0b59006164588652265dc04a",
+    "experiments/run_benchmark.py": "3951b5325d593275b4a5397a92c538c5c52f0928a6e0aaa3a9ad76f570a1c693",
+    "experiments/i3_p0_stress.py": "cbd7d126dafc2246353fd841a11fd7596301a0d89efc2adbc5df7af64f5d2945",
+    "experiments/__init__.py": "b7a9a305f5ad494cf8aa9d34b3c797b02fd3c5b8e1d692aa440132c6c787695d",
+    "experiments/harness_audit.py": "1ca4b7a26e0855cb466ea908a363c790ab46a6de9c9af49bd1d95e1a75e7b534",
+    "experiments/trace_diagnostics.py": "dd6da037739ea0c016a33cf007c7fc97a0ad5c680e02d20a162d4c3bec954994",
+    "experiments/partial_reporting.py": "1499bbb9f124d8248bf1efa84ac9758ceabda73a93377598a3144b1620c84e05",
+    "experiments/generate_tool_metadata.py": "efb9c73b8d5f0d7fb3d8789414c9127588e01a5b75c2c70f4d56d8b2424ce181",
+    "experiments/partial_controls.py": "9cd1ad321543082d807c4e4d41728f51db629f5a90d8c7f690879f1913fd1788",
+    "experiments/plots/draw_comparison.py": "4fb2b854fa88c112ae3451cbdf2cf7b9549637a618b4106286325f53eecee0f5",
+    "experiments/plots/draw_ablation.py": "a242f195c910c499b5bf212fd3f19276a59c99faab1350fb01a8e14fdcbcb313",
+    "experiments/plots/__init__.py": "cf937b9fed7f8e322194830917413d8f90d12152e47f350bdcb8e63c8da01749",
+    "experiments/plots/draw_cost.py": "d44def8fb4324fef01292ed8c631a4292ddd8edd74f0767782a98a16183e4ebf",
+    "experiments/plots/draw_combined.py": "d946471b27550fcbbfad35cb8c72c2d5b0bf59bc2e5a6a5ab2fa849023de8f06",
+    "dashboard/history_export.py": "5fdb5b664e8b7c007d7272c768507a3cb1e13a2f7f7f646d239372680f939f92",
+    "dashboard/__init__.py": "fec27e47326f11c94b3da47952a2f46a7612e7502426b7f18b2d80aa475e2dd1",
+    "dashboard/app.py": "662819b0589c66c2ffd9808d8fc0b8c51a82acbe815f790f1614d1d1acf60716",
+    "dashboard/templates/index.html": "9f06c3434eff3e0731b93fd9e5aea89f2abb71ed15390e910010ba6f79bb181d",
+    "dashboard/templates/history.html": "0765e5991fb08275e109d3fe31caec645a9be43fd8a663fc5f8923b8de7bac40",
+    "dashboard/templates/_header.html": "00cbaf0dca48b7f3848474df179c3fea3b7134be745711daf13bd9d4deba1098",
+    "dashboard/static/css/style.css": "b2fe011c47e03b968277df985dd6c98de10fe8931c7a5bd49b402fb0f4cf27da",
+    "dashboard/static/js/history_selection.js": "f262ee6abba33432b24658c83b666eadd738b0625f9573aecd6e0c4b27bb90d1",
+    "dashboard/static/js/history_charts.js": "f76c3df6d45605b959c55f126f460eabb5f35f29ed179b577000ff8196180e40",
+    "dashboard/static/js/history.js": "c97309d7cf57ba6a55cd263069540105f82986be17193b080f36972f18606eaf",
+    "dashboard/static/js/app.js": "c5ebd1fca4572177f1f3d07c560073ae4d42c0c836c5784842ad491b93f47438",
+    "config/tools.agentdojo-v1.2.toml": "c9e955264de67c78fd15293883c232b46bc2664e7cd019020911dead7ca143e2",
+    "config/tools.example.toml": "709bed5fec7b83955b5eb76005245587f16f3ab12637ccd4fbfc17cca70a90af",
+    "config/models.example.toml": "1c09c8db44cef88da0443b5bfe019a2d946365cae4df6fed94ace9f88433a0cf"
+  },
+  "new_model_calls": 0,
+  "new_benchmark_samples": 0,
+  "limitations": [
+    "Formal research gates unchanged; full historical migration remains blocked by deleted research compatibility paths.",
+    "Completed scheme engineering does not certify planned cost goals or model evaluation."
+  ]
+}

@@ -3,11 +3,14 @@ from tempfile import TemporaryDirectory
 import unittest
 
 from dscg.model_config import (
+    DASHSCOPE_NON_THINKING_MODEL_IDS,
+    DASHSCOPE_STRICT_SCHEMA_MODEL_IDS,
     DEEPSEEK_MODEL_IDS,
     PROVIDER_PRESETS,
     load_model_settings,
     reasoning_effort_for_config,
     resolve_model_config,
+    thinking_request_options,
 )
 
 
@@ -162,6 +165,47 @@ api_key = "local-key"
         )
 
         self.assertEqual(reasoning_effort_for_config(config), "none")
+
+    def test_thinking_default_models_get_explicit_non_thinking_switch(self):
+        self.assertEqual(DASHSCOPE_NON_THINKING_MODEL_IDS,
+                         ("qwen3.5-flash", "qwen3.7-plus", "qwen3.8-flash"))
+        for model_id in DASHSCOPE_NON_THINKING_MODEL_IDS:
+            with self.subTest(model_id=model_id):
+                self.assertIn(model_id, DASHSCOPE_STRICT_SCHEMA_MODEL_IDS)
+                config = resolve_model_config(
+                    local_settings={"main": {"provider": "dashscope",
+                                              "model_id": model_id, "api_key": "test-key"}},
+                    env={},
+                )
+                self.assertEqual(thinking_request_options(config),
+                                 {"extra_body": {"enable_thinking": False}})
+                self.assertIs(config.public_dict()["enable_thinking"], False)
+                self.assertIsNone(reasoning_effort_for_config(config))
+                dated = resolve_model_config(
+                    local_settings={"main": {"provider": "dashscope",
+                                              "model_id": model_id + "-2026-01-01",
+                                              "api_key": "test-key"}},
+                    env={},
+                )
+                self.assertEqual(thinking_request_options(dated),
+                                 {"extra_body": {"enable_thinking": False}})
+
+    def test_recorded_and_out_of_scope_models_keep_existing_request_bytes(self):
+        recorded = resolve_model_config(
+            local_settings={"main": {"provider": "dashscope",
+                                      "model_id": "qwen3.7-flash", "api_key": "test-key"}},
+            env={},
+        )
+        self.assertEqual(thinking_request_options(recorded), {})
+        self.assertNotIn("enable_thinking", recorded.public_dict())
+        self.assertEqual(reasoning_effort_for_config(recorded), "none")
+        outside = resolve_model_config(
+            local_settings={"main": {"provider": "dashscope",
+                                      "model_id": "qwen3.8-max", "api_key": "test-key"}},
+            env={},
+        )
+        self.assertEqual(thinking_request_options(outside), {})
+        self.assertNotIn("enable_thinking", outside.public_dict())
 
 
 if __name__ == "__main__":

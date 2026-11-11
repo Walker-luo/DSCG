@@ -16,6 +16,9 @@ dependencies:
       - openai==2.14.0
       - pydantic==2.12.5
       - tomli==2.4.0
+      # 项目配置解析与本地模型探针
+      - PyYAML==6.0.3
+      - python-dotenv==1.2.3
 
       # Dashboard 与绘图
       - flask==3.1.2

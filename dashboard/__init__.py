@@ -1,2 +1,2 @@
-"""DSCG experiment dashboard."""
+"""GrantBind experiment dashboard."""
 

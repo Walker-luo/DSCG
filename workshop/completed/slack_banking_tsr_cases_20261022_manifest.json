@@ -1,0 +1,113 @@
+{
+  "schema": "dscg.tsr-paired-analysis.v1",
+  "status": "read_only_observational_analysis_complete",
+  "export": "download/dscg-history-analysis-20261022T020502Z",
+  "target_run": "qwen3.7-flash_DSCG_v4.1",
+  "framework_version": "three-layer-v3.2",
+  "case_counts": {
+    "slack": 176,
+    "banking": 161,
+    "total": 337
+  },
+  "paired_key": [
+    "suite",
+    "attack",
+    "user_task_id",
+    "injection_task_id"
+  ],
+  "condition": "baseline utility=true and DSCG_v4.1 utility=false; valid exported rows, native labels verified",
+  "revision": "60f3da3fd7071380057e4daca4ad70edaac98e9c",
+  "production_changes": false,
+  "paid_model_calls": 0,
+  "benchmark_runs": 0,
+  "checks": {
+    "distinct_case_csv_coverage": 337,
+    "native_label_matches": true,
+    "protected_files": 14841,
+    "protected_changes": [],
+    "input_hash_count": 2266,
+    "local_links": 1245,
+    "new_link_errors": [],
+    "preexisting_link_errors": [
+      [
+        "workshop/README.md",
+        "../report/report.md",
+        "missing file"
+      ],
+      [
+        "workshop/completed/README.md",
+        "../../report/report.md",
+        "missing file"
+      ]
+    ],
+    "git_diff_check_exit": 0
+  },
+  "commands": [
+    {
+      "command": "python workshop/artifacts/20261022_tsr_case_analysis/analyze.py",
+      "exit_code": 0
+    },
+    {
+      "command": "python workshop/artifacts/20261022_tsr_case_analysis/enrich.py",
+      "exit_code": 0
+    },
+    {
+      "command": "python workshop/artifacts/20261022_tsr_case_analysis/aggregate.py",
+      "exit_code": 0
+    },
+    {
+      "command": "python workshop/artifacts/20261022_tsr_case_analysis/render_cases.py",
+      "exit_code": 0
+    },
+    {
+      "command": "python workshop/artifacts/20261022_tsr_case_analysis/render_summary.py",
+      "exit_code": 0
+    },
+    {
+      "command": "python workshop/artifacts/20261022_tsr_case_analysis/validate.py",
+      "exit_code": 0
+    },
+    {
+      "command": "conda run --no-capture-output -n ipi python -B workshop/artifacts/20261022_tsr_case_analysis/native_reference.py",
+      "exit_code": 0
+    }
+  ],
+  "hashes": {
+    "workshop/completed/slack_banking_tsr_cases_20261022.md": "6394b35c3b6a9773495ec6a937ac0b625ed74e2538c11e972f8a8b8bbb2c00fb",
+    "workshop/README.md": "3b91a6d0c24ac5d23a952467fddf48eea5d2d0eaaa1ea48e87dc387fb57e3a9c",
+    "workshop/completed/README.md": "9ef749b29f8680f91facc1f32cda1adcb45897f5d6914991cd1b9c232314a751",
+    "workshop/artifacts/20261022_tsr_case_analysis/analyze.py": "8b50c2df518de77186734eb48c949e0d75fd42d0bcbee79c54ad44e8b69c76e5",
+    "workshop/artifacts/20261022_tsr_case_analysis/enrich.py": "359b117412506218a21d410afcb66ddbc23ee6353461e093a7a0481a05a97645",
+    "workshop/artifacts/20261022_tsr_case_analysis/aggregate.py": "8d48f1b7ae90fde9efdbe1277e942c9b9eff7afdc1a8015bf6ec79e1e92a9cbe",
+    "workshop/artifacts/20261022_tsr_case_analysis/native_reference.py": "23550b4d4de8948430bb801b2bef5596edbfb1e0a4219603c301b37521aa399c",
+    "workshop/artifacts/20261022_tsr_case_analysis/render_cases.py": "2c443285c498d1866bb4d64aae422d88bc7e54cf7e358534c9e73a3ccd5fd91d",
+    "workshop/artifacts/20261022_tsr_case_analysis/render_summary.py": "7b0f5ecaaa007843136e2c907f6ffca04e5f5068609445cfc104bb11e805f886",
+    "workshop/artifacts/20261022_tsr_case_analysis/validate.py": "c182d1d8d4975f6bf5317f518cb2727210253ccab79550350c618a44e402a6cf",
+    "workshop/artifacts/20261022_tsr_case_analysis/native_tasks.json": "7328f228fd736282293168c9b76ba37ab588fc0750bf09e875deaaa035f7c6bb",
+    "workshop/artifacts/20261022_tsr_case_analysis/record_validation_probe.json": "aa52962851736642580b8f0b78de0d6d122fee17de562e094a9a609d5564c844",
+    "workshop/artifacts/20261022_tsr_case_analysis/aggregates.json": "499ac310e42b9087ad667baded0d1e74f8a3a3b6396d6af96a065cfd4272a4e5",
+    "workshop/artifacts/20261022_tsr_case_analysis/additional_signals.json": "ba8c6ae2091220056e886adbbad33291d47f9a9e4b181e327942ac88a92eb425",
+    "workshop/artifacts/20261022_tsr_case_analysis/per_user.json": "63e54c3a24cde7df03f1d90acb5e42a232cefc6ed5402e80b1010a3d5c2240c6",
+    "workshop/artifacts/20261022_tsr_case_analysis/task_notes.json": "ab514d45e42dbb621ad11b380c3a73ee2bc03e7d083d1bf057d74b6fdf552405",
+    "workshop/artifacts/20261022_tsr_case_analysis/v41_cases.json": "268cb1ca41c6aca94e83c26a95f6725b5e8f7586080b74a8c5279a686713fc07",
+    "workshop/artifacts/20261022_tsr_case_analysis/v41_cases.csv": "dd5b1c465418e53fc627746028747b7adb6e7c751303bc274891332e5b1f181c",
+    "workshop/artifacts/20261022_tsr_case_analysis/case_index.md": "7a9d62c23df277d94dd6febd2fc3e595c05b240879c965ba91868c07e61fb67b",
+    "workshop/artifacts/20261022_tsr_case_analysis/slack_cases.md": "a5da616b3962d3fbc426eaf07b5788b4951caa7c014244effdca8ea6671bf183",
+    "workshop/artifacts/20261022_tsr_case_analysis/banking_cases.md": "189ffb93f09534375f259d438beb3c42075ebb913a29a0a69041907e2c7bdb4a",
+    "workshop/artifacts/20261022_tsr_case_analysis/input_sha256.json": "fe2f3e491b4011c7b1937740550afd7192baafffb45a7dcbab28970cc7395bbe",
+    "workshop/artifacts/20261022_tsr_case_analysis/validation.json": "207011c71bae2cba72ebc200b5c0d1d9da685b9614b194dc23d6869035f26a05",
+    "workshop/artifacts/20261022_tsr_case_analysis/validation_final.log": "d7ec1aed7e37bf119e4a3b7ece4c5c57e88bcb7410b90185f5857f56830c819d",
+    "workshop/artifacts/20261022_tsr_case_analysis/native_reference_final.log": "a6f3fa90171e9fd50406b828bdb1a04361bacae9935617ea051b5ad99f9705f5",
+    "workshop/artifacts/20261022_tsr_case_analysis/before.json": "95b9e549e19af720e006988527ecec6393d759c6b040ca30b90fcfd257f4e8d6",
+    "workshop/artifacts/20261022_tsr_case_analysis/original_documents.json": "f2b898ccde380279293b51179b3a8cc553dfa171b386d04bb3969172ee198a56"
+  },
+  "limitations": [
+    "Trace evidence only; no independent rescoring, no real model rerun.",
+    "Source/parameter semantics are observations and explicit hypotheses, not certified causal attribution.",
+    "Historical raw audit record fields absent; authored parser/record mismatch is not a replay of those missing fields.",
+    "Actual adapter identity missing in old baseline; package metadata equality does not certify backend source/client variant.",
+    "Model service revision not pinned; no one-variable causal attribution.",
+    "Reference call signatures are explanatory, not independent rescoring or the only possible completion path."
+  ],
+  "next_action": "User reviews each case and decides future optimization; no policy change or paid rerun automatically authorized."
+}
